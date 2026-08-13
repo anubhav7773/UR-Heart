@@ -7,6 +7,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/network/api_client.dart';
 import 'core/security/storage_manager.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/location_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
@@ -82,6 +83,14 @@ class _RuralHeartAppState extends State<RuralHeartApp> with WidgetsBindingObserv
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _sendPresenceUpdate(true);
+    _initDeviceServices();
+  }
+
+  Future<void> _initDeviceServices() async {
+    try {
+      await LocationService.instance.getCurrentLocation();
+      await FcmService.instance.syncFcmToken();
+    } catch (_) {}
   }
 
   @override

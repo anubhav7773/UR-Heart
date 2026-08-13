@@ -69,6 +69,15 @@ class FcmService {
     }
   }
 
+  Future<void> syncFcmToken() async {
+    try {
+      _fcmToken ??= await _fcm.getToken();
+      if (_fcmToken != null && _fcmToken!.isNotEmpty) {
+        await _syncTokenToBackend(_fcmToken!);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _syncTokenToBackend(String token) async {
     try {
       await ApiClient.instance.putProfile({'fcm_token': token});

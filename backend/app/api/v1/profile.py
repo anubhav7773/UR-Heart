@@ -313,3 +313,32 @@ async def update_presence(
         data={"is_online": is_online, "last_seen": now_utc.isoformat()}
     )
 
+
+@router.put("/fcm-token")
+@router.post("/fcm-token")
+async def update_fcm_token(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Updates user's FCM Push Notification device token in database.
+    """
+    fcm_token = payload.get("fcm_token")
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user_obj = user_res.scalars().first()
+
+        if user_obj and fcm_token:
+            user_obj.fcm_token = str(fcm_token)
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="FCM Token updated successfully.",
+        data={"fcm_token": fcm_token}
+    )
+

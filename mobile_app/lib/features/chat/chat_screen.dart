@@ -998,7 +998,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
-                      final isMe = msg.senderId == 'current_user_id';
+                      final isMe = (_currentUserId.isNotEmpty && msg.senderId == _currentUserId) || msg.senderId == 'current_user_id';
                       final String timeStr = '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}';
 
                       return MessageBubbleWidget(
