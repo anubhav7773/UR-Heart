@@ -125,10 +125,17 @@ async def upload_profile_photo(
                 contents,
                 file_options={"content-type": file.content_type or "image/jpeg", "upsert": "true"}
             )
-            public_url_obj = supabase.storage.from_("profile-photos").get_public_url(file_path)
-            public_url = str(public_url_obj)
+            base_supa_url = settings.SUPABASE_URL.rstrip('/') if settings.SUPABASE_URL else ""
+            if base_supa_url:
+                public_url = f"{base_supa_url}/storage/v1/object/public/profile-photos/{file_path}"
+            else:
+                public_url_obj = supabase.storage.from_("profile-photos").get_public_url(file_path)
+                public_url = str(public_url_obj)
         except Exception:
             pass
+
+    if public_url and "/object/info/public/" in public_url:
+        public_url = public_url.replace("/object/info/public/", "/object/public/")
 
     if not public_url:
         try:
