@@ -287,7 +287,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   ChatRecipient? _recipientProfile;
   bool _isRecipientProfileLoading = true;
-  String _recipientDistanceLabel = 'Online';
+  String _recipientDistanceLabel = 'Location pending';
 
   ChatRecipient get _displayRecipient => _recipientProfile ?? widget.recipientUser;
 
@@ -296,7 +296,11 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _loadUserStatus();
     // Refresh the local GPS fix before calculating the recipient distance.
-    LocationService.instance.getCurrentLocation();
+    LocationService.instance.getCurrentLocation().then((position) {
+      if (position == null && mounted && _recipientDistanceLabel == 'Location pending') {
+        setState(() => _recipientDistanceLabel = 'Location unavailable');
+      }
+    });
     _fetchWhatsAppBridgeStatus();
     _fetchRecipientProfile();
     _fetchMessages();

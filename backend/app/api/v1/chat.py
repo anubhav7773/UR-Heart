@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import selectinload
@@ -195,6 +195,7 @@ async def get_chat_messages(
 @router.post("/send", response_model=APIResponse[ChatMessageRead])
 async def send_chat_message(
     payload: SendMessageRequest,
+    background_tasks: BackgroundTasks,
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
@@ -278,10 +279,12 @@ async def send_chat_message(
             sender_name = sender_user.full_name if sender_user else "Matched User"
 
             if recip_user and recip_user.fcm_token:
-                NotificationEngineService.send_chat_message_notification(
+                background_tasks.add_task(
+                    NotificationEngineService.send_push_notification,
                     target_fcm_token=recip_user.fcm_token,
-                    sender_name=sender_name,
-                    message_preview=payload.content or "Sent you a media attachment.",
+                    title=sender_name,
+                    body=payload.content or "Sent you a media attachment.",
+                    data_payload={"type": "chat_message", "match_id": payload.match_id},
                 )
     except Exception:
         pass

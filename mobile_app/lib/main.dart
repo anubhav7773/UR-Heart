@@ -23,6 +23,8 @@ const webFirebaseOptions = FirebaseOptions(
   appId: '1:1038187472582:web:eef9e7296a2900f19119c7',
 );
 
+final GlobalKey<ScaffoldMessengerState> appMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -60,7 +62,7 @@ void main() async {
       webProvider: ReCaptchaV3Provider('6LeA_sample_site_key'),
     );
 
-    await FcmService.instance.initialize();
+    await FcmService.instance.initialize(foregroundMessengerKey: appMessengerKey);
   } catch (e) {
     if (kDebugMode) {
       print('AdMob / AppCheck initialization notice: ${e.toString()}');
@@ -124,6 +126,7 @@ class _RuralHeartAppState extends State<RuralHeartApp> with WidgetsBindingObserv
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'UR-Heart',
+      scaffoldMessengerKey: appMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: const AnimatedSplashScreen(),

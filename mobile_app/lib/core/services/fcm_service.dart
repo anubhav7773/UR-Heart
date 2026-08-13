@@ -1,9 +1,12 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../network/api_client.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
   if (kDebugMode) {
     print('FCM Background Message Received: ${message.messageId}');
     print('Title: ${message.notification?.title}, Body: ${message.notification?.body}');
@@ -18,10 +21,13 @@ class FcmService {
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   String? _fcmToken;
+  GlobalKey<ScaffoldMessengerState>? _foregroundMessengerKey;
 
   String? get fcmToken => _fcmToken;
 
-  Future<void> initialize() async {
+  Future<void> initialize({GlobalKey<ScaffoldMessengerState>? foregroundMessengerKey}) async {
+    _foregroundMessengerKey = foregroundMessengerKey;
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     try {
       // 1. Request Notification Permissions
       NotificationSettings settings = await _fcm.requestPermission(
@@ -54,13 +60,19 @@ class FcmService {
 
         // 3. Foreground Message Listener
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          final notification = message.notification;
           if (kDebugMode) {
-            print('FCM Foreground Message: ${message.notification?.title} - ${message.notification?.body}');
+            print('FCM Foreground Message: ${notification?.title} - ${notification?.body}');
+          }
+          final messenger = _foregroundMessengerKey?.currentState;
+          if (messenger != null && notification != null) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text('${notification.title ?? 'New message'}: ${notification.body ?? ''}'),
+              ),
+            );
           }
         });
-
-        // 4. Set Background Message Handler
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
       }
     } catch (e) {
       if (kDebugMode) {
@@ -80,7 +92,7 @@ class FcmService {
 
   Future<void> _syncTokenToBackend(String token) async {
     try {
-      await ApiClient.instance.putProfile({'fcm_token': token});
+      await ApiClient.instance.dio.post('/users/fcm-token', data: {'fcm_token': token});
       if (kDebugMode) {
         print('FCM Device Token synced to backend profile.');
       }
