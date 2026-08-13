@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -279,5 +279,37 @@ async def complete_profile(
             user_id=str(user.id),
             is_profile_complete=True
         )
+    )
+
+
+@router.put("/presence")
+@router.post("/presence")
+async def update_presence(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Updates the user's online status (is_online: bool) and last_seen timestamp in database.
+    """
+    is_online = bool(payload.get("is_online", True))
+    now_utc = datetime.now(timezone.utc)
+
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user_obj = user_res.scalars().first()
+
+        if user_obj:
+            user_obj.is_online = is_online
+            user_obj.last_seen = now_utc
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message=f"Presence updated to is_online={is_online}.",
+        data={"is_online": is_online, "last_seen": now_utc.isoformat()}
     )
 

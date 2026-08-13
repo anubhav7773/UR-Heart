@@ -1,6 +1,6 @@
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import selectinload
@@ -20,6 +20,51 @@ from app.models.schemas import (
 from app.services.storage_engine import StorageEngineService
 
 router = APIRouter(prefix="/chat", tags=["Real-Time Chat & Media Attachments"])
+
+
+class ConnectionManager:
+    """Real-Time WebSocket Connection Manager for instant chat broadcasting."""
+
+    def __init__(self):
+        self.active_connections: dict[str, list[WebSocket]] = {}
+
+    async def connect(self, match_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if match_id not in self.active_connections:
+            self.active_connections[match_id] = []
+        self.active_connections[match_id].append(websocket)
+
+    def disconnect(self, match_id: str, websocket: WebSocket):
+        if match_id in self.active_connections:
+            if websocket in self.active_connections[match_id]:
+                self.active_connections[match_id].remove(websocket)
+
+    async def broadcast(self, match_id: str, message: dict):
+        if match_id in self.active_connections:
+            for connection in list(self.active_connections[match_id]):
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    pass
+
+
+ws_manager = ConnectionManager()
+
+
+@router.websocket("/ws/{match_id}")
+async def chat_websocket_endpoint(websocket: WebSocket, match_id: str):
+    """
+    Bidirectional real-time WebSocket connection for instant chat message delivery.
+    """
+    await ws_manager.connect(match_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await ws_manager.broadcast(match_id, data)
+    except WebSocketDisconnect:
+        ws_manager.disconnect(match_id, websocket)
+    except Exception:
+        ws_manager.disconnect(match_id, websocket)
 
 
 @router.get("/matches", response_model=APIResponse[List[MatchRead]])
@@ -163,6 +208,23 @@ async def send_chat_message(
 
     await db.commit()
     await db.refresh(new_msg)
+
+    # Broadcast message to active WebSocket connection
+    try:
+        await ws_manager.broadcast(
+            payload.match_id,
+            {
+                "id": str(new_msg.id),
+                "match_id": str(new_msg.match_id),
+                "sender_id": str(new_msg.sender_id),
+                "content": new_msg.content,
+                "media_url": new_msg.media_url,
+                "media_type": new_msg.media_type,
+                "created_at": new_msg.created_at.isoformat() if new_msg.created_at else "",
+            }
+        )
+    except Exception:
+        pass
 
     # Trigger push notification to recipient
     try:

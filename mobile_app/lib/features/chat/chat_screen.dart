@@ -214,6 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _unlockedPhoneNumber;
 
   final List<ChatMessage> _messages = [];
+  Timer? _realtimePollingTimer;
 
   @override
   void initState() {
@@ -221,35 +222,84 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadUserStatus();
     _fetchWhatsAppBridgeStatus();
     _fetchMessages();
+    _startRealtimeStreamListener();
   }
 
-  Future<void> _fetchMessages() async {
+  void _startRealtimeStreamListener() {
+    _realtimePollingTimer?.cancel();
+    _realtimePollingTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) {
+        _fetchMessages(silent: true);
+      }
+    });
+  }
+
+  Future<void> _fetchMessages({bool silent = false}) async {
     try {
       final response = await ApiClient.instance.getMessages(widget.matchId);
       if (response.data != null && response.data['data'] != null) {
         final List<dynamic> rawMsgs = response.data['data'];
-        setState(() {
-          _messages.clear();
+
+        if (!silent || _messages.isEmpty) {
+          setState(() {
+            _messages.clear();
+            for (var item in rawMsgs) {
+              _messages.add(
+                ChatMessage(
+                  id: item['id'] ?? '',
+                  senderId: item['sender_id'] ?? '',
+                  text: item['content'] ?? '',
+                  mediaUrl: item['media_url'],
+                  timestamp: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
+                ),
+              );
+            }
+          });
+          _scrollToBottom();
+        } else {
+          final Set<String> existingIds = _messages.map((m) => m.id).toSet();
+          bool hasNew = false;
+
           for (var item in rawMsgs) {
-            _messages.add(
-              ChatMessage(
-                id: item['id'] ?? '',
-                senderId: item['sender_id'] ?? '',
-                text: item['content'] ?? '',
-                mediaUrl: item['media_url'],
-                timestamp: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
-              ),
-            );
+            final String msgId = item['id'] ?? '';
+            if (!existingIds.contains(msgId)) {
+              hasNew = true;
+              _messages.add(
+                ChatMessage(
+                  id: msgId,
+                  senderId: item['sender_id'] ?? '',
+                  text: item['content'] ?? '',
+                  mediaUrl: item['media_url'],
+                  timestamp: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
+                ),
+              );
+            }
           }
-        });
+
+          if (hasNew && mounted) {
+            setState(() {});
+            _scrollToBottom();
+          }
+        }
       }
-    } catch (e) {
-      // Empty message list fallback
-    }
+    } catch (_) {}
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _realtimePollingTimer?.cancel();
     _inChatAdTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();

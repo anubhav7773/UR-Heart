@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'core/network/api_client.dart';
 import 'core/security/storage_manager.dart';
 import 'core/services/fcm_service.dart';
 import 'core/theme/app_theme.dart';
@@ -68,8 +69,47 @@ void main() async {
   runApp(const RuralHeartApp());
 }
 
-class RuralHeartApp extends StatelessWidget {
+class RuralHeartApp extends StatefulWidget {
   const RuralHeartApp({super.key});
+
+  @override
+  State<RuralHeartApp> createState() => _RuralHeartAppState();
+}
+
+class _RuralHeartAppState extends State<RuralHeartApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _sendPresenceUpdate(true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _sendPresenceUpdate(true);
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _sendPresenceUpdate(false);
+    }
+  }
+
+  Future<void> _sendPresenceUpdate(bool isOnline) async {
+    try {
+      final token = await StorageManager.instance.getAuthToken();
+      if (token != null && token.isNotEmpty) {
+        await ApiClient.instance.dio.put(
+          '/profile/presence',
+          data: {'is_online': isOnline},
+        );
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
