@@ -52,18 +52,26 @@ async def get_feed(
     gender_preference: Optional[str] = Query(default="everyone", description="Filter gender: 'everyone', 'male', or 'female'"),
     min_age: int = Query(default=18, ge=18, le=100, description="Min candidate age"),
     max_age: int = Query(default=50, ge=18, le=100, description="Max candidate age"),
+    lat: Optional[float] = Query(default=None, description="Active user GPS latitude"),
+    lng: Optional[float] = Query(default=None, description="Active user GPS longitude"),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Retrieves candidate cards from Supabase PostgreSQL based on discovery preference filters
-    (gender preference, age range, max distance) and excludes swiped/blocked users.
+    (gender preference, age range, max distance) and active GPS location coordinates, sorted by nearest distance.
     """
     profile_cards: List[ProfileCardData] = []
     user_uuid = uuid.UUID(current_user_id)
     effective_radius = max_distance_km if max_distance_km is not None else radius_km
 
     try:
+        # 0. Fetch current logged-in user profile location for GPS fallback
+        self_res = await db.execute(select(User).where(User.id == user_uuid))
+        self_user = self_res.scalars().first()
+        user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else 26.7880)
+        user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else 82.1300)
+
         # 1. Fetch IDs already swiped by current user
         swiped_res = await db.execute(select(Swipe.swiped_id).where(Swipe.swiper_id == user_uuid))
         excluded_ids = set(swiped_res.scalars().all())
@@ -71,7 +79,7 @@ async def get_feed(
 
         # 2. Exclude blocked users (both directions)
         blocked_res1 = await db.execute(select(BlockedUser.blocked_id).where(BlockedUser.blocker_id == user_uuid))
-        blocked_res2 = await db.execute(select(BlockedUser.blocker_id).where(BlockedUser.blocked_id == user_uuid))
+        blocked_res2 = await db.execute(select(BlockedUser.blocker_id).where(BlockedUser.blocker_id == user_uuid))
         excluded_ids.update(blocked_res1.scalars().all())
         excluded_ids.update(blocked_res2.scalars().all())
 
@@ -87,23 +95,29 @@ async def get_feed(
             target_g = ORMGenderEnum(gender_preference.lower())
             stmt = stmt.where(User.gender == target_g)
 
-        result = await db.execute(stmt.limit(limit * 2))
+        result = await db.execute(stmt.limit(limit * 3))
         db_users = result.scalars().all()
 
+        # Calculate distances & filter candidates
+        candidates_with_dist = []
         for user in db_users:
             user_age = calculate_age(user.dob) if user.dob else 22
             if user_age < min_age or user_age > max_age:
                 continue
 
-            dist_km = 3.4
-            if user.latitude is not None and user.longitude is not None:
-                dist_km = GeoEngineService.calculate_haversine_distance(
-                    26.7880, 82.1300, float(user.latitude), float(user.longitude)
-                )
+            cand_lat = float(user.latitude) if user.latitude is not None else 26.7880
+            cand_lng = float(user.longitude) if user.longitude is not None else 82.1300
+            dist_km = GeoEngineService.calculate_haversine_distance(user_lat, user_lng, cand_lat, cand_lng)
 
             if dist_km > effective_radius:
                 continue
 
+            candidates_with_dist.append((dist_km, user, user_age))
+
+        # Sort candidates by nearest distance first
+        candidates_with_dist.sort(key=lambda x: x[0])
+
+        for dist_km, user, user_age in candidates_with_dist:
             base_obfuscated = GeoEngineService.obfuscate_distance(dist_km)
             landmark = user.area_name or "Saket College area"
             dist_label = f"{base_obfuscated} • Near {landmark}"

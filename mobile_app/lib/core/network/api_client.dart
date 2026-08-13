@@ -302,6 +302,8 @@ class ApiClient {
     int? minAge,
     int? maxAge,
     double? maxDistanceKm,
+    double? lat,
+    double? lng,
   }) async {
     final query = <String, dynamic>{
       'limit': limit,
@@ -310,6 +312,8 @@ class ApiClient {
       if (minAge != null) 'min_age': minAge,
       if (maxAge != null) 'max_age': maxAge,
       if (maxDistanceKm != null) 'max_distance_km': maxDistanceKm,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
     };
     return await dio.get('/feed', queryParameters: query);
   }

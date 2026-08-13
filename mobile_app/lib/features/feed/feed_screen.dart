@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/services/location_service.dart';
 import '../chat/chat_screen.dart';
 import 'native_ad_card_widget.dart';
 
@@ -31,12 +32,16 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _loadFeed() async {
     setState(() => _isLoading = true);
     try {
+      final pos = await LocationService.instance.getCurrentLocation();
+
       final response = await ApiClient.instance.getMatchesFeed(
         limit: 10,
         genderPreference: _genderPref,
         minAge: _ageRange.start.round(),
         maxAge: _ageRange.end.round(),
         maxDistanceKm: _maxDistanceKm,
+        lat: pos?.latitude,
+        lng: pos?.longitude,
       );
       if (response.data != null && response.data['data'] != null) {
         final cardsList = response.data['data']['cards'] as List<dynamic>? ?? [];
