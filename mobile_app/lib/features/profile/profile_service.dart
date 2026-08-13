@@ -22,7 +22,8 @@ class ProfileService {
 
   /// Uploads profile photo to FastAPI backend (`POST /api/v1/profile/photos`)
   /// using Dio and FormData.fromMap with MultipartFile.fromFile.
-  /// Automatically passes `Authorization: Bearer <firebase_id_token>` header.
+  /// Automatically passes `Authorization: Bearer <firebase_id_token>` header,
+  /// and immediately saves/persists the returned photo URL in the user profile state in DB.
   Future<String?> uploadProfilePhoto(File imageFile) async {
     final token = await _getAuthToken();
     final fileName = imageFile.path.split('/').last.split('\\').last;
@@ -43,16 +44,36 @@ class ProfileService {
       options: options,
     );
 
+    String? photoUrl;
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = response.data;
       if (data is Map<String, dynamic>) {
         if (data.containsKey('photo_url') && data['photo_url'] != null) {
-          return data['photo_url'] as String;
+          photoUrl = data['photo_url'] as String;
         } else if (data['data'] != null && data['data']['photo_url'] != null) {
-          return data['data']['photo_url'] as String;
+          photoUrl = data['data']['photo_url'] as String;
         }
       }
     }
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      try {
+        final currentProfile = await getUserProfile();
+        final List<dynamic> currentPhotos = List.from(currentProfile?['photos'] ?? []);
+        if (!currentPhotos.contains(photoUrl)) {
+          currentPhotos.insert(0, photoUrl);
+        }
+        await updateProfile({
+          'photos': List.generate(currentPhotos.length, (index) => {
+            'photo_url': currentPhotos[index],
+            'is_first_impression': index == 0,
+            'display_order': index + 1,
+          }),
+        });
+      } catch (_) {}
+      return photoUrl;
+    }
+
     return null;
   }
 
