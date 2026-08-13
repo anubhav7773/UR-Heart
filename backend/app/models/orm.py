@@ -221,6 +221,7 @@ class ChatMessage(Base):
     sender_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    client_msg_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     media_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     media_type: Mapped[str] = mapped_column(String(20), default="text")  # text, image, audio

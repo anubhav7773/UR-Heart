@@ -34,13 +34,14 @@ else:
 
 @router.get("")
 @router.get("/")
+@router.get("/me")
 async def get_user_profile(
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Retrieves logged-in user profile details (id, full_name, dob, age, gender, interested_in, intent, bio, area_name, village_pin_code, photos).
-    Safely uses selectinload(User.photos) and converts result to clean response dictionary.
+    Retrieves logged-in user profile details for current token's user_id from PostgreSQL.
+    Raises HTTP 404 if user profile does not exist. Never falls back to dummy user.
     """
     try:
         user_uuid = uuid.UUID(current_user_id)
@@ -50,38 +51,36 @@ async def get_user_profile(
             detail="Invalid user ID format."
         )
 
-    user = None
-    photos = []
-    try:
-        stmt = select(User).options(selectinload(User.photos)).where(User.id == user_uuid)
-        res = await db.execute(stmt)
-        user = res.scalars().first()
-        if user and user.photos:
-            photos = user.photos
-    except Exception:
-        await db.rollback()
+    stmt = select(User).options(selectinload(User.photos)).where(User.id == user_uuid)
+    res = await db.execute(stmt)
+    user = res.scalars().first()
 
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User profile for ID '{current_user_id}' not found."
+        )
+
+    photos = user.photos if user.photos else []
     today = date.today()
-    if user and user.dob:
-        age = today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day))
-    else:
-        age = 22
-
-    photo_urls = [p.photo_url for p in photos] if photos else []
+    age = today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day)) if user.dob else 22
+    photo_urls = [p.photo_url for p in photos]
 
     profile_data = {
-        "user_id": current_user_id,
-        "full_name": user.full_name if user and user.full_name else "RuralHeart User",
-        "dob": user.dob.isoformat() if user and user.dob else "2000-01-01",
+        "user_id": str(user.id),
+        "full_name": user.full_name or "UR Heart User",
+        "dob": user.dob.isoformat() if user.dob else "2000-01-01",
         "age": age,
-        "gender": user.gender.value if user and user.gender else "male",
-        "interested_in": user.interested_in.value if user and user.interested_in else "female",
-        "intent": user.intent.value if user and user.intent else "casual",
-        "bio": user.bio if user and user.bio else "Simple & genuine person looking for connection.",
-        "area_name": user.area_name if user and user.area_name else "Ayodhya",
-        "village_pin_code": user.village_pin_code if user and user.village_pin_code else "224001",
+        "gender": user.gender.value if user.gender else "male",
+        "interested_in": user.interested_in.value if user.interested_in else "female",
+        "intent": user.intent.value if user.intent else "casual",
+        "bio": user.bio or "",
+        "area_name": user.area_name or "Ayodhya",
+        "village_pin_code": user.village_pin_code or "224001",
+        "latitude": float(user.latitude) if user.latitude is not None else None,
+        "longitude": float(user.longitude) if user.longitude is not None else None,
         "photos": photo_urls,
-        "is_profile_complete": bool(user and len(photo_urls) > 0),
+        "is_profile_complete": bool(len(photo_urls) >= 1),
     }
 
     return APIResponse(
@@ -316,6 +315,8 @@ async def update_presence(
 
 @router.put("/fcm-token")
 @router.post("/fcm-token")
+@router.post("/users/fcm-token")
+@router.put("/users/fcm-token")
 async def update_fcm_token(
     payload: dict,
     current_user_id: str = Depends(get_current_user_id),

@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/network/api_client.dart';
-import '../../core/security/storage_manager.dart';
 import '../../core/widgets/app_logo.dart';
 import '../home/home_screen.dart';
 import '../profile/onboarding_screen.dart';
+import 'auth_provider.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -40,13 +40,13 @@ class _AuthScreenState extends State<AuthScreen> {
     final bool isComplete = data['is_profile_complete'] ?? false;
     final bool isPremium = data['is_premium'] ?? false;
 
-    // Clear previous cached session before saving new user credentials
-    await StorageManager.instance.clearAll();
-
-    await StorageManager.instance.saveAuthToken(token);
-    await StorageManager.instance.saveUserId(userId);
-    await StorageManager.instance.setProfileComplete(isComplete);
-    await StorageManager.instance.setPremiumStatus(isPremium);
+    // Purge previous SharedPreferences and FlutterSecureStorage memory & save dynamic credentials
+    await AppAuthProvider.instance.handleLoginSuccess(
+      token: token,
+      userId: userId,
+      isProfileComplete: isComplete,
+      isPremium: isPremium,
+    );
 
     if (!mounted) return;
 

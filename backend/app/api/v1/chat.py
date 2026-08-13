@@ -185,13 +185,35 @@ async def send_chat_message(
 ):
     """
     Sends a new text or media message within an active match.
+    Enforces absolute deduplication via unique client_msg_id.
     """
     match_uuid = uuid.UUID(payload.match_id)
     sender_uuid = uuid.UUID(current_user_id)
 
+    # 0. Deduplication Check via client_msg_id
+    if payload.client_msg_id:
+        existing_res = await db.execute(
+            select(ChatMessage).where(ChatMessage.client_msg_id == payload.client_msg_id)
+        )
+        existing_msg = existing_res.scalars().first()
+        if existing_msg:
+            return APIResponse(
+                success=True,
+                data=ChatMessageRead(
+                    id=str(existing_msg.id),
+                    match_id=str(existing_msg.match_id),
+                    sender_id=str(existing_msg.sender_id),
+                    content=existing_msg.content,
+                    media_url=existing_msg.media_url,
+                    media_type=existing_msg.media_type,
+                    created_at=existing_msg.created_at.isoformat() if existing_msg.created_at else "",
+                )
+            )
+
     new_msg = ChatMessage(
         match_id=match_uuid,
         sender_id=sender_uuid,
+        client_msg_id=payload.client_msg_id,
         content=payload.content,
         media_url=payload.media_url,
         media_type=payload.media_type or "text",

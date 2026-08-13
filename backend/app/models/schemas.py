@@ -455,6 +455,7 @@ class ChatMessageRead(BaseModel):
 
 class SendMessageRequest(BaseModel):
     match_id: str
+    client_msg_id: Optional[str] = None
     content: Optional[str] = None
     media_url: Optional[str] = None
     media_type: str = "text"
