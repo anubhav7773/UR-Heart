@@ -90,10 +90,10 @@ class User(Base):
     )
 
     photos: Mapped[List["UserPhoto"]] = relationship(
-        "UserPhoto", back_populates="user", cascade="all, delete-orphan", order_by="UserPhoto.display_order"
+        "UserPhoto", back_populates="user", cascade="all, delete-orphan", order_by="UserPhoto.display_order", lazy="selectin"
     )
     ad_counter: Mapped[Optional["UserAdCounter"]] = relationship(
-        "UserAdCounter", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "UserAdCounter", back_populates="user", uselist=False, cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -113,7 +113,7 @@ class UserPhoto(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="photos")
+    user: Mapped["User"] = relationship("User", back_populates="photos", lazy="selectin")
 
 
 class UserAdCounter(Base):
@@ -131,7 +131,7 @@ class UserAdCounter(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="ad_counter")
+    user: Mapped["User"] = relationship("User", back_populates="ad_counter", lazy="selectin")
 
 
 class ChaiStatus(Base):

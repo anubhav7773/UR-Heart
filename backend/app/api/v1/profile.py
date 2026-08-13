@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 try:
     from supabase import create_client, Client
@@ -39,6 +40,7 @@ async def get_user_profile(
 ):
     """
     Retrieves logged-in user profile details (id, full_name, dob, age, gender, interested_in, intent, bio, area_name, village_pin_code, photos).
+    Safely uses selectinload(User.photos) and converts result to clean response dictionary.
     """
     try:
         user_uuid = uuid.UUID(current_user_id)
@@ -51,13 +53,11 @@ async def get_user_profile(
     user = None
     photos = []
     try:
-        res = await db.execute(select(User).where(User.id == user_uuid))
+        stmt = select(User).options(selectinload(User.photos)).where(User.id == user_uuid)
+        res = await db.execute(stmt)
         user = res.scalars().first()
-        if user:
-            photos_res = await db.execute(
-                select(UserPhoto).where(UserPhoto.user_id == user_uuid).order_by(UserPhoto.display_order)
-            )
-            photos = photos_res.scalars().all()
+        if user and user.photos:
+            photos = user.photos
     except Exception:
         await db.rollback()
 
@@ -162,7 +162,8 @@ async def complete_profile(
         )
 
     try:
-        res = await db.execute(select(User).where(User.id == user_uuid))
+        stmt = select(User).options(selectinload(User.photos)).where(User.id == user_uuid)
+        res = await db.execute(stmt)
         user = res.scalars().first()
     except Exception:
         await db.rollback()
