@@ -91,9 +91,11 @@ app.include_router(safety_router, prefix=api_v1_prefix)
 
 
 @app.get("/health", status_code=200, tags=["Health Check"])
+@app.head("/health", status_code=200, tags=["Health Check"])
 @app.get(f"{settings.API_V1_STR}/health", status_code=200, tags=["Health Check"])
+@app.head(f"{settings.API_V1_STR}/health", status_code=200, tags=["Health Check"])
 async def health_check():
-    """Fast, lightweight health check endpoint for UptimeRobot monitoring."""
+    """Fast, lightweight health check endpoint supporting both GET and HEAD for UptimeRobot monitoring."""
     return {
         "status": "online",
         "message": "UR-Heart Backend active and healthy",
