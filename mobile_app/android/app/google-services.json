@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1038187472582",
+    "project_id": "ur-heart",
+    "storage_bucket": "ur-heart.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1038187472582:android:eef9e7296a2900f19119c7",
+        "android_client_info": {
+          "package_name": "com.ruralheart.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1038187472582-be9gjdhrrldui43h80um3chd5j4jir65.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ruralheart.app",
+            "certificate_hash": "3768ef4785de6fef035392128ffd8ed4d261a4da"
+          }
+        },
+        {
+          "client_id": "1038187472582-o6jseecrlmr46v5ovm7v6icn5l8vju7e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSAqbIIfzeWErV-XdA7NbJ2aus-E0AoFk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1038187472582-o6jseecrlmr46v5ovm7v6icn5l8vju7e.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

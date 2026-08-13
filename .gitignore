@@ -1,0 +1,45 @@
+# Sensitive credentials & environment files
+*.json.json
+serviceAccountKey.json
+serviceAccountKey*.json
+.env
+.env.*
+node_modules/
+
+# Python & FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.venv/
+venv/
+ENV/
+
+# Flutter & Android Build Artifacts
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+mobile_app/build/
+mobile_app/.dart_tool/
+mobile_app/.flutter-plugins
+mobile_app/.flutter-plugins-dependencies
+mobile_app/android/.gradle/
+mobile_app/android/app/build/
+mobile_app/android/gradle/wrapper/*.zip
+*.zip
+
+
+# IDE & System Files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
