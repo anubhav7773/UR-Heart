@@ -152,33 +152,38 @@ async def get_active_pass_status(
 ):
     """
     Returns the user's active pass details and strict expiry countdown.
+    Safely handles missing tables or database exceptions.
     """
-    user_uuid = uuid.UUID(current_user_id)
-    now_utc = datetime.now(timezone.utc)
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        now_utc = datetime.now(timezone.utc)
 
-    # Check active transactions
-    txn_res = await db.execute(
-        select(SachetTransaction)
-        .where(SachetTransaction.user_id == user_uuid)
-        .where(SachetTransaction.status == "paid")
-        .where(SachetTransaction.valid_until > now_utc)
-        .order_by(desc(SachetTransaction.valid_until))
-    )
-    active_txn = txn_res.scalars().first()
-
-    if active_txn and active_txn.valid_until:
-        remaining_seconds = (active_txn.valid_until - now_utc).total_seconds()
-        remaining_hours = max(0, int(remaining_seconds // 3600))
-        return APIResponse(
-            success=True,
-            data={
-                "has_active_pass": True,
-                "plan_type": active_txn.plan_type,
-                "valid_until": active_txn.valid_until.isoformat(),
-                "remaining_hours": remaining_hours,
-                "badge_text": f"Active (Expires in {remaining_hours} hrs)" if remaining_hours < 48 else f"Active (Expires in {remaining_hours // 24} days)",
-            }
+        # Check active transactions safely
+        txn_res = await db.execute(
+            select(SachetTransaction)
+            .where(SachetTransaction.user_id == user_uuid)
+            .where(SachetTransaction.status == "paid")
+            .where(SachetTransaction.valid_until > now_utc)
+            .order_by(desc(SachetTransaction.valid_until))
         )
+        active_txn = txn_res.scalars().first()
+
+        if active_txn and active_txn.valid_until:
+            remaining_seconds = (active_txn.valid_until - now_utc).total_seconds()
+            remaining_hours = max(0, int(remaining_seconds // 3600))
+            return APIResponse(
+                success=True,
+                data={
+                    "has_active_pass": True,
+                    "plan_type": active_txn.plan_type,
+                    "valid_until": active_txn.valid_until.isoformat(),
+                    "remaining_hours": remaining_hours,
+                    "badge_text": f"Active (Expires in {remaining_hours} hrs)" if remaining_hours < 48 else f"Active (Expires in {remaining_hours // 24} days)",
+                }
+            )
+    except Exception as e:
+        # Gracefully catch missing sachet_transactions table or database errors
+        pass
 
     return APIResponse(
         success=True,

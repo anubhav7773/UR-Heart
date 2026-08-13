@@ -11,7 +11,20 @@ try:
 except ModuleNotFoundError:
     HAS_SLOWAPI = False
 
+from contextlib import asynccontextmanager
 from app.core.config import settings
+from app.core.database import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-create all missing PostgreSQL/Supabase tables on server startup
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"[DB Auto-Migration Notice] init_db skipped/notice: {e}")
+    yield
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -19,6 +32,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # 1. CORS Middleware placed immediately after app creation & before router inclusion
