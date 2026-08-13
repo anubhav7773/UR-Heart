@@ -1,0 +1,12 @@
+# Heavy Build & Temp Folders
+build/
+.dart_tool/
+.gradle/
+__pycache__/
+*.apk
+*.zip
+*.log
+mobile_app/build/
+mobile_app/android/.gradle/
+mobile_app/android/app/build/
+backend/__pycache__/

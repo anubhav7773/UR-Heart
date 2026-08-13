@@ -8,16 +8,8 @@ class ApiClient {
 
   late final Dio dio;
 
-  // Base URL configuration for local development, Flutter Web, & physical mobile devices
-  static String get defaultBaseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000/api/v1';
-    }
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.115.240.224:8000/api/v1';
-    }
-    return 'http://10.115.240.224:8000/api/v1';
-  }
+  // Base URL configuration for Render production deployment
+  static String get defaultBaseUrl => 'https://ur-heart.onrender.com/api/v1';
 
   ApiClient._internal() {
     dio = Dio(
