@@ -90,6 +90,8 @@ app.include_router(payments_router, prefix=api_v1_prefix)
 app.include_router(safety_router, prefix=api_v1_prefix)
 
 
+@app.get("/", status_code=200, tags=["Root"])
+@app.head("/", status_code=200, tags=["Root"])
 @app.get("/health", status_code=200, tags=["Health Check"])
 @app.head("/health", status_code=200, tags=["Health Check"])
 @app.get(f"{settings.API_V1_STR}/health", status_code=200, tags=["Health Check"])
@@ -98,17 +100,8 @@ async def health_check():
     """Fast, lightweight health check endpoint supporting both GET and HEAD for UptimeRobot monitoring."""
     return {
         "status": "online",
-        "message": "UR-Heart Backend active and healthy",
+        "message": "UR-Heart Backend Active",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-
-@app.get("/", tags=["Root"])
-async def root():
-    """Root landing endpoint providing API information."""
-    return {
-        "message": f"Welcome to {settings.PROJECT_NAME}. Access OpenAPI documentation at /docs",
-        "api_v1": settings.API_V1_STR,
     }

@@ -47,27 +47,49 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     super.dispose();
   }
 
+  bool _hasNavigated = false;
+
   Future<void> _checkAuthStateAndNavigate() async {
-    await Future.delayed(const Duration(milliseconds: 2200));
-
-    if (!mounted) return;
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    final token = await StorageManager.instance.getAuthToken();
-    final isComplete = await StorageManager.instance.isProfileComplete();
-
-    if (!mounted) return;
-
-    Widget targetScreen;
-    if (currentUser != null || (token != null && token.isNotEmpty)) {
-      if (isComplete) {
-        targetScreen = const MainHomeScreen();
-      } else {
-        targetScreen = const OnboardingScreen();
+    // 3-Second Maximum Timeout Safeguard
+    Future.delayed(const Duration(milliseconds: 3000), () {
+      if (mounted && !_hasNavigated) {
+        _navigateTo(const AuthScreen());
       }
-    } else {
-      targetScreen = const AuthScreen();
+    });
+
+    await Future.delayed(const Duration(milliseconds: 1800));
+
+    if (!mounted || _hasNavigated) return;
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final token = await StorageManager.instance.getAuthToken();
+      final isComplete = await StorageManager.instance.isProfileComplete();
+
+      if (!mounted || _hasNavigated) return;
+
+      Widget targetScreen;
+      if (currentUser != null || (token != null && token.isNotEmpty)) {
+        if (isComplete) {
+          targetScreen = const MainHomeScreen();
+        } else {
+          targetScreen = const OnboardingScreen();
+        }
+      } else {
+        targetScreen = const AuthScreen();
+      }
+
+      _navigateTo(targetScreen);
+    } catch (_) {
+      if (mounted && !_hasNavigated) {
+        _navigateTo(const AuthScreen());
+      }
     }
+  }
+
+  void _navigateTo(Widget targetScreen) {
+    if (!mounted || _hasNavigated) return;
+    setState(() => _hasNavigated = true);
 
     Navigator.pushReplacement(
       context,
