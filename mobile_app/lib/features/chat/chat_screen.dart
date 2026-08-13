@@ -306,10 +306,14 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  String _currentUserId = '';
+
   Future<void> _loadUserStatus() async {
     final bool premium = await StorageManager.instance.isPremium();
+    final String? uid = await StorageManager.instance.getUserId();
     setState(() {
       _isPremiumUser = premium;
+      _currentUserId = uid ?? '';
     });
 
     if (!_isPremiumUser) {
@@ -566,9 +570,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final String content = text ?? _messageController.text.trim();
     if (content.isEmpty && mediaUrl == null) return;
 
+    final String actualSenderId = _currentUserId.isNotEmpty ? _currentUserId : 'current_user_id';
     final newMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      senderId: 'current_user_id',
+      senderId: actualSenderId,
       text: content,
       mediaUrl: mediaUrl,
       timestamp: DateTime.now(),

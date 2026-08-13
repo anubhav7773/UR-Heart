@@ -69,8 +69,8 @@ async def get_feed(
         # 0. Fetch current logged-in user profile location for GPS fallback
         self_res = await db.execute(select(User).where(User.id == user_uuid))
         self_user = self_res.scalars().first()
-        user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else 26.7880)
-        user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else 82.1300)
+        user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else GeoEngineService.SAKET_COLLEGE_LAT)
+        user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else GeoEngineService.SAKET_COLLEGE_LON)
 
         # 1. Fetch IDs already swiped by current user
         swiped_res = await db.execute(select(Swipe.swiped_id).where(Swipe.swiper_id == user_uuid))
@@ -79,7 +79,7 @@ async def get_feed(
 
         # 2. Exclude blocked users (both directions)
         blocked_res1 = await db.execute(select(BlockedUser.blocked_id).where(BlockedUser.blocker_id == user_uuid))
-        blocked_res2 = await db.execute(select(BlockedUser.blocker_id).where(BlockedUser.blocker_id == user_uuid))
+        blocked_res2 = await db.execute(select(BlockedUser.blocker_id).where(BlockedUser.blocked_id == user_uuid))
         excluded_ids.update(blocked_res1.scalars().all())
         excluded_ids.update(blocked_res2.scalars().all())
 
@@ -105,8 +105,8 @@ async def get_feed(
             if user_age < min_age or user_age > max_age:
                 continue
 
-            cand_lat = float(user.latitude) if user.latitude is not None else 26.7880
-            cand_lng = float(user.longitude) if user.longitude is not None else 82.1300
+            cand_lat = float(user.latitude) if user.latitude is not None else GeoEngineService.SAKET_COLLEGE_LAT
+            cand_lng = float(user.longitude) if user.longitude is not None else GeoEngineService.SAKET_COLLEGE_LON
             dist_km = GeoEngineService.calculate_haversine_distance(user_lat, user_lng, cand_lat, cand_lng)
 
             if dist_km > effective_radius:
@@ -122,7 +122,8 @@ async def get_feed(
             landmark = user.area_name or "Saket College area"
             dist_label = f"{base_obfuscated} • Near {landmark}"
 
-            first_name = user.full_name.split()[0] if user.full_name else "User"
+            full_name = user.full_name or "User"
+            first_name = full_name.split()[0]
             photos = [p.photo_url for p in user.photos] if user.photos else []
             is_female = user.gender == ORMGenderEnum.female or user.gender == "female"
 
@@ -130,9 +131,10 @@ async def get_feed(
                 ProfileCardData(
                     user_id=str(user.id),
                     first_name=first_name,
+                    full_name=full_name,
                     age=user_age,
                     distance_label=dist_label,
-                    bio=user.bio or "Looking for genuine connection on RuralHeart.",
+                    bio=user.bio or "Looking for genuine connection on UR Heart.",
                     area_name=user.area_name or "Ayodhya Region",
                     intent=IntentEnum(user.intent.value) if user.intent else IntentEnum.CASUAL,
                     photos=photos,

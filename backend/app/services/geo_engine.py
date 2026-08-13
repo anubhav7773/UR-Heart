@@ -4,21 +4,30 @@ import math
 class GeoEngineService:
     """Service handling distance calculation and rural location obfuscation."""
 
+    # Default fallback landmark: Saket College, Ayodhya (26.7900° N, 82.1900° E)
+    SAKET_COLLEGE_LAT = 26.7900
+    SAKET_COLLEGE_LON = 82.1900
+
     @staticmethod
     def obfuscate_distance(distance_in_km: float) -> str:
         """
-        Converts exact distance into generalized obfuscated label for rural privacy.
-
-        < 2.0 km  -> "Within 2 km"
+        Converts exact distance into clean, readable labels:
+        < 1.0 km  -> "Less than 1 km away"
+        <= 2.0 km -> "Within 2 km"
         <= 5.0 km -> "Within 5 km"
-        > 5.0 km  -> "Within 10 km"
+        <= 10.0 km -> "Within 10 km"
+        > 10.0 km -> f"Within {int(math.ceil(distance_in_km))} km"
         """
-        if distance_in_km < 2.0:
+        if distance_in_km < 1.0:
+            return "Less than 1 km away"
+        elif distance_in_km <= 2.0:
             return "Within 2 km"
         elif distance_in_km <= 5.0:
             return "Within 5 km"
-        else:
+        elif distance_in_km <= 10.0:
             return "Within 10 km"
+        else:
+            return f"Within {int(math.ceil(distance_in_km))} km"
 
     @staticmethod
     def calculate_haversine_distance(

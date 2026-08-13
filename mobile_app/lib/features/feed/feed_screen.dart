@@ -732,16 +732,15 @@ class _FeedScreenState extends State<FeedScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
-                                      children: [
-                                        Text(
-                                          '${profile['first_name']}, ${profile['age']}',
-                                          style: const TextStyle(
-                                            fontSize: 28,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
+                                       children: [
+                                         Text(
+                                           '${(profile['full_name'] as String?)?.isNotEmpty == true ? profile['full_name'] : (profile['first_name'] ?? 'User')}, ${profile['age'] ?? 22}',
+                                           style: const TextStyle(
+                                             fontSize: 28,
+                                             fontWeight: FontWeight.bold,
+                                             color: Colors.white,
+                                           ),
+                                         ),                   const SizedBox(width: 8),
                                         const Icon(Icons.verified, color: Colors.blue, size: 22),
                                       ],
                                     ),

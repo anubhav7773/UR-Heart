@@ -308,6 +308,7 @@ class UserRead(BaseModel):
 class ProfileCardData(BaseModel):
     user_id: str
     first_name: str
+    full_name: Optional[str] = None
     age: int
     distance_label: str
     bio: str
