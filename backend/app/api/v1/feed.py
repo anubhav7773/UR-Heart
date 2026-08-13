@@ -66,11 +66,13 @@ async def get_feed(
     effective_radius = max_distance_km if max_distance_km is not None else radius_km
 
     try:
-        # 0. Fetch current logged-in user profile location for GPS fallback
+        # 0. Use live request coordinates, then the caller's persisted GPS fix.
         self_res = await db.execute(select(User).where(User.id == user_uuid))
         self_user = self_res.scalars().first()
-        user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else GeoEngineService.SAKET_COLLEGE_LAT)
-        user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else GeoEngineService.SAKET_COLLEGE_LON)
+        user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else None)
+        user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else None)
+        if user_lat is None or user_lng is None:
+            return APIResponse(success=True, data=FeedData(cards=[]), message="Location is required to find nearby people.")
 
         # 1. Fetch IDs already swiped by current user
         swiped_res = await db.execute(select(Swipe.swiped_id).where(Swipe.swiper_id == user_uuid))
@@ -105,8 +107,10 @@ async def get_feed(
             if user_age < min_age or user_age > max_age:
                 continue
 
-            cand_lat = float(user.latitude) if user.latitude is not None else GeoEngineService.SAKET_COLLEGE_LAT
-            cand_lng = float(user.longitude) if user.longitude is not None else GeoEngineService.SAKET_COLLEGE_LON
+            if user.latitude is None or user.longitude is None:
+                continue
+            cand_lat = float(user.latitude)
+            cand_lng = float(user.longitude)
             dist_km = GeoEngineService.calculate_haversine_distance(user_lat, user_lng, cand_lat, cand_lng)
 
             if dist_km > effective_radius:
@@ -119,8 +123,7 @@ async def get_feed(
 
         for dist_km, user, user_age in candidates_with_dist:
             base_obfuscated = GeoEngineService.obfuscate_distance(dist_km)
-            landmark = user.area_name or "Saket College area"
-            dist_label = f"{base_obfuscated} • Near {landmark}"
+            dist_label = base_obfuscated
 
             full_name = user.full_name or "User"
             first_name = full_name.split()[0]

@@ -84,6 +84,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # 4. Attach Versioned API Routers (Must be AFTER CORSMiddleware)
 from app.api.v1.auth import router as auth_router
 from app.api.v1.profile import router as profile_router
+from app.api.v1.users import router as users_router
 from app.api.v1.feed import router as feed_router
 from app.api.v1.matches import router as matches_router
 from app.api.v1.chat import router as chat_router
@@ -95,6 +96,7 @@ from app.api.v1.safety import router as safety_router
 api_v1_prefix = settings.API_V1_STR
 app.include_router(auth_router, prefix=api_v1_prefix)
 app.include_router(profile_router, prefix=api_v1_prefix)
+app.include_router(users_router, prefix=api_v1_prefix)
 app.include_router(feed_router, prefix=api_v1_prefix)
 app.include_router(matches_router, prefix=api_v1_prefix)
 app.include_router(chat_router, prefix=api_v1_prefix)

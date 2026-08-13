@@ -9,15 +9,16 @@ class LocationService {
 
   Position? _currentPosition;
   Position? get currentPosition => _currentPosition;
+  String? _lastError;
+  String? get lastError => _lastError;
 
   /// Requests GPS location permissions and fetches active device coordinates.
   Future<Position?> getCurrentLocation() async {
+    _lastError = null;
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (kDebugMode) {
-          print('GPS location services are disabled on device.');
-        }
+        _lastError = 'Location services are disabled. Turn on GPS to see nearby people.';
         return null;
       }
 
@@ -25,17 +26,13 @@ class LocationService {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          if (kDebugMode) {
-            print('GPS location permissions denied by user.');
-          }
+          _lastError = 'Location permission was denied. Enable it to see nearby people.';
           return null;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        if (kDebugMode) {
-          print('GPS location permissions are permanently denied.');
-        }
+        _lastError = 'Location permission is permanently denied. Enable it in Android settings.';
         return null;
       }
 
@@ -57,41 +54,28 @@ class LocationService {
 
       return _currentPosition;
     } catch (e) {
-      if (kDebugMode) {
-        print('GPS Location Exception: $e');
-      }
+      _lastError = 'Unable to get your current GPS location. Please try again.';
+      if (kDebugMode) print('GPS Location Exception: $e');
       return null;
     }
   }
 
   Future<Position?> updateUserLocation() async {
-    final pos = await getCurrentLocation();
-    if (pos != null) {
-      try {
-        await ApiClient.instance.dio.post('/users/location', data: {
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-        });
-      } catch (_) {}
-    }
-    return pos;
+    return getCurrentLocation();
   }
 
   Future<void> _syncLocationToBackend(double lat, double lng) async {
     try {
-      await ApiClient.instance.putProfile({
+      await ApiClient.instance.dio.post('/users/location', data: {
         'latitude': lat,
         'longitude': lng,
-      });
-      await ApiClient.instance.dio.post('/users/location', data: {
-        'lat': lat,
-        'lng': lng,
       });
       if (kDebugMode) {
         print('User GPS location synced to backend profile.');
       }
     } catch (e) {
-      // Non-blocking location update fallback
+      _lastError = 'Location captured but could not be synced. It will retry next time.';
+      if (kDebugMode) print('GPS sync failed: $e');
     }
   }
 }

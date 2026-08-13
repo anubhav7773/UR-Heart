@@ -105,8 +105,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'bio': _bioController.text.trim(),
         'area_name': _areaController.text.trim(),
         'village_pin_code': _pinController.text.trim(),
-        'latitude': 26.7880,
-        'longitude': 82.1300,
         'photos': List.generate(filledPhotos.length, (index) {
           final path = filledPhotos[index]!;
           return {

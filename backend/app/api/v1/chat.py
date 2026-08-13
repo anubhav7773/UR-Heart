@@ -23,6 +23,16 @@ from app.services.storage_engine import StorageEngineService
 router = APIRouter(prefix="/chat", tags=["Real-Time Chat & Media Attachments"])
 
 
+def _utc_iso(value: Optional[datetime] = None) -> str:
+    """Serialize message timestamps as timezone-aware UTC ISO 8601 strings."""
+    instant = value or datetime.now(timezone.utc)
+    if instant.tzinfo is None:
+        instant = instant.replace(tzinfo=timezone.utc)
+    else:
+        instant = instant.astimezone(timezone.utc)
+    return instant.isoformat().replace("+00:00", "Z")
+
+
 class ConnectionManager:
     """Real-Time WebSocket Connection Manager for instant chat broadcasting."""
 
@@ -43,7 +53,7 @@ class ConnectionManager:
     async def broadcast(self, match_id: str, message: dict, sender_ws: Optional[WebSocket] = None):
         if match_id in self.active_connections:
             for connection in list(self.active_connections[match_id]):
-                if sender_ws is not None and connection == sender_ws:
+                if connection == sender_ws:
                     continue  # Never echo message back to its originator socket
                 try:
                     await connection.send_json(message)
@@ -174,7 +184,8 @@ async def get_chat_messages(
             content=msg.content,
             media_url=msg.media_url,
             media_type=msg.media_type or "text",
-            created_at=msg.created_at.isoformat() if msg.created_at else datetime.now(timezone.utc).isoformat(),
+            client_msg_id=msg.client_msg_id,
+            created_at=_utc_iso(msg.created_at),
         )
         for msg in messages
     ]
@@ -207,10 +218,11 @@ async def send_chat_message(
                     id=str(existing_msg.id),
                     match_id=str(existing_msg.match_id),
                     sender_id=str(existing_msg.sender_id),
+                    client_msg_id=existing_msg.client_msg_id,
                     content=existing_msg.content,
                     media_url=existing_msg.media_url,
                     media_type=existing_msg.media_type,
-                    created_at=existing_msg.created_at.isoformat() if existing_msg.created_at else datetime.now(timezone.utc).isoformat(),
+                    created_at=_utc_iso(existing_msg.created_at),
                 )
             )
 
@@ -235,7 +247,7 @@ async def send_chat_message(
     await db.commit()
     await db.refresh(new_msg)
 
-    iso_created_at = new_msg.created_at.isoformat() if new_msg.created_at else datetime.now(timezone.utc).isoformat()
+    iso_created_at = _utc_iso(new_msg.created_at)
 
     # Broadcast message to active WebSocket connection
     try:
@@ -245,6 +257,7 @@ async def send_chat_message(
                 "id": str(new_msg.id),
                 "match_id": str(new_msg.match_id),
                 "sender_id": str(new_msg.sender_id),
+                "client_msg_id": new_msg.client_msg_id,
                 "content": new_msg.content,
                 "media_url": new_msg.media_url,
                 "media_type": new_msg.media_type,
@@ -279,10 +292,11 @@ async def send_chat_message(
             id=str(new_msg.id),
             match_id=str(new_msg.match_id),
             sender_id=str(new_msg.sender_id),
+            client_msg_id=new_msg.client_msg_id,
             content=new_msg.content,
             media_url=new_msg.media_url,
             media_type=new_msg.media_type,
-            created_at=new_msg.created_at.isoformat() if new_msg.created_at else "",
+            created_at=_utc_iso(new_msg.created_at),
         )
     )
 

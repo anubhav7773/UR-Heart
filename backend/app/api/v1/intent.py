@@ -38,7 +38,7 @@ async def update_chai_status(
                 user_id=user_uuid,
                 is_free_for_chai=payload.is_free_for_chai,
                 status_badge=payload.status_badge,
-                location_landmark=payload.location_landmark or "Saket College Junction",
+                location_landmark=payload.location_landmark,
             )
             db.add(chai_rec)
         else:
@@ -54,7 +54,7 @@ async def update_chai_status(
     data = ChaiStatusData(
         is_free_for_chai=payload.is_free_for_chai,
         status_badge=payload.status_badge,
-        location_landmark=payload.location_landmark or "Saket College Junction",
+        location_landmark=payload.location_landmark,
     )
     return APIResponse(success=True, data=data)
 

@@ -356,8 +356,8 @@ async def update_user_location(
     """
     Updates user's real-time device GPS coordinates (latitude, longitude) in PostgreSQL database.
     """
-    lat = payload.get("lat") or payload.get("latitude")
-    lng = payload.get("lng") or payload.get("longitude")
+    lat = payload.get("latitude", payload.get("lat"))
+    lng = payload.get("longitude", payload.get("lng"))
 
     if lat is None or lng is None:
         raise HTTPException(
@@ -366,20 +366,30 @@ async def update_user_location(
         )
 
     try:
+        latitude = float(lat)
+        longitude = float(lng)
+        if not -90.0 <= latitude <= 90.0 or not -180.0 <= longitude <= 180.0:
+            raise ValueError("Coordinates are outside valid GPS bounds.")
         user_uuid = uuid.UUID(current_user_id)
         user_res = await db.execute(select(User).where(User.id == user_uuid))
         user_obj = user_res.scalars().first()
 
-        if user_obj:
-            user_obj.latitude = float(lat)
-            user_obj.longitude = float(lng)
-            await db.commit()
+        if not user_obj:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
+        user_obj.latitude = latitude
+        user_obj.longitude = longitude
+        await db.commit()
+    except HTTPException:
+        raise
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid GPS coordinates.")
     except Exception:
         await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to save GPS location.")
 
     return APIResponse(
         success=True,
         message="Device GPS location updated successfully.",
-        data={"latitude": float(lat), "longitude": float(lng)}
+        data={"latitude": latitude, "longitude": longitude}
     )
 

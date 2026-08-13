@@ -56,6 +56,11 @@ async def get_matches_feed(
     user_uuid = uuid.UUID(current_user_id)
 
     try:
+        current_user_res = await db.execute(select(User).where(User.id == user_uuid))
+        current_user = current_user_res.scalars().first()
+        if current_user is None or current_user.latitude is None or current_user.longitude is None:
+            return APIResponse(success=True, data=FeedData(cards=[]), message="Location is required to find nearby people.")
+
         swiped_res = await db.execute(select(Swipe.swiped_id).where(Swipe.swiper_id == user_uuid))
         swiped_ids = set(swiped_res.scalars().all())
         swiped_ids.add(user_uuid)
@@ -70,18 +75,15 @@ async def get_matches_feed(
         db_users = result.scalars().all()
 
         for user in db_users:
-            dist_km = 3.4
-            if user.latitude is not None and user.longitude is not None:
-                dist_km = GeoEngineService.calculate_haversine_distance(
-                    26.7880, 82.1300, float(user.latitude), float(user.longitude)
-                )
+            dist_km = GeoEngineService.distance_between_users(current_user, user)
+            if dist_km is None:
+                continue
 
             if dist_km > radius_km:
                 continue
 
             base_obfuscated = GeoEngineService.obfuscate_distance(dist_km)
-            landmark = user.area_name or "Ayodhya Area"
-            dist_label = f"{base_obfuscated} • Near {landmark}"
+            dist_label = base_obfuscated
 
             first_name = user.full_name.split()[0] if user.full_name else "User"
             age = calculate_age(user.dob) if user.dob else 22

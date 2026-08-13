@@ -1,12 +1,9 @@
 import math
+from typing import Optional
 
 
 class GeoEngineService:
     """Service handling distance calculation and rural location obfuscation."""
-
-    # Default fallback landmark: Saket College, Ayodhya (26.7900° N, 82.1900° E)
-    SAKET_COLLEGE_LAT = 26.7900
-    SAKET_COLLEGE_LON = 82.1900
 
     @staticmethod
     def obfuscate_distance(distance_in_km: float) -> str:
@@ -50,3 +47,12 @@ class GeoEngineService:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
         return R * c
+
+    @classmethod
+    def distance_between_users(cls, user_a: object, user_b: object) -> Optional[float]:
+        """Return live GPS distance, or None when either user has no GPS fix."""
+        a_lat, a_lon = getattr(user_a, "latitude", None), getattr(user_a, "longitude", None)
+        b_lat, b_lon = getattr(user_b, "latitude", None), getattr(user_b, "longitude", None)
+        if None in (a_lat, a_lon, b_lat, b_lon):
+            return None
+        return cls.calculate_haversine_distance(float(a_lat), float(a_lon), float(b_lat), float(b_lon))

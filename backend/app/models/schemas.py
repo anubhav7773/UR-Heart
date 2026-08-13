@@ -241,27 +241,27 @@ class CompleteProfileRequest(BaseModel):
     @classmethod
     def validate_lat(cls, v):
         if v is None or v == "":
-            return 26.7880
+            return None
         try:
             val = float(v)
             if -90.0 <= val <= 90.0:
                 return val
-            return 26.7880
+            return None
         except Exception:
-            return 26.7880
+            return None
 
     @field_validator("longitude", mode="before")
     @classmethod
     def validate_lng(cls, v):
         if v is None or v == "":
-            return 82.1300
+            return None
         try:
             val = float(v)
             if -180.0 <= val <= 180.0:
                 return val
-            return 82.1300
+            return None
         except Exception:
-            return 82.1300
+            return None
 
     @field_validator("photos", mode="before")
     @classmethod
@@ -445,6 +445,7 @@ class ChatMessageRead(BaseModel):
     id: str
     match_id: str
     sender_id: str
+    client_msg_id: Optional[str] = None
     content: Optional[str] = None
     media_url: Optional[str] = None
     media_type: str = "text"

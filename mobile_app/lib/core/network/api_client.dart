@@ -252,12 +252,14 @@ class ApiClient {
   // 17. Send Chat Message (Text / Media)
   Future<Response> sendMessage({
     required String matchId,
+    String? clientMsgId,
     String? content,
     String? mediaUrl,
     String mediaType = 'text',
   }) async {
     return await dio.post('/chat/send', data: {
       'match_id': matchId,
+      if (clientMsgId != null) 'client_msg_id': clientMsgId,
       if (content != null) 'content': content,
       if (mediaUrl != null) 'media_url': mediaUrl,
       'media_type': mediaType,

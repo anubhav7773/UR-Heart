@@ -10,6 +10,7 @@ import 'message_bubble.dart';
 
 class ChatMessage {
   final String id;
+  final String? clientMsgId;
   final String senderId;
   final String text;
   final String? mediaUrl;
@@ -21,6 +22,7 @@ class ChatMessage {
 
   ChatMessage({
     required this.id,
+    this.clientMsgId,
     required this.senderId,
     required this.text,
     this.mediaUrl,
@@ -30,6 +32,68 @@ class ChatMessage {
     this.isDelivered = true,
     this.isRead = true,
   });
+}
+
+/// The person on the other side of a chat.
+///
+/// This is deliberately separate from the signed-in user: chat UI must never
+/// infer its recipient from authentication or profile state.
+class ChatRecipient {
+  final String id;
+  final String name;
+  final String avatarUrl;
+
+  const ChatRecipient({
+    required this.id,
+    required this.name,
+    this.avatarUrl = '',
+  });
+
+  factory ChatRecipient.fromConversation(Map<String, dynamic> conversation) {
+    return ChatRecipient(
+      id: (conversation['target_user_id'] ?? conversation['target_id'] ?? '').toString(),
+      name: (conversation['target_user_name'] ??
+              conversation['full_name'] ??
+              conversation['match_name'] ??
+              '')
+          .toString(),
+      avatarUrl: (conversation['target_user_photo'] ??
+              conversation['avatar_url'] ??
+              conversation['photo_url'] ??
+              '')
+          .toString(),
+    );
+  }
+
+  ChatRecipient copyWith({String? name, String? avatarUrl}) {
+    return ChatRecipient(
+      id: id,
+      name: name ?? this.name,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+    );
+  }
+}
+
+class _RecipientHeaderLoadingPlaceholder extends StatelessWidget {
+  const _RecipientHeaderLoadingPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const CircleAvatar(radius: 18, backgroundColor: Colors.white24),
+        const SizedBox(width: 10),
+        Container(
+          width: 96,
+          height: 12,
+          decoration: BoxDecoration(
+            color: Colors.white24,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class ConversationsScreen extends StatefulWidget {
@@ -120,21 +184,27 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   itemBuilder: (context, index) {
                     final item = _conversations[index];
                     final String matchId = item['id'] ?? item['match_id'] ?? '';
-                    final String matchName = item['target_user_name'] ?? item['full_name'] ?? item['match_name'] ?? 'User';
-                    final String avatarUrl = item['target_user_photo'] ?? item['avatar_url'] ?? item['photo_url'] ?? '';
+                    final recipientUser = ChatRecipient.fromConversation(
+                      Map<String, dynamic>.from(item as Map),
+                    );
+                    final String matchName = recipientUser.name.isNotEmpty ? recipientUser.name : 'User';
+                    final String avatarUrl = recipientUser.avatarUrl;
                     final String lastMsg = item['last_message'] ?? 'Matched! Say hello 👋';
 
                     return ListTile(
                       onTap: () async {
-                        final String targetUserId = item['target_user_id'] ?? item['target_id'] ?? '';
+                        if (recipientUser.id.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('This conversation has no recipient. Please refresh and try again.')),
+                          );
+                          return;
+                        }
                         final res = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ChatScreen(
                               matchId: matchId,
-                              matchName: matchName,
-                              matchAvatarUrl: avatarUrl,
-                              targetUserId: targetUserId,
+                              recipientUser: recipientUser,
                             ),
                           ),
                         );
@@ -185,16 +255,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
 class ChatScreen extends StatefulWidget {
   final String matchId;
-  final String matchName;
-  final String matchAvatarUrl;
-  final String targetUserId;
+  final ChatRecipient recipientUser;
 
   const ChatScreen({
     super.key,
     required this.matchId,
-    required this.matchName,
-    this.matchAvatarUrl = '',
-    this.targetUserId = '',
+    required this.recipientUser,
   });
 
   @override
@@ -216,18 +282,21 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _unlockedPhoneNumber;
 
   final List<ChatMessage> _messages = [];
+  final Set<String> _processedMessageIds = {};
   Timer? _realtimePollingTimer;
 
-  String _activeMatchName = '';
-  String _activeAvatarUrl = '';
+  ChatRecipient? _recipientProfile;
+  bool _isRecipientProfileLoading = true;
   String _recipientDistanceLabel = 'Online';
+
+  ChatRecipient get _displayRecipient => _recipientProfile ?? widget.recipientUser;
 
   @override
   void initState() {
     super.initState();
-    _activeMatchName = widget.matchName;
-    _activeAvatarUrl = widget.matchAvatarUrl;
     _loadUserStatus();
+    // Refresh the local GPS fix before calculating the recipient distance.
+    LocationService.instance.getCurrentLocation();
     _fetchWhatsAppBridgeStatus();
     _fetchRecipientProfile();
     _fetchMessages();
@@ -236,20 +305,33 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _fetchRecipientProfile() async {
     try {
-      final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
-      if (targetId.isNotEmpty) {
-        final response = await ApiClient.instance.dio.get('/profile', queryParameters: {'user_id': targetId});
+      final recipientId = widget.recipientUser.id;
+      if (recipientId.isNotEmpty) {
+        final response = await ApiClient.instance.dio.get(
+          '/profile',
+          queryParameters: {'user_id': recipientId},
+        );
         if (response.data != null && response.data['data'] != null) {
-          final data = response.data['data'];
+          final Map<String, dynamic> data = Map<String, dynamic>.from(response.data['data'] as Map);
+          final returnedUserId = (data['user_id'] ?? data['id'] ?? '').toString();
+
+          // A profile endpoint response for another account must identify that
+          // account. Never let a response for the signed-in user overwrite the
+          // recipient state, even if an older backend ignores `user_id`.
+          if (returnedUserId != recipientId) return;
+
           if (mounted) {
             setState(() {
-              final String name = data['full_name'] ?? '';
-              if (name.isNotEmpty) _activeMatchName = name;
-
+              final String name = (data['full_name'] ?? '').toString();
+              String avatarUrl = widget.recipientUser.avatarUrl;
               final photos = data['photos'] as List<dynamic>?;
               if (photos != null && photos.isNotEmpty) {
-                _activeAvatarUrl = photos.first.toString();
+                avatarUrl = photos.first.toString();
               }
+              _recipientProfile = widget.recipientUser.copyWith(
+                name: name.isNotEmpty ? name : widget.recipientUser.name,
+                avatarUrl: avatarUrl,
+              );
 
               final myPos = LocationService.instance.currentPosition;
               final double? rLat = (data['latitude'] as num?)?.toDouble();
@@ -270,7 +352,11 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Keep the explicitly supplied recipient visible; never substitute self.
+    } finally {
+      if (mounted) setState(() => _isRecipientProfileLoading = false);
+    }
   }
 
   void _startRealtimeStreamListener() {
@@ -288,53 +374,56 @@ class _ChatScreenState extends State<ChatScreen> {
       if (response.data != null && response.data['data'] != null) {
         final List<dynamic> rawMsgs = response.data['data'];
 
-        if (!silent || _messages.isEmpty) {
-          setState(() {
-            _messages.clear();
-            for (var item in rawMsgs) {
-              final String rawTime = item['created_at'] ?? '';
-              final parsedDt = DateTime.tryParse(rawTime);
-              _messages.add(
-                ChatMessage(
-                  id: item['id'] ?? '',
-                  senderId: item['sender_id'] ?? '',
-                  text: item['content'] ?? '',
-                  mediaUrl: item['media_url'],
-                  timestamp: parsedDt != null ? parsedDt.toLocal() : DateTime.now(),
-                ),
-              );
-            }
-          });
-          _scrollToBottom();
-        } else {
-          final Set<String> existingIds = _messages.map((m) => m.id).toSet();
-          bool hasNew = false;
-
-          for (var item in rawMsgs) {
-            final String msgId = item['id'] ?? '';
-            if (!existingIds.contains(msgId)) {
-              hasNew = true;
-              final String rawTime = item['created_at'] ?? '';
-              final parsedDt = DateTime.tryParse(rawTime);
-              _messages.add(
-                ChatMessage(
-                  id: msgId,
-                  senderId: item['sender_id'] ?? '',
-                  text: item['content'] ?? '',
-                  mediaUrl: item['media_url'],
-                  timestamp: parsedDt != null ? parsedDt.toLocal() : DateTime.now(),
-                ),
-              );
-            }
+        bool changed = false;
+        setState(() {
+          for (final item in rawMsgs) {
+            changed = _upsertServerMessage(Map<String, dynamic>.from(item as Map)) || changed;
           }
-
-          if (hasNew && mounted) {
-            setState(() {});
-            _scrollToBottom();
-          }
-        }
+        });
+        if (changed || (!silent && _messages.isNotEmpty)) _scrollToBottom();
       }
     } catch (_) {}
+  }
+
+  DateTime _parseLocalTimestamp(String isoTimestamp) {
+    try {
+      return DateTime.parse(isoTimestamp).toLocal();
+    } on FormatException {
+      return DateTime.now();
+    }
+  }
+
+  /// Adds a server message once, or swaps an optimistic client message in place.
+  bool _upsertServerMessage(Map<String, dynamic> data) {
+    final dbId = (data['id'] ?? '').toString();
+    final clientMsgId = (data['client_msg_id'] ?? '').toString();
+    if (dbId.isEmpty) return false;
+
+    final serverMessage = ChatMessage(
+      id: dbId,
+      clientMsgId: clientMsgId.isEmpty ? null : clientMsgId,
+      senderId: (data['sender_id'] ?? '').toString(),
+      text: (data['content'] ?? '').toString(),
+      mediaUrl: data['media_url']?.toString(),
+      timestamp: _parseLocalTimestamp((data['created_at'] ?? '').toString()),
+      isSent: true,
+    );
+    if (_processedMessageIds.contains(dbId)) return false;
+
+    final optimisticIndex = clientMsgId.isEmpty
+        ? -1
+        : _messages.indexWhere((message) =>
+            message.id == clientMsgId || message.clientMsgId == clientMsgId);
+
+    if (optimisticIndex != -1) {
+      _messages[optimisticIndex] = serverMessage;
+      _processedMessageIds..add(clientMsgId)..add(dbId);
+      return true;
+    }
+    _processedMessageIds.add(dbId);
+    if (clientMsgId.isNotEmpty) _processedMessageIds.add(clientMsgId);
+    _messages.add(serverMessage);
+    return true;
   }
 
   void _scrollToBottom() {
@@ -451,12 +540,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendChaiInviteDirect() async {
     try {
-      final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
-      await ApiClient.instance.postSendChaiInvite(receiverId: targetId);
+      await ApiClient.instance.postSendChaiInvite(receiverId: widget.recipientUser.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('⚡ ₹9 Direct Invite Pass sent to ${widget.matchName}!'),
+          content: Text('⚡ ₹9 Direct Invite Pass sent to ${_displayRecipient.name}!'),
           backgroundColor: AppTheme.primaryColor,
           duration: const Duration(seconds: 3),
         ),
@@ -501,8 +589,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     CircleAvatar(
                       radius: 60,
                       backgroundColor: AppTheme.primaryColor,
-                      backgroundImage: widget.matchAvatarUrl.isNotEmpty ? NetworkImage(widget.matchAvatarUrl) : null,
-                      child: widget.matchAvatarUrl.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                      backgroundImage: _displayRecipient.avatarUrl.isNotEmpty ? NetworkImage(_displayRecipient.avatarUrl) : null,
+                      child: _displayRecipient.avatarUrl.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
                     ),
                     const SizedBox(height: 16),
 
@@ -510,7 +598,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          widget.matchName,
+                          _displayRecipient.name,
                           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         const SizedBox(width: 6),
@@ -526,12 +614,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey[700]!),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.location_on, size: 14, color: AppTheme.secondaryColor),
                           SizedBox(width: 4),
-                          Text('Within 3.4 km • Near Saket College', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text(_recipientDistanceLabel, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -623,16 +711,20 @@ class _ChatScreenState extends State<ChatScreen> {
     if (content.isEmpty && mediaUrl == null) return;
 
     final String actualSenderId = _currentUserId.isNotEmpty ? _currentUserId : 'current_user_id';
+    final clientMsgId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
     final newMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: clientMsgId,
+      clientMsgId: clientMsgId,
       senderId: actualSenderId,
       text: content,
       mediaUrl: mediaUrl,
       timestamp: DateTime.now(),
+      isSent: false,
     );
 
     setState(() {
       _messages.add(newMessage);
+      _processedMessageIds.add(clientMsgId);
       _messageController.clear();
       _mutualMessageCount++;
 
@@ -642,11 +734,18 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      await ApiClient.instance.sendMessage(
+      final response = await ApiClient.instance.sendMessage(
         matchId: widget.matchId,
+        clientMsgId: clientMsgId,
         content: content,
         mediaUrl: mediaUrl,
       );
+      final data = response.data?['data'];
+      if (data is Map && mounted) {
+        setState(() {
+          _upsertServerMessage(Map<String, dynamic>.from(data));
+        });
+      }
     } catch (_) {}
 
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -674,7 +773,7 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               const Icon(Icons.report_problem, color: AppTheme.secondaryColor),
               const SizedBox(width: 10),
-              Text('Report ${widget.matchName}', style: const TextStyle(color: Colors.white, fontSize: 18)),
+              Text('Report ${_displayRecipient.name}', style: const TextStyle(color: Colors.white, fontSize: 18)),
             ],
           ),
           content: Column(
@@ -724,9 +823,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(context);
                 try {
-                  final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
                   await ApiClient.instance.reportUser(
-                    reportedUserId: targetId,
+                    reportedUserId: widget.recipientUser.id,
                     reason: selectedReason,
                     details: detailsController.text.trim(),
                   );
@@ -761,7 +859,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             const Icon(Icons.block, color: Colors.redAccent),
             const SizedBox(width: 10),
-            Text('Block ${widget.matchName}?', style: const TextStyle(color: Colors.white, fontSize: 18)),
+            Text('Block ${_displayRecipient.name}?', style: const TextStyle(color: Colors.white, fontSize: 18)),
           ],
         ),
         content: const Text(
@@ -779,11 +877,10 @@ class _ChatScreenState extends State<ChatScreen> {
               final nav = Navigator.of(context);
               nav.pop();
               try {
-                final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
-                await ApiClient.instance.blockUser(blockedUserId: targetId);
+                await ApiClient.instance.blockUser(blockedUserId: widget.recipientUser.id);
                 messenger.showSnackBar(
                   SnackBar(
-                    content: Text('Blocked ${widget.matchName} successfully.'),
+                    content: Text('Blocked ${_displayRecipient.name} successfully.'),
                     backgroundColor: Colors.redAccent,
                   ),
                 );
@@ -810,16 +907,18 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: AppTheme.surfaceColor,
         titleSpacing: 0,
         title: InkWell(
-          onTap: _showMatchProfileBottomSheet,
-          child: Row(
+          onTap: _isRecipientProfileLoading ? null : _showMatchProfileBottomSheet,
+          child: _isRecipientProfileLoading
+              ? const _RecipientHeaderLoadingPlaceholder()
+              : Row(
             children: [
               Stack(
                 children: [
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: AppTheme.primaryColor,
-                    backgroundImage: _activeAvatarUrl.isNotEmpty ? NetworkImage(_activeAvatarUrl) : null,
-                    child: _activeAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
+                    backgroundImage: _displayRecipient.avatarUrl.isNotEmpty ? NetworkImage(_displayRecipient.avatarUrl) : null,
+                    child: _displayRecipient.avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
                   ),
                   Positioned(
                     right: 0,
@@ -840,7 +939,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_activeMatchName.isNotEmpty ? _activeMatchName : widget.matchName, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(_displayRecipient.name, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
                   Text(
                     _isTyping ? 'typing...' : 'Online • $_recipientDistanceLabel',
                     style: TextStyle(
@@ -1025,7 +1124,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Say Hi to ${widget.matchName}! ✨',
+                            'Say Hi to ${_displayRecipient.name}! ✨',
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           const SizedBox(height: 8),
@@ -1058,7 +1157,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         isMe: isMe,
                         time: timeStr,
                         mediaUrl: msg.mediaUrl,
-                        senderAvatarUrl: widget.matchAvatarUrl,
+                        senderAvatarUrl: _displayRecipient.avatarUrl,
                       );
                     },
                   ),

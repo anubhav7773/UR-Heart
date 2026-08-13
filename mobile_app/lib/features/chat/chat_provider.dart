@@ -55,13 +55,15 @@ class ChatProvider extends ChangeNotifier {
 
   void setMessages(List<ChatMessage> newMessages) {
     _uniqueMessageIds.clear();
-    _messages = newMessages.where((m) => _uniqueMessageIds.add(m.id)).toList();
+    _messages = [];
+    for (final message in newMessages) {
+      _upsertMessage(message);
+    }
     notifyListeners();
   }
 
   void appendMessage(ChatMessage message) {
-    if (_uniqueMessageIds.add(message.id)) {
-      _messages.add(message);
+    if (_upsertMessage(message)) {
       notifyListeners();
     }
   }
@@ -69,14 +71,30 @@ class ChatProvider extends ChangeNotifier {
   void appendMessages(List<ChatMessage> newMessages) {
     bool updated = false;
     for (var m in newMessages) {
-      if (_uniqueMessageIds.add(m.id)) {
-        _messages.add(m);
+      if (_upsertMessage(m)) {
         updated = true;
       }
     }
     if (updated) {
       notifyListeners();
     }
+  }
+
+  bool _upsertMessage(ChatMessage message) {
+    if (_uniqueMessageIds.contains(message.id)) return false;
+    final clientMsgId = message.clientMsgId;
+    final optimisticIndex = clientMsgId == null
+        ? -1
+        : _messages.indexWhere((existing) =>
+            existing.id == clientMsgId || existing.clientMsgId == clientMsgId);
+    if (optimisticIndex != -1) {
+      _messages[optimisticIndex] = message;
+    } else {
+      _messages.add(message);
+    }
+    _uniqueMessageIds.add(message.id);
+    if (clientMsgId != null) _uniqueMessageIds.add(clientMsgId);
+    return true;
   }
 
   Future<void> fetchMessages(String matchId, {bool silent = false}) async {
@@ -99,14 +117,20 @@ class ChatProvider extends ChangeNotifier {
           final String msgId = item['id'] ?? '';
           if (msgId.isNotEmpty) {
             final String rawTime = item['created_at'] ?? '';
-            final parsedDt = DateTime.tryParse(rawTime);
+            DateTime parsedDt;
+            try {
+              parsedDt = DateTime.parse(rawTime).toLocal();
+            } on FormatException {
+              parsedDt = DateTime.now();
+            }
             parsedList.add(
               ChatMessage(
                 id: msgId,
+                clientMsgId: item['client_msg_id']?.toString(),
                 senderId: item['sender_id'] ?? '',
                 text: item['content'] ?? '',
                 mediaUrl: item['media_url'],
-                timestamp: parsedDt != null ? parsedDt.toLocal() : DateTime.now(),
+                timestamp: parsedDt,
               ),
             );
           }
@@ -135,15 +159,17 @@ class ChatProvider extends ChangeNotifier {
     required String content,
     String? mediaUrl,
   }) async {
-    final String clientMsgId = 'client_${DateTime.now().millisecondsSinceEpoch}_${_messages.length}';
+    final String clientMsgId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
     final String actualSenderId = _currentUserId.isNotEmpty ? _currentUserId : 'current_user_id';
 
     final optimisticMessage = ChatMessage(
       id: clientMsgId,
+      clientMsgId: clientMsgId,
       senderId: actualSenderId,
       text: content,
       mediaUrl: mediaUrl,
       timestamp: DateTime.now(),
+      isSent: false,
     );
 
     appendMessage(optimisticMessage);
@@ -151,23 +177,26 @@ class ChatProvider extends ChangeNotifier {
     try {
       final response = await ApiClient.instance.sendMessage(
         matchId: matchId,
+        clientMsgId: clientMsgId,
         content: content,
         mediaUrl: mediaUrl,
       );
 
       if (response.data != null && response.data['data'] != null) {
-        final String serverId = response.data['data']['id'] ?? clientMsgId;
+        final data = response.data['data'];
+        final String serverId = data['id'] ?? clientMsgId;
         if (serverId != clientMsgId) {
-          final index = _messages.indexWhere((m) => m.id == clientMsgId);
+          final index = _messages.indexWhere((m) => m.id == clientMsgId || m.clientMsgId == clientMsgId);
           if (index != -1) {
-            _uniqueMessageIds.remove(clientMsgId);
             _uniqueMessageIds.add(serverId);
             _messages[index] = ChatMessage(
               id: serverId,
+              clientMsgId: clientMsgId,
               senderId: actualSenderId,
               text: content,
               mediaUrl: mediaUrl,
-              timestamp: optimisticMessage.timestamp,
+              timestamp: _parseResponseTimestamp(data['created_at'], optimisticMessage.timestamp),
+              isSent: true,
             );
             notifyListeners();
           }
@@ -179,6 +208,14 @@ class ChatProvider extends ChangeNotifier {
         print('[ChatProvider] Error sending message: $e');
       }
       return false;
+    }
+  }
+
+  DateTime _parseResponseTimestamp(dynamic value, DateTime fallback) {
+    try {
+      return DateTime.parse(value?.toString() ?? '').toLocal();
+    } on FormatException {
+      return fallback;
     }
   }
 
