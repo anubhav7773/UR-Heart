@@ -36,79 +36,6 @@ router = APIRouter(prefix="/feed", tags=["Discovery Feed & Swiping Engine"])
 
 _mock_user_skip_counts = {}
 
-CURATED_FALLBACK_PROFILES = [
-    ProfileCardData(
-        user_id="b1febc88-1c0b-4ef8-bb6d-6bb9bd380b22",
-        first_name="Priya",
-        age=22,
-        distance_label="Within 2 km • Near Saket College area",
-        bio="Coffee addict and book lover. Looking for genuine connection.",
-        area_name="Ayodhya Cantt",
-        intent=IntentEnum.SERIOUS,
-        photos=[
-            "https://r2.ruralheart.com/priya_1.webp",
-            "https://r2.ruralheart.com/priya_2.webp",
-        ],
-        is_verified_local=True,
-    ),
-    ProfileCardData(
-        user_id="c2febc88-2c0b-4ef8-bb6d-6bb9bd380c33",
-        first_name="Ananya",
-        age=24,
-        distance_label="Within 5 km • Near Sohawal Market",
-        bio="Architecture graduate & classical dancer. Tea lover.",
-        area_name="Sohawal, Ayodhya",
-        intent=IntentEnum.SERIOUS,
-        photos=[
-            "https://r2.ruralheart.com/p1.webp",
-            "https://r2.ruralheart.com/p2.webp",
-        ],
-        is_verified_local=True,
-    ),
-    ProfileCardData(
-        user_id="d3febc88-3c0b-4ef8-bb6d-6bb9bd380d44",
-        first_name="Riya",
-        age=21,
-        distance_label="Within 8 km • Near Faizabad City Center",
-        bio="Passionate about photography & travel.",
-        area_name="Faizabad City",
-        intent=IntentEnum.CASUAL,
-        photos=[
-            "https://r2.ruralheart.com/p3.webp",
-            "https://r2.ruralheart.com/p4.webp",
-        ],
-        is_verified_local=True,
-    ),
-    ProfileCardData(
-        user_id="e4febc88-4c0b-4ef8-bb6d-6bb9bd380e55",
-        first_name="Kavya",
-        age=23,
-        distance_label="Within 2 km • Near Nawabganj Circle",
-        bio="Tech enthusiast & food lover.",
-        area_name="Nawabganj",
-        intent=IntentEnum.FRIENDSHIP,
-        photos=[
-            "https://r2.ruralheart.com/p5.webp",
-            "https://r2.ruralheart.com/priya_1.webp",
-        ],
-        is_verified_local=True,
-    ),
-    ProfileCardData(
-        user_id="f5febc88-5c0b-4ef8-bb6d-6bb9bd380f66",
-        first_name="Sneha",
-        age=25,
-        distance_label="Within 10 km • Near Rudauli Station",
-        bio="Music addict and badminton player.",
-        area_name="Rudauli",
-        intent=IntentEnum.SERIOUS,
-        photos=[
-            "https://r2.ruralheart.com/p2.webp",
-            "https://r2.ruralheart.com/p3.webp",
-        ],
-        is_verified_local=True,
-    ),
-]
-
 
 def calculate_age(born: date) -> int:
     today = date.today()
@@ -124,6 +51,7 @@ async def get_feed(
 ):
     """
     Retrieves candidate cards from Supabase PostgreSQL, excluding users already swiped.
+    Returns an empty array `[]` when no candidates exist.
     """
     profile_cards: List[ProfileCardData] = []
     user_uuid = uuid.UUID(current_user_id)
@@ -159,9 +87,7 @@ async def get_feed(
 
             first_name = user.full_name.split()[0] if user.full_name else "User"
             age = calculate_age(user.dob) if user.dob else 22
-            photos = [p.photo_url for p in user.photos] if user.photos else [
-                "https://r2.ruralheart.com/priya_1.webp"
-            ]
+            photos = [p.photo_url for p in user.photos] if user.photos else []
 
             is_female = user.gender == ORMGenderEnum.female or user.gender == "female"
 
@@ -180,12 +106,6 @@ async def get_feed(
             )
     except Exception:
         pass
-
-    if len(profile_cards) < 5:
-        existing_ids = {p.user_id for p in profile_cards}
-        for fb in CURATED_FALLBACK_PROFILES:
-            if fb.user_id not in existing_ids:
-                profile_cards.append(fb)
 
     cards: List[FeedCardItem] = []
     ad_interval = settings.IN_FEED_AD_INTERVAL

@@ -19,24 +19,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final ImagePicker _picker = ImagePicker();
   final ProfileService _profileService = ProfileService();
 
-  final TextEditingController _nameController = TextEditingController(text: 'Rahul Singh');
-  final TextEditingController _bioController = TextEditingController(
-      text: 'Simple guy from Ayodhya. Love tea, photography, and late night talks.');
-  final TextEditingController _areaController = TextEditingController(text: 'Sohawal, Ayodhya');
-  final TextEditingController _pinController = TextEditingController(text: '224189');
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
+  final TextEditingController _areaController = TextEditingController();
+  final TextEditingController _pinController = TextEditingController();
 
-  final DateTime _selectedDob = DateTime(2002, 3, 26);
+  final DateTime _selectedDob = DateTime(2002, 1, 1);
   final String _gender = 'male';
   final String _interestedIn = 'female';
-  String _intent = 'serious';
+  String _intent = 'casual';
   bool _isSubmitting = false;
 
   final List<String?> _photoPaths = [
-    'https://r2.ruralheart.com/p1.webp',
-    'https://r2.ruralheart.com/p2.webp',
-    'https://r2.ruralheart.com/p3.webp',
-    'https://r2.ruralheart.com/p4.webp',
-    'https://r2.ruralheart.com/p5.webp',
+    null,
+    null,
+    null,
+    null,
+    null,
   ];
 
   Future<void> _pickImageForSlot(int index) async {
@@ -84,10 +83,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final filledPhotos = _photoPaths.where((p) => p != null && p.isNotEmpty).toList();
-    if (filledPhotos.length < 5) {
+    if (filledPhotos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select/upload photos for all 5 slots.'),
+          content: Text('Please select/upload at least 1 profile photo.'),
           backgroundColor: Colors.amber,
         ),
       );
@@ -108,8 +107,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'village_pin_code': _pinController.text.trim(),
         'latitude': 26.7880,
         'longitude': 82.1300,
-        'photos': List.generate(5, (index) {
-          final path = _photoPaths[index]!;
+        'photos': List.generate(filledPhotos.length, (index) {
+          final path = filledPhotos[index]!;
           return {
             'photo_url': path,
             'is_first_impression': index == 0,

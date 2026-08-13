@@ -53,7 +53,7 @@ async def get_matches(
                 target_photo = (
                     target_user.photos[0].photo_url
                     if target_user and target_user.photos
-                    else "https://r2.ruralheart.com/priya_1.webp"
+                    else ""
                 )
 
                 # Get last message
@@ -209,17 +209,29 @@ async def get_whatsapp_bridge_status(
 ):
     """
     Checks Safe WhatsApp Bridge status (15 mutual messages threshold).
-    Unlocks phone number when 15 mutual messages are exchanged.
+    Unlocks and retrieves verified phone number from DB when 15 mutual messages are exchanged.
     """
+    count = 0
+    unlocked = False
+    target_phone = None
+
     try:
+        user_uuid = uuid.UUID(current_user_id)
         match_uuid = uuid.UUID(match_id)
         match_res = await db.execute(select(Match).where(Match.id == match_uuid))
         match_obj = match_res.scalars().first()
-        count = match_obj.mutual_message_count if match_obj else 15
-        unlocked = match_obj.is_whatsapp_unlocked if match_obj else True
+
+        if match_obj:
+            count = match_obj.mutual_message_count
+            unlocked = match_obj.is_whatsapp_unlocked or (count >= 15)
+
+            target_id = match_obj.user2_id if match_obj.user1_id == user_uuid else match_obj.user1_id
+            target_res = await db.execute(select(User).where(User.id == target_id))
+            target_user = target_res.scalars().first()
+            if target_user and target_user.phone_number:
+                target_phone = target_user.phone_number
     except Exception:
-        count = 15
-        unlocked = True
+        await db.rollback()
 
     return APIResponse(
         success=True,
@@ -228,6 +240,6 @@ async def get_whatsapp_bridge_status(
             mutual_message_count=count,
             required_threshold=15,
             is_whatsapp_unlocked=unlocked,
-            phone_number="+91 98765 43210" if unlocked else None,
+            phone_number=target_phone if unlocked and target_phone else None,
         )
     )

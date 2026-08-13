@@ -209,10 +209,10 @@ class _FeedScreenState extends State<FeedScreen> {
     final profile = currentCard?['profile'];
     final photosList = profile != null ? (profile['photos'] as List<dynamic>?) : null;
     final String? imageUrl = (photosList != null && photosList.isNotEmpty) ? photosList.first as String? : null;
-    final String targetUserId = profile?['user_id'] ?? 'b1febc88-1c0b-4ef8-bb6d-6bb9bd380b22';
-    final String firstName = profile?['first_name'] ?? 'Priya';
+    final String targetUserId = profile?['user_id'] ?? '';
+    final String firstName = profile?['first_name'] ?? 'User';
     final bool isVerifiedLocal = profile?['is_verified_local'] ?? true;
-    final String distanceLabel = profile?['distance_label'] ?? 'Within 2 km • Near Saket College area';
+    final String distanceLabel = profile?['distance_label'] ?? 'Nearby';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -433,22 +433,53 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                       )
                     : Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.style, size: 60, color: Colors.grey),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No More Profiles Nearby',
-                              style: TextStyle(fontSize: 18, color: Colors.white),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              onPressed: _loadFeed,
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE91E63)),
-                              child: const Text('Refresh Feed', style: TextStyle(color: Colors.white)),
-                            ),
-                          ],
+                        child: Container(
+                          margin: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(28),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[900],
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.3)),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 4)),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE91E63).withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.explore_off_rounded, size: 50, color: Color(0xFFE91E63)),
+                              ),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'No profiles around you right now!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                'Expand your distance filter or check back later to discover new members in your area.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                onPressed: _loadFeed,
+                                icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
+                                label: const Text('Refresh Feed', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFE91E63),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
               ),
