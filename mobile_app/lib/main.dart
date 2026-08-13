@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/security/storage_manager.dart';
 import 'core/services/fcm_service.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/profile/onboarding_screen.dart';
+import 'features/splash/splash_screen.dart';
 
 const webFirebaseOptions = FirebaseOptions(
   apiKey: 'AIzaSyDSAqbIIfzeWErV-XdA7NbJ2aus-E0AoFk',
@@ -50,18 +52,10 @@ class RuralHeartApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Project RuralHeart',
+      title: 'UR-Heart',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE91E63),
-          brightness: Brightness.dark,
-        ),
-        fontFamily: 'Roboto',
-      ),
-      home: const RootSplashHandler(),
+      theme: AppTheme.darkTheme,
+      home: const AnimatedSplashScreen(),
     );
   }
 }

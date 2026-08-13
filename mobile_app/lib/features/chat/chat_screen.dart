@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/theme/app_theme.dart';
 import '../subscription/subscription_sheet.dart';
+import 'message_bubble.dart';
 
 class ChatMessage {
   final String id;
@@ -65,11 +67,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
-        title: const Text('Matches & Chats', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Matches & Conversations', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
@@ -78,7 +80,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE91E63)))
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
           : _conversations.isEmpty
               ? Center(
                   child: Padding(
@@ -89,10 +91,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: Colors.grey[900],
+                            color: AppTheme.cardColor,
                             shape: BoxShape.circle,
+                            border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
                           ),
-                          child: const Icon(Icons.mark_chat_read_outlined, size: 64, color: Color(0xFFE91E63)),
+                          child: const Icon(Icons.favorite_outline, size: 64, color: AppTheme.primaryColor),
                         ),
                         const SizedBox(height: 24),
                         const Text(
@@ -101,7 +104,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Keep swiping on the feed to find your match and start chatting.',
+                          'Keep swiping on the feed to find your match and start chatting over Chai.',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 14, color: Colors.grey),
                         ),
@@ -137,11 +140,28 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           _fetchConversations();
                         }
                       },
-                      leading: CircleAvatar(
-                        radius: 26,
-                        backgroundColor: const Color(0xFFE91E63),
-                        backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                        child: avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
+                      leading: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: AppTheme.primaryColor,
+                            backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                            child: avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
+                          ),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: Colors.greenAccent,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppTheme.backgroundColor, width: 2),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       title: Text(
                         matchName,
@@ -280,11 +300,11 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       barrierDismissible: true,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppTheme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.ondemand_video, color: Colors.amber, size: 26),
+            Icon(Icons.ondemand_video, color: AppTheme.secondaryColor, size: 26),
             SizedBox(width: 10),
             Text('In-Chat Video Ad (10s)', style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
@@ -296,7 +316,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Dismiss', style: TextStyle(color: Colors.amber)),
+            child: const Text('Dismiss', style: TextStyle(color: AppTheme.secondaryColor)),
           ),
         ],
       ),
@@ -319,8 +339,177 @@ class _ChatScreenState extends State<ChatScreen> {
         _inChatAdTimer?.cancel();
       }
     } else {
-      _sendMessage(text: '📷 Shared attachment');
+      _sendMessage(text: '📷 Shared photo attachment');
     }
+  }
+
+  Future<void> _sendChaiInviteDirect() async {
+    try {
+      final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
+      await ApiClient.instance.postSendChaiInvite(receiverId: targetId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('☕ ₹9 Chai Invite sent to ${widget.matchName}!'),
+          backgroundColor: AppTheme.secondaryColor,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      _sendMessage(text: '☕ I invited you for a Chai date!');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Chai Invite notice: ${e.toString()}')),
+      );
+    }
+  }
+
+  void _showMatchProfileBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.82,
+        decoration: const BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[700],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    // Profile Header Image
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: AppTheme.primaryColor,
+                      backgroundImage: widget.matchAvatarUrl.isNotEmpty ? NetworkImage(widget.matchAvatarUrl) : null,
+                      child: widget.matchAvatarUrl.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          widget.matchName,
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified, color: Colors.blueAccent, size: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black45,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[700]!),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.location_on, size: 14, color: AppTheme.secondaryColor),
+                          SizedBox(width: 4),
+                          Text('Within 3.4 km • Near Saket College', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Bio Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.backgroundColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[800]!),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('About Me', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                          SizedBox(height: 6),
+                          Text(
+                            'Love authentic conversations over evening Chai ☕. Looking for genuine connections on UR-Heart.',
+                            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Quick Action: Send Chai Invite
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _sendChaiInviteDirect();
+                      },
+                      icon: const Text('☕', style: TextStyle(fontSize: 20)),
+                      label: const Text('Send ₹9 Chai Invite'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.secondaryColor,
+                        foregroundColor: Colors.black,
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Report & Block Options
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _showReportDialog();
+                            },
+                            icon: const Icon(Icons.report_problem, color: AppTheme.secondaryColor, size: 18),
+                            label: const Text('Report', style: TextStyle(color: AppTheme.secondaryColor)),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppTheme.secondaryColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _showBlockConfirmDialog();
+                            },
+                            icon: const Icon(Icons.block, color: Colors.redAccent, size: 18),
+                            label: const Text('Block', style: TextStyle(color: Colors.redAccent)),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.redAccent),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _sendMessage({String? mediaUrl, String? text}) async {
@@ -372,11 +561,11 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
-              const Icon(Icons.report_problem, color: Colors.amber),
+              const Icon(Icons.report_problem, color: AppTheme.secondaryColor),
               const SizedBox(width: 10),
               Text('Report ${widget.matchName}', style: const TextStyle(color: Colors.white, fontSize: 18)),
             ],
@@ -389,7 +578,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: 10),
               DropdownButton<String>(
                 value: selectedReason,
-                dropdownColor: Colors.grey[850],
+                dropdownColor: AppTheme.surfaceColor,
                 isExpanded: true,
                 style: const TextStyle(color: Colors.white),
                 items: const [
@@ -412,7 +601,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   hintText: 'Additional details (optional)...',
                   hintStyle: const TextStyle(color: Colors.grey),
                   filled: true,
-                  fillColor: Colors.grey[800],
+                  fillColor: AppTheme.backgroundColor,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -436,7 +625,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                   messenger.showSnackBar(
                     const SnackBar(
-                      content: Text('Report submitted. Thank you for keeping RuralHeart safe.'),
+                      content: Text('Report submitted. Thank you for keeping UR-Heart safe.'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -446,8 +635,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber[800]),
-              child: const Text('Submit Report', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor, foregroundColor: Colors.black),
+              child: const Text('Submit Report'),
             ),
           ],
         ),
@@ -459,7 +648,7 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppTheme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -469,7 +658,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         content: const Text(
-          'They will no longer be able to see your profile or send you messages on RuralHeart.',
+          'They will no longer be able to see your profile or send you messages on UR-Heart.',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -509,44 +698,68 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppTheme.surfaceColor,
         titleSpacing: 0,
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: const Color(0xFFE91E63),
-              backgroundImage: widget.matchAvatarUrl.isNotEmpty ? NetworkImage(widget.matchAvatarUrl) : null,
-              child: widget.matchAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.matchName, style: const TextStyle(fontSize: 16, color: Colors.white)),
-                Text(
-                  _isTyping ? 'typing...' : 'Online',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _isTyping ? const Color(0xFFE91E63) : Colors.greenAccent,
+        title: InkWell(
+          onTap: _showMatchProfileBottomSheet,
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppTheme.primaryColor,
+                    backgroundImage: widget.matchAvatarUrl.isNotEmpty ? NetworkImage(widget.matchAvatarUrl) : null,
+                    child: widget.matchAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
                   ),
-                ),
-              ],
-            ),
-          ],
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.greenAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.surfaceColor, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.matchName, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(
+                    _isTyping ? 'typing...' : 'Online',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _isTyping ? AppTheme.primaryColor : Colors.greenAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         actions: [
+          // Quick Action: Send ₹9 Chai Invite
           IconButton(
-            icon: const Icon(Icons.call_outlined, color: Colors.white),
-            onPressed: () {},
+            tooltip: 'Send ₹9 Chai Invite',
+            icon: const Text('☕', style: TextStyle(fontSize: 20)),
+            onPressed: _sendChaiInviteDirect,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
-            color: Colors.grey[900],
+            color: AppTheme.cardColor,
             onSelected: (val) {
-              if (val == 'report') {
+              if (val == 'profile') {
+                _showMatchProfileBottomSheet();
+              } else if (val == 'report') {
                 _showReportDialog();
               } else if (val == 'block') {
                 _showBlockConfirmDialog();
@@ -554,10 +767,20 @@ class _ChatScreenState extends State<ChatScreen> {
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.account_circle, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Text('View Profile', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'report',
                 child: Row(
                   children: [
-                    Icon(Icons.report, color: Colors.amber, size: 18),
+                    Icon(Icons.report, color: AppTheme.secondaryColor, size: 18),
                     SizedBox(width: 8),
                     Text('Report User', style: TextStyle(color: Colors.white)),
                   ],
@@ -583,22 +806,22 @@ class _ChatScreenState extends State<ChatScreen> {
           if (!_isPremiumUser)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              color: Colors.amber.withValues(alpha: 0.15),
+              color: AppTheme.secondaryColor.withValues(alpha: 0.15),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: Colors.amber),
+                  const Icon(Icons.info_outline, size: 16, color: AppTheme.secondaryColor),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Free Tier: Next 10s video ad in ${300 - _secondsActive}s',
-                      style: const TextStyle(fontSize: 11, color: Colors.amber),
+                      style: const TextStyle(fontSize: 11, color: AppTheme.secondaryColor),
                     ),
                   ),
                   InkWell(
                     onTap: _handleAttachmentTap,
                     child: const Text(
                       'Upgrade ₹99',
-                      style: TextStyle(fontSize: 11, color: Color(0xFFE91E63), fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 11, color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -608,7 +831,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Safe WhatsApp Bridge Progress & Unlock Header Widget
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: Colors.grey[900],
+            color: AppTheme.surfaceColor,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -674,123 +897,135 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _messages.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.waving_hand, size: 48, color: Colors.amber),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Say Hello to ${widget.matchName}!',
-                          style: const TextStyle(fontSize: 16, color: Colors.white70),
-                        ),
-                      ],
+                    child: Container(
+                      margin: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.all(28),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardColor,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.favorite_rounded, color: AppTheme.primaryColor, size: 36),
+                                SizedBox(width: 4),
+                                Text('☕', style: TextStyle(fontSize: 26)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Say Hi to ${widget.matchName}! ✨',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'You matched! Start a warm conversation over Chai or share a photo.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => _sendMessage(text: 'Hi 👋 Great to match with you!'),
+                            icon: const Icon(Icons.waving_hand, size: 18),
+                            label: const Text('Send Quick Hi 👋'),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
                       final isMe = msg.senderId == 'current_user_id';
+                      final String timeStr = '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}';
 
-                      return Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                          decoration: BoxDecoration(
-                            color: isMe ? const Color(0xFFE91E63) : Colors.grey[850],
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(16),
-                              topRight: const Radius.circular(16),
-                              bottomLeft: Radius.circular(isMe ? 16 : 4),
-                              bottomRight: Radius.circular(isMe ? 4 : 16),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                msg.text,
-                                style: const TextStyle(color: Colors.white, fontSize: 15),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                                    style: const TextStyle(fontSize: 10, color: Colors.white60),
-                                  ),
-                                  if (isMe) ...[
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.done_all, size: 14, color: Colors.blueAccent),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+                      return MessageBubbleWidget(
+                        message: msg.text,
+                        isMe: isMe,
+                        time: timeStr,
+                        mediaUrl: msg.mediaUrl,
+                        senderAvatarUrl: widget.matchAvatarUrl,
                       );
                     },
                   ),
           ),
 
-          // Bottom Messaging Bar
+          // Modern Floating Input Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-            color: Colors.grey[900],
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+            color: AppTheme.surfaceColor,
             child: SafeArea(
               child: Row(
                 children: [
-                  // Attachment / Paywall Lock Button
+                  // Attachment Button
                   IconButton(
                     icon: Icon(
                       _isPremiumUser ? Icons.photo_camera : Icons.lock_outline,
-                      color: _isPremiumUser ? Colors.blueAccent : Colors.amber,
+                      color: _isPremiumUser ? Colors.blueAccent : AppTheme.secondaryColor,
                     ),
                     onPressed: _handleAttachmentTap,
                   ),
 
-                  // Message Input
+                  // Floating Input Field
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
-                        color: Colors.black,
+                        color: AppTheme.backgroundColor,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(color: Colors.grey[800]!),
                       ),
-                      child: TextField(
-                        controller: _messageController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          hintText: 'Type a message...',
-                          hintStyle: TextStyle(color: Colors.grey),
-                          border: InputBorder.none,
-                        ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _messageController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: const InputDecoration(
+                                hintText: 'Type a warm message...',
+                                hintStyle: TextStyle(color: Colors.grey),
+                                border: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.sentiment_satisfied_alt, color: Colors.white54, size: 22),
+                            onPressed: () {
+                              _messageController.text += ' 😊';
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
 
-                  // Voice Note Button
-                  IconButton(
-                    icon: const Icon(Icons.mic, color: Colors.grey),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Voice note feature active.')),
-                      );
-                    },
-                  ),
-
-                  // Send Button
-                  IconButton(
-                    icon: const Icon(Icons.send_rounded, color: Color(0xFFE91E63)),
-                    onPressed: () => _sendMessage(),
+                  // Micro-animated Send Button
+                  Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: AppTheme.sentBubbleGradient,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      onPressed: () => _sendMessage(),
+                    ),
                   ),
                 ],
               ),

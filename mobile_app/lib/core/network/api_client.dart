@@ -368,4 +368,11 @@ class ApiClient {
       if (planType != null) 'plan_type': planType,
     });
   }
+
+  // 27. Send Chai Invite (POST /intent/send-chai-invite)
+  Future<Response> postSendChaiInvite({required String receiverId}) async {
+    return await dio.post('/intent/send-chai-invite', data: {
+      'receiver_id': receiverId,
+    });
+  }
 }
