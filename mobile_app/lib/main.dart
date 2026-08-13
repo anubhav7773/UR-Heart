@@ -23,10 +23,25 @@ const webFirebaseOptions = FirebaseOptions(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 1. Explicit Safe Firebase Initialization before runApp
   try {
-    if (kIsWeb) {
-      await Firebase.initializeApp(options: webFirebaseOptions);
-    } else {
+    if (Firebase.apps.isEmpty) {
+      if (kIsWeb) {
+        await Firebase.initializeApp(options: webFirebaseOptions);
+      } else {
+        await Firebase.initializeApp();
+      }
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('Firebase initializeApp notice: ${e.toString()}');
+    }
+  }
+
+  // 2. Safe Mobile Ads & AppCheck Initialization
+  try {
+    if (!kIsWeb) {
       await MobileAds.instance.initialize();
       await MobileAds.instance.updateRequestConfiguration(
         RequestConfiguration(
@@ -46,9 +61,10 @@ void main() async {
     await FcmService.instance.initialize();
   } catch (e) {
     if (kDebugMode) {
-      print('Firebase / AdMob initialization notice: ${e.toString()}');
+      print('AdMob / AppCheck initialization notice: ${e.toString()}');
     }
   }
+
   runApp(const RuralHeartApp());
 }
 

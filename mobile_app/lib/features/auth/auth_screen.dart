@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -87,6 +88,12 @@ class _AuthScreenState extends State<AuthScreen> {
       }
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Firebase Initialization Safeguard
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
+
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -471,7 +478,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
               const SizedBox(height: 24),
               const Text(
-                'By signing in, you agree to RuralHeart\'s Terms of Service & Privacy Policy.',
+                "By signing in, you agree to UR Heart's Terms of Service & Privacy Policy.",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
