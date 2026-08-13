@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
-import '../profile/profile_screen.dart';
-import '../feed/feed_screen.dart';
+import '../home/home_screen.dart';
+import '../profile/onboarding_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -48,12 +48,12 @@ class _AuthScreenState extends State<AuthScreen> {
     if (isComplete) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const FeedScreen()),
+        MaterialPageRoute(builder: (context) => const MainHomeScreen()),
       );
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
       );
     }
   }

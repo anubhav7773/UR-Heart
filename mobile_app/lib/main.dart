@@ -1,11 +1,12 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'core/security/storage_manager.dart';
 import 'features/auth/auth_screen.dart';
-import 'features/profile/profile_screen.dart';
-import 'features/feed/feed_screen.dart';
+import 'features/home/home_screen.dart';
+import 'features/profile/onboarding_screen.dart';
 
 const webFirebaseOptions = FirebaseOptions(
   apiKey: 'AIzaSyDSAqbIIfzeWErV-XdA7NbJ2aus-E0AoFk',
@@ -59,7 +60,6 @@ class RuralHeartApp extends StatelessWidget {
     );
   }
 }
-
 class RootSplashHandler extends StatefulWidget {
   const RootSplashHandler({super.key});
 
@@ -75,6 +75,7 @@ class _RootSplashHandlerState extends State<RootSplashHandler> {
   }
 
   Future<void> _checkAuthState() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
     final token = await StorageManager.instance.getAuthToken();
     final isComplete = await StorageManager.instance.isProfileComplete();
 
@@ -82,16 +83,16 @@ class _RootSplashHandlerState extends State<RootSplashHandler> {
 
     if (!mounted) return;
 
-    if (token != null && token.isNotEmpty) {
+    if (currentUser != null || (token != null && token.isNotEmpty)) {
       if (isComplete) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const FeedScreen()),
+          MaterialPageRoute(builder: (context) => const MainHomeScreen()),
         );
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
         );
       }
     } else {

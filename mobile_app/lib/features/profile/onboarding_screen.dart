@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/security/storage_manager.dart';
-import '../feed/feed_screen.dart';
+import '../home/home_screen.dart';
 import 'profile_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -132,7 +132,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const FeedScreen()),
+          MaterialPageRoute(builder: (context) => const MainHomeScreen()),
         );
       } else {
         final errText = response.data != null ? response.data.toString() : 'HTTP ${response.statusCode}';

@@ -134,7 +134,7 @@ class _FeedScreenState extends State<FeedScreen> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ChatScreen()),
+                MaterialPageRoute(builder: (context) => const ConversationsScreen()),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE91E63)),
@@ -226,7 +226,7 @@ class _FeedScreenState extends State<FeedScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ChatScreen()),
+                MaterialPageRoute(builder: (context) => const ConversationsScreen()),
               );
             },
           ),

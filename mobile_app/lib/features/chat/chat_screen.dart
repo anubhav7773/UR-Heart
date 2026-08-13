@@ -28,15 +28,143 @@ class ChatMessage {
   });
 }
 
+class ConversationsScreen extends StatefulWidget {
+  const ConversationsScreen({super.key});
+
+  @override
+  State<ConversationsScreen> createState() => _ConversationsScreenState();
+}
+
+class _ConversationsScreenState extends State<ConversationsScreen> {
+  bool _isLoading = true;
+  List<dynamic> _conversations = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchConversations();
+  }
+
+  Future<void> _fetchConversations() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await ApiClient.instance.getChatConversations();
+      if (response.data != null && response.data['data'] != null) {
+        final List<dynamic> list = response.data['data'];
+        setState(() {
+          _conversations = list;
+        });
+      }
+    } catch (e) {
+      // Empty list fallback on network errors
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        title: const Text('Matches & Chats', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _fetchConversations,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE91E63)))
+          : _conversations.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[900],
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.mark_chat_read_outlined, size: 64, color: Color(0xFFE91E63)),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'No matches yet!',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Keep swiping on the feed to find your match and start chatting.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: _conversations.length,
+                  itemBuilder: (context, index) {
+                    final item = _conversations[index];
+                    final String matchId = item['match_id'] ?? item['id'] ?? '';
+                    final String matchName = item['match_name'] ?? item['full_name'] ?? 'Match';
+                    final String avatarUrl = item['avatar_url'] ?? item['photo_url'] ?? '';
+                    final String lastMsg = item['last_message'] ?? 'Matched! Say hello 👋';
+
+                    return ListTile(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChatScreen(
+                              matchId: matchId,
+                              matchName: matchName,
+                              matchAvatarUrl: avatarUrl,
+                            ),
+                          ),
+                        );
+                      },
+                      leading: CircleAvatar(
+                        radius: 26,
+                        backgroundColor: const Color(0xFFE91E63),
+                        backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                        child: avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
+                      ),
+                      title: Text(
+                        matchName,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      subtitle: Text(
+                        lastMsg,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    );
+                  },
+                ),
+    );
+  }
+}
+
 class ChatScreen extends StatefulWidget {
   final String matchId;
   final String matchName;
   final String matchAvatarUrl;
   const ChatScreen({
     super.key,
-    this.matchId = 'match_test_123',
-    this.matchName = 'Priya',
-    this.matchAvatarUrl = 'https://r2.ruralheart.com/priya_1.webp',
+    required this.matchId,
+    required this.matchName,
+    this.matchAvatarUrl = '',
   });
 
   @override
@@ -53,7 +181,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _secondsActive = 0;
 
   // Safe WhatsApp Bridge State
-  int _mutualMessageCount = 12;
+  int _mutualMessageCount = 0;
   bool _isWhatsAppUnlocked = false;
   String? _unlockedPhoneNumber;
 
@@ -117,7 +245,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'];
         setState(() {
-          _mutualMessageCount = data['mutual_message_count'] ?? 12;
+          _mutualMessageCount = data['mutual_message_count'] ?? 0;
           _isWhatsAppUnlocked = data['is_whatsapp_unlocked'] ?? false;
           _unlockedPhoneNumber = data['phone_number'];
         });
@@ -183,11 +311,11 @@ class _ChatScreenState extends State<ChatScreen> {
         _inChatAdTimer?.cancel();
       }
     } else {
-      _sendMessage(mediaUrl: 'https://r2.ruralheart.com/chat/sample_photo.webp', text: '📷 Shared a photo');
+      _sendMessage(text: '📷 Shared attachment');
     }
   }
 
-  void _sendMessage({String? mediaUrl, String? text}) {
+  Future<void> _sendMessage({String? mediaUrl, String? text}) async {
     final String content = text ?? _messageController.text.trim();
     if (content.isEmpty && mediaUrl == null) return;
 
@@ -204,12 +332,18 @@ class _ChatScreenState extends State<ChatScreen> {
       _messageController.clear();
       _mutualMessageCount++;
 
-      // Check if threshold of 15 mutual messages is met
       if (_mutualMessageCount >= 15 && !_isWhatsAppUnlocked) {
         _isWhatsAppUnlocked = true;
-        _unlockedPhoneNumber = "+91 98765 43210";
       }
     });
+
+    try {
+      await ApiClient.instance.sendMessage(
+        matchId: widget.matchId,
+        content: content,
+        mediaUrl: mediaUrl,
+      );
+    } catch (_) {}
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -234,7 +368,8 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: const Color(0xFFE91E63),
-              backgroundImage: NetworkImage(widget.matchAvatarUrl),
+              backgroundImage: widget.matchAvatarUrl.isNotEmpty ? NetworkImage(widget.matchAvatarUrl) : null,
+              child: widget.matchAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
             ),
             const SizedBox(width: 12),
             Column(
@@ -330,7 +465,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         const SizedBox(height: 2),
                         Text(
                           _isWhatsAppUnlocked
-                              ? 'WhatsApp: ${_unlockedPhoneNumber ?? "+91 98765 43210"}'
+                              ? 'WhatsApp: ${_unlockedPhoneNumber ?? "Contact Available"}'
                               : 'Mutual Messages: $_mutualMessageCount/15 to reveal WhatsApp contact',
                           style: TextStyle(
                             fontSize: 11,
@@ -358,57 +493,71 @@ class _ChatScreenState extends State<ChatScreen> {
 
           // Messages List View
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final isMe = msg.senderId == 'current_user_id';
-
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFFE91E63) : Colors.grey[850],
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 16),
-                      ),
-                    ),
+            child: _messages.isEmpty
+                ? Center(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        const Icon(Icons.waving_hand, size: 48, color: Colors.amber),
+                        const SizedBox(height: 12),
                         Text(
-                          msg.text,
-                          style: const TextStyle(color: Colors.white, fontSize: 15),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(fontSize: 10, color: Colors.white60),
-                            ),
-                            if (isMe) ...[
-                              const SizedBox(width: 4),
-                              const Icon(Icons.done_all, size: 14, color: Colors.blueAccent),
-                            ],
-                          ],
+                          'Say Hello to ${widget.matchName}!',
+                          style: const TextStyle(fontSize: 16, color: Colors.white70),
                         ),
                       ],
                     ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16.0),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      final isMe = msg.senderId == 'current_user_id';
+
+                      return Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                          decoration: BoxDecoration(
+                            color: isMe ? const Color(0xFFE91E63) : Colors.grey[850],
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(16),
+                              topRight: const Radius.circular(16),
+                              bottomLeft: Radius.circular(isMe ? 16 : 4),
+                              bottomRight: Radius.circular(isMe ? 4 : 16),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                msg.text,
+                                style: const TextStyle(color: Colors.white, fontSize: 15),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
+                                    style: const TextStyle(fontSize: 10, color: Colors.white60),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.done_all, size: 14, color: Colors.blueAccent),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
 
           // Bottom Messaging Bar
@@ -454,7 +603,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     icon: const Icon(Icons.mic, color: Colors.grey),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Voice note recorded (Unlimited on Free & Premium)')),
+                        const SnackBar(content: Text('Voice note feature active.')),
                       );
                     },
                   ),
