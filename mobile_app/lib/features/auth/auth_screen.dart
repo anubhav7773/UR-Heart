@@ -244,10 +244,10 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Project RuralHeart',
+                'UR Heart',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   letterSpacing: 1.2,
@@ -255,9 +255,9 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Dil Se Dil Tak • Safe & Verified Dating',
+                "UR Heart • India's Most Honest & Affordable Dating App",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: TextStyle(fontSize: 13, color: Colors.amber, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 28),
 

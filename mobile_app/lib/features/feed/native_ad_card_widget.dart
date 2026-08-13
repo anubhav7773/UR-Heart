@@ -7,7 +7,7 @@ class NativeAdCardWidget extends StatefulWidget {
   final String adUnitId;
   const NativeAdCardWidget({
     super.key,
-    this.adUnitId = 'ca-app-pub-3940256099942544/6300978111', // Test Banner/Native ID
+    this.adUnitId = 'ca-app-pub-3940256099942544/2247696110', // Official Android Native Test Ad Unit ID
   });
 
   @override
@@ -113,7 +113,7 @@ class _NativeAdCardWidgetState extends State<NativeAdCardWidget> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Discover local products & exclusive offers curated for your area on RuralHeart.',
+                          'Discover local products & exclusive offers curated for your area on UR Heart.',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
                         ),

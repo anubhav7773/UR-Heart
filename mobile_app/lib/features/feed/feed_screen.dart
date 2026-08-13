@@ -3,6 +3,7 @@ import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/services/location_service.dart';
 import '../chat/chat_screen.dart';
+import '../subscription/subscription_sheet.dart';
 import 'native_ad_card_widget.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -519,7 +520,7 @@ class _FeedScreenState extends State<FeedScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('RuralHeart', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('UR Heart', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
@@ -780,52 +781,103 @@ class _FeedScreenState extends State<FeedScreen> {
                       )
                     : Container()))
                     : Center(
-                        child: Container(
-                          margin: const EdgeInsets.all(20),
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[900],
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.3)),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 4)),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE91E63).withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
+                        child: SingleChildScrollView(
+                          child: Container(
+                            margin: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[900],
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.3)),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 4)),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(18),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE91E63).withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.favorite_border_rounded, size: 48, color: Color(0xFFE91E63)),
                                 ),
-                                child: const Icon(Icons.explore_off_rounded, size: 50, color: Color(0xFFE91E63)),
-                              ),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'No profiles around you right now!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'Expand your distance filter or check back later to discover new members in your area.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
-                              ),
-                              const SizedBox(height: 24),
-                              ElevatedButton.icon(
-                                onPressed: _loadFeed,
-                                icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
-                                label: const Text('Refresh Feed', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFE91E63),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'No members nearby right now! ✨',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                const Text(
+                                  "You've seen all active profiles in your current radius.",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 13, color: Colors.white70),
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Action 1: Expand Radius (up to 100 km)
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _maxDistanceKm = 100.0;
+                                    });
+                                    _loadFeed();
+                                  },
+                                  icon: const Icon(Icons.map_rounded, color: Colors.white, size: 18),
+                                  label: const Text('Expand Distance Radius (up to 100 km)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(48),
+                                    backgroundColor: const Color(0xFFE91E63),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Action 2: Send Chai Invite Nationwide
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (context) => const SubscriptionSheet(),
+                                    );
+                                  },
+                                  icon: const Text('☕', style: TextStyle(fontSize: 18)),
+                                  label: const Text('Send a Chai Invite (₹9) to Active Members', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(48),
+                                    backgroundColor: Colors.amber[800],
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Daily Check-in Prompt
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey[800]!),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.schedule, size: 14, color: Colors.amber),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        "Check back at 8 PM for tonight's fresh matches!",
+                                        style: TextStyle(fontSize: 11, color: Colors.white70),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

@@ -114,7 +114,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
         final options = {
           'key': razorpayKey,
           'amount': (amountInr * 100).toInt(),
-          'name': 'Project RuralHeart',
+          'name': 'UR Heart',
           'description': '₹${amountInr.toStringAsFixed(0)} Sachet Micro-Transaction',
           'order_id': orderId,
           'timeout': 180,
