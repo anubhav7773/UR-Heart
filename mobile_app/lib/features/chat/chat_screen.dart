@@ -117,9 +117,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   itemCount: _conversations.length,
                   itemBuilder: (context, index) {
                     final item = _conversations[index];
-                    final String matchId = item['match_id'] ?? item['id'] ?? '';
-                    final String matchName = item['match_name'] ?? item['full_name'] ?? 'Match';
-                    final String avatarUrl = item['avatar_url'] ?? item['photo_url'] ?? '';
+                    final String matchId = item['id'] ?? item['match_id'] ?? '';
+                    final String matchName = item['target_user_name'] ?? item['full_name'] ?? item['match_name'] ?? 'User';
+                    final String avatarUrl = item['target_user_photo'] ?? item['avatar_url'] ?? item['photo_url'] ?? '';
                     final String lastMsg = item['last_message'] ?? 'Matched! Say hello 👋';
 
                     return ListTile(

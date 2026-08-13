@@ -39,9 +39,11 @@ class ConnectionManager:
             if websocket in self.active_connections[match_id]:
                 self.active_connections[match_id].remove(websocket)
 
-    async def broadcast(self, match_id: str, message: dict):
+    async def broadcast(self, match_id: str, message: dict, sender_ws: Optional[WebSocket] = None):
         if match_id in self.active_connections:
             for connection in list(self.active_connections[match_id]):
+                if sender_ws is not None and connection == sender_ws:
+                    continue  # Never echo message back to its originator socket
                 try:
                     await connection.send_json(message)
                 except Exception:
@@ -55,12 +57,13 @@ ws_manager = ConnectionManager()
 async def chat_websocket_endpoint(websocket: WebSocket, match_id: str):
     """
     Bidirectional real-time WebSocket connection for instant chat message delivery.
+    Skips echoing back to originator socket to prevent client duplication loops.
     """
     await ws_manager.connect(match_id, websocket)
     try:
         while True:
             data = await websocket.receive_json()
-            await ws_manager.broadcast(match_id, data)
+            await ws_manager.broadcast(match_id, data, sender_ws=websocket)
     except WebSocketDisconnect:
         ws_manager.disconnect(match_id, websocket)
     except Exception:

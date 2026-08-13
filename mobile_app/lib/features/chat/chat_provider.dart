@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
@@ -13,6 +14,39 @@ class ChatProvider extends ChangeNotifier {
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get isLoading => _isLoading;
   String get currentUserId => _currentUserId;
+
+  static double calculateHaversineDistance({
+    required double lat1,
+    required double lon1,
+    required double lat2,
+    required double lon2,
+  }) {
+    const double R = 6371.0;
+    final double dLat = (lat2 - lat1) * (math.pi / 180.0);
+    final double dLon = (lon2 - lon1) * (math.pi / 180.0);
+
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * (math.pi / 180.0)) *
+            math.cos(lat2 * (math.pi / 180.0)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return R * c;
+  }
+
+  static String getFormattedDistanceLabel(double distKm) {
+    if (distKm < 1.0) {
+      return "Less than 1 km away";
+    } else if (distKm <= 2.0) {
+      return "Within 2 km";
+    } else if (distKm <= 5.0) {
+      return "Within 5 km";
+    } else if (distKm <= 10.0) {
+      return "Within 10 km";
+    } else {
+      return "Within ${distKm.ceil()} km";
+    }
+  }
 
   Future<void> initialize() async {
     _currentUserId = await StorageManager.instance.getUserId() ?? '';
