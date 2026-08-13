@@ -478,3 +478,17 @@ class ReportUserRequest(BaseModel):
 class ReportUserData(BaseModel):
     report_id: str
     message: str = "Report submitted successfully."
+
+
+# 15. Payment Verification Schemas
+class VerifyPaymentRequest(BaseModel):
+    razorpay_payment_id: str
+    razorpay_order_id: str
+    razorpay_signature: str
+    plan_type: Optional[str] = "monthly"
+
+
+class VerifyPaymentData(BaseModel):
+    verified: bool = True
+    plan_type: str
+    message: str = "Payment verified successfully."

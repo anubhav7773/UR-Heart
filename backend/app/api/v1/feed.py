@@ -32,6 +32,7 @@ from app.models.schemas import (
 )
 from app.services.geo_engine import GeoEngineService
 from app.services.ad_engine import AdEngineService
+from app.services.notification_engine import NotificationEngineService
 
 router = APIRouter(prefix="/feed", tags=["Discovery Feed & Swiping Engine"])
 
@@ -209,6 +210,19 @@ async def swipe_action(
                     )
                     db.add(new_match)
                     await db.commit()
+
+                # Trigger match push notification to target user
+                target_user_res = await db.execute(select(User).where(User.id == target_uuid))
+                target_user_obj = target_user_res.scalars().first()
+                swiper_res = await db.execute(select(User).where(User.id == user_uuid))
+                swiper_user_obj = swiper_res.scalars().first()
+                swiper_name = swiper_user_obj.full_name if swiper_user_obj else "Someone"
+
+                if target_user_obj and target_user_obj.fcm_token:
+                    NotificationEngineService.send_match_notification(
+                        target_fcm_token=target_user_obj.fcm_token,
+                        matched_user_name=swiper_name,
+                    )
         except Exception:
             is_match = True
 

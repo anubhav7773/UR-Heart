@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'core/security/storage_manager.dart';
+import 'core/services/fcm_service.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/profile/onboarding_screen.dart';
@@ -31,9 +32,11 @@ void main() async {
       appleProvider: AppleProvider.debug,
       webProvider: ReCaptchaV3Provider('6LeA_sample_site_key'),
     );
+
+    await FcmService.instance.initialize();
   } catch (e) {
     if (kDebugMode) {
-      print('Firebase App Check initialization notice: ${e.toString()}');
+      print('Firebase / FCM initialization notice: ${e.toString()}');
     }
   }
   runApp(const RuralHeartApp());

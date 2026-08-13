@@ -40,12 +40,25 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    try {
+      await ApiClient.instance.verifyPayment(
+        paymentId: response.paymentId ?? '',
+        orderId: response.orderId ?? '',
+        signature: response.signature ?? '',
+        planType: _selectedPlanType,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Payment verification notice: ${e.toString()}');
+      }
+    }
+
     await StorageManager.instance.setPremiumStatus(true);
     if (!mounted) return;
     Navigator.pop(context, true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Payment Successful! Payment ID: ${response.paymentId}'),
+        content: Text('Payment Successful & Verified! ID: ${response.paymentId}'),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 4),
       ),

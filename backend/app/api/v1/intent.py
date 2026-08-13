@@ -5,7 +5,8 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import get_current_user_id
-from app.models.orm import ChaiStatus, ChaiInvite
+from app.models.orm import ChaiStatus, ChaiInvite, User
+from app.services.notification_engine import NotificationEngineService
 from app.models.schemas import (
     APIResponse,
     ChaiStatusRequest,
@@ -87,6 +88,19 @@ async def send_chai_invite(
         )
         db.add(new_invite)
         await db.commit()
+
+        # Trigger push notification to receiver
+        sender_res = await db.execute(select(User).where(User.id == sender_uuid))
+        sender_user = sender_res.scalars().first()
+        recip_res = await db.execute(select(User).where(User.id == receiver_uuid))
+        recip_user = recip_res.scalars().first()
+
+        sender_name = sender_user.full_name if sender_user else "Someone"
+        if recip_user and recip_user.fcm_token:
+            NotificationEngineService.send_chai_invite_notification(
+                target_fcm_token=recip_user.fcm_token,
+                sender_name=sender_name,
+            )
     except Exception:
         pass
 

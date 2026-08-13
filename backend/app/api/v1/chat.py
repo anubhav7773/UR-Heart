@@ -7,7 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user_id
-from app.models.orm import Match, ChatMessage, User, UserPhoto
+from app.models.orm import Match, ChatMessage, User, UserPhoto, BlockedUser
+from app.services.notification_engine import NotificationEngineService
 from app.models.schemas import (
     APIResponse,
     MatchRead,
@@ -162,6 +163,25 @@ async def send_chat_message(
 
     await db.commit()
     await db.refresh(new_msg)
+
+    # Trigger push notification to recipient
+    try:
+        if match_obj:
+            recipient_id = match_obj.user2_id if match_obj.user1_id == sender_uuid else match_obj.user1_id
+            recip_res = await db.execute(select(User).where(User.id == recipient_id))
+            recip_user = recip_res.scalars().first()
+            sender_res = await db.execute(select(User).where(User.id == sender_uuid))
+            sender_user = sender_res.scalars().first()
+            sender_name = sender_user.full_name if sender_user else "Matched User"
+
+            if recip_user and recip_user.fcm_token:
+                NotificationEngineService.send_chat_message_notification(
+                    target_fcm_token=recip_user.fcm_token,
+                    sender_name=sender_name,
+                    message_preview=payload.content or "Sent you a media attachment.",
+                )
+    except Exception:
+        pass
 
     return APIResponse(
         success=True,

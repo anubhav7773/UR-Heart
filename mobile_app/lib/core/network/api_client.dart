@@ -336,4 +336,19 @@ class ApiClient {
       if (details != null) 'details': details,
     });
   }
+
+  // 26. Verify Razorpay Payment (POST /payments/verify)
+  Future<Response> verifyPayment({
+    required String paymentId,
+    required String orderId,
+    required String signature,
+    String? planType,
+  }) async {
+    return await dio.post('/payments/verify', data: {
+      'razorpay_payment_id': paymentId,
+      'razorpay_order_id': orderId,
+      'razorpay_signature': signature,
+      if (planType != null) 'plan_type': planType,
+    });
+  }
 }
