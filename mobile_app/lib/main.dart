@@ -27,8 +27,14 @@ void main() async {
     if (kIsWeb) {
       await Firebase.initializeApp(options: webFirebaseOptions);
     } else {
-      await Firebase.initializeApp();
       await MobileAds.instance.initialize();
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          testDeviceIds: [
+            '33BE2250B43518CCDA7DE426D04EE231', // Personal Developer Test Device Safeguard
+          ],
+        ),
+      );
     }
 
     await FirebaseAppCheck.instance.activate(

@@ -565,7 +565,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 child: hasCards
                     ? (cardType == 'ad_slot'
                         ? NativeAdCardWidget(
-                            adUnitId: currentCard?['ad_config']?['ad_unit_id'] ?? 'ca-app-pub-3940256099942544/6300978111',
+                            adUnitId: currentCard?['ad_config']?['ad_unit_id'] ?? 'ca-app-pub-5734148065484801/7497381449',
                           )
                         : (profile != null
                             ? Container(

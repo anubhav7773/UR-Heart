@@ -7,7 +7,7 @@ class NativeAdCardWidget extends StatefulWidget {
   final String adUnitId;
   const NativeAdCardWidget({
     super.key,
-    this.adUnitId = 'ca-app-pub-3940256099942544/2247696110', // Official Android Native Test Ad Unit ID
+    this.adUnitId = 'ca-app-pub-5734148065484801/7497381449', // Production Real Native Ad Unit ID
   });
 
   @override
