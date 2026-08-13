@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/services/location_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../subscription/subscription_sheet.dart';
+import 'chat_provider.dart';
 import 'message_bubble.dart';
 
 class ChatMessage {
@@ -216,13 +218,59 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   Timer? _realtimePollingTimer;
 
+  String _activeMatchName = '';
+  String _activeAvatarUrl = '';
+  String _recipientDistanceLabel = 'Online';
+
   @override
   void initState() {
     super.initState();
+    _activeMatchName = widget.matchName;
+    _activeAvatarUrl = widget.matchAvatarUrl;
     _loadUserStatus();
     _fetchWhatsAppBridgeStatus();
+    _fetchRecipientProfile();
     _fetchMessages();
     _startRealtimeStreamListener();
+  }
+
+  Future<void> _fetchRecipientProfile() async {
+    try {
+      final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
+      if (targetId.isNotEmpty) {
+        final response = await ApiClient.instance.dio.get('/profile', queryParameters: {'user_id': targetId});
+        if (response.data != null && response.data['data'] != null) {
+          final data = response.data['data'];
+          if (mounted) {
+            setState(() {
+              final String name = data['full_name'] ?? '';
+              if (name.isNotEmpty) _activeMatchName = name;
+
+              final photos = data['photos'] as List<dynamic>?;
+              if (photos != null && photos.isNotEmpty) {
+                _activeAvatarUrl = photos.first.toString();
+              }
+
+              final myPos = LocationService.instance.currentPosition;
+              final double? rLat = (data['latitude'] as num?)?.toDouble();
+              final double? rLng = (data['longitude'] as num?)?.toDouble();
+
+              if (myPos != null && rLat != null && rLng != null) {
+                final distKm = ChatProvider.calculateHaversineDistance(
+                  lat1: myPos.latitude,
+                  lon1: myPos.longitude,
+                  lat2: rLat,
+                  lon2: rLng,
+                );
+                _recipientDistanceLabel = ChatProvider.getFormattedDistanceLabel(distKm);
+              } else if (data['area_name'] != null) {
+                _recipientDistanceLabel = data['area_name'].toString();
+              }
+            });
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   void _startRealtimeStreamListener() {
@@ -766,8 +814,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: AppTheme.primaryColor,
-                    backgroundImage: widget.matchAvatarUrl.isNotEmpty ? NetworkImage(widget.matchAvatarUrl) : null,
-                    child: widget.matchAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
+                    backgroundImage: _activeAvatarUrl.isNotEmpty ? NetworkImage(_activeAvatarUrl) : null,
+                    child: _activeAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
                   ),
                   Positioned(
                     right: 0,
@@ -788,9 +836,9 @@ class _ChatScreenState extends State<ChatScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.matchName, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(_activeMatchName.isNotEmpty ? _activeMatchName : widget.matchName, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
                   Text(
-                    _isTyping ? 'typing...' : 'Online',
+                    _isTyping ? 'typing...' : 'Online • $_recipientDistanceLabel',
                     style: TextStyle(
                       fontSize: 11,
                       color: _isTyping ? AppTheme.primaryColor : Colors.greenAccent,

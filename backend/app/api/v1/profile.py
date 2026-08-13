@@ -343,3 +343,43 @@ async def update_fcm_token(
         data={"fcm_token": fcm_token}
     )
 
+
+@router.post("/users/location")
+@router.put("/users/location")
+@router.post("/location")
+@router.put("/location")
+async def update_user_location(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Updates user's real-time device GPS coordinates (latitude, longitude) in PostgreSQL database.
+    """
+    lat = payload.get("lat") or payload.get("latitude")
+    lng = payload.get("lng") or payload.get("longitude")
+
+    if lat is None or lng is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="latitude and longitude are required."
+        )
+
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user_obj = user_res.scalars().first()
+
+        if user_obj:
+            user_obj.latitude = float(lat)
+            user_obj.longitude = float(lng)
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="Device GPS location updated successfully.",
+        data={"latitude": float(lat), "longitude": float(lng)}
+    )
+

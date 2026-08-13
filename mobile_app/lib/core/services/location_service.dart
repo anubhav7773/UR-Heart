@@ -64,11 +64,28 @@ class LocationService {
     }
   }
 
+  Future<Position?> updateUserLocation() async {
+    final pos = await getCurrentLocation();
+    if (pos != null) {
+      try {
+        await ApiClient.instance.dio.post('/users/location', data: {
+          'lat': pos.latitude,
+          'lng': pos.longitude,
+        });
+      } catch (_) {}
+    }
+    return pos;
+  }
+
   Future<void> _syncLocationToBackend(double lat, double lng) async {
     try {
       await ApiClient.instance.putProfile({
         'latitude': lat,
         'longitude': lng,
+      });
+      await ApiClient.instance.dio.post('/users/location', data: {
+        'lat': lat,
+        'lng': lng,
       });
       if (kDebugMode) {
         print('User GPS location synced to backend profile.');
