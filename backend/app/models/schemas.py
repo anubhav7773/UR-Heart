@@ -154,7 +154,18 @@ class EmailPasswordLoginRequest(BaseModel):
 class PhotoInput(BaseModel):
     photo_url: str = Field(..., description="Compressed WebP photo URL")
     is_first_impression: bool = Field(False, description="Primary verified facial photo #1")
-    display_order: int = Field(..., ge=1, le=5, description="Display order position 1 to 5")
+    display_order: Optional[int] = Field(1, ge=1, le=50, description="Display order position 1 to 50")
+
+    @field_validator("display_order", mode="before")
+    @classmethod
+    def validate_display_order(cls, v):
+        if v is None or v == "":
+            return 1
+        try:
+            val = int(v)
+            return max(1, min(val, 50))
+        except Exception:
+            return 1
 
 
 class CompleteProfileRequest(BaseModel):

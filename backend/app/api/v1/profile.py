@@ -246,8 +246,8 @@ async def complete_profile(
                     id=uuid.uuid4(),
                     user_id=user_uuid,
                     photo_url=p_input.photo_url,
-                    is_first_impression=p_input.is_first_impression,
-                    display_order=p_input.display_order,
+                    is_first_impression=p_input.is_first_impression if p_input.is_first_impression is not None else (idx == 1),
+                    display_order=p_input.display_order if p_input.display_order is not None else idx,
                 )
                 db.add(photo)
         except Exception:
