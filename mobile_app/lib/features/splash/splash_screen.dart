@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_logo.dart';
 import '../auth/auth_screen.dart';
 import '../home/home_screen.dart';
 import '../profile/onboarding_screen.dart';
@@ -106,51 +107,10 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Animated Pulsing Heart & Chai Icon Stack
+                // Animated Pulsing Heart Icon
                 ScaleTransition(
                   scale: _scaleAnimation,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Pulsing outer aura
-                      Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                              blurRadius: 30,
-                              spreadRadius: 10,
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Core Icon Container
-                      Container(
-                        width: 100,
-                        height: 100,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFE91E63), Color(0xFFFFB300)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.favorite_rounded, color: Colors.white, size: 38),
-                            SizedBox(width: 2),
-                            Text('☕', style: TextStyle(fontSize: 26)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: const AppLogo(size: 100, showGlow: true),
                 ),
                 const SizedBox(height: 32),
 
@@ -161,10 +121,10 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                     children: [
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0xFFE91E63), Color(0xFFFFB300)],
+                          colors: [Color(0xFFE91E63), Color(0xFFFF4081)],
                         ).createShader(bounds),
                         child: const Text(
-                          'UR-Heart',
+                          'UR Heart',
                           style: TextStyle(
                             fontSize: 38,
                             fontWeight: FontWeight.w900,
@@ -175,9 +135,10 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Connect Hearts, Over Chai',
+                        'Connect Hearts • Genuine Connections Across Rural & Urban',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: Colors.white70,
                           letterSpacing: 0.5,

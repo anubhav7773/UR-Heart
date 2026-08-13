@@ -836,7 +836,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                 ),
                                 const SizedBox(height: 10),
 
-                                // Action 2: Send Chai Invite Nationwide
+                                // Action 2: Send Direct Invite Pass
                                 ElevatedButton.icon(
                                   onPressed: () {
                                     showModalBottomSheet(
@@ -846,8 +846,8 @@ class _FeedScreenState extends State<FeedScreen> {
                                       builder: (context) => const SubscriptionSheet(),
                                     );
                                   },
-                                  icon: const Text('☕', style: TextStyle(fontSize: 18)),
-                                  label: const Text('Send a Chai Invite (₹9) to Active Members', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  icon: const Icon(Icons.bolt, color: Colors.black, size: 20),
+                                  label: const Text('Send a Direct Invite Pass (₹9) to Active Members', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
                                   style: ElevatedButton.styleFrom(
                                     minimumSize: const Size.fromHeight(48),
                                     backgroundColor: Colors.amber[800],
@@ -908,13 +908,13 @@ class _FeedScreenState extends State<FeedScreen> {
                     child: const Icon(Icons.favorite, color: Colors.white, size: 40),
                   ),
 
-                  // 3. Send ₹9 Chai Invite Button
+                  // 3. Send ₹9 Direct Invite Button
                   FloatingActionButton(
-                    heroTag: 'btn_chai_invite_deck',
+                    heroTag: 'btn_direct_invite_deck',
                     onPressed: () => _handleSendChaiInvite(targetUserId, firstName),
                     backgroundColor: Colors.amber[800],
                     shape: const CircleBorder(),
-                    child: const Text('☕', style: TextStyle(fontSize: 22)),
+                    child: const Icon(Icons.bolt, color: Colors.white, size: 24),
                   ),
 
                   // 4. DM (Direct Message)

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/widgets/app_logo.dart';
 import '../home/home_screen.dart';
 import '../profile/onboarding_screen.dart';
 
@@ -228,19 +229,8 @@ class _AuthScreenState extends State<AuthScreen> {
             children: [
               const SizedBox(height: 20),
               // App Branding Header
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    color: Color(0x26E91E63),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.favorite_rounded,
-                    size: 64,
-                    color: Color(0xFFE91E63),
-                  ),
-                ),
+              const Center(
+                child: AppLogo(size: 80, showGlow: true),
               ),
               const SizedBox(height: 16),
               const Text(

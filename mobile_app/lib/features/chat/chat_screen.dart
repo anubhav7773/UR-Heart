@@ -350,12 +350,12 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('☕ ₹9 Chai Invite sent to ${widget.matchName}!'),
-          backgroundColor: AppTheme.secondaryColor,
+          content: Text('⚡ ₹9 Direct Invite Pass sent to ${widget.matchName}!'),
+          backgroundColor: AppTheme.primaryColor,
           duration: const Duration(seconds: 3),
         ),
       );
-      _sendMessage(text: '☕ I invited you for a Chai date!');
+      _sendMessage(text: '⚡ I sent you a Direct Invite Pass!');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -454,17 +454,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Quick Action: Send Chai Invite
+                    // Quick Action: Send Direct Invite Pass
                     ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
                         _sendChaiInviteDirect();
                       },
-                      icon: const Text('☕', style: TextStyle(fontSize: 20)),
-                      label: const Text('Send ₹9 Chai Invite'),
+                      icon: const Icon(Icons.bolt, size: 20),
+                      label: const Text('Send ₹9 Direct Pass (24 Hours)'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.secondaryColor,
-                        foregroundColor: Colors.black,
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
                       ),
                     ),
@@ -747,10 +747,10 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         actions: [
-          // Quick Action: Send ₹9 Chai Invite
+          // Quick Action: Send ₹9 Direct Pass
           IconButton(
-            tooltip: 'Send ₹9 Chai Invite',
-            icon: const Text('☕', style: TextStyle(fontSize: 20)),
+            tooltip: 'Send ₹9 Direct Pass',
+            icon: const Icon(Icons.bolt, color: AppTheme.secondaryColor, size: 22),
             onPressed: _sendChaiInviteDirect,
           ),
           PopupMenuButton<String>(
@@ -914,14 +914,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: AppTheme.primaryColor.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.favorite_rounded, color: AppTheme.primaryColor, size: 36),
-                                SizedBox(width: 4),
-                                Text('☕', style: TextStyle(fontSize: 26)),
-                              ],
-                            ),
+                            child: const Icon(Icons.favorite_rounded, color: AppTheme.primaryColor, size: 44),
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -930,7 +923,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'You matched! Start a warm conversation over Chai or share a photo.',
+                            'You matched! Start a warm conversation or share a photo.',
                             textAlign: TextAlign.center,
                             style: TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
                           ),

@@ -234,12 +234,13 @@ class SachetTransaction(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    plan_type: Mapped[SachetPlanTypeEnum] = mapped_column(
-        SQLEnum(SachetPlanTypeEnum, name="sachet_plan_type"), nullable=False
-    )
+    plan_type: Mapped[str] = mapped_column(String(50), nullable=False)
     amount_inr: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     order_id: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="created")  # created, paid, failed
+    valid_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
