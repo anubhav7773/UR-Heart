@@ -15,6 +15,7 @@ from app.models.orm import (
     UserAdCounter,
     Swipe,
     Match,
+    BlockedUser,
     SwipeActionEnum as ORMSwipeActionEnum,
     GenderEnum as ORMGenderEnum
 )
@@ -45,40 +46,61 @@ def calculate_age(born: date) -> int:
 @router.get("", response_model=APIResponse[FeedData])
 async def get_feed(
     limit: int = Query(default=10, ge=1, le=50),
-    radius_km: float = Query(default=5.0, ge=2.0, le=10.0, description="Micro-radius filter in km (2 to 10 km)"),
+    radius_km: float = Query(default=50.0, ge=1.0, le=100.0, description="Max distance filter in km (1 to 100 km)"),
+    max_distance_km: Optional[float] = Query(default=None, ge=1.0, le=100.0, description="Max distance filter in km"),
+    gender_preference: Optional[str] = Query(default="everyone", description="Filter gender: 'everyone', 'male', or 'female'"),
+    min_age: int = Query(default=18, ge=18, le=100, description="Min candidate age"),
+    max_age: int = Query(default=50, ge=18, le=100, description="Max candidate age"),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Retrieves candidate cards from Supabase PostgreSQL, excluding users already swiped.
-    Returns an empty array `[]` when no candidates exist.
+    Retrieves candidate cards from Supabase PostgreSQL based on discovery preference filters
+    (gender preference, age range, max distance) and excludes swiped/blocked users.
     """
     profile_cards: List[ProfileCardData] = []
     user_uuid = uuid.UUID(current_user_id)
+    effective_radius = max_distance_km if max_distance_km is not None else radius_km
 
     try:
-        # Fetch IDs already swiped by current user
+        # 1. Fetch IDs already swiped by current user
         swiped_res = await db.execute(select(Swipe.swiped_id).where(Swipe.swiper_id == user_uuid))
-        swiped_ids = set(swiped_res.scalars().all())
-        swiped_ids.add(user_uuid)
+        excluded_ids = set(swiped_res.scalars().all())
+        excluded_ids.add(user_uuid)
 
-        result = await db.execute(
+        # 2. Exclude blocked users (both directions)
+        blocked_res1 = await db.execute(select(BlockedUser.blocked_id).where(BlockedUser.blocker_id == user_uuid))
+        blocked_res2 = await db.execute(select(BlockedUser.blocker_id).where(BlockedUser.blocked_id == user_uuid))
+        excluded_ids.update(blocked_res1.scalars().all())
+        excluded_ids.update(blocked_res2.scalars().all())
+
+        stmt = (
             select(User)
             .where(User.is_active == True)
-            .where(~User.id.in_(swiped_ids))
+            .where(~User.id.in_(excluded_ids))
             .options(selectinload(User.photos))
-            .limit(limit)
         )
+
+        # Filter by gender preference if specified
+        if gender_preference and gender_preference.lower() in ("male", "female"):
+            target_g = ORMGenderEnum(gender_preference.lower())
+            stmt = stmt.where(User.gender == target_g)
+
+        result = await db.execute(stmt.limit(limit * 2))
         db_users = result.scalars().all()
 
         for user in db_users:
+            user_age = calculate_age(user.dob) if user.dob else 22
+            if user_age < min_age or user_age > max_age:
+                continue
+
             dist_km = 3.4
             if user.latitude is not None and user.longitude is not None:
                 dist_km = GeoEngineService.calculate_haversine_distance(
                     26.7880, 82.1300, float(user.latitude), float(user.longitude)
                 )
 
-            if dist_km > radius_km:
+            if dist_km > effective_radius:
                 continue
 
             base_obfuscated = GeoEngineService.obfuscate_distance(dist_km)
@@ -86,16 +108,14 @@ async def get_feed(
             dist_label = f"{base_obfuscated} • Near {landmark}"
 
             first_name = user.full_name.split()[0] if user.full_name else "User"
-            age = calculate_age(user.dob) if user.dob else 22
             photos = [p.photo_url for p in user.photos] if user.photos else []
-
             is_female = user.gender == ORMGenderEnum.female or user.gender == "female"
 
             profile_cards.append(
                 ProfileCardData(
                     user_id=str(user.id),
                     first_name=first_name,
-                    age=age,
+                    age=user_age,
                     distance_label=dist_label,
                     bio=user.bio or "Looking for genuine connection on RuralHeart.",
                     area_name=user.area_name or "Ayodhya Region",
@@ -104,8 +124,10 @@ async def get_feed(
                     is_verified_local=is_female or True,
                 )
             )
+            if len(profile_cards) >= limit:
+                break
     except Exception:
-        pass
+        await db.rollback()
 
     cards: List[FeedCardItem] = []
     ad_interval = settings.IN_FEED_AD_INTERVAL

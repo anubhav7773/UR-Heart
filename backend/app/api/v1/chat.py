@@ -29,11 +29,17 @@ async def get_matches(
 ):
     """
     Fetches all active matches for the authenticated user with target user profile details.
-    Safely handles empty matches table or DB query exceptions by returning HTTP 200 with an empty list.
+    Safely excludes blocked users and handles empty matches table with HTTP 200 empty list.
     """
     match_list: List[MatchRead] = []
     try:
         user_uuid = uuid.UUID(current_user_id)
+
+        # Exclude blocked users (both directions)
+        blocked_res1 = await db.execute(select(BlockedUser.blocked_id).where(BlockedUser.blocker_id == user_uuid))
+        blocked_res2 = await db.execute(select(BlockedUser.blocker_id).where(BlockedUser.blocked_id == user_uuid))
+        blocked_ids = set(blocked_res1.scalars().all()).union(set(blocked_res2.scalars().all()))
+
         matches_res = await db.execute(
             select(Match).where(
                 or_(Match.user1_id == user_uuid, Match.user2_id == user_uuid)
@@ -44,6 +50,9 @@ async def get_matches(
         for m in matches:
             try:
                 target_id = m.user2_id if m.user1_id == user_uuid else m.user1_id
+                if target_id in blocked_ids:
+                    continue
+
                 target_res = await db.execute(
                     select(User).where(User.id == target_id).options(selectinload(User.photos))
                 )

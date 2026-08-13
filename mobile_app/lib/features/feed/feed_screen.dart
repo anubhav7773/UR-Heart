@@ -16,6 +16,11 @@ class _FeedScreenState extends State<FeedScreen> {
   int _currentIndex = 0;
   int _persistentSkipCount = 0;
 
+  // Discovery Preference Filters State
+  String _genderPref = 'everyone';
+  RangeValues _ageRange = const RangeValues(18, 50);
+  double _maxDistanceKm = 50.0;
+
   @override
   void initState() {
     super.initState();
@@ -25,7 +30,13 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _loadFeed() async {
     setState(() => _isLoading = true);
     try {
-      final response = await ApiClient.instance.getMatchesFeed(limit: 10);
+      final response = await ApiClient.instance.getMatchesFeed(
+        limit: 10,
+        genderPreference: _genderPref,
+        minAge: _ageRange.start.round(),
+        maxAge: _ageRange.end.round(),
+        maxDistanceKm: _maxDistanceKm,
+      );
       if (response.data != null && response.data['data'] != null) {
         final cardsList = response.data['data']['cards'] as List<dynamic>? ?? [];
         setState(() {
@@ -105,6 +116,290 @@ class _FeedScreenState extends State<FeedScreen> {
         SnackBar(content: Text('Failed to send Chai Invite: ${e.toString()}')),
       );
     }
+  }
+
+  void _showFilterBottomSheet() {
+    String tempGender = _genderPref;
+    RangeValues tempAge = _ageRange;
+    double tempDist = _maxDistanceKm;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey[950],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.tune, color: Color(0xFFE91E63)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Discovery Preferences',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Gender Preference Filter
+                  const Text('Interested In', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Everyone 👥'),
+                        selected: tempGender == 'everyone',
+                        selectedColor: const Color(0xFFE91E63),
+                        onSelected: (sel) => setModalState(() => tempGender = 'everyone'),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Women 👧'),
+                        selected: tempGender == 'female',
+                        selectedColor: const Color(0xFFE91E63),
+                        onSelected: (sel) => setModalState(() => tempGender = 'female'),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Men 👦'),
+                        selected: tempGender == 'male',
+                        selectedColor: const Color(0xFFE91E63),
+                        onSelected: (sel) => setModalState(() => tempGender = 'male'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Age Range Slider
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Age Range', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                      Text(
+                        '${tempAge.start.round()} - ${tempAge.end.round()} yrs',
+                        style: const TextStyle(color: Color(0xFFE91E63), fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  RangeSlider(
+                    values: tempAge,
+                    min: 18,
+                    max: 60,
+                    divisions: 42,
+                    activeColor: const Color(0xFFE91E63),
+                    inactiveColor: Colors.grey[800],
+                    onChanged: (vals) => setModalState(() => tempAge = vals),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Distance Radius Slider
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Maximum Distance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                      Text(
+                        '${tempDist.round()} km',
+                        style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: tempDist,
+                    min: 1,
+                    max: 100,
+                    divisions: 99,
+                    activeColor: Colors.amber,
+                    inactiveColor: Colors.grey[800],
+                    onChanged: (val) => setModalState(() => tempDist = val),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Apply Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _genderPref = tempGender;
+                          _ageRange = tempAge;
+                          _maxDistanceKm = tempDist;
+                        });
+                        Navigator.pop(context);
+                        _loadFeed();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE91E63),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Apply Filters', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showReportDialog(String userId, String userName) {
+    String selectedReason = 'Inappropriate Content';
+    final detailsController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.report_problem, color: Colors.amber),
+              const SizedBox(width: 10),
+              Text('Report $userName', style: const TextStyle(color: Colors.white, fontSize: 18)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select reason for reporting:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 10),
+              DropdownButton<String>(
+                value: selectedReason,
+                dropdownColor: Colors.grey[850],
+                isExpanded: true,
+                style: const TextStyle(color: Colors.white),
+                items: const [
+                  DropdownMenuItem(value: 'Inappropriate Content', child: Text('Inappropriate Content')),
+                  DropdownMenuItem(value: 'Harassment or Bullying', child: Text('Harassment or Bullying')),
+                  DropdownMenuItem(value: 'Fake Profile or Impersonation', child: Text('Fake Profile or Impersonation')),
+                  DropdownMenuItem(value: 'Spam or Scam', child: Text('Spam or Scam')),
+                  DropdownMenuItem(value: 'Other Reason', child: Text('Other Reason')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setDlgState(() => selectedReason = val);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: detailsController,
+                maxLines: 2,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Additional details (optional)...',
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                try {
+                  await ApiClient.instance.reportUser(
+                    reportedUserId: userId,
+                    reason: selectedReason,
+                    details: detailsController.text.trim(),
+                  );
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Report submitted. Thank you for helping keep RuralHeart safe.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Notice: ${e.toString()}')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber[800]),
+              child: const Text('Submit Report', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBlockConfirmDialog(String userId, String userName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.block, color: Colors.redAccent),
+            const SizedBox(width: 10),
+            Text('Block $userName?', style: const TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'They will no longer be able to see your profile or send you messages on RuralHeart.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(context);
+              try {
+                await ApiClient.instance.blockUser(blockedUserId: userId);
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Blocked $userName successfully.'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+                _loadFeed();
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Notice: ${e.toString()}')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Block User', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showMatchDialog() {
@@ -222,6 +517,10 @@ class _FeedScreenState extends State<FeedScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.tune, color: Color(0xFFE91E63)),
+            onPressed: _showFilterBottomSheet,
+          ),
+          IconButton(
             icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
             onPressed: () {
               Navigator.push(
@@ -234,15 +533,15 @@ class _FeedScreenState extends State<FeedScreen> {
             child: Padding(
               padding: const EdgeInsets.only(right: 12.0),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.grey[800]!),
                 ),
                 child: Text(
                   'Skips: $_persistentSkipCount/20',
-                  style: const TextStyle(fontSize: 12, color: Colors.amber),
+                  style: const TextStyle(fontSize: 11, color: Colors.amber),
                 ),
               ),
             ),
@@ -333,38 +632,73 @@ class _FeedScreenState extends State<FeedScreen> {
                               ),
                             ),
 
-                            // Top Right "Verified Local Resident" Safety Badge
-                            if (isVerifiedLocal)
-                              Positioned(
-                                top: 16,
-                                right: 16,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green[800]!.withValues(alpha: 0.90),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.greenAccent, width: 1),
-                                    boxShadow: const [
-                                      BoxShadow(color: Colors.black45, blurRadius: 6, offset: Offset(0, 2)),
-                                    ],
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.shield_outlined, color: Colors.greenAccent, size: 16),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'Verified Local Resident',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                            // Top Right Safety 3-Dots Safety Menu & Verified Badge
+                            Positioned(
+                              top: 16,
+                              right: 16,
+                              child: Row(
+                                children: [
+                                  if (isVerifiedLocal)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green[800]!.withValues(alpha: 0.90),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: Colors.greenAccent, width: 1),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.shield_outlined, color: Colors.greenAccent, size: 16),
+                                          SizedBox(width: 4),
+                                          Text('Verified', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                                        ],
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  PopupMenuButton<String>(
+                                    icon: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.more_vert, color: Colors.white, size: 18),
+                                    ),
+                                    color: Colors.grey[900],
+                                    onSelected: (val) {
+                                      if (val == 'report') {
+                                        _showReportDialog(targetUserId, firstName);
+                                      } else if (val == 'block') {
+                                        _showBlockConfirmDialog(targetUserId, firstName);
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'report',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.report, color: Colors.amber, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('Report Profile', style: TextStyle(color: Colors.white)),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'block',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.block, color: Colors.redAccent, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('Block User', style: TextStyle(color: Colors.redAccent)),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
+                                ],
                               ),
+                            ),
 
                             // Profile Details Gradient Overlay
                             Positioned(

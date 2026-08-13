@@ -457,3 +457,24 @@ class SendMessageRequest(BaseModel):
     content: Optional[str] = None
     media_url: Optional[str] = None
     media_type: str = "text"
+
+
+# 14. Safety & Moderation Schemas
+class BlockUserRequest(BaseModel):
+    blocked_user_id: str = Field(..., description="Target user ID to block")
+
+
+class BlockUserData(BaseModel):
+    blocked_user_id: str
+    message: str = "User blocked successfully."
+
+
+class ReportUserRequest(BaseModel):
+    reported_user_id: str = Field(..., description="Target user ID to report")
+    reason: str = Field(..., description="Reason for report")
+    details: Optional[str] = Field(None, max_length=1000)
+
+
+class ReportUserData(BaseModel):
+    report_id: str
+    message: str = "Report submitted successfully."

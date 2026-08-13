@@ -282,8 +282,23 @@ class ApiClient {
   }
 
   // 21. Matches Feed (GET /matches/feed)
-  Future<Response> getMatchesFeed({int limit = 10, double radiusKm = 5.0}) async {
-    return await dio.get('/matches/feed', queryParameters: {'limit': limit, 'radius_km': radiusKm});
+  Future<Response> getMatchesFeed({
+    int limit = 10,
+    double radiusKm = 50.0,
+    String? genderPreference,
+    int? minAge,
+    int? maxAge,
+    double? maxDistanceKm,
+  }) async {
+    final query = <String, dynamic>{
+      'limit': limit,
+      'radius_km': maxDistanceKm ?? radiusKm,
+      if (genderPreference != null) 'gender_preference': genderPreference,
+      if (minAge != null) 'min_age': minAge,
+      if (maxAge != null) 'max_age': maxAge,
+      if (maxDistanceKm != null) 'max_distance_km': maxDistanceKm,
+    };
+    return await dio.get('/feed', queryParameters: query);
   }
 
   // 22. Matches Swipe (POST /matches/swipe)
@@ -291,7 +306,7 @@ class ApiClient {
     required String targetUserId,
     required String action,
   }) async {
-    return await dio.post('/matches/swipe', data: {
+    return await dio.post('/feed/swipe', data: {
       'target_user_id': targetUserId,
       'action': action,
     });
@@ -300,5 +315,25 @@ class ApiClient {
   // 23. Chat Conversations (GET /chat/conversations)
   Future<Response> getChatConversations() async {
     return await dio.get('/chat/conversations');
+  }
+
+  // 24. Block User (POST /safety/block)
+  Future<Response> blockUser({required String blockedUserId}) async {
+    return await dio.post('/safety/block', data: {
+      'blocked_user_id': blockedUserId,
+    });
+  }
+
+  // 25. Report User (POST /safety/report)
+  Future<Response> reportUser({
+    required String reportedUserId,
+    required String reason,
+    String? details,
+  }) async {
+    return await dio.post('/safety/report', data: {
+      'reported_user_id': reportedUserId,
+      'reason': reason,
+      if (details != null) 'details': details,
+    });
   }
 }

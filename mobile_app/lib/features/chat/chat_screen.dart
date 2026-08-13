@@ -120,17 +120,22 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     final String lastMsg = item['last_message'] ?? 'Matched! Say hello 👋';
 
                     return ListTile(
-                      onTap: () {
-                        Navigator.push(
+                      onTap: () async {
+                        final String targetUserId = item['target_user_id'] ?? item['target_id'] ?? '';
+                        final res = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ChatScreen(
                               matchId: matchId,
                               matchName: matchName,
                               matchAvatarUrl: avatarUrl,
+                              targetUserId: targetUserId,
                             ),
                           ),
                         );
+                        if (res == true) {
+                          _fetchConversations();
+                        }
                       },
                       leading: CircleAvatar(
                         radius: 26,
@@ -160,11 +165,14 @@ class ChatScreen extends StatefulWidget {
   final String matchId;
   final String matchName;
   final String matchAvatarUrl;
+  final String targetUserId;
+
   const ChatScreen({
     super.key,
     required this.matchId,
     required this.matchName,
     this.matchAvatarUrl = '',
+    this.targetUserId = '',
   });
 
   @override
@@ -356,6 +364,148 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _showReportDialog() {
+    String selectedReason = 'Inappropriate Content';
+    final detailsController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.report_problem, color: Colors.amber),
+              const SizedBox(width: 10),
+              Text('Report ${widget.matchName}', style: const TextStyle(color: Colors.white, fontSize: 18)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select reason for reporting:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 10),
+              DropdownButton<String>(
+                value: selectedReason,
+                dropdownColor: Colors.grey[850],
+                isExpanded: true,
+                style: const TextStyle(color: Colors.white),
+                items: const [
+                  DropdownMenuItem(value: 'Inappropriate Content', child: Text('Inappropriate Content')),
+                  DropdownMenuItem(value: 'Harassment or Bullying', child: Text('Harassment or Bullying')),
+                  DropdownMenuItem(value: 'Fake Profile or Impersonation', child: Text('Fake Profile or Impersonation')),
+                  DropdownMenuItem(value: 'Spam or Scam', child: Text('Spam or Scam')),
+                  DropdownMenuItem(value: 'Other Reason', child: Text('Other Reason')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setDlgState(() => selectedReason = val);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: detailsController,
+                maxLines: 2,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Additional details (optional)...',
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                try {
+                  final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
+                  await ApiClient.instance.reportUser(
+                    reportedUserId: targetId,
+                    reason: selectedReason,
+                    details: detailsController.text.trim(),
+                  );
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Report submitted. Thank you for keeping RuralHeart safe.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Notice: ${e.toString()}')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber[800]),
+              child: const Text('Submit Report', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBlockConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.block, color: Colors.redAccent),
+            const SizedBox(width: 10),
+            Text('Block ${widget.matchName}?', style: const TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'They will no longer be able to see your profile or send you messages on RuralHeart.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final nav = Navigator.of(context);
+              nav.pop();
+              try {
+                final targetId = widget.targetUserId.isNotEmpty ? widget.targetUserId : widget.matchId;
+                await ApiClient.instance.blockUser(blockedUserId: targetId);
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Blocked ${widget.matchName} successfully.'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+                nav.pop(true);
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Notice: ${e.toString()}')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Block User', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -392,9 +542,38 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.call_outlined, color: Colors.white),
             onPressed: () {},
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () {},
+            color: Colors.grey[900],
+            onSelected: (val) {
+              if (val == 'report') {
+                _showReportDialog();
+              } else if (val == 'block') {
+                _showBlockConfirmDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'report',
+                child: Row(
+                  children: [
+                    Icon(Icons.report, color: Colors.amber, size: 18),
+                    SizedBox(width: 8),
+                    Text('Report User', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'block',
+                child: Row(
+                  children: [
+                    Icon(Icons.block, color: Colors.redAccent, size: 18),
+                    SizedBox(width: 8),
+                    Text('Block User', style: TextStyle(color: Colors.redAccent)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
