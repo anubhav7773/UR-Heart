@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/security/storage_manager.dart';
 import 'core/services/fcm_service.dart';
 import 'features/auth/auth_screen.dart';
@@ -25,6 +26,7 @@ void main() async {
       await Firebase.initializeApp(options: webFirebaseOptions);
     } else {
       await Firebase.initializeApp();
+      await MobileAds.instance.initialize();
     }
 
     await FirebaseAppCheck.instance.activate(
@@ -36,7 +38,7 @@ void main() async {
     await FcmService.instance.initialize();
   } catch (e) {
     if (kDebugMode) {
-      print('Firebase / FCM initialization notice: ${e.toString()}');
+      print('Firebase / AdMob initialization notice: ${e.toString()}');
     }
   }
   runApp(const RuralHeartApp());

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../chat/chat_screen.dart';
+import 'native_ad_card_widget.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -501,6 +502,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
     final bool hasCards = _currentIndex < _cards.length;
     final currentCard = hasCards ? _cards[_currentIndex] : null;
+    final String cardType = currentCard?['type'] ?? 'profile';
     final profile = currentCard?['profile'];
     final photosList = profile != null ? (profile['photos'] as List<dynamic>?) : null;
     final String? imageUrl = (photosList != null && photosList.isNotEmpty) ? photosList.first as String? : null;
@@ -554,14 +556,19 @@ class _FeedScreenState extends State<FeedScreen> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: hasCards && profile != null
-                    ? Container(
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          color: Colors.grey[900],
-                        ),
-                        child: Stack(
+                child: hasCards
+                    ? (cardType == 'ad_slot'
+                        ? NativeAdCardWidget(
+                            adUnitId: currentCard?['ad_config']?['ad_unit_id'] ?? 'ca-app-pub-3940256099942544/6300978111',
+                          )
+                        : (profile != null
+                            ? Container(
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(24),
+                                  color: Colors.grey[900],
+                                ),
+                                child: Stack(
                           fit: StackFit.expand,
                           children: [
                             // Network Image with Error and Loading Fallback Placeholders
@@ -766,6 +773,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           ],
                         ),
                       )
+                    : Container()))
                     : Center(
                         child: Container(
                           margin: const EdgeInsets.all(20),

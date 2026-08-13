@@ -212,6 +212,19 @@ class ApiClient {
     });
   }
 
+  // 12b. Log Ad Telemetry Event (Impressions / Clicks)
+  Future<Response> logAdTelemetry({
+    required String adUnitId,
+    required String eventType,
+    String format = 'native_card',
+  }) async {
+    return await dio.post('/ads/telemetry', data: {
+      'ad_unit_id': adUnitId,
+      'ad_unit_type': format,
+      'event_type': eventType,
+    });
+  }
+
   // 13. Create Razorpay Subscription Order (₹99/mo)
   Future<Response> createRazorpayOrder() async {
     return await dio.post('/payments/create-order');
