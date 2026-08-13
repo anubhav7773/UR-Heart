@@ -158,17 +158,17 @@ class PhotoInput(BaseModel):
 
 
 class CompleteProfileRequest(BaseModel):
-    full_name: Optional[str] = Field("User", max_length=100)
-    dob: Optional[date] = Field(default_factory=lambda: date(2000, 1, 1))
-    gender: Optional[GenderEnum] = GenderEnum.MALE
-    interested_in: Optional[GenderEnum] = GenderEnum.FEMALE
-    intent: Optional[IntentEnum] = IntentEnum.CASUAL
-    bio: Optional[str] = Field("", max_length=500)
-    area_name: Optional[str] = Field("", max_length=100)
-    village_pin_code: Optional[str] = Field("", max_length=20)
-    latitude: Optional[float] = Field(26.7880, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(82.1300, ge=-180.0, le=180.0)
-    photos: Optional[List[PhotoInput]] = Field(default_factory=list)
+    full_name: Optional[str] = None
+    dob: Optional[date] = None
+    gender: Optional[GenderEnum] = None
+    interested_in: Optional[GenderEnum] = None
+    intent: Optional[IntentEnum] = None
+    bio: Optional[str] = None
+    area_name: Optional[str] = None
+    village_pin_code: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    photos: Optional[List[PhotoInput]] = None
 
     @field_validator("full_name", mode="before")
     @classmethod

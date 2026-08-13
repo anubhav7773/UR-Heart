@@ -95,12 +95,13 @@ async def get_user_profile(
 @router.post("/photos")
 async def upload_profile_photo(
     file: UploadFile = File(...),
-    current_user_id: str = Depends(get_current_user_id)
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Accepts file as `file: UploadFile = File(...)` in POST /api/v1/profile/photos.
     Reads file bytes (`contents = await file.read()`) and uploads directly to Supabase Storage bucket 'profile-photos'.
-    Gets public URL using `supabase.storage.from_('profile-photos').get_public_url(file_path)` and returns {"photo_url": public_url}.
+    Gets public URL using `supabase.storage.from_('profile-photos').get_public_url(file_path)` and inserts/updates DB photo reference directly.
     """
     filename = file.filename or f"photo_{uuid.uuid4().hex[:8]}.jpg"
     try:
@@ -139,6 +140,26 @@ async def upload_profile_photo(
         except Exception:
             public_url = f"https://r2.ruralheart.com/uploads/{file_path}"
 
+    # Immediately insert/update UserPhoto in Postgres DB for current_user_id
+    if public_url:
+        try:
+            user_uuid = uuid.UUID(current_user_id)
+            existing_res = await db.execute(
+                select(UserPhoto).where(UserPhoto.user_id == user_uuid).order_by(UserPhoto.display_order)
+            )
+            existing_photos = existing_res.scalars().all()
+            new_photo = UserPhoto(
+                id=uuid.uuid4(),
+                user_id=user_uuid,
+                photo_url=public_url,
+                is_first_impression=len(existing_photos) == 0,
+                display_order=len(existing_photos) + 1,
+            )
+            db.add(new_photo)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
     return {"photo_url": public_url}
 
 
@@ -169,11 +190,11 @@ async def complete_profile(
         await db.rollback()
         user = None
 
-    full_name = payload.full_name or "User"
-    dob_val = payload.dob or date(2000, 1, 1)
-    gender_val = ORMGenderEnum(payload.gender.value) if payload.gender else ORMGenderEnum.male
-    interested_val = ORMGenderEnum(payload.interested_in.value) if payload.interested_in else ORMGenderEnum.female
-    intent_val = ORMIntentEnum(payload.intent.value) if payload.intent else ORMIntentEnum.casual
+    full_name = payload.full_name if payload.full_name is not None else (user.full_name if user else "User")
+    dob_val = payload.dob if payload.dob is not None else (user.dob if user else date(2000, 1, 1))
+    gender_val = ORMGenderEnum(payload.gender.value) if payload.gender else (user.gender if user else ORMGenderEnum.male)
+    interested_val = ORMGenderEnum(payload.interested_in.value) if payload.interested_in else (user.interested_in if user else ORMGenderEnum.female)
+    intent_val = ORMIntentEnum(payload.intent.value) if payload.intent else (user.intent if user else ORMIntentEnum.casual)
 
     if not user:
         user = User(

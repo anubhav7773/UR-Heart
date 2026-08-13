@@ -273,6 +273,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  String _getCacheBusterUrl(String url) {
+    if (url.isEmpty) return '';
+    final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final String separator = url.contains('?') ? '&' : '?';
+    return '$url${separator}t=$timestamp';
+  }
+
   Future<void> _uploadNewPhoto() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -287,18 +294,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final String? uploadedUrl = await _profileService.uploadProfilePhoto(imageFile);
 
         if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
-          final List<dynamic> currentPhotos = List.from(_profileData?['photos'] ?? []);
-          currentPhotos.insert(0, uploadedUrl);
+          // Force evict Flutter NetworkImage memory & live image caches
+          PaintingBinding.instance.imageCache.clear();
+          PaintingBinding.instance.imageCache.clearLiveImages();
 
-          final payload = {
-            'photos': List.generate(currentPhotos.length, (index) => {
-              'photo_url': currentPhotos[index],
-              'is_first_impression': index == 0,
-              'display_order': index + 1,
-            }),
-          };
-
-          await _profileService.updateProfile(payload);
+          if (mounted) {
+            setState(() {
+              final List<dynamic> currentPhotos = List.from(_profileData?['photos'] ?? []);
+              if (!currentPhotos.contains(uploadedUrl)) {
+                currentPhotos.insert(0, uploadedUrl);
+              }
+              if (_profileData != null) {
+                _profileData!['photos'] = currentPhotos;
+              }
+            });
+          }
         }
       }
     } catch (e) {
@@ -351,7 +361,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             const SizedBox(height: 10),
-            // Profile Main Avatar Card
+            // Profile Main Avatar Card with Cache-Busting Network Image
             Center(
               child: Stack(
                 children: [
@@ -361,14 +371,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xFFE91E63), width: 3),
-                      image: mainPhoto.isNotEmpty
-                          ? DecorationImage(image: NetworkImage(mainPhoto), fit: BoxFit.cover)
-                          : null,
                       color: Colors.grey[900],
                     ),
-                    child: mainPhoto.isEmpty
-                        ? const Icon(Icons.person, size: 70, color: Colors.grey)
-                        : null,
+                    child: ClipOval(
+                      child: mainPhoto.isNotEmpty
+                          ? Image.network(
+                              _getCacheBusterUrl(mainPhoto),
+                              key: UniqueKey(),
+                              fit: BoxFit.cover,
+                              width: 130,
+                              height: 130,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(Icons.person, size: 70, color: Colors.grey),
+                            )
+                          : const Icon(Icons.person, size: 70, color: Colors.grey),
+                    ),
                   ),
                   Positioned(
                     bottom: 0,
@@ -533,7 +550,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
                         color: Colors.grey[900],
-                        image: DecorationImage(image: NetworkImage(pUrl), fit: BoxFit.cover),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.network(
+                          _getCacheBusterUrl(pUrl),
+                          key: UniqueKey(),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: Colors.grey[900],
+                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                          ),
+                        ),
                       ),
                     );
                   },
