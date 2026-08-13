@@ -43,7 +43,26 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+from sqlalchemy import text
+
+
 async def init_db() -> None:
-    """Helper function to create tables from SQLAlchemy metadata."""
+    """Helper function to create tables and auto-migrate missing columns in PostgreSQL."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Execute safe ALTER TABLE column additions for existing PostgreSQL tables
+        migration_queries = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT TRUE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMP WITH TIME ZONE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude NUMERIC(10, 6);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude NUMERIC(10, 6);",
+            "ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP WITH TIME ZONE;",
+        ]
+        for query in migration_queries:
+            try:
+                await conn.execute(text(query))
+            except Exception as e:
+                print(f"[DB Schema Migration Notice] {query} -> {e}")

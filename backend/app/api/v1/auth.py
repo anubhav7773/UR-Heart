@@ -182,8 +182,9 @@ async def firebase_login(
 
         if not user:
             logger.info(f"[Firebase-Login] Creating new DB user profile for {verified_email}")
+            new_id = uuid.uuid4()
             user = User(
-                id=uuid.UUID(user_id),
+                id=new_id,
                 email=verified_email,
                 full_name=google_name,
                 dob=date(2000, 1, 1),
@@ -192,19 +193,31 @@ async def firebase_login(
                 intent=ORMIntentEnum.casual,
                 is_active=True,
                 is_premium=False,
+                is_online=True,
             )
             db.add(user)
             await db.commit()
             await db.refresh(user)
+        else:
+            user.is_online = True
+            await db.commit()
 
         user_id = str(user.id)
-        is_premium = user.is_premium
+        is_premium = bool(user.is_premium)
         photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
         photos = photo_count_res.scalars().all()
-        is_complete = len(photos) == 5
+        is_complete = bool(len(photos) >= 1)
     except Exception as db_err:
         logger.warning(f"[Firebase-Login] Supabase DB lookup warning: {db_err}")
-        pass
+        await db.rollback()
+        try:
+            res = await db.execute(select(User).where(User.email == verified_email))
+            user = res.scalars().first()
+            if user:
+                user_id = str(user.id)
+                is_premium = bool(user.is_premium)
+        except Exception:
+            pass
 
     access_token = create_access_token(subject=user_id)
 

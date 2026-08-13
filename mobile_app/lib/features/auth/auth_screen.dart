@@ -40,6 +40,9 @@ class _AuthScreenState extends State<AuthScreen> {
     final bool isComplete = data['is_profile_complete'] ?? false;
     final bool isPremium = data['is_premium'] ?? false;
 
+    // Clear previous cached session before saving new user credentials
+    await StorageManager.instance.clearAll();
+
     await StorageManager.instance.saveAuthToken(token);
     await StorageManager.instance.saveUserId(userId);
     await StorageManager.instance.setProfileComplete(isComplete);
