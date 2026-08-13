@@ -292,13 +292,15 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             _messages.clear();
             for (var item in rawMsgs) {
+              final String rawTime = item['created_at'] ?? '';
+              final parsedDt = DateTime.tryParse(rawTime);
               _messages.add(
                 ChatMessage(
                   id: item['id'] ?? '',
                   senderId: item['sender_id'] ?? '',
                   text: item['content'] ?? '',
                   mediaUrl: item['media_url'],
-                  timestamp: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
+                  timestamp: parsedDt != null ? parsedDt.toLocal() : DateTime.now(),
                 ),
               );
             }
@@ -312,13 +314,15 @@ class _ChatScreenState extends State<ChatScreen> {
             final String msgId = item['id'] ?? '';
             if (!existingIds.contains(msgId)) {
               hasNew = true;
+              final String rawTime = item['created_at'] ?? '';
+              final parsedDt = DateTime.tryParse(rawTime);
               _messages.add(
                 ChatMessage(
                   id: msgId,
                   senderId: item['sender_id'] ?? '',
                   text: item['content'] ?? '',
                   mediaUrl: item['media_url'],
-                  timestamp: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
+                  timestamp: parsedDt != null ? parsedDt.toLocal() : DateTime.now(),
                 ),
               );
             }

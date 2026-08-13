@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -173,7 +174,7 @@ async def get_chat_messages(
             content=msg.content,
             media_url=msg.media_url,
             media_type=msg.media_type or "text",
-            created_at=msg.created_at.isoformat() if msg.created_at else "",
+            created_at=msg.created_at.isoformat() if msg.created_at else datetime.now(timezone.utc).isoformat(),
         )
         for msg in messages
     ]
@@ -209,7 +210,7 @@ async def send_chat_message(
                     content=existing_msg.content,
                     media_url=existing_msg.media_url,
                     media_type=existing_msg.media_type,
-                    created_at=existing_msg.created_at.isoformat() if existing_msg.created_at else "",
+                    created_at=existing_msg.created_at.isoformat() if existing_msg.created_at else datetime.now(timezone.utc).isoformat(),
                 )
             )
 
@@ -234,6 +235,8 @@ async def send_chat_message(
     await db.commit()
     await db.refresh(new_msg)
 
+    iso_created_at = new_msg.created_at.isoformat() if new_msg.created_at else datetime.now(timezone.utc).isoformat()
+
     # Broadcast message to active WebSocket connection
     try:
         await ws_manager.broadcast(
@@ -245,7 +248,7 @@ async def send_chat_message(
                 "content": new_msg.content,
                 "media_url": new_msg.media_url,
                 "media_type": new_msg.media_type,
-                "created_at": new_msg.created_at.isoformat() if new_msg.created_at else "",
+                "created_at": iso_created_at,
             }
         )
     except Exception:

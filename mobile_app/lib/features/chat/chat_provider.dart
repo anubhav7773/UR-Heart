@@ -98,13 +98,15 @@ class ChatProvider extends ChangeNotifier {
         for (var item in rawMsgs) {
           final String msgId = item['id'] ?? '';
           if (msgId.isNotEmpty) {
+            final String rawTime = item['created_at'] ?? '';
+            final parsedDt = DateTime.tryParse(rawTime);
             parsedList.add(
               ChatMessage(
                 id: msgId,
                 senderId: item['sender_id'] ?? '',
                 text: item['content'] ?? '',
                 mediaUrl: item['media_url'],
-                timestamp: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
+                timestamp: parsedDt != null ? parsedDt.toLocal() : DateTime.now(),
               ),
             );
           }
