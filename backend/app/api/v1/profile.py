@@ -320,24 +320,37 @@ async def update_presence(
 @router.post("/users/fcm-token")
 @router.put("/users/fcm-token")
 async def update_fcm_token(
-    payload: dict,
+    payload: dict = Body(...),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Updates user's FCM Push Notification device token in database.
+    Accepts either {"fcm_token": "..."} or {"token": "..."} in JSON body.
     """
-    fcm_token = payload.get("fcm_token")
+    fcm_token = str(payload.get("fcm_token") or payload.get("token") or "").strip()
+    if not fcm_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fcm_token is required.")
+
     try:
         user_uuid = uuid.UUID(current_user_id)
         user_res = await db.execute(select(User).where(User.id == user_uuid))
         user_obj = user_res.scalars().first()
 
-        if user_obj and fcm_token:
-            user_obj.fcm_token = str(fcm_token)
-            await db.commit()
-    except Exception:
+        if not user_obj:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
+
+        user_obj.fcm_token = fcm_token
+        db.add(user_obj)
+        await db.commit()
+        await db.refresh(user_obj)
+        print(f"[FCM_SAVE] Successfully saved token for user {user_obj.id}: {fcm_token[:15]}...")
+    except HTTPException:
+        raise
+    except Exception as e:
         await db.rollback()
+        print(f"[FCM_SAVE] ERROR saving FCM token for user {current_user_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to save FCM token.")
 
     return APIResponse(
         success=True,

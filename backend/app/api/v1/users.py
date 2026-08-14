@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,11 +15,15 @@ router = APIRouter(prefix="/users", tags=["User Location"])
 @router.post("/fcm-token")
 @router.put("/fcm-token")
 async def update_fcm_token(
-    payload: dict,
+    payload: dict = Body(...),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    token = str(payload.get("fcm_token") or "").strip()
+    """
+    Persists the authenticated device's FCM push notification token to the database.
+    Accepts either {"fcm_token": "..."} or {"token": "..."} in JSON body.
+    """
+    token = str(payload.get("fcm_token") or payload.get("token") or "").strip()
     if not token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fcm_token is required.")
 
@@ -30,11 +34,15 @@ async def update_fcm_token(
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
         user.fcm_token = token
+        db.add(user)
         await db.commit()
+        await db.refresh(user)
+        print(f"[FCM_SAVE] Successfully saved token for user {user.id}: {token[:15]}...")
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         await db.rollback()
+        print(f"[FCM_SAVE] ERROR saving FCM token for user {current_user_id}: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to save FCM token.")
 
     return APIResponse(success=True, message="FCM token updated successfully.", data={"fcm_token": token})
