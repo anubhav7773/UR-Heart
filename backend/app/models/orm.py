@@ -52,6 +52,7 @@ class VerificationStatusEnum(str, enum.Enum):
 class SachetPlanTypeEnum(str, enum.Enum):
     chai_invite = "chai_invite"  # ₹9
     photo_pass = "photo_pass"    # ₹19
+    super_boost = "super_boost"  # ₹29
     monthly = "monthly"          # ₹99
 
 
@@ -95,6 +96,14 @@ class User(Base):
     premium_expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    boosted_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    photo_pass_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    bonus_swipes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verification_status: Mapped[VerificationStatusEnum] = mapped_column(
@@ -154,6 +163,10 @@ class UserAdCounter(Base):
     persistent_skip_count: Mapped[int] = mapped_column(Integer, default=0)
     total_interstitials_shown: Mapped[int] = mapped_column(Integer, default=0)
     last_interstitial_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    rewarded_claims_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_rewarded_claim_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     updated_at: Mapped[datetime] = mapped_column(

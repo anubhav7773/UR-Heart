@@ -2,11 +2,13 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_windowmanager/flutter_windowmanager.dart';
+import '../../core/ads/ad_manager.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/services/location_service.dart';
 import '../chat/chat_screen.dart';
 import '../profile/profile_view_dialog.dart';
+import '../subscription/subscription_sheet.dart';
 import 'native_ad_card_widget.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class _FeedScreenState extends State<FeedScreen> {
   List<dynamic> _cards = [];
   int _currentIndex = 0;
   int _persistentSkipCount = 0;
+  bool _isClaimingReward = false;
 
   // Discovery Preference Filters State
   String _genderPref = 'everyone';
@@ -31,6 +34,7 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _enableScreenshotProtection();
+    AdManager.instance.loadRewardedAd();
     _loadFeed();
   }
 
@@ -136,6 +140,161 @@ class _FeedScreenState extends State<FeedScreen> {
     } catch (e) {
       // Background action processing
     }
+  }
+
+  Future<void> _claimRewardedSwipes() async {
+    setState(() => _isClaimingReward = true);
+    AdManager.instance.showRewardedAd(
+      onRewardEarned: () async {
+        try {
+          final res = await ApiClient.instance.claimAdReward(rewardType: 'swipes');
+          if (mounted) {
+            final data = res.data?['data'];
+            final int remaining = data?['remaining_ad_claims_today'] ?? 2;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('🎉 +5 Free Swipes Earned! ($remaining video claims remaining today)'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            _loadFeed();
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Reward claim notice: ${e.toString()}')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _isClaimingReward = false);
+        }
+      },
+      onFailed: () {
+        if (mounted) {
+          setState(() => _isClaimingReward = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Rewarded ad is loading or unavailable. Please try again in a few seconds.'),
+              backgroundColor: Colors.blueGrey,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  void _showEarnSwipesRewardSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey[950],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[700],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE91E63).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.bolt, color: Color(0xFFE91E63), size: 36),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Need More Swipes? 🚀',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Watch a short sponsored video to get 5 free swipes instantly, or boost your profile for 10x visibility.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+
+              // Option 1: Watch Rewarded Ad (Free +5 Swipes)
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.5)),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.ondemand_video, color: Colors.greenAccent, size: 30),
+                  title: const Text('Watch Short Ad (+5 Free Swipes)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Takes 15-30 seconds • Max 3/day', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  trailing: ElevatedButton(
+                    onPressed: _isClaimingReward
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                            _claimRewardedSwipes();
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.greenAccent.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Watch 🎬', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Option 2: Super Boost (₹29) or VIP Pro (₹99)
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.5)),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.workspace_premium, color: Color(0xFFE91E63), size: 30),
+                  title: const Text('⚡ Super Boost (₹29) & VIP Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  subtitle: const Text('10x feed priority & unlimited swipes', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  trailing: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => const SubscriptionSheet(),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE91E63),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Explore 👑', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _handleSendChaiInvite(String targetUserId, String name) async {
@@ -640,6 +799,11 @@ class _FeedScreenState extends State<FeedScreen> {
             onPressed: _showFilterBottomSheet,
           ),
           IconButton(
+            icon: const Icon(Icons.bolt, color: Colors.amber),
+            tooltip: 'Earn Free Swipes / Super Boost',
+            onPressed: _showEarnSwipesRewardSheet,
+          ),
+          IconButton(
             icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
             onPressed: () {
               Navigator.push(
@@ -861,6 +1025,29 @@ class _FeedScreenState extends State<FeedScreen> {
                                           const SizedBox(width: 8),
                                           const Icon(Icons.verified, color: Colors.blue, size: 22),
                                         ],
+                                        if (profile['is_boosted'] == true) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [Color(0xFFFF9100), Color(0xFFFF3D00)],
+                                              ),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.bolt, color: Colors.white, size: 12),
+                                                SizedBox(width: 2),
+                                                Text(
+                                                  'BOOSTED',
+                                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                     const SizedBox(height: 4),
@@ -930,21 +1117,53 @@ class _FeedScreenState extends State<FeedScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 const Text(
-                                  "You've seen all active profiles in your current radius.",
+                                  "You've seen all active profiles in your current radius. Earn more swipes or boost your visibility!",
                                   textAlign: TextAlign.center,
                                   style: TextStyle(fontSize: 13, color: Colors.white70),
                                 ),
                                 const SizedBox(height: 20),
 
+                                // Action 1: Watch Rewarded Ad for Free Swipes
                                 ElevatedButton.icon(
-                                  onPressed: _loadFeed,
-                                  icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                                  label: const Text('Refresh Feed', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  onPressed: _isClaimingReward ? null : _claimRewardedSwipes,
+                                  icon: const Icon(Icons.ondemand_video, color: Colors.white, size: 18),
+                                  label: Text(
+                                    _isClaimingReward ? 'Loading Ad...' : 'Watch Video (+5 Free Swipes) 🎬',
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
                                   style: ElevatedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(48),
-                                    backgroundColor: const Color(0xFFE91E63),
+                                    minimumSize: const Size.fromHeight(46),
+                                    backgroundColor: Colors.greenAccent.shade700,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                   ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Action 2: Super Boost (₹29) / VIP Pro
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (_) => const SubscriptionSheet(),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.bolt, color: Colors.amber, size: 18),
+                                  label: const Text('⚡ Super Boost Profile (₹29)', style: TextStyle(color: Colors.amber, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(46),
+                                    side: const BorderSide(color: Colors.amber),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Action 3: Refresh Feed
+                                TextButton.icon(
+                                  onPressed: _loadFeed,
+                                  icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 18),
+                                  label: const Text('Refresh Discovery Feed', style: TextStyle(color: Colors.white70, fontSize: 13)),
                                 ),
                               ],
                             ),

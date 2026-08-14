@@ -232,6 +232,20 @@ class ApiClient {
     });
   }
 
+  // 12c. Claim Rewarded Ad Bonus (Swipes or Temporary Photo Pass)
+  Future<Response> claimAdReward({
+    required String rewardType,
+  }) async {
+    return await dio.post('/ads/claim-reward', data: {
+      'reward_type': rewardType,
+    });
+  }
+
+  // 12d. Fetch Active Pass & Super Boost Status
+  Future<Response> getActivePassStatus() async {
+    return await dio.get('/payments/active-pass');
+  }
+
   // 13. Create Razorpay Subscription Order (₹99/mo)
   Future<Response> createRazorpayOrder() async {
     return await dio.post('/payments/create-order');

@@ -1,10 +1,10 @@
 import math
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_, func
+from sqlalchemy import select, or_, and_, func, case
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -129,13 +129,19 @@ async def get_feed(
             elif g_str in ("female", "f"):
                 resolved_gender = ORMGenderEnum.female
 
-        # 3. Primary Query: Active candidates
+        from sqlalchemy import case
+        now_dt = datetime.now(timezone.utc)
+
+        # 3. Primary Query: Active candidates prioritized by active Super Boost
         stmt = (
             select(User)
             .where(User.is_active == True)
             .where(~User.id.in_(excluded_ids))
             .options(selectinload(User.photos))
-            .order_by(User.created_at.desc())
+            .order_by(
+                case((User.boosted_until > func.now(), 1), else_=0).desc(),
+                User.created_at.desc()
+            )
         )
         if resolved_gender:
             stmt = stmt.where(User.gender == resolved_gender)
@@ -172,6 +178,7 @@ async def get_feed(
             # Strict verification badge check: approved only
             v_status_val = user.verification_status.value if getattr(user, 'verification_status', None) else "UNVERIFIED"
             is_approved = bool(user.is_verified and getattr(user, 'verification_status', None) == ORMVerificationStatusEnum.APPROVED)
+            is_boosted = bool(user.boosted_until and user.boosted_until > now_dt)
 
             profile_cards.append(
                 ProfileCardData(
@@ -189,6 +196,8 @@ async def get_feed(
                     is_verified=is_approved,
                     verification_status=VerificationStatusEnum(v_status_val),
                     is_verified_local=is_approved,
+                    is_boosted=is_boosted,
+                    boosted_until=user.boosted_until,
                 )
             )
             added_user_ids.add(user.id)
@@ -202,7 +211,10 @@ async def get_feed(
                 .where(User.is_active == True)
                 .where(~User.id.in_(excluded_ids))
                 .options(selectinload(User.photos))
-                .order_by(User.created_at.desc())
+                .order_by(
+                    case((User.boosted_until > func.now(), 1), else_=0).desc(),
+                    User.created_at.desc()
+                )
                 .limit(limit * 2)
             )
             fallback_res = await db.execute(fallback_stmt)
@@ -226,6 +238,7 @@ async def get_feed(
 
                 f_status_val = fallback_user.verification_status.value if getattr(fallback_user, 'verification_status', None) else "UNVERIFIED"
                 f_is_approved = bool(fallback_user.is_verified and getattr(fallback_user, 'verification_status', None) == ORMVerificationStatusEnum.APPROVED)
+                f_is_boosted = bool(fallback_user.boosted_until and fallback_user.boosted_until > now_dt)
 
                 profile_cards.append(
                     ProfileCardData(
@@ -243,6 +256,8 @@ async def get_feed(
                         is_verified=f_is_approved,
                         verification_status=VerificationStatusEnum(f_status_val),
                         is_verified_local=f_is_approved,
+                        is_boosted=f_is_boosted,
+                        boosted_until=fallback_user.boosted_until,
                     )
                 )
                 added_user_ids.add(fallback_user.id)

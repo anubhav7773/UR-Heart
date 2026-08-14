@@ -1,6 +1,14 @@
 import 'package:flutter/foundation.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../network/api_client.dart';
 import '../security/storage_manager.dart';
+
+class AdConfig {
+  static const String rewardedAdUnitId = AdManager.rewardedAdUnitId;
+  static const String nativeAdUnitId = AdManager.nativeAdUnitId;
+  static const String interstitialAdUnitId = AdManager.interstitialAdUnitId;
+  static const String appOpenAdUnitId = AdManager.appOpenAdUnitId;
+}
 
 class AdManager {
   static final AdManager instance = AdManager._internal();
@@ -24,7 +32,71 @@ class AdManager {
   int _localSkipCount = 0;
   DateTime? _lastAppOpenAdTime;
 
+  // Rewarded Video Ad Cache State
+  RewardedAd? _rewardedAd;
+  bool _isRewardedAdLoading = false;
+
   int get localSkipCount => _localSkipCount;
+
+  void loadRewardedAd() {
+    if (kIsWeb) return;
+    if (_isRewardedAdLoading || _rewardedAd != null) return;
+    _isRewardedAdLoading = true;
+    try {
+      RewardedAd.load(
+        adUnitId: rewardedAdUnitId,
+        request: const AdRequest(),
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (ad) {
+            _rewardedAd = ad;
+            _isRewardedAdLoading = false;
+            if (kDebugMode) print('AdManager: RewardedAd loaded successfully.');
+          },
+          onAdFailedToLoad: (error) {
+            _rewardedAd = null;
+            _isRewardedAdLoading = false;
+            if (kDebugMode) print('AdManager: RewardedAd failed to load: $error');
+          },
+        ),
+      );
+    } catch (e) {
+      _rewardedAd = null;
+      _isRewardedAdLoading = false;
+      if (kDebugMode) print('AdManager: Exception loading RewardedAd: $e');
+    }
+  }
+
+  void showRewardedAd({required Function() onRewardEarned, Function()? onFailed}) {
+    if (kIsWeb) {
+      // In web preview, directly reward the user
+      logAdImpression('rewarded_video');
+      onRewardEarned();
+      return;
+    }
+
+    if (_rewardedAd != null) {
+      _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (ad) {
+          ad.dispose();
+          _rewardedAd = null;
+          loadRewardedAd(); // Preload next ad
+        },
+        onAdFailedToShowFullScreenContent: (ad, error) {
+          ad.dispose();
+          _rewardedAd = null;
+          loadRewardedAd();
+          if (onFailed != null) onFailed();
+        },
+      );
+      _rewardedAd!.show(onUserEarnedReward: (ad, reward) {
+        logAdImpression('rewarded_video');
+        onRewardEarned();
+      });
+    } else {
+      if (onFailed != null) onFailed();
+      loadRewardedAd();
+    }
+  }
 
   Future<void> fetchRemoteConfig() async {
     try {

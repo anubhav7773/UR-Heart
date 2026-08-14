@@ -314,6 +314,10 @@ class UserRead(BaseModel):
     area_name: Optional[str] = None
     village_pin_code: Optional[str] = None
     is_premium: bool = False
+    is_boosted: bool = False
+    boosted_until: Optional[datetime] = None
+    photo_pass_until: Optional[datetime] = None
+    bonus_swipes: int = 0
     is_verified: bool = False
     verification_status: VerificationStatusEnum = VerificationStatusEnum.UNVERIFIED
     verification_video_url: Optional[str] = None
@@ -339,6 +343,8 @@ class ProfileCardData(BaseModel):
     is_verified: bool = False
     verification_status: VerificationStatusEnum = VerificationStatusEnum.UNVERIFIED
     is_verified_local: bool = False
+    is_boosted: bool = False
+    boosted_until: Optional[datetime] = None
 
 
 class AdConfigSlot(BaseModel):
@@ -385,6 +391,20 @@ class LogAdEventRequest(BaseModel):
     event_type: AdEventTypeEnum
     network_provider: str = "AdMob"
     ecpm_estimate: float = 0.0
+
+
+class ClaimAdRewardRequest(BaseModel):
+    reward_type: str = Field("swipes", description="'swipes' (+5 swipes) or 'photo_pass' (2-hour pass)")
+
+
+class ClaimAdRewardData(BaseModel):
+    success: bool = True
+    reward_type: str
+    bonus_swipes_granted: int = 0
+    photo_pass_granted_hours: int = 0
+    photo_pass_until: Optional[str] = None
+    remaining_ad_claims_today: int = 2
+    message: str = "Reward claimed successfully."
 
 
 # 8. Chat & Payment Schemas
@@ -437,7 +457,7 @@ class WhatsAppBridgeStatusData(BaseModel):
 
 # 11. Sachet Micro-Transaction Schemas
 class CreateSachetOrderRequest(BaseModel):
-    plan_type: str = Field(..., description="'chai_invite' (₹9), 'photo_pass' (₹19), or 'monthly' (₹99)")
+    plan_type: str = Field(..., description="'chai_invite' (₹9), 'photo_pass' (₹19), 'super_boost' (₹29), or 'monthly' (₹99)")
 
 
 class CreateSachetOrderData(BaseModel):

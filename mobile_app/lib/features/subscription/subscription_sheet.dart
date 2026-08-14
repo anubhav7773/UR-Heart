@@ -196,14 +196,16 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
               ),
             ),
 
-          // 3-Option Pass Selector Cards with Explicit Validity Tags
+          // 4-Option Pass Selector Cards with Explicit Validity Tags
           Row(
             children: [
-              _buildPlanTile('fast_pass', '⚡ Direct Invite', '₹9', 'Valid for 24 Hours'),
-              const SizedBox(width: 8),
-              _buildPlanTile('photo_pass', '📷 Photo Pass', '₹19', 'Valid for 24 Hours'),
-              const SizedBox(width: 8),
-              _buildPlanTile('monthly', '👑 Pro Monthly', '₹99', 'Valid for 30 Days'),
+              _buildPlanTile('fast_pass', '⚡ Invite', '₹9', '24 Hours'),
+              const SizedBox(width: 6),
+              _buildPlanTile('photo_pass', '📷 Photo', '₹19', '24 Hours'),
+              const SizedBox(width: 6),
+              _buildPlanTile('super_boost', '🔥 Boost', '₹29', '1 Hour (10x)'),
+              const SizedBox(width: 6),
+              _buildPlanTile('monthly', '👑 Pro', '₹99', '30 Days'),
             ],
           ),
           const SizedBox(height: 20),
@@ -213,9 +215,15 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
             children: [
               ListTile(
                 dense: true,
+                leading: Icon(Icons.bolt, color: Colors.amber),
+                title: Text('⚡ 10x Profile Boost & Priority Feed', style: TextStyle(color: Colors.white)),
+                subtitle: Text('Get featured at the top of candidate feeds for 1 hour', style: TextStyle(color: Colors.grey)),
+              ),
+              ListTile(
+                dense: true,
                 leading: Icon(Icons.offline_bolt_outlined, color: Colors.greenAccent),
                 title: Text('Instant Direct Message & Photo Access', style: TextStyle(color: Colors.white)),
-                subtitle: Text('Bypass swipe queues & message immediately', style: TextStyle(color: Colors.grey)),
+                subtitle: Text('Bypass swipe queues & message candidates immediately', style: TextStyle(color: Colors.grey)),
               ),
               ListTile(
                 dense: true,
@@ -259,10 +267,12 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
   String _getPlanPriceLabel() {
     if (_selectedPlanType == 'fast_pass' || _selectedPlanType == 'chai_invite') return '₹9';
     if (_selectedPlanType == 'photo_pass') return '₹19';
+    if (_selectedPlanType == 'super_boost') return '₹29';
     return '₹99';
   }
 
   String _getPlanValidityLabel() {
+    if (_selectedPlanType == 'super_boost') return 'Valid 1 Hour (10x Views)';
     if (_selectedPlanType == 'monthly') return 'Valid 30 Days';
     return 'Valid 24 Hours';
   }
@@ -275,7 +285,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
         onTap: () => setState(() => _selectedPlanType = planKey),
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           decoration: BoxDecoration(
             color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.2) : AppTheme.surfaceColor,
             borderRadius: BorderRadius.circular(14),
@@ -289,16 +299,16 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 4),
               Text(
                 price,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
               ),
               const SizedBox(height: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected ? AppTheme.primaryColor : Colors.black45,
                   borderRadius: BorderRadius.circular(8),
@@ -307,7 +317,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
                   validitySubtitle,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 8.5,
+                    fontSize: 8,
                     fontWeight: FontWeight.bold,
                     color: isSelected ? Colors.white : Colors.white70,
                   ),

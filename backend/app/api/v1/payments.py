@@ -44,6 +44,7 @@ async def create_sachet_order(payload: CreateSachetOrderRequest):
     Initiates a Razorpay UPI order session for Micro-Transactions & Passes:
     - 'fast_pass' / 'chai_invite' / 'direct_invite': ₹9 (Valid for 24 Hours)
     - 'photo_pass': ₹19 (Valid for 24 Hours)
+    - 'super_boost': ₹29 (Valid for 1 Hour - 10x Feed Visibility)
     - 'monthly' / 'subscription': ₹99 (Valid for 30 Days)
     """
     plan = payload.plan_type.lower().strip()
@@ -51,12 +52,15 @@ async def create_sachet_order(payload: CreateSachetOrderRequest):
         amount = 9.0
     elif plan == "photo_pass":
         amount = 19.0
+    elif plan in ("super_boost", "boost"):
+        amount = 29.0
+        plan = "super_boost"
     elif plan in ("monthly", "subscription"):
         amount = 99.0
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid plan_type. Choose 'fast_pass' (₹9), 'photo_pass' (₹19), or 'monthly' (₹99)."
+            detail="Invalid plan_type. Choose 'fast_pass' (₹9), 'photo_pass' (₹19), 'super_boost' (₹29), or 'monthly' (₹99)."
         )
 
     order_id = f"order_pass_{plan}_{uuid.uuid4().hex[:10]}"
@@ -80,6 +84,7 @@ async def verify_payment(
     Verifies Razorpay payment signature using HMAC-SHA256 and sets strict validity expiry rules:
     - ₹9 Pass: Valid for 24 Hours
     - ₹19 Pass: Valid for 24 Hours
+    - ₹29 Super Boost: Valid for 1 Hour (10x Feed Priority)
     - ₹99 Pass: Valid for 30 Days (Monthly Pro)
     """
     secret = settings.RAZORPAY_KEY_SECRET or "rzp_secret_dummy_123"
@@ -98,12 +103,19 @@ async def verify_payment(
     if plan in ("fast_pass", "chai_invite", "direct_invite", "₹9"):
         valid_until = now_utc + timedelta(hours=24)
         amount_inr = 9.0
+        plan = "fast_pass"
     elif plan in ("photo_pass", "₹19"):
         valid_until = now_utc + timedelta(hours=24)
         amount_inr = 19.0
+        plan = "photo_pass"
+    elif plan in ("super_boost", "boost", "₹29"):
+        valid_until = now_utc + timedelta(hours=1)
+        amount_inr = 29.0
+        plan = "super_boost"
     elif plan in ("monthly", "subscription", "₹99"):
         valid_until = now_utc + timedelta(days=30)
         amount_inr = 99.0
+        plan = "monthly"
     else:
         valid_until = now_utc + timedelta(hours=24)
         amount_inr = 9.0
@@ -118,6 +130,10 @@ async def verify_payment(
             if plan in ("monthly", "subscription", "₹99"):
                 user_obj.is_premium = True
                 user_obj.premium_expires_at = valid_until
+            elif plan == "super_boost":
+                user_obj.boosted_until = valid_until
+            elif plan == "photo_pass":
+                user_obj.photo_pass_until = valid_until
 
             # Record Sachet Transaction with strict valid_until timestamp
             txn = SachetTransaction(
@@ -134,13 +150,19 @@ async def verify_payment(
     except Exception:
         await db.rollback()
 
-    validity_str = "24 Hours" if amount_inr < 99 else "30 Days"
+    if plan == "super_boost":
+        validity_str = "1 Hour (10x Profile Views)"
+    elif amount_inr < 99:
+        validity_str = "24 Hours"
+    else:
+        validity_str = "30 Days"
+
     return APIResponse(
         success=True,
         data=VerifyPaymentData(
             verified=is_valid,
             plan_type=plan,
-            message=f"Payment verified successfully! {plan.upper()} pass active for {validity_str} on UR Heart."
+            message=f"Payment verified successfully! {plan.upper()} active for {validity_str} on UR Heart."
         )
     )
 
@@ -151,12 +173,26 @@ async def get_active_pass_status(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Returns the user's active pass details and strict expiry countdown.
-    Safely handles missing tables or database exceptions.
+    Returns the user's active pass details, Super Boost status, and strict expiry countdown.
     """
     try:
         user_uuid = uuid.UUID(current_user_id)
         now_utc = datetime.now(timezone.utc)
+
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user_obj = user_res.scalars().first()
+
+        is_boosted = False
+        boost_remaining_mins = 0
+        boost_badge = None
+        boosted_until_str = None
+
+        if user_obj and user_obj.boosted_until:
+            if user_obj.boosted_until > now_utc:
+                is_boosted = True
+                boost_remaining_mins = max(1, int((user_obj.boosted_until - now_utc).total_seconds() // 60))
+                boost_badge = f"⚡ Boosted ({boost_remaining_mins}m left)"
+                boosted_until_str = user_obj.boosted_until.isoformat()
 
         # Check active transactions safely
         txn_res = await db.execute(
@@ -179,10 +215,28 @@ async def get_active_pass_status(
                     "valid_until": active_txn.valid_until.isoformat(),
                     "remaining_hours": remaining_hours,
                     "badge_text": f"Active (Expires in {remaining_hours} hrs)" if remaining_hours < 48 else f"Active (Expires in {remaining_hours // 24} days)",
+                    "is_boosted": is_boosted,
+                    "boost_remaining_minutes": boost_remaining_mins,
+                    "boost_badge_text": boost_badge,
+                    "boosted_until": boosted_until_str,
                 }
             )
-    except Exception as e:
-        # Gracefully catch missing sachet_transactions table or database errors
+
+        return APIResponse(
+            success=True,
+            data={
+                "has_active_pass": False,
+                "plan_type": None,
+                "valid_until": None,
+                "remaining_hours": 0,
+                "badge_text": "No Active Pass",
+                "is_boosted": is_boosted,
+                "boost_remaining_minutes": boost_remaining_mins,
+                "boost_badge_text": boost_badge,
+                "boosted_until": boosted_until_str,
+            }
+        )
+    except Exception:
         pass
 
     return APIResponse(
@@ -193,6 +247,10 @@ async def get_active_pass_status(
             "valid_until": None,
             "remaining_hours": 0,
             "badge_text": "No Active Pass",
+            "is_boosted": False,
+            "boost_remaining_minutes": 0,
+            "boost_badge_text": None,
+            "boosted_until": None,
         }
     )
 

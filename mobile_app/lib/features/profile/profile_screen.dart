@@ -2,9 +2,11 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../auth/auth_screen.dart';
 import '../settings/blocked_users_screen.dart';
+import '../subscription/subscription_sheet.dart';
 import '../../screens/admin_verification_screen.dart';
 import '../../screens/activity_screen.dart';
 import 'edit_profile_screen.dart';
@@ -23,6 +25,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
+  bool _isBoosted = false;
+  String? _boostBadgeText;
 
   @override
   void initState() {
@@ -34,6 +38,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       final data = await _profileService.getUserProfile();
+      try {
+        final passRes = await ApiClient.instance.getActivePassStatus();
+        if (passRes.data != null && passRes.data['data'] != null) {
+          final passData = passRes.data['data'];
+          _isBoosted = passData['is_boosted'] ?? false;
+          _boostBadgeText = passData['boost_badge_text'];
+        }
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _profileData = data;
@@ -634,6 +647,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 6),
 
+            // Active Super Boost Countdown Badge
+            if (_isBoosted && _boostBadgeText != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF9100), Color(0xFFFF3D00)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.deepOrangeAccent, blurRadius: 8, spreadRadius: 1),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt, color: Colors.white, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      _boostBadgeText!,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+
             // Location Chip
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -647,6 +687,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Icon(Icons.location_on, size: 14, color: Colors.amber),
                   const SizedBox(width: 4),
                   Text(areaName, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Super Boost (₹29) / VIP Promotion Card
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFE91E63).withValues(alpha: 0.15),
+                    Colors.amber.withValues(alpha: 0.15),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: Colors.amber,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.bolt, color: Colors.black87, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '⚡ 10x Visibility Super Boost',
+                          style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _isBoosted ? 'Active on your profile now! 🔥' : 'Be #1 in candidate feeds for 1 hour (₹29)',
+                          style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => const SubscriptionSheet(),
+                      ).then((_) => _fetchProfile());
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      foregroundColor: Colors.black87,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(_isBoosted ? 'Extend 🔥' : 'Boost ₹29', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
             ),
