@@ -2,7 +2,8 @@ import uuid
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Query, Body, Path
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from pydantic import BaseModel
+from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 try:
@@ -424,6 +425,18 @@ async def verify_video_profile(
     )
 
 
+class UnblockPayload(BaseModel):
+    target_id: Optional[str] = None
+    reported_id: Optional[str] = None
+
+
+class ReportUserPayload(BaseModel):
+    target_id: Optional[str] = None
+    reported_id: Optional[str] = None
+    reason: str = "Inappropriate Behavior"
+    details: Optional[str] = ""
+
+
 async def _execute_unblock_logic(current_user_id: str, target_id_str: str, db: AsyncSession) -> dict:
     if not target_id_str:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id parameter is required.")
@@ -432,16 +445,12 @@ async def _execute_unblock_logic(current_user_id: str, target_id_str: str, db: A
         blocker_uuid = uuid.UUID(current_user_id)
         target_uuid = uuid.UUID(target_id_str)
 
-        res = await db.execute(
-            select(BlockedUser).where(
-                BlockedUser.blocker_id == blocker_uuid,
-                BlockedUser.blocked_id == target_uuid
-            )
+        stmt = delete(BlockedUser).where(
+            BlockedUser.blocker_id == blocker_uuid,
+            BlockedUser.blocked_id == target_uuid
         )
-        blocked_entry = res.scalars().first()
-        if blocked_entry:
-            await db.delete(blocked_entry)
-            await db.commit()
+        await db.execute(stmt)
+        await db.commit()
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid target_id UUID format.")
     except Exception:
@@ -470,14 +479,14 @@ async def unblock_user_by_path(
 @router.post("/unblock")
 async def unblock_user(
     target_id: Optional[str] = Query(default=None),
-    payload: Optional[dict] = Body(default=None),
+    payload: Optional[UnblockPayload] = Body(default=None),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Unblocks a target user via query parameter ?target_id=... or JSON body {"target_id": "..."}.
     """
-    unblock_target = target_id or (payload.get("target_id") if isinstance(payload, dict) else None) or (payload.get("reported_id") if isinstance(payload, dict) else None)
+    unblock_target = target_id or (payload.target_id if payload else None) or (payload.reported_id if payload else None)
     if not unblock_target:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id parameter is required.")
 
@@ -550,16 +559,16 @@ async def get_blocked_users(
 @router.post("/report")
 @router.post("/report-user")
 async def report_user(
-    payload: dict,
+    payload: ReportUserPayload,
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Logs report entry into user_reports table and automatically blocks the reported user.
     """
-    target_id = payload.get("target_id") or payload.get("reported_id")
-    reason = payload.get("reason", "Inappropriate Behavior")
-    details = payload.get("details", "")
+    target_id = payload.target_id or payload.reported_id
+    reason = payload.reason
+    details = payload.details or ""
 
     if not target_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id is required.")
