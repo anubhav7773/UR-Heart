@@ -13,7 +13,9 @@ router = APIRouter(prefix="/users", tags=["User Location"])
 
 
 @router.post("/fcm-token")
+@router.post("/fcm-token/")
 @router.put("/fcm-token")
+@router.put("/fcm-token/")
 async def update_fcm_token(
     payload: dict = Body(...),
     current_user_id: str = Depends(get_current_user_id),
@@ -49,7 +51,9 @@ async def update_fcm_token(
 
 
 @router.post("/location")
+@router.post("/location/")
 @router.put("/location")
+@router.put("/location/")
 async def update_user_location(
     payload: dict,
     current_user_id: str = Depends(get_current_user_id),
@@ -120,6 +124,7 @@ def _serialize_user_profile(user: User) -> dict:
 
 
 @router.get("/activity")
+@router.get("/activity/")
 async def get_user_activity(
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)

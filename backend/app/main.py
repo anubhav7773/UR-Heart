@@ -96,20 +96,24 @@ from app.api.v1.verification import router as verification_router
 from app.api.v1.admin import router as admin_router
 
 api_v1_prefix = settings.API_V1_STR
-app.include_router(auth_router, prefix=api_v1_prefix)
-app.include_router(profile_router, prefix=api_v1_prefix)
-app.include_router(users_router, prefix=api_v1_prefix)
-app.include_router(feed_router, prefix=api_v1_prefix)
-app.include_router(matches_router, prefix=api_v1_prefix)
-app.include_router(chat_router, prefix=api_v1_prefix)
-app.include_router(intent_router, prefix=api_v1_prefix)
-app.include_router(ads_router, prefix=api_v1_prefix)
-app.include_router(payments_router, prefix=api_v1_prefix)
-app.include_router(safety_router, prefix=api_v1_prefix)
-app.include_router(verification_router, prefix=api_v1_prefix)
-app.include_router(verification_router, prefix="")
-app.include_router(admin_router, prefix=api_v1_prefix)
-app.include_router(admin_router, prefix="")
+all_routers = [
+    auth_router,
+    profile_router,
+    users_router,
+    feed_router,
+    matches_router,
+    chat_router,
+    intent_router,
+    ads_router,
+    payments_router,
+    safety_router,
+    verification_router,
+    admin_router,
+]
+
+for r in all_routers:
+    app.include_router(r, prefix=api_v1_prefix)
+    app.include_router(r, prefix="")
 
 
 @app.get("/", status_code=200, tags=["Root"])

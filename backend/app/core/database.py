@@ -106,6 +106,24 @@ async def init_db() -> None:
 
         -- Sachet transactions table
         ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ DEFAULT NULL;
+
+        -- User ad counters table and columns
+        CREATE TABLE IF NOT EXISTS user_ad_counters (
+            user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            persistent_skip_count INT DEFAULT 0,
+            total_interstitials_shown INT DEFAULT 0,
+            last_interstitial_at TIMESTAMPTZ DEFAULT NULL,
+            rewarded_claims_today INT DEFAULT 0,
+            last_rewarded_claim_at TIMESTAMPTZ DEFAULT NULL,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS persistent_skip_count INT DEFAULT 0;
+        ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS total_interstitials_shown INT DEFAULT 0;
+        ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS last_interstitial_at TIMESTAMPTZ DEFAULT NULL;
+        ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS rewarded_claims_today INT DEFAULT 0;
+        ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS last_rewarded_claim_at TIMESTAMPTZ DEFAULT NULL;
+        ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
     END $$;
     """
 
@@ -142,6 +160,12 @@ async def init_db() -> None:
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS mutual_message_count INT DEFAULT 0;",
         "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_msg_id VARCHAR(64);",
         "ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP WITH TIME ZONE;",
+        "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS persistent_skip_count INT DEFAULT 0;",
+        "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS total_interstitials_shown INT DEFAULT 0;",
+        "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS last_interstitial_at TIMESTAMPTZ DEFAULT NULL;",
+        "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS rewarded_claims_today INT DEFAULT 0;",
+        "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS last_rewarded_claim_at TIMESTAMPTZ DEFAULT NULL;",
+        "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();",
     ]
 
     for query in individual_queries:
