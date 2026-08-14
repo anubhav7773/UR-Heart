@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import Optional, Dict, Any
 from app.core.config import settings
 
@@ -12,26 +13,44 @@ try:
     from firebase_admin import credentials, messaging
 
     if not firebase_admin._apps:
-        try:
-            if settings.FIREBASE_CREDENTIALS_JSON:
-                cred_dict = json.loads(settings.FIREBASE_CREDENTIALS_JSON)
+        raw_json = (
+            os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+            or os.getenv("FIREBASE_CREDENTIALS")
+            or settings.FIREBASE_SERVICE_ACCOUNT_JSON
+            or settings.FIREBASE_CREDENTIALS
+            or settings.FIREBASE_CREDENTIALS_JSON
+        )
+        if raw_json:
+            try:
+                cred_dict = json.loads(raw_json)
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
                 _firebase_app_initialized = True
-            elif settings.FIREBASE_PROJECT_ID:
-                firebase_admin.initialize_app(options={"projectId": settings.FIREBASE_PROJECT_ID})
+                print("Firebase Admin initialized successfully from JSON env.")
+            except Exception as e:
+                print(f"Failed to initialize Firebase Admin from JSON: {e}")
+                try:
+                    firebase_admin.initialize_app()
+                    _firebase_app_initialized = True
+                    print("Firebase Admin initialized with default application credentials fallback.")
+                except Exception as fallback_err:
+                    print(f"Fallback default Firebase Admin initialization notice: {fallback_err}")
+                    _firebase_app_initialized = False
+        else:
+            try:
+                if settings.FIREBASE_PROJECT_ID:
+                    firebase_admin.initialize_app(options={"projectId": settings.FIREBASE_PROJECT_ID})
+                else:
+                    firebase_admin.initialize_app()
                 _firebase_app_initialized = True
-            else:
-                # Default initialization (uses GOOGLE_APPLICATION_CREDENTIALS if available)
-                firebase_admin.initialize_app()
-                _firebase_app_initialized = True
-        except Exception as init_err:
-            logger.warning(f"FCM Service initialization notice (running in mock mode): {init_err}")
-            _firebase_app_initialized = False
+                print("Firebase Admin initialized successfully.")
+            except Exception as init_err:
+                print(f"Firebase Admin initialization notice: {init_err}")
+                _firebase_app_initialized = False
     else:
         _firebase_app_initialized = True
 except (ImportError, ModuleNotFoundError):
-    logger.warning("firebase_admin package not installed. FCM Service running in mock/fallback mode.")
+    print("firebase_admin package not installed. Notification engine running in mock mode.")
     messaging = None
 
 
@@ -42,33 +61,40 @@ async def send_push_notification(
     data: Optional[Dict[str, Any]] = None
 ) -> bool:
     """
-    Safely dispatches an FCM push notification payload to a target device token.
-    Prevents throwing unhandled exceptions or blocking API response pipelines.
+    Safely dispatches high-priority Android/FCM push notifications.
+    Logs explicit status for recipient token, successful delivery IDs, or error tracebacks.
     """
     if not fcm_token or not str(fcm_token).strip():
-        logger.debug("FCM token is empty or missing. Skipping push notification.")
+        print("[FCM] Skipped: No fcm_token for recipient")
         return False
 
-    data_payload = {str(k): str(v) for k, v in (data or {}).items() if v is not None}
+    msg_data = {str(k): str(v) for k, v in (data or {}).items() if v is not None}
 
     if not _firebase_app_initialized or messaging is None:
-        logger.info(f"[MOCK FCM PUSH] Token: {fcm_token[:12]}... | Title: '{title}' | Body: '{body}' | Data: {data_payload}")
+        print(f"[MOCK FCM PUSH] Token: {fcm_token[:12]}... | Title: '{title}' | Body: '{body}' | Data: {msg_data}")
         return True
 
     try:
-        msg = messaging.Message(
+        message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
                 body=body,
             ),
-            data=data_payload,
+            data=msg_data,
             token=fcm_token,
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id='high_importance_channel',
+                    sound='default',
+                ),
+            ),
         )
-        response = messaging.send(msg)
-        logger.info(f"FCM Push Notification sent successfully to {fcm_token[:12]}... Message ID: {response}")
+        response = messaging.send(message)
+        print(f"[FCM SUCCESS] Sent notification ID: {response}")
         return True
-    except Exception as exc:
-        logger.error(f"Failed to send FCM push notification: {exc}")
+    except Exception as err:
+        print(f"[FCM ERROR] Failed sending notification: {err}")
         return False
 
 

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Firebase Cloud Messaging (FCM)
     FIREBASE_PROJECT_ID: Optional[str] = None
     FIREBASE_CREDENTIALS_JSON: Optional[str] = None
+    FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
+    FIREBASE_CREDENTIALS: Optional[str] = None
 
     # Cloudflare R2 Media Storage
     R2_ACCOUNT_ID: Optional[str] = None
