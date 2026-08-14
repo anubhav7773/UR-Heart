@@ -279,10 +279,13 @@ async def send_chat_message(
             sender_user = sender_res.scalars().first()
             sender_name = sender_user.full_name if sender_user else "Matched User"
 
-            if recip_user and recip_user.fcm_token:
+            recip_token = recip_user.fcm_token if recip_user else None
+            print(f"[FCM] Dispatching push to user: {recipient_id}, token: {recip_token or 'None'}")
+
+            if recip_user and recip_token:
                 background_tasks.add_task(
                     send_push_notification,
-                    fcm_token=recip_user.fcm_token,
+                    fcm_token=recip_token,
                     title=sender_name,
                     body=payload.content or "Sent you a media attachment.",
                     data={
@@ -292,8 +295,10 @@ async def send_chat_message(
                         "conversation_id": str(payload.match_id),
                     },
                 )
-    except Exception:
-        pass
+            else:
+                print(f"[FCM] Skipped dispatch: recipient user {recipient_id} has no registered FCM token.")
+    except Exception as exc:
+        print(f"[FCM] Exception while staging chat push notification: {exc}")
 
     return APIResponse(
         success=True,

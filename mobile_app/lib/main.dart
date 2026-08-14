@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/network/api_client.dart';
 import 'core/security/storage_manager.dart';
@@ -43,7 +44,28 @@ void main() async {
     }
   }
 
-  // 2. Safe Mobile Ads & AppCheck Initialization
+  // 2. Android High Importance Notification Channel Setup
+  if (!kIsWeb) {
+    try {
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'high_importance_channel',
+        'High Importance Notifications',
+        description: 'This channel is used for urgent match and chat push notifications.',
+        importance: Importance.max,
+        playSound: true,
+      );
+      final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
+      await localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Android Notification Channel creation notice: $e');
+      }
+    }
+  }
+
+  // 3. Safe Mobile Ads & AppCheck Initialization
   try {
     if (!kIsWeb) {
       await MobileAds.instance.initialize();

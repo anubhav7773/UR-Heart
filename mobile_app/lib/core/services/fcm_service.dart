@@ -28,7 +28,7 @@ class FcmService {
     'high_importance_channel',
     'High Importance Notifications',
     description: 'This channel is used for urgent match and chat push notifications.',
-    importance: Importance.high,
+    importance: Importance.max,
     playSound: true,
   );
 
@@ -154,8 +154,8 @@ class FcmService {
             _highImportanceChannel.id,
             _highImportanceChannel.name,
             channelDescription: _highImportanceChannel.description,
-            importance: Importance.high,
-            priority: Priority.high,
+            importance: Importance.max,
+            priority: Priority.max,
             icon: '@mipmap/ic_launcher',
           ),
         ),
