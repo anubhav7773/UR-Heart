@@ -2,7 +2,7 @@ import 'dart:io' show Platform;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_windowmanager/flutter_windowmanager.dart';
+import '../../core/security/flutter_windowmanager.dart';
 import '../../core/ads/ad_manager.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
