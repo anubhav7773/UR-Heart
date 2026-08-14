@@ -1,25 +1,45 @@
 import os
 import json
 import logging
-import firebase_admin
-from firebase_admin import credentials, auth as fb_auth
 
 logger = logging.getLogger(__name__)
 
+try:
+    import firebase_admin
+    from firebase_admin import credentials, auth as fb_auth
+except (ImportError, ModuleNotFoundError):
+    firebase_admin = None
+    fb_auth = None
+
 def initialize_firebase():
     """Initializes Firebase Admin SDK with env var, serviceAccountKey.json or fallback project options."""
+    if firebase_admin is None:
+        logger.warning("[Firebase] firebase_admin package not installed. Skipping initialization.")
+        return
+
     if not firebase_admin._apps:
-        # 1. Try environment variable FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_CREDENTIALS
-        env_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON") or os.environ.get("FIREBASE_CREDENTIALS")
-        if env_json:
+        # 1. Try environment variable FIREBASE_CREDENTIALS_JSON, FIREBASE_SERVICE_ACCOUNT_JSON, or FIREBASE_CREDENTIALS
+        service_account_raw = (
+            os.getenv("FIREBASE_CREDENTIALS_JSON")
+            or os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+            or os.getenv("FIREBASE_CREDENTIALS")
+        )
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
+
+        if service_account_raw:
             try:
-                cred_dict = json.loads(env_json)
-                cred = credentials.Certificate(cred_dict)
+                cert_dict = json.loads(service_account_raw)
+                cred = credentials.Certificate(cert_dict)
                 firebase_admin.initialize_app(cred)
-                logger.info("[Firebase] Initialized Admin SDK from environment variable credentials.")
+                print("[FIREBASE_INIT] Successfully initialized with Service Account Credentials!")
                 return
             except Exception as e:
-                logger.error(f"[Firebase] Error parsing environment JSON credentials: {e}")
+                print(f"[FIREBASE_INIT] Failed to load JSON creds: {e}")
+                try:
+                    firebase_admin.initialize_app(options={"projectId": project_id})
+                    return
+                except Exception:
+                    pass
 
         # 2. Try serviceAccountKey.json file in backend root
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -29,15 +49,15 @@ def initialize_firebase():
             try:
                 cred = credentials.Certificate(service_account_path)
                 firebase_admin.initialize_app(cred)
-                logger.info(f"[Firebase] Initialized Admin SDK with credentials from {service_account_path}")
+                print(f"[FIREBASE_INIT] Initialized with credentials from {service_account_path}")
                 return
             except Exception as e:
                 logger.error(f"[Firebase] Error initializing Certificate: {e}")
 
         # 3. Fallback project options
-        logger.warning("[Firebase] serviceAccountKey.json or env var not found; initializing with fallback options.")
         try:
-            firebase_admin.initialize_app(options={'projectId': 'ur-heart'})
+            firebase_admin.initialize_app(options={"projectId": project_id})
+            print(f"[FIREBASE_INIT] Initialized with fallback options: {project_id}")
         except Exception:
             pass
 

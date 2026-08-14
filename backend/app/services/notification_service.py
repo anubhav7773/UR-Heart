@@ -58,20 +58,19 @@ async def send_push_notification(
     title: str,
     body: str,
     data: Optional[Dict[str, Any]] = None
-) -> bool:
+) -> Optional[str]:
     """
-    Safely dispatches high-priority Android/FCM push notifications.
-    Logs explicit status for recipient token, successful delivery IDs, or error tracebacks.
+    Sends a Firebase Cloud Messaging push notification with high priority.
     """
     if not fcm_token or not str(fcm_token).strip():
         print("[FCM] Skipped: No fcm_token for recipient")
-        return False
+        return None
 
-    msg_data = {str(k): str(v) for k, v in (data or {}).items() if v is not None}
+    msg_data = {str(k): str(v) for k, v in (data or {}).items()}
 
     if not _firebase_app_initialized or messaging is None:
         print(f"[MOCK FCM PUSH] Token: {fcm_token[:12]}... | Title: '{title}' | Body: '{body}' | Data: {msg_data}")
-        return True
+        return "mock-notification-id"
 
     try:
         message = messaging.Message(
@@ -82,37 +81,45 @@ async def send_push_notification(
             data=msg_data,
             token=fcm_token,
             android=messaging.AndroidConfig(
-                priority='high',
+                priority="high",
                 notification=messaging.AndroidNotification(
-                    channel_id='high_importance_channel',
-                    sound='default',
+                    channel_id="high_importance_channel",
+                    sound="default",
                 ),
+            ),
+            apns=messaging.APNSConfig(
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        sound="default",
+                        badge=1,
+                    )
+                )
             ),
         )
         response = messaging.send(message)
         print(f"[FCM SUCCESS] Sent notification ID: {response}")
-        return True
+        return response
     except Exception as err:
         print(f"[FCM ERROR] Failed sending notification: {err}")
-        return False
+        return None
 
 
 async def send_match_notification(
     target_fcm_token: str,
     matched_user_name: str,
-    match_id: str = ""
-) -> bool:
+    match_id: str
+) -> Optional[str]:
     """
-    Triggers an instant push notification when a mutual match occurs ("It's a Match! 🎉").
+    Convenience helper for match notifications.
     """
     return await send_push_notification(
         fcm_token=target_fcm_token,
-        title="It's a Match! 🎉",
+        title="It's a Match! \U0001F389",
         body=f"You and {matched_user_name} liked each other!",
         data={
             "type": "match",
-            "match_id": match_id,
-            "matched_user_name": matched_user_name,
+            "match_id": str(match_id),
+            "click_action": "FLUTTER_NOTIFICATION_CLICK"
         }
     )
 
@@ -120,22 +127,20 @@ async def send_match_notification(
 async def send_chat_notification(
     target_fcm_token: str,
     sender_name: str,
-    message_text: str,
-    sender_id: str = "",
-    match_id: str = ""
-) -> bool:
+    message_preview: str,
+    match_id: str
+) -> Optional[str]:
     """
-    Triggers an instant push notification when a direct chat message is received.
+    Convenience helper for chat message notifications.
     """
-    preview = message_text if len(message_text) <= 60 else f"{message_text[:57]}..."
     return await send_push_notification(
         fcm_token=target_fcm_token,
         title=sender_name,
-        body=preview or "Sent you a message.",
+        body=message_preview or "Sent you a message",
         data={
             "type": "chat",
-            "sender_id": sender_id,
-            "match_id": match_id,
-            "conversation_id": match_id,
+            "match_id": str(match_id),
+            "conversation_id": str(match_id),
+            "click_action": "FLUTTER_NOTIFICATION_CLICK"
         }
     )
