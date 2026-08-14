@@ -1,58 +1,57 @@
-import os
 import json
 import logging
+from typing import Optional
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 try:
     import firebase_admin
-    from firebase_admin import credentials, auth as fb_auth
+    from firebase_admin import credentials, auth as fb_auth, messaging
+
+    def get_firebase_app():
+        if not firebase_admin._apps:
+            # Check if JSON string is provided in settings
+            raw_creds = getattr(settings, "FIREBASE_SERVICE_ACCOUNT_JSON", None)
+            if raw_creds:
+                try:
+                    # Handle both string and already parsed dict
+                    if isinstance(raw_creds, str):
+                        raw_creds = raw_creds.strip("'\"")
+                        cred_dict = json.loads(raw_creds)
+                    else:
+                        cred_dict = raw_creds
+                    
+                    cred = credentials.Certificate(cred_dict)
+                    return firebase_admin.initialize_app(cred)
+                except Exception as e:
+                    print(f"[Firebase Init Error] Failed loading credentials from JSON: {e}")
+            
+            # Fallback to default credentials
+            try:
+                return firebase_admin.initialize_app()
+            except Exception as e:
+                print(f"[Firebase Init Error] Fallback failed: {e}")
+        return firebase_admin.get_app()
+
+    def initialize_firebase():
+        """Alias for backwards compatibility."""
+        return get_firebase_app()
+
+    # Initialize on module load
+    try:
+        get_firebase_app()
+    except Exception as e:
+        logger.warning(f"[Firebase Init Notice] {e}")
+
 except (ImportError, ModuleNotFoundError):
+    logger.warning("[Firebase] firebase_admin package not installed. Skipping initialization.")
     firebase_admin = None
     fb_auth = None
+    messaging = None
+    
+    def get_firebase_app():
+        return None
 
-def initialize_firebase():
-    """Initializes Firebase Admin SDK with env var, serviceAccountKey.json or fallback project options."""
-    if firebase_admin is None:
-        logger.warning("[Firebase] firebase_admin package not installed. Skipping initialization.")
-        return
-
-    if not firebase_admin._apps:
-        service_account_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON") or os.getenv("FIREBASE_CREDENTIALS_JSON") or os.getenv("FIREBASE_CREDENTIALS")
-        if service_account_env:
-            try:
-                cert_dict = json.loads(service_account_env) if isinstance(service_account_env, str) else service_account_env
-                cred = credentials.Certificate(cert_dict)
-                firebase_admin.initialize_app(cred)
-                print("[FCM_INIT] Firebase initialized successfully with Service Account JSON.")
-                return
-            except Exception as e:
-                print(f"[FCM_INIT_ERROR] JSON parsing failed: {e}")
-                try:
-                    firebase_admin.initialize_app()
-                    return
-                except Exception:
-                    pass
-
-        # Try serviceAccountKey.json file in backend root
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-        service_account_path = os.path.join(base_dir, "serviceAccountKey.json")
-
-        if os.path.exists(service_account_path):
-            try:
-                cred = credentials.Certificate(service_account_path)
-                firebase_admin.initialize_app(cred)
-                print(f"[FCM_INIT] Firebase initialized successfully with Service Account JSON from {service_account_path}")
-                return
-            except Exception as e:
-                print(f"[FCM_INIT_ERROR] Error initializing Certificate from file: {e}")
-
-        # Fallback if no credentials found
-        try:
-            project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
-            firebase_admin.initialize_app(options={"projectId": project_id})
-        except Exception:
-            pass
-
-initialize_firebase()
-
+    def initialize_firebase():
+        return None

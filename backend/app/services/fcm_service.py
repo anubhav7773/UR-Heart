@@ -1,45 +1,48 @@
 import json
 import logging
-import os
 from typing import Optional, Dict, Any
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_firebase_app_initialized = False
-
 try:
     import firebase_admin
     from firebase_admin import credentials, messaging
 
-    if not firebase_admin._apps:
-        service_account_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON") or os.getenv("FIREBASE_CREDENTIALS_JSON") or os.getenv("FIREBASE_CREDENTIALS")
-        if service_account_env:
-            try:
-                cert_dict = json.loads(service_account_env) if isinstance(service_account_env, str) else service_account_env
-                cred = credentials.Certificate(cert_dict)
-                firebase_admin.initialize_app(cred)
-                _firebase_app_initialized = True
-                print("[FCM_INIT] Firebase initialized successfully with Service Account JSON.")
-            except Exception as e:
-                print(f"[FCM_INIT_ERROR] JSON parsing failed: {e}")
+    def get_firebase_app():
+        if not firebase_admin._apps:
+            # Check if JSON string is provided in settings
+            raw_creds = getattr(settings, "FIREBASE_SERVICE_ACCOUNT_JSON", None)
+            if raw_creds:
                 try:
-                    firebase_admin.initialize_app()
-                    _firebase_app_initialized = True
-                except Exception:
-                    _firebase_app_initialized = False
-        else:
-            project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
+                    # Handle both string and already parsed dict
+                    if isinstance(raw_creds, str):
+                        raw_creds = raw_creds.strip("'\"")
+                        cred_dict = json.loads(raw_creds)
+                    else:
+                        cred_dict = raw_creds
+                    
+                    cred = credentials.Certificate(cred_dict)
+                    return firebase_admin.initialize_app(cred)
+                except Exception as e:
+                    print(f"[Firebase Init Error] Failed loading credentials from JSON: {e}")
+            
+            # Fallback to default credentials
             try:
-                firebase_admin.initialize_app(options={"projectId": project_id})
-                _firebase_app_initialized = True
-            except Exception:
-                _firebase_app_initialized = False
-    else:
-        _firebase_app_initialized = True
+                return firebase_admin.initialize_app()
+            except Exception as e:
+                print(f"[Firebase Init Error] Fallback failed: {e}")
+        return firebase_admin.get_app()
+
+    # Initialize on module load
+    try:
+        get_firebase_app()
+    except Exception:
+        pass
 except (ImportError, ModuleNotFoundError):
     print("firebase_admin package not installed. Notification engine running in mock mode.")
     messaging = None
+    get_firebase_app = lambda: None
 
 
 async def send_push_notification(
@@ -58,7 +61,12 @@ async def send_push_notification(
 
     msg_data = {str(k): str(v) for k, v in (data or {}).items() if v is not None}
 
-    if not _firebase_app_initialized or messaging is None:
+    try:
+        app = get_firebase_app()
+    except Exception:
+        app = None
+
+    if app is None or messaging is None:
         print(f"[MOCK FCM PUSH] Token: {fcm_token[:12]}... | Title: '{title}' | Body: '{body}' | Data: {msg_data}")
         return True
 
@@ -78,7 +86,7 @@ async def send_push_notification(
                 ),
             ),
         )
-        response = messaging.send(message)
+        response = messaging.send(message, app=app)
         print(f"[FCM SUCCESS] Sent notification ID: {response}")
         return True
     except Exception as err:

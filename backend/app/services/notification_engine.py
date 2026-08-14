@@ -1,24 +1,48 @@
+import json
 import logging
 from typing import Optional, Dict, Any
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-_firebase_app_initialized = False
 
 try:
     import firebase_admin
     from firebase_admin import credentials, messaging
-    if not firebase_admin._apps:
-        # Default initialization; if service account JSON is omitted, uses environment default
-        try:
-            firebase_admin.initialize_app()
-            _firebase_app_initialized = True
-        except Exception as init_err:
-            logger.warning(f"Firebase Admin SDK initialization notice: {init_err}")
-    else:
-        _firebase_app_initialized = True
-except ModuleNotFoundError:
+
+    def get_firebase_app():
+        if not firebase_admin._apps:
+            # Check if JSON string is provided in settings
+            raw_creds = getattr(settings, "FIREBASE_SERVICE_ACCOUNT_JSON", None)
+            if raw_creds:
+                try:
+                    # Handle both string and already parsed dict
+                    if isinstance(raw_creds, str):
+                        raw_creds = raw_creds.strip("'\"")
+                        cred_dict = json.loads(raw_creds)
+                    else:
+                        cred_dict = raw_creds
+                    
+                    cred = credentials.Certificate(cred_dict)
+                    return firebase_admin.initialize_app(cred)
+                except Exception as e:
+                    print(f"[Firebase Init Error] Failed loading credentials from JSON: {e}")
+            
+            # Fallback to default credentials
+            try:
+                return firebase_admin.initialize_app()
+            except Exception as e:
+                print(f"[Firebase Init Error] Fallback failed: {e}")
+        return firebase_admin.get_app()
+
+    # Initialize on module load
+    try:
+        get_firebase_app()
+    except Exception:
+        pass
+except (ImportError, ModuleNotFoundError):
     logger.warning("firebase_admin package not installed. Notification engine will run in mock mode.")
+    messaging = None
+    get_firebase_app = lambda: None
 
 
 class NotificationEngineService:
@@ -36,7 +60,12 @@ class NotificationEngineService:
             logger.info("No FCM token available for target user. Skipping push notification.")
             return False
 
-        if not _firebase_app_initialized:
+        try:
+            app = get_firebase_app()
+        except Exception:
+            app = None
+
+        if app is None or messaging is None:
             logger.info(f"[MOCK FCM NOTIFICATION] To: {target_fcm_token[:10]}... | Title: '{title}' | Body: '{body}'")
             return True
 
@@ -49,7 +78,7 @@ class NotificationEngineService:
                 data=data_payload or {},
                 token=target_fcm_token,
             )
-            response = messaging.send(msg)
+            response = messaging.send(msg, app=app)
             logger.info(f"FCM Push Notification sent successfully. Message ID: {response}")
             return True
         except Exception as e:
