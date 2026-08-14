@@ -429,8 +429,10 @@ class WhatsAppBridgeStatusData(BaseModel):
     match_id: str
     mutual_message_count: int
     required_threshold: int = 15
-    is_whatsapp_unlocked: bool
-    phone_number: Optional[str] = Field(None, description="Unlocked WhatsApp phone number when count >= 15")
+    my_consent: bool = False
+    partner_consent: bool = False
+    is_whatsapp_unlocked: bool = False
+    phone_number: Optional[str] = Field(None, description="Unlocked WhatsApp phone number when both users have consented")
 
 
 # 11. Sachet Micro-Transaction Schemas

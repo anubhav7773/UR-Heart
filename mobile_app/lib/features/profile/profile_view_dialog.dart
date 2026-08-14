@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_windowmanager/flutter_windowmanager.dart';
 
 class ProfileViewDialog extends StatefulWidget {
   final String name;
@@ -25,9 +28,36 @@ class _ProfileViewDialogState extends State<ProfileViewDialog> {
   int _pageIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _enableScreenshotProtection();
+  }
+
+  @override
   void dispose() {
+    _disableScreenshotProtection();
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _enableScreenshotProtection() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+      } catch (e) {
+        if (kDebugMode) print('Could not enable FLAG_SECURE: $e');
+      }
+    }
+  }
+
+  Future<void> _disableScreenshotProtection() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
+      } catch (e) {
+        if (kDebugMode) print('Could not clear FLAG_SECURE: $e');
+      }
+    }
   }
 
   @override

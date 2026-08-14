@@ -43,6 +43,10 @@ dependencies:
   google_sign_in: ^6.2.1
   flutter_local_notifications: ^17.1.0
 
+  # Window & System Security / URL Launcher
+  flutter_windowmanager: ^0.2.0
+  url_launcher: ^6.2.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

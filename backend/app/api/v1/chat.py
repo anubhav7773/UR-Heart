@@ -355,10 +355,13 @@ async def get_whatsapp_bridge_status(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Checks Safe WhatsApp Bridge status (15 mutual messages threshold).
-    Unlocks and retrieves verified phone number from DB when 15 mutual messages are exchanged.
+    Checks Safe WhatsApp Bridge double-consent status.
+    Unlocks contact number only when at least 15 mutual messages are exchanged
+    AND both participants have explicitly provided their consent.
     """
     count = 0
+    my_consent = False
+    partner_consent = False
     unlocked = False
     target_phone = None
 
@@ -369,15 +372,31 @@ async def get_whatsapp_bridge_status(
         match_obj = match_res.scalars().first()
 
         if match_obj:
-            count = match_obj.mutual_message_count
-            unlocked = match_obj.is_whatsapp_unlocked or (count >= 15)
+            if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a participant in this match."
+                )
 
-            target_id = match_obj.user2_id if match_obj.user1_id == user_uuid else match_obj.user1_id
-            target_res = await db.execute(select(User).where(User.id == target_id))
-            target_user = target_res.scalars().first()
-            if target_user and target_user.phone_number:
-                target_phone = target_user.phone_number
-    except Exception:
+            count = match_obj.mutual_message_count or 0
+            is_user1 = (match_obj.user1_id == user_uuid)
+
+            my_consent = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
+            partner_consent = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
+
+            # Unlocked only when both consented and count >= 15 (or previously marked unlocked)
+            unlocked = (my_consent and partner_consent and count >= 15) or match_obj.is_whatsapp_unlocked
+
+            if unlocked:
+                target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
+                target_res = await db.execute(select(User).where(User.id == target_id))
+                target_user = target_res.scalars().first()
+                if target_user and target_user.phone_number:
+                    target_phone = target_user.phone_number
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.warning(f"[WhatsApp-Bridge] Error checking status for match {match_id}: {err}")
         await db.rollback()
 
     return APIResponse(
@@ -386,7 +405,90 @@ async def get_whatsapp_bridge_status(
             match_id=match_id,
             mutual_message_count=count,
             required_threshold=15,
+            my_consent=my_consent,
+            partner_consent=partner_consent,
             is_whatsapp_unlocked=unlocked,
             phone_number=target_phone if unlocked and target_phone else None,
+        )
+    )
+
+
+@router.post("/whatsapp-consent/{match_id}", response_model=APIResponse[WhatsAppBridgeStatusData])
+async def give_whatsapp_consent(
+    match_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submits current user's explicit consent to share WhatsApp contact details with match partner.
+    Requires at least 15 mutual messages to be exchanged.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        match_uuid = uuid.UUID(match_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid match ID or user ID format."
+        )
+
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    match_obj = match_res.scalars().first()
+
+    if not match_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match conversation not found."
+        )
+
+    if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an authorized participant in this conversation."
+        )
+
+    count = match_obj.mutual_message_count or 0
+    if count < 15:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"At least 15 mutual messages required before unlocking WhatsApp consent. (Current: {count}/15)"
+        )
+
+    is_user1 = (match_obj.user1_id == user_uuid)
+    if is_user1:
+        match_obj.user1_whatsapp_consent = True
+    else:
+        match_obj.user2_whatsapp_consent = True
+
+    # Check if both have now consented
+    both_consented = match_obj.user1_whatsapp_consent and match_obj.user2_whatsapp_consent
+    if both_consented:
+        match_obj.is_whatsapp_unlocked = True
+
+    await db.commit()
+    await db.refresh(match_obj)
+
+    target_phone = None
+    if match_obj.is_whatsapp_unlocked:
+        target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
+        target_res = await db.execute(select(User).where(User.id == target_id))
+        target_user = target_res.scalars().first()
+        if target_user and target_user.phone_number:
+            target_phone = target_user.phone_number
+
+    my_consent = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
+    partner_consent = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
+
+    return APIResponse(
+        success=True,
+        message="WhatsApp contact sharing consent recorded successfully.",
+        data=WhatsAppBridgeStatusData(
+            match_id=match_id,
+            mutual_message_count=count,
+            required_threshold=15,
+            my_consent=my_consent,
+            partner_consent=partner_consent,
+            is_whatsapp_unlocked=match_obj.is_whatsapp_unlocked,
+            phone_number=target_phone if match_obj.is_whatsapp_unlocked and target_phone else None,
         )
     )

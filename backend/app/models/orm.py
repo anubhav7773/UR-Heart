@@ -228,6 +228,8 @@ class Match(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     mutual_message_count: Mapped[int] = mapped_column(Integer, default=0)
+    user1_whatsapp_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    user2_whatsapp_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_whatsapp_unlocked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

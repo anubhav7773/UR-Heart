@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import create_access_token, get_current_user_id
 from app.models.orm import User, UserPhoto, UserAdCounter, GenderEnum as ORMGenderEnum, IntentEnum as ORMIntentEnum
@@ -36,6 +37,15 @@ router = APIRouter(prefix="", tags=["Authentication & Onboarding"])
 # Fast2SMS SMS Gateway Credentials & Active OTP In-Memory Store (5-Min Expiry)
 FAST2SMS_API_KEY = "XpyeJ4EN26nsazjOgVWCS70xFDLKYUMuocqPTRdwtHGirlbBZAzacATYetJ8CMpLUjDIoRNiSbvkwXP3"
 _active_otp_store = {}
+
+
+def _is_mock_auth_allowed() -> bool:
+    """Only allow mock bypass tokens in local dev/test environments when debug is enabled."""
+    env = (getattr(settings, "ENVIRONMENT", "production") or "").lower().strip()
+    is_debug = bool(getattr(settings, "DEBUG", False))
+    if env == "production" or not is_debug:
+        return False
+    return env in ["development", "test", "local"]
 
 
 def calculate_age(born: date) -> int:
@@ -143,6 +153,12 @@ async def firebase_login(
         logger.info(f"[Firebase-Login] Verified claims for email: {decoded_claims.get('email')}")
     except Exception as e:
         if payload.id_token == "mock_firebase_id_token_12345":
+            if not _is_mock_auth_allowed():
+                logger.warning("[Security] Mock credentials attempted in production environment for firebase-login.")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Mock credentials disabled in production environment"
+                )
             decoded_claims = {
                 "email": f"test_{payload.device_id[:8]}@ruralheart.com",
                 "name": "Test User",
@@ -256,6 +272,12 @@ async def email_signup(
         decoded_claims = fb_auth.verify_id_token(payload.id_token)
     except Exception as e:
         if payload.id_token == "mock_firebase_id_token_12345":
+            if not _is_mock_auth_allowed():
+                logger.warning("[Security] Mock credentials attempted in production environment for email-signup.")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Mock credentials disabled in production environment"
+                )
             decoded_claims = {
                 "email": f"signup_{payload.device_id[:8]}@ruralheart.com",
                 "name": payload.full_name,
@@ -337,6 +359,12 @@ async def email_login_endpoint(
             verified_email = decoded_claims.get("email")
         except Exception as e:
             if payload.id_token == "mock_firebase_id_token_12345":
+                if not _is_mock_auth_allowed():
+                    logger.warning("[Security] Mock credentials attempted in production environment for email-login.")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Mock credentials disabled in production environment"
+                    )
                 verified_email = f"login_{payload.device_id[:8]}@ruralheart.com"
             else:
                 logger.error(f"[Email-Login] Token verification error: {str(e)}")

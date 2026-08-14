@@ -192,6 +192,13 @@ class ApiClient {
     return await dio.get('/chat/whatsapp-bridge-status/$matchId');
   }
 
+  // 10b. Submit WhatsApp Contact Sharing Consent Handshake
+  Future<Response> giveWhatsAppConsent({
+    required String matchId,
+  }) async {
+    return await dio.post('/chat/whatsapp-consent/$matchId');
+  }
+
   // 11. Remote Ad Configuration
   Future<Response> getAdConfig() async {
     return await dio.get('/ads/config');

@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_windowmanager/flutter_windowmanager.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/services/location_service.dart';
@@ -27,7 +30,34 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void initState() {
     super.initState();
+    _enableScreenshotProtection();
     _loadFeed();
+  }
+
+  @override
+  void dispose() {
+    _disableScreenshotProtection();
+    super.dispose();
+  }
+
+  Future<void> _enableScreenshotProtection() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+      } catch (e) {
+        if (kDebugMode) print('Could not enable FLAG_SECURE: $e');
+      }
+    }
+  }
+
+  Future<void> _disableScreenshotProtection() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
+      } catch (e) {
+        if (kDebugMode) print('Could not clear FLAG_SECURE: $e');
+      }
+    }
   }
 
   Future<void> _loadFeed() async {
