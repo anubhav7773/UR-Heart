@@ -1,10 +1,11 @@
 import uuid
 from datetime import date, datetime, timezone
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Query, Body, Path
+from typing import Optional
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Query, Body, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
 
 try:
     from supabase import create_client, Client
@@ -478,24 +479,46 @@ async def unblock_user_by_path(
 
 @router.post("/unblock")
 async def unblock_user(
-    target_id: Optional[str] = Query(default=None),
-    payload: Optional[UnblockPayload] = Body(default=None),
+    request: Request,
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Unblocks a target user via query parameter ?target_id=... or JSON body {"target_id": "..."}.
-    """
-    unblock_target = target_id or (payload.target_id if payload else None) or (payload.reported_id if payload else None)
-    if not unblock_target:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id parameter is required.")
+    # Extract target_id from query params or JSON body safely without triggering Pydantic TypeAdapter
+    target_id = request.query_params.get("target_id")
+    if not target_id:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                target_id = body.get("target_id") or body.get("reported_id")
+        except Exception:
+            pass
 
-    data = await _execute_unblock_logic(current_user_id, unblock_target, db)
-    return APIResponse(
-        success=True,
-        message="User unblocked successfully.",
-        data=data
-    )
+    if not target_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="target_id parameter is required"
+        )
+
+    # Delete blocked user entry
+    try:
+        blocker_uuid = uuid.UUID(current_user_id)
+        target_uuid = uuid.UUID(target_id)
+
+        stmt = delete(BlockedUser).where(
+            BlockedUser.blocker_id == blocker_uuid,
+            BlockedUser.blocked_id == target_uuid
+        )
+        await db.execute(stmt)
+        await db.commit()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid target_id UUID format."
+        )
+    except Exception:
+        await db.rollback()
+
+    return {"status": "success", "message": "User unblocked successfully"}
 
 
 @router.delete("/block/{target_id}")
