@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import '../../core/network/api_client.dart';
@@ -20,14 +21,26 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _dobController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
 
+  DateTime? _selectedDob;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isVerified = false;
   String _verificationStatus = 'UNVERIFIED';
   bool _isUploadingVideo = false;
+
+  int? get _computedAge {
+    if (_selectedDob == null) return null;
+    final now = DateTime.now();
+    int age = now.year - _selectedDob!.year;
+    if (now.month < _selectedDob!.month || (now.month == _selectedDob!.month && now.day < _selectedDob!.day)) {
+      age--;
+    }
+    return age;
+  }
 
   // Voice Bio Audio Recording State
   late final AudioRecorder _audioRecorder;
@@ -59,6 +72,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _audioRecorder.dispose();
     _audioPlayer.dispose();
     _nameController.dispose();
+    _dobController.dispose();
     _bioController.dispose();
     _areaController.dispose();
     super.dispose();
@@ -76,6 +90,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _isVerified = data['is_verified'] == true;
         _verificationStatus = (data['verification_status'] ?? 'UNVERIFIED').toString().toUpperCase();
         _existingVoiceBioUrl = data['voice_bio_url'];
+
+        final dobRaw = data['dob'] ?? data['date_of_birth'];
+        if (dobRaw != null && dobRaw.toString().isNotEmpty) {
+          _selectedDob = DateTime.tryParse(dobRaw.toString().split('T').first);
+          if (_selectedDob != null) {
+            _dobController.text = DateFormat('dd/MM/yyyy').format(_selectedDob!);
+          }
+        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -83,6 +105,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final now = DateTime.now();
+    final lastDate = DateTime(now.year - 18, now.month, now.day);
+    final firstDate = DateTime(1940);
+    final initialDate = (_selectedDob != null && _selectedDob!.isBefore(lastDate))
+        ? _selectedDob!
+        : DateTime(now.year - 20, 1, 1);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'Select Date of Birth (18+ only)',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppTheme.primaryColor,
+              onPrimary: Colors.white,
+              surface: AppTheme.surfaceColor,
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDob = picked;
+        _dobController.text = DateFormat('dd/MM/yyyy').format(picked);
+      });
     }
   }
 
@@ -243,8 +302,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
 
       // 2. Persist profile info
+      final dobStr = _selectedDob != null ? DateFormat('yyyy-MM-dd').format(_selectedDob!) : null;
       await ApiClient.instance.putProfile({
         'full_name': _nameController.text.trim(),
+        'dob': dobStr,
+        'date_of_birth': dobStr,
         'bio': _bioController.text.trim(),
         'area_name': _areaController.text.trim(),
       });
@@ -298,122 +360,126 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         gradient: LinearGradient(
                           colors: _isVerified
                               ? [Colors.blue.shade900.withValues(alpha: 0.5), Colors.blue.shade700.withValues(alpha: 0.3)]
-                              : [AppTheme.surfaceColor, AppTheme.cardColor],
+                              : [AppTheme.surfaceColor, AppTheme.surfaceColor],
                         ),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: _isVerified ? Colors.blueAccent : Colors.grey[800]!,
-                          width: 1.5,
+                          color: _isVerified
+                              ? Colors.blueAccent
+                              : (_verificationStatus == 'PENDING' ? Colors.amber : Colors.white24),
                         ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isVerified
+                                ? Icons.verified
+                                : (_verificationStatus == 'PENDING' ? Icons.hourglass_top : Icons.shield_outlined),
+                            color: _isVerified
+                                ? Colors.blueAccent
+                                : (_verificationStatus == 'PENDING' ? Colors.amber : Colors.white60),
+                            size: 36,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      _isVerified ? 'Video Verified 🛡️' : 'Profile Verification',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: _isVerified
+                                            ? Colors.blueAccent.withValues(alpha: 0.2)
+                                            : (_verificationStatus == 'PENDING'
+                                                ? Colors.amber.withValues(alpha: 0.2)
+                                                : Colors.white10),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        _verificationStatus,
+                                        style: TextStyle(
+                                          color: _isVerified
+                                              ? Colors.blueAccent
+                                              : (_verificationStatus == 'PENDING' ? Colors.amber : Colors.white60),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _isVerified
+                                      ? 'Your identity is fully verified with our trusted local badge.'
+                                      : (_verificationStatus == 'PENDING'
+                                          ? 'Your selfie video is under review by admin.'
+                                          : 'Record a 5-10s video selfie to earn a trust badge.'),
+                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!_isVerified && _verificationStatus != 'PENDING')
+                            ElevatedButton(
+                              onPressed: _isUploadingVideo ? null : _recordVerificationVideo,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: _isUploadingVideo
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 🎙️ Voice Bio (15s Intro) Section
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                _isVerified ? Icons.verified : Icons.verified_user_outlined,
-                                color: _isVerified ? Colors.blueAccent : Colors.white70,
-                                size: 28,
+                              const Icon(Icons.mic, color: Colors.purpleAccent, size: 22),
+                              const SizedBox(width: 8),
+                              const Text(
+                                '🎙️ 15s Voice Bio (Audio Intro)',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _isVerified
-                                      ? 'Profile Verified ✓'
-                                      : _verificationStatus == 'PENDING'
-                                          ? 'Verification Under Review ⏳'
-                                          : _verificationStatus == 'REJECTED'
-                                              ? 'Verification Rejected ❌'
-                                              : 'Get Verified Blue Tick',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: _isVerified
-                                        ? Colors.blueAccent
-                                        : _verificationStatus == 'PENDING'
-                                            ? Colors.amber
-                                            : _verificationStatus == 'REJECTED'
-                                                ? Colors.redAccent
-                                                : Colors.white,
+                              const Spacer(),
+                              if (_existingVoiceBioUrl != null || _recordedVoicePath != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.greenAccent.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
+                                  child: const Text('Active', style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isVerified
-                                ? 'Your identity is verified. Your Blue Tick badge is visible on your profile and discovery cards.'
-                                : _verificationStatus == 'PENDING'
-                                    ? 'Your selfie video has been submitted and is currently being reviewed by our moderation team (takes up to 24h).'
-                                    : _verificationStatus == 'REJECTED'
-                                        ? 'Your previous selfie video did not pass community quality guidelines. Please record a clearer video.'
-                                        : 'Record a 5-second selfie video to unlock the official Verified Blue Tick badge.',
-                            style: const TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _isUploadingVideo ? null : _recordVerificationVideo,
-                              icon: _isUploadingVideo
-                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                  : Icon(_isVerified ? Icons.videocam_outlined : Icons.camera_front, size: 20),
-                              label: Text(_isVerified
-                                  ? 'Re-record Verification Video'
-                                  : _verificationStatus == 'PENDING'
-                                      ? 'Re-upload Verification Video'
-                                      : 'Record 5s Selfie Video 📹'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _isVerified ? Colors.blue.shade800 : AppTheme.primaryColor,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 🎙️ Voice Bio (15s Intro Greeting) Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.purple.shade900.withValues(alpha: 0.3),
-                            AppTheme.surfaceColor,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _recordedVoicePath != null || (_existingVoiceBioUrl != null && _existingVoiceBioUrl!.isNotEmpty)
-                              ? Colors.purpleAccent
-                              : Colors.grey[800]!,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.mic, color: Colors.purpleAccent, size: 26),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  '🎙️ 15-Second Voice Bio (Audio Intro)',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Speak a friendly 15-second greeting in your regional accent or Hindi. Profiles with audio get 3x higher responses!',
-                            style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                            'Record a short audio greeting (up to 15s) in your voice. Potential matches can listen directly on your card!',
+                            style: TextStyle(color: Colors.white60, fontSize: 12),
                           ),
                           const SizedBox(height: 14),
 
@@ -532,6 +598,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                       validator: (val) => val == null || val.trim().isEmpty ? 'Name cannot be empty' : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Date of Birth Field (with live age calculation)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Date of Birth', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
+                        if (_computedAge != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5)),
+                            ),
+                            child: Text(
+                              'Age: $_computedAge years',
+                              style: const TextStyle(color: AppTheme.primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: _pickDateOfBirth,
+                      borderRadius: BorderRadius.circular(12),
+                      child: IgnorePointer(
+                        child: TextFormField(
+                          controller: _dobController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'DD/MM/YYYY',
+                            hintStyle: const TextStyle(color: Colors.grey),
+                            prefixIcon: const Icon(Icons.calendar_today, color: AppTheme.primaryColor, size: 20),
+                            suffixIcon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                            filled: true,
+                            fillColor: AppTheme.surfaceColor,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
 

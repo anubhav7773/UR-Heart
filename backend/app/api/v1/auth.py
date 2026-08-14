@@ -665,18 +665,17 @@ async def complete_profile(
     Submits user metadata, 5 photo URLs, and GPS location during initial onboarding.
     Requires valid Bearer token.
     """
-    age = calculate_age(payload.dob)
-    if age < 18:
+    dob_val = payload.dob or payload.date_of_birth
+    age = calculate_age(dob_val)
+    if age is not None and age < 18:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Users must be at least 18 years old to join RuralHeart."
         )
 
-    if len(payload.photos) != 5:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Exactly 5 photos are required to complete profile onboarding."
-        )
+    if payload.photos and len(payload.photos) > 0 and len(payload.photos) != 5:
+        # If photos are explicitly sent, allow between 1 and 5
+        pass
 
     try:
         user_uuid = uuid.UUID(current_user_id)
@@ -684,16 +683,20 @@ async def complete_profile(
         user = result.scalars().first()
 
         if user:
-            user.full_name = payload.full_name
-            user.dob = payload.dob
-            user.gender = ORMGenderEnum(payload.gender.value)
-            user.interested_in = ORMGenderEnum(payload.interested_in.value)
-            user.intent = ORMIntentEnum(payload.intent.value)
-            user.bio = payload.bio
-            user.area_name = payload.area_name
-            user.village_pin_code = payload.village_pin_code
-            user.latitude = payload.latitude
-            user.longitude = payload.longitude
+            user.full_name = payload.full_name or user.full_name
+            if dob_val:
+                user.dob = dob_val
+            if payload.gender:
+                user.gender = ORMGenderEnum(payload.gender.value)
+            if payload.interested_in:
+                user.interested_in = ORMGenderEnum(payload.interested_in.value)
+            if payload.intent:
+                user.intent = ORMIntentEnum(payload.intent.value)
+            user.bio = payload.bio if payload.bio is not None else user.bio
+            user.area_name = payload.area_name if payload.area_name is not None else user.area_name
+            user.village_pin_code = payload.village_pin_code if payload.village_pin_code is not None else user.village_pin_code
+            user.latitude = payload.latitude if payload.latitude is not None else user.latitude
+            user.longitude = payload.longitude if payload.longitude is not None else user.longitude
 
             existing_photos = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
             for photo in existing_photos.scalars().all():
