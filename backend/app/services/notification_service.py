@@ -12,42 +12,42 @@ try:
     import firebase_admin
     from firebase_admin import credentials, messaging
 
-    if not firebase_admin._apps:
-        service_account_env = (
-            os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-            or os.getenv("FIREBASE_CREDENTIALS_JSON")
-            or os.getenv("FIREBASE_CREDENTIALS")
-            or getattr(settings, "FIREBASE_SERVICE_ACCOUNT_JSON", None)
-            or getattr(settings, "FIREBASE_CREDENTIALS_JSON", None)
-            or getattr(settings, "FIREBASE_CREDENTIALS", None)
-        )
-        if service_account_env:
-            try:
-                cert_dict = json.loads(service_account_env)
-                cred = credentials.Certificate(cert_dict)
-                firebase_admin.initialize_app(cred)
-                _firebase_app_initialized = True
-                print("[FCM_INIT] Firebase initialized successfully with Service Account JSON.")
-            except Exception as e:
-                print(f"[FCM_INIT_ERROR] Failed initializing with Service Account JSON: {e}")
+    def initialize_firebase():
+        global _firebase_app_initialized
+        if not firebase_admin._apps:
+            raw_json = (
+                os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+                or os.getenv("FIREBASE_CREDENTIALS_JSON")
+                or os.getenv("FIREBASE_CREDENTIALS")
+                or getattr(settings, "FIREBASE_SERVICE_ACCOUNT_JSON", None)
+                or getattr(settings, "FIREBASE_CREDENTIALS_JSON", None)
+                or getattr(settings, "FIREBASE_CREDENTIALS", None)
+            )
+
+            if raw_json:
                 try:
-                    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
-                    firebase_admin.initialize_app(options={"projectId": project_id})
+                    cert_info = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+                    cred = credentials.Certificate(cert_info)
+                    firebase_admin.initialize_app(cred)
                     _firebase_app_initialized = True
-                except Exception as fallback_err:
-                    print(f"[FCM_INIT_ERROR] Fallback initialization notice: {fallback_err}")
-                    _firebase_app_initialized = False
-        else:
+                    print("[FCM_INIT] Successfully initialized Firebase with Service Account JSON.")
+                    return
+                except Exception as e:
+                    print(f"[FCM_INIT_ERROR] Failed parsing credentials JSON: {e}")
+
+            # Fallback if no credentials found
             try:
                 project_id = os.getenv("GOOGLE_CLOUD_PROJECT") or getattr(settings, "FIREBASE_PROJECT_ID", "ur-heart") or "ur-heart"
                 firebase_admin.initialize_app(options={"projectId": project_id})
                 _firebase_app_initialized = True
-                print(f"[FCM_INIT] Initialized with fallback projectId: {project_id}")
-            except Exception as init_err:
-                print(f"[FCM_INIT_ERROR] Initialization notice: {init_err}")
+                print(f"[FCM_INIT] Initialized Firebase with fallback project_id: {project_id}")
+            except Exception as e:
+                print(f"[FCM_INIT_ERROR] Fallback initialization notice: {e}")
                 _firebase_app_initialized = False
-    else:
-        _firebase_app_initialized = True
+        else:
+            _firebase_app_initialized = True
+
+    initialize_firebase()
 except (ImportError, ModuleNotFoundError):
     print("firebase_admin package not installed. Notification engine running in mock mode.")
     messaging = None
