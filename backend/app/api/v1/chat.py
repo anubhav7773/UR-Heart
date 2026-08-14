@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user_id
 from app.models.orm import Match, ChatMessage, User, UserPhoto, BlockedUser
 from app.services.notification_engine import NotificationEngineService
+from app.services.fcm_service import send_push_notification
 from app.models.schemas import (
     APIResponse,
     MatchRead,
@@ -280,11 +281,16 @@ async def send_chat_message(
 
             if recip_user and recip_user.fcm_token:
                 background_tasks.add_task(
-                    NotificationEngineService.send_push_notification,
-                    target_fcm_token=recip_user.fcm_token,
+                    send_push_notification,
+                    fcm_token=recip_user.fcm_token,
                     title=sender_name,
                     body=payload.content or "Sent you a media attachment.",
-                    data_payload={"type": "chat_message", "match_id": payload.match_id},
+                    data={
+                        "type": "chat",
+                        "sender_id": str(sender_uuid),
+                        "match_id": str(payload.match_id),
+                        "conversation_id": str(payload.match_id),
+                    },
                 )
     except Exception:
         pass

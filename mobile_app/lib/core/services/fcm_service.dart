@@ -23,12 +23,18 @@ class FcmService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   String? _fcmToken;
   GlobalKey<ScaffoldMessengerState>? _foregroundMessengerKey;
+  GlobalKey<NavigatorState>? _navigatorKey;
 
   String? get fcmToken => _fcmToken;
 
-  Future<void> initialize({GlobalKey<ScaffoldMessengerState>? foregroundMessengerKey}) async {
+  Future<void> initialize({
+    GlobalKey<ScaffoldMessengerState>? foregroundMessengerKey,
+    GlobalKey<NavigatorState>? navigatorKey,
+  }) async {
     _foregroundMessengerKey = foregroundMessengerKey;
+    _navigatorKey = navigatorKey;
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
     try {
       // 1. Request Notification Permissions
       NotificationSettings settings = await _fcm.requestPermission(
@@ -59,26 +65,90 @@ class FcmService {
           await _syncTokenToBackend(newToken);
         });
 
-        // 3. Foreground Message Listener
+        // 3. Foreground Message Listener (Displays local push banner)
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
           final notification = message.notification;
+          final data = message.data;
           if (kDebugMode) {
-            print('FCM Foreground Message: ${notification?.title} - ${notification?.body}');
+            print('FCM Foreground Message: ${notification?.title} - ${notification?.body} | Data: $data');
           }
+
           final messenger = _foregroundMessengerKey?.currentState;
-          if (messenger != null && notification != null) {
+          if (messenger != null && (notification != null || data.isNotEmpty)) {
+            final title = notification?.title ?? data['title'] ?? 'New Notification';
+            final body = notification?.body ?? data['body'] ?? '';
+
             messenger.showSnackBar(
               SnackBar(
-                content: Text('${notification.title ?? 'New message'}: ${notification.body ?? ''}'),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    if (body.isNotEmpty)
+                      Text(
+                        body,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+                action: SnackBarAction(
+                  label: 'VIEW',
+                  textColor: Colors.amber,
+                  onPressed: () => _handleNotificationTap(message),
+                ),
               ),
             );
           }
         });
+
+        // 4. Background Notification Tap Handler
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+          if (kDebugMode) {
+            print('FCM App Opened from Notification Tap: ${message.data}');
+          }
+          _handleNotificationTap(message);
+        });
+
+        // 5. Terminated App Launch Notification Handler
+        final initialMessage = await _fcm.getInitialMessage();
+        if (initialMessage != null) {
+          if (kDebugMode) {
+            print('FCM Initial Message on Cold Launch: ${initialMessage.data}');
+          }
+          _handleNotificationTap(initialMessage);
+        }
       }
     } catch (e) {
       if (kDebugMode) {
         print('FCM Service Initialization notice: $e');
       }
+    }
+  }
+
+  void _handleNotificationTap(RemoteMessage message) {
+    final data = message.data;
+    final String? type = data['type'];
+    final String? matchId = data['match_id'] ?? data['conversation_id'];
+
+    if (kDebugMode) {
+      print('Handling Notification Tap: type=$type, matchId=$matchId');
+    }
+
+    final navState = _navigatorKey?.currentState;
+    if (navState == null) return;
+
+    if (type == 'match' && matchId != null && matchId.isNotEmpty) {
+      navState.pushNamed('/chat_screen', arguments: {'match_id': matchId});
+    } else if (type == 'chat' && matchId != null && matchId.isNotEmpty) {
+      navState.pushNamed('/chat_screen', arguments: {'match_id': matchId});
     }
   }
 

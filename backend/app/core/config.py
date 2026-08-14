@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     SUPABASE_KEY: Optional[str] = None
     SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
 
+    # Firebase Cloud Messaging (FCM)
+    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_CREDENTIALS_JSON: Optional[str] = None
+
     # Cloudflare R2 Media Storage
     R2_ACCOUNT_ID: Optional[str] = None
     R2_ACCESS_KEY_ID: Optional[str] = None

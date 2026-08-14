@@ -34,6 +34,7 @@ from app.models.schemas import (
 from app.services.geo_engine import GeoEngineService
 from app.services.ad_engine import AdEngineService
 from app.services.notification_engine import NotificationEngineService
+from app.services.fcm_service import send_push_notification, send_match_notification
 
 router = APIRouter(prefix="/feed", tags=["Discovery Feed & Swiping Engine"])
 
@@ -245,26 +246,44 @@ async def swipe_action(
                         )
                     )
                 )
-                existing_match = match_res.scalars().first()
-                if not existing_match:
+                match_id_str = ""
+                if existing_match:
+                    match_id_str = str(existing_match.id)
+                else:
                     new_match = Match(
                         user1_id=user_uuid,
                         user2_id=target_uuid
                     )
                     db.add(new_match)
                     await db.commit()
+                    await db.refresh(new_match)
+                    match_id_str = str(new_match.id)
 
-                # Trigger match push notification to target user
+                # Fetch FCM tokens and names for both matched users
                 target_user_res = await db.execute(select(User).where(User.id == target_uuid))
                 target_user_obj = target_user_res.scalars().first()
                 swiper_res = await db.execute(select(User).where(User.id == user_uuid))
                 swiper_user_obj = swiper_res.scalars().first()
-                swiper_name = swiper_user_obj.full_name if swiper_user_obj else "Someone"
 
+                swiper_name = swiper_user_obj.full_name if (swiper_user_obj and swiper_user_obj.full_name) else "Someone"
+                target_name = target_user_obj.full_name if (target_user_obj and target_user_obj.full_name) else "Someone"
+
+                # Send push notification to Target User (User A)
                 if target_user_obj and target_user_obj.fcm_token:
-                    NotificationEngineService.send_match_notification(
-                        target_fcm_token=target_user_obj.fcm_token,
-                        matched_user_name=swiper_name,
+                    await send_push_notification(
+                        fcm_token=target_user_obj.fcm_token,
+                        title="It's a Match! 🎉",
+                        body=f"You and {swiper_name} liked each other!",
+                        data={"type": "match", "match_id": match_id_str}
+                    )
+
+                # Send push notification to Swiper User (User B)
+                if swiper_user_obj and swiper_user_obj.fcm_token:
+                    await send_push_notification(
+                        fcm_token=swiper_user_obj.fcm_token,
+                        title="It's a Match! 🎉",
+                        body=f"You and {target_name} liked each other!",
+                        data={"type": "match", "match_id": match_id_str}
                     )
         except Exception:
             is_match = True
