@@ -18,24 +18,23 @@ def initialize_firebase():
         return
 
     if not firebase_admin._apps:
-        # 1. Try environment variable FIREBASE_CREDENTIALS_JSON, FIREBASE_SERVICE_ACCOUNT_JSON, or FIREBASE_CREDENTIALS
-        service_account_raw = (
-            os.getenv("FIREBASE_CREDENTIALS_JSON")
-            or os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+        # 1. Try environment variable FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_CREDENTIALS_JSON, or FIREBASE_CREDENTIALS
+        service_account_env = (
+            os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+            or os.getenv("FIREBASE_CREDENTIALS_JSON")
             or os.getenv("FIREBASE_CREDENTIALS")
         )
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
-
-        if service_account_raw:
+        if service_account_env:
             try:
-                cert_dict = json.loads(service_account_raw)
+                cert_dict = json.loads(service_account_env)
                 cred = credentials.Certificate(cert_dict)
                 firebase_admin.initialize_app(cred)
-                print("[FIREBASE_INIT] Successfully initialized with Service Account Credentials!")
+                print("[FCM_INIT] Firebase initialized successfully with Service Account JSON.")
                 return
             except Exception as e:
-                print(f"[FIREBASE_INIT] Failed to load JSON creds: {e}")
+                print(f"[FCM_INIT_ERROR] Failed initializing with Service Account JSON: {e}")
                 try:
+                    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
                     firebase_admin.initialize_app(options={"projectId": project_id})
                     return
                 except Exception:
@@ -49,15 +48,16 @@ def initialize_firebase():
             try:
                 cred = credentials.Certificate(service_account_path)
                 firebase_admin.initialize_app(cred)
-                print(f"[FIREBASE_INIT] Initialized with credentials from {service_account_path}")
+                print(f"[FCM_INIT] Initialized with credentials from {service_account_path}")
                 return
             except Exception as e:
                 logger.error(f"[Firebase] Error initializing Certificate: {e}")
 
         # 3. Fallback project options
         try:
+            project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
             firebase_admin.initialize_app(options={"projectId": project_id})
-            print(f"[FIREBASE_INIT] Initialized with fallback options: {project_id}")
+            print(f"[FCM_INIT] Initialized with fallback projectId: {project_id}")
         except Exception:
             pass
 
