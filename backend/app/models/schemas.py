@@ -321,6 +321,8 @@ class UserRead(BaseModel):
     is_verified: bool = False
     verification_status: VerificationStatusEnum = VerificationStatusEnum.UNVERIFIED
     verification_video_url: Optional[str] = None
+    voice_bio_url: Optional[str] = None
+    voice_bio_duration_seconds: Optional[int] = 0
     is_active: bool = True
     photos: List[PhotoRead] = []
 
@@ -345,6 +347,8 @@ class ProfileCardData(BaseModel):
     is_verified_local: bool = False
     is_boosted: bool = False
     boosted_until: Optional[datetime] = None
+    voice_bio_url: Optional[str] = None
+    voice_bio_duration_seconds: Optional[int] = 0
 
 
 class AdConfigSlot(BaseModel):
@@ -553,4 +557,22 @@ class VideoVerificationResponse(BaseModel):
 
 class AdminVerificationReviewRequest(BaseModel):
     action: str = Field(..., description="'APPROVE' or 'REJECT'")
+
+
+# 17. Voice Bio & Icebreaker Schemas
+class VoiceBioUploadData(BaseModel):
+    voice_bio_url: str
+    duration_seconds: int = 15
+    message: str = "Voice Bio uploaded successfully!"
+
+
+class IcebreakerItem(BaseModel):
+    id: str
+    emoji: str
+    text: str
+    category: str = "general"
+
+
+class IcebreakerListData(BaseModel):
+    icebreakers: List[IcebreakerItem]
 

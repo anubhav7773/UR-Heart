@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_windowmanager/flutter_windowmanager.dart';
@@ -25,6 +26,10 @@ class _FeedScreenState extends State<FeedScreen> {
   int _persistentSkipCount = 0;
   bool _isClaimingReward = false;
 
+  // Voice Bio Playback State
+  late final AudioPlayer _feedAudioPlayer;
+  String? _playingVoiceBioUrl;
+
   // Discovery Preference Filters State
   String _genderPref = 'everyone';
   RangeValues _ageRange = const RangeValues(18, 50);
@@ -33,6 +38,10 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void initState() {
     super.initState();
+    _feedAudioPlayer = AudioPlayer();
+    _feedAudioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _playingVoiceBioUrl = null);
+    });
     _enableScreenshotProtection();
     AdManager.instance.loadRewardedAd();
     _loadFeed();
@@ -40,6 +49,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   void dispose() {
+    _feedAudioPlayer.dispose();
     _disableScreenshotProtection();
     super.dispose();
   }
@@ -98,6 +108,14 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _handleSwipeAction(String action) async {
     if (_cards.isEmpty || _currentIndex >= _cards.length) return;
+
+    // Stop active voice bio audio when swiping cards
+    try {
+      if (_playingVoiceBioUrl != null) {
+        await _feedAudioPlayer.stop();
+        setState(() => _playingVoiceBioUrl = null);
+      }
+    } catch (_) {}
 
     final currentCard = _cards[_currentIndex];
     final String? targetUserId = currentCard['profile']?['user_id'];
@@ -713,6 +731,8 @@ class _FeedScreenState extends State<FeedScreen> {
         distanceLabel: (profile['distance_label'] ?? 'Location unavailable').toString(),
         photos: photos,
         isVerified: profile['is_verified'] == true,
+        voiceBioUrl: profile['voice_bio_url'] as String?,
+        voiceBioDurationSeconds: (profile['voice_bio_duration_seconds'] as num?)?.toInt() ?? 15,
       ),
     );
   }
@@ -1053,24 +1073,87 @@ class _FeedScreenState extends State<FeedScreen> {
                                     const SizedBox(height: 4),
 
                                     // Micro-Radius Distance & Landmark Pill Chip
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black54,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: Colors.grey[700]!),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.location_on_outlined, size: 14, color: Colors.amber),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            distanceLabel,
-                                            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black54,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.grey[700]!),
                                           ),
-                                        ],
-                                      ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.location_on_outlined, size: 14, color: Colors.amber),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                distanceLabel,
+                                                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // 🎙️ Voice Bio Audio Pill Chip
+                                        if (profile['voice_bio_url'] != null && (profile['voice_bio_url'] as String).isNotEmpty)
+                                          GestureDetector(
+                                            onTap: () async {
+                                              final url = profile['voice_bio_url'] as String;
+                                              if (_playingVoiceBioUrl == url) {
+                                                await _feedAudioPlayer.stop();
+                                                setState(() => _playingVoiceBioUrl = null);
+                                              } else {
+                                                await _feedAudioPlayer.play(UrlSource(url));
+                                                setState(() => _playingVoiceBioUrl = url);
+                                              }
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: _playingVoiceBioUrl == profile['voice_bio_url']
+                                                      ? [Colors.purpleAccent.shade700, Colors.deepPurple]
+                                                      : [Colors.purple.shade900.withValues(alpha: 0.8), Colors.black87],
+                                                ),
+                                                borderRadius: BorderRadius.circular(14),
+                                                border: Border.all(color: Colors.purpleAccent, width: 1.5),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.purpleAccent.withValues(alpha: 0.3),
+                                                    blurRadius: 6,
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    _playingVoiceBioUrl == profile['voice_bio_url']
+                                                        ? Icons.pause_circle_filled
+                                                        : Icons.play_circle_filled,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    _playingVoiceBioUrl == profile['voice_bio_url']
+                                                        ? 'Playing Voice 🎵'
+                                                        : '▶ Play Voice Intro (0:${(profile['voice_bio_duration_seconds'] ?? 15).toString().padLeft(2, '0')})',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                     const SizedBox(height: 8),
                                     Text(

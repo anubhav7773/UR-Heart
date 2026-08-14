@@ -112,6 +112,8 @@ class User(Base):
         nullable=False,
     )
     verification_video_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    voice_bio_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    voice_bio_duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_online: Mapped[bool] = mapped_column(Boolean, default=True)
     last_seen: Mapped[Optional[datetime]] = mapped_column(

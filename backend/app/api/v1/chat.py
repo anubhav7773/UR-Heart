@@ -18,6 +18,8 @@ from app.models.schemas import (
     SendMessageRequest,
     UploadMediaData,
     WhatsAppBridgeStatusData,
+    IcebreakerItem,
+    IcebreakerListData,
 )
 from app.services.storage_engine import StorageEngineService
 
@@ -491,4 +493,24 @@ async def give_whatsapp_consent(
             is_whatsapp_unlocked=match_obj.is_whatsapp_unlocked,
             phone_number=target_phone if match_obj.is_whatsapp_unlocked and target_phone else None,
         )
+    )
+
+
+@router.get("/icebreakers", response_model=APIResponse[IcebreakerListData])
+async def get_icebreakers():
+    """
+    Returns a curated list of cultural Hinglish/Hindi conversation starters for new matches.
+    """
+    starters = [
+        IcebreakerItem(id="1", emoji="☕", text="Chai date ke liye kab chalein?", category="chai"),
+        IcebreakerItem(id="2", emoji="🎶", text="Aajkal kaun sa gaana loop pe chal raha hai?", category="music"),
+        IcebreakerItem(id="3", emoji="🌴", text="Shaam ko ghoomne ki best jagah kaun si hai?", category="travel"),
+        IcebreakerItem(id="4", emoji="🎬", text="Koi achhi movie recommend karo!", category="movies"),
+        IcebreakerItem(id="5", emoji="✨", text="Aapka weekend plan kya hai?", category="weekend"),
+        IcebreakerItem(id="6", emoji="🍕", text="Street food ya cafe date? What's your vibe?", category="food"),
+    ]
+    return APIResponse(
+        success=True,
+        message="Icebreakers retrieved successfully.",
+        data=IcebreakerListData(icebreakers=starters)
     )

@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_windowmanager/flutter_windowmanager.dart';
@@ -9,6 +10,8 @@ class ProfileViewDialog extends StatefulWidget {
   final String distanceLabel;
   final List<String> photos;
   final bool isVerified;
+  final String? voiceBioUrl;
+  final int voiceBioDurationSeconds;
 
   const ProfileViewDialog({
     super.key,
@@ -17,6 +20,8 @@ class ProfileViewDialog extends StatefulWidget {
     required this.distanceLabel,
     required this.photos,
     this.isVerified = false,
+    this.voiceBioUrl,
+    this.voiceBioDurationSeconds = 15,
   });
 
   @override
@@ -26,15 +31,22 @@ class ProfileViewDialog extends StatefulWidget {
 class _ProfileViewDialogState extends State<ProfileViewDialog> {
   final PageController _pageController = PageController();
   int _pageIndex = 0;
+  late final AudioPlayer _audioPlayer;
+  bool _isPlayingVoice = false;
 
   @override
   void initState() {
     super.initState();
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _isPlayingVoice = false);
+    });
     _enableScreenshotProtection();
   }
 
   @override
   void dispose() {
+    _audioPlayer.dispose();
     _disableScreenshotProtection();
     _pageController.dispose();
     super.dispose();
@@ -136,6 +148,49 @@ class _ProfileViewDialogState extends State<ProfileViewDialog> {
                     ],
                   ),
                   Text(widget.distanceLabel, style: const TextStyle(color: Colors.white70)),
+                  if (widget.voiceBioUrl != null && widget.voiceBioUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () async {
+                        if (_isPlayingVoice) {
+                          await _audioPlayer.stop();
+                          setState(() => _isPlayingVoice = false);
+                        } else {
+                          await _audioPlayer.play(UrlSource(widget.voiceBioUrl!));
+                          setState(() => _isPlayingVoice = true);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: _isPlayingVoice
+                                ? [Colors.purpleAccent.shade700, Colors.deepPurple]
+                                : [Colors.purple.shade900.withValues(alpha: 0.8), Colors.black87],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.purpleAccent, width: 1.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isPlayingVoice ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _isPlayingVoice
+                                  ? 'Playing Voice Intro 🎵'
+                                  : '▶ Play Voice Intro (0:${widget.voiceBioDurationSeconds.toString().padLeft(2, '0')})',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

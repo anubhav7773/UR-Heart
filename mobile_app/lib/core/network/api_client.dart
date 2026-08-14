@@ -317,6 +317,41 @@ class ApiClient {
     return await dio.post('/profile/photos', data: formData);
   }
 
+  // 20c. Upload 15-Second Voice Bio (Audio Intro)
+  Future<Response> uploadVoiceBio(List<int> bytes, String fileName, {int durationSeconds = 15}) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: fileName),
+    });
+    return await dio.post(
+      '/profile/upload-voice-bio',
+      queryParameters: {'duration_seconds': durationSeconds},
+      data: formData,
+    );
+  }
+
+  // 20d. Upload Voice Bio via Local File Path
+  Future<Response> uploadVoiceBioFile(String filePath, {int durationSeconds = 15}) async {
+    final fileName = filePath.split('/').last.split('\\').last;
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+    });
+    return await dio.post(
+      '/profile/upload-voice-bio',
+      queryParameters: {'duration_seconds': durationSeconds},
+      data: formData,
+    );
+  }
+
+  // 20e. Delete Voice Bio
+  Future<Response> deleteVoiceBio() async {
+    return await dio.delete('/profile/voice-bio');
+  }
+
+  // 20f. Get Conversational Icebreakers
+  Future<Response> getIcebreakers() async {
+    return await dio.get('/chat/icebreakers');
+  }
+
   // 21. Matches Feed (GET /matches/feed)
   Future<Response> getMatchesFeed({
     int limit = 10,

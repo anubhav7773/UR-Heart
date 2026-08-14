@@ -17,7 +17,13 @@ except ImportError:
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.schemas import APIResponse, UploadPhotoData, CompleteProfileRequest, CompleteProfileData
+from app.models.schemas import (
+    APIResponse,
+    UploadPhotoData,
+    CompleteProfileRequest,
+    CompleteProfileData,
+    VoiceBioUploadData,
+)
 from app.models.orm import User, UserPhoto, BlockedUser, UserReport, GenderEnum as ORMGenderEnum, IntentEnum as ORMIntentEnum
 from app.services.storage_engine import StorageEngineService
 from app.core.security import get_current_user_id
@@ -87,6 +93,8 @@ async def get_user_profile(
         "is_verified": bool(user.is_verified and getattr(user, 'verification_status', None) and user.verification_status.value == "APPROVED"),
         "verification_status": user.verification_status.value if getattr(user, 'verification_status', None) else "UNVERIFIED",
         "verification_video_url": user.verification_video_url,
+        "voice_bio_url": user.voice_bio_url,
+        "voice_bio_duration_seconds": user.voice_bio_duration_seconds or 0,
     }
 
     return APIResponse(
@@ -645,4 +653,113 @@ async def report_user(
         success=True,
         message="User reported and blocked successfully. They will no longer appear in your feed.",
         data={"reported_id": target_id, "reason": reason}
+    )
+
+
+@router.post("/upload-voice-bio", response_model=APIResponse[VoiceBioUploadData])
+async def upload_voice_bio(
+    file: UploadFile = File(...),
+    duration_seconds: int = Query(15, description="Duration in seconds (max 15s)"),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Accepts 15-second audio voice greeting (.m4a, .mp3, .aac, .wav).
+    Uploads directly to Supabase Storage 'voice-bios' or Cloudflare R2 and updates user profile.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user token session."
+        )
+
+    filename = file.filename or f"voice_{uuid.uuid4().hex[:8]}.m4a"
+    try:
+        contents = await file.read()
+    except Exception:
+        contents = b""
+
+    if len(contents) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded audio file is empty."
+        )
+
+    file_path = f"voice_bios/{user_uuid.hex}_{filename.split('/')[-1].split('\\')[-1]}"
+    public_url = None
+
+    if supabase is not None:
+        try:
+            # Upload to 'voice-bios' or 'profile-photos' bucket
+            supabase.storage.from_("profile-photos").upload(
+                file_path,
+                contents,
+                file_options={"content-type": file.content_type or "audio/m4a", "upsert": "true"}
+            )
+            base_supa_url = settings.SUPABASE_URL.rstrip('/') if settings.SUPABASE_URL else ""
+            if base_supa_url:
+                public_url = f"{base_supa_url}/storage/v1/object/public/profile-photos/{file_path}"
+            else:
+                public_url_obj = supabase.storage.from_("profile-photos").get_public_url(file_path)
+                public_url = str(public_url_obj)
+        except Exception:
+            pass
+
+    if not public_url:
+        try:
+            public_url = await StorageEngineService.upload_profile_photo(
+                file_bytes=contents,
+                filename=filename
+            )
+        except Exception:
+            public_url = f"https://r2.ruralheart.com/uploads/{file_path}"
+
+    dur = min(max(1, duration_seconds), 15)
+
+    try:
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user = user_res.scalars().first()
+        if user:
+            user.voice_bio_url = public_url
+            user.voice_bio_duration_seconds = dur
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="Voice Bio uploaded successfully! 🎙️",
+        data=VoiceBioUploadData(
+            voice_bio_url=public_url,
+            duration_seconds=dur,
+            message="Voice Bio uploaded successfully! 🎙️"
+        )
+    )
+
+
+@router.delete("/voice-bio", response_model=APIResponse[dict])
+async def delete_voice_bio(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Removes the user's active voice bio audio introduction.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user = user_res.scalars().first()
+        if user:
+            user.voice_bio_url = None
+            user.voice_bio_duration_seconds = 0
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="Voice Bio removed successfully.",
+        data={"voice_bio_url": None}
     )

@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import 'profile_service.dart';
@@ -25,17 +29,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String _verificationStatus = 'UNVERIFIED';
   bool _isUploadingVideo = false;
 
+  // Voice Bio Audio Recording State
+  late final AudioRecorder _audioRecorder;
+  late final AudioPlayer _audioPlayer;
+  bool _isRecording = false;
+  bool _isPlayingVoiceBio = false;
+  int _recordDuration = 0;
+  Timer? _recordTimer;
+  String? _recordedVoicePath;
+  String? _existingVoiceBioUrl;
+
   final ImagePicker _picker = ImagePicker();
   final ProfileService _profileService = ProfileService();
 
   @override
   void initState() {
     super.initState();
+    _audioRecorder = AudioRecorder();
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _isPlayingVoiceBio = false);
+    });
     _fetchProfileData();
   }
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
     _nameController.dispose();
     _bioController.dispose();
     _areaController.dispose();
@@ -53,6 +75,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _areaController.text = data['area_name'] ?? '';
         _isVerified = data['is_verified'] == true;
         _verificationStatus = (data['verification_status'] ?? 'UNVERIFIED').toString().toUpperCase();
+        _existingVoiceBioUrl = data['voice_bio_url'];
       }
     } catch (e) {
       if (kDebugMode) {
@@ -60,6 +83,111 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _startRecordingVoiceBio() async {
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        final dir = await getTemporaryDirectory();
+        final path = '${dir.path}/voice_bio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100),
+          path: path,
+        );
+
+        setState(() {
+          _isRecording = true;
+          _recordDuration = 0;
+          _recordedVoicePath = path;
+          _isPlayingVoiceBio = false;
+        });
+
+        _recordTimer?.cancel();
+        _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+          setState(() {
+            _recordDuration++;
+          });
+          if (_recordDuration >= 15) {
+            _stopRecordingVoiceBio();
+          }
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission is required to record a Voice Bio.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('[VoiceBio] Recording error: $e');
+    }
+  }
+
+  Future<void> _stopRecordingVoiceBio() async {
+    _recordTimer?.cancel();
+    try {
+      final path = await _audioRecorder.stop();
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _recordedVoicePath = path ?? _recordedVoicePath;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isRecording = false);
+    }
+  }
+
+  Future<void> _togglePlayVoiceBio() async {
+    if (_isPlayingVoiceBio) {
+      await _audioPlayer.stop();
+      setState(() => _isPlayingVoiceBio = false);
+    } else {
+      try {
+        if (_recordedVoicePath != null) {
+          await _audioPlayer.play(DeviceFileSource(_recordedVoicePath!));
+          setState(() => _isPlayingVoiceBio = true);
+        } else if (_existingVoiceBioUrl != null && _existingVoiceBioUrl!.isNotEmpty) {
+          await _audioPlayer.play(UrlSource(_existingVoiceBioUrl!));
+          setState(() => _isPlayingVoiceBio = true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not play audio: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteVoiceBio() async {
+    try {
+      await ApiClient.instance.deleteVoiceBio();
+      if (_isPlayingVoiceBio) await _audioPlayer.stop();
+      if (mounted) {
+        setState(() {
+          _existingVoiceBioUrl = null;
+          _recordedVoicePath = null;
+          _isPlayingVoiceBio = false;
+          _recordDuration = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Voice Bio removed.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remove voice bio: $e')),
+        );
+      }
     }
   }
 
@@ -105,6 +233,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => _isSaving = true);
     try {
+      // 1. Upload newly recorded Voice Bio if present
+      if (_recordedVoicePath != null) {
+        final dur = _recordDuration > 0 ? _recordDuration : 15;
+        await ApiClient.instance.uploadVoiceBioFile(
+          _recordedVoicePath!,
+          durationSeconds: dur,
+        );
+      }
+
+      // 2. Persist profile info
       await ApiClient.instance.putProfile({
         'full_name': _nameController.text.trim(),
         'bio': _bioController.text.trim(),
@@ -113,7 +251,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!')),
+          const SnackBar(content: Text('Profile and Voice Bio updated successfully!')),
         );
         Navigator.pop(context, true);
       }
@@ -234,6 +372,147 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 🎙️ Voice Bio (15s Intro Greeting) Card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.purple.shade900.withValues(alpha: 0.3),
+                            AppTheme.surfaceColor,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _recordedVoicePath != null || (_existingVoiceBioUrl != null && _existingVoiceBioUrl!.isNotEmpty)
+                              ? Colors.purpleAccent
+                              : Colors.grey[800]!,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.mic, color: Colors.purpleAccent, size: 26),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  '🎙️ 15-Second Voice Bio (Audio Intro)',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Speak a friendly 15-second greeting in your regional accent or Hindi. Profiles with audio get 3x higher responses!',
+                            style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Recording & Playback Controls
+                          if (_isRecording) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade900.withValues(alpha: 0.4),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.redAccent),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 20),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Recording... 0:${_recordDuration.toString().padLeft(2, '0')} / 0:15',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  const Spacer(),
+                                  ElevatedButton(
+                                    onPressed: _stopRecordingVoiceBio,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    child: const Text('Stop ⏹', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (_recordedVoicePath != null || (_existingVoiceBioUrl != null && _existingVoiceBioUrl!.isNotEmpty)) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.purple.shade900.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.5)),
+                              ),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      _isPlayingVoiceBio ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                      color: Colors.purpleAccent,
+                                      size: 36,
+                                    ),
+                                    onPressed: _togglePlayVoiceBio,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _isPlayingVoiceBio ? 'Playing Voice Intro 🎵' : 'Voice Intro Ready ▶',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                        Text(
+                                          _recordedVoicePath != null ? 'New recording saved' : 'Active on your profile',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh, color: Colors.amber, size: 22),
+                                    tooltip: 'Re-record',
+                                    onPressed: _startRecordingVoiceBio,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 22),
+                                    tooltip: 'Delete',
+                                    onPressed: _deleteVoiceBio,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _startRecordingVoiceBio,
+                                icon: const Icon(Icons.mic, color: Colors.purpleAccent, size: 20),
+                                label: const Text(
+                                  'Record 15s Voice Bio 🎙️',
+                                  style: TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Colors.purpleAccent),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

@@ -198,6 +198,8 @@ async def get_feed(
                     is_verified_local=is_approved,
                     is_boosted=is_boosted,
                     boosted_until=user.boosted_until,
+                    voice_bio_url=user.voice_bio_url,
+                    voice_bio_duration_seconds=user.voice_bio_duration_seconds or 0,
                 )
             )
             added_user_ids.add(user.id)
@@ -258,6 +260,8 @@ async def get_feed(
                         is_verified_local=f_is_approved,
                         is_boosted=f_is_boosted,
                         boosted_until=fallback_user.boosted_until,
+                        voice_bio_url=fallback_user.voice_bio_url,
+                        voice_bio_duration_seconds=fallback_user.voice_bio_duration_seconds or 0,
                     )
                 )
                 added_user_ids.add(fallback_user.id)

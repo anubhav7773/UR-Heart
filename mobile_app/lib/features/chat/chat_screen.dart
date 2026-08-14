@@ -1344,43 +1344,65 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _messages.isEmpty
                 ? Center(
-                    child: Container(
-                      margin: const EdgeInsets.all(28),
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardColor,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                              shape: BoxShape.circle,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          color: AppTheme.cardColor,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.favorite_rounded, color: AppTheme.primaryColor, size: 36),
                             ),
-                            child: const Icon(Icons.favorite_rounded, color: AppTheme.primaryColor, size: 44),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Say Hi to ${_displayRecipient.name}! ✨',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'You matched! Start a warm conversation or share a photo.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: () => _sendMessage(text: 'Hi 👋 Great to match with you!'),
-                            icon: const Icon(Icons.waving_hand, size: 18),
-                            label: const Text('Send Quick Hi 👋'),
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            Text(
+                              'Say Hi to ${_displayRecipient.name}! ✨',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Break the ice with a ready-to-tap conversation starter:',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12, color: Colors.white70),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 4-Action Icebreaker Starter Chips
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _buildIcebreakerChip('☕ Chai date ke liye kab chalein?'),
+                                _buildIcebreakerChip('🎶 Aajkal kaun sa gaana loop pe chal raha hai?'),
+                                _buildIcebreakerChip('🌴 Shaam ko ghoomne ki best jagah kaun si hai?'),
+                                _buildIcebreakerChip('🎬 Koi achhi movie recommend karo!'),
+                                _buildIcebreakerChip('✨ Weekend ka kya plan hai?'),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: () => _sendMessage(text: 'Hi 👋 Great to match with you!'),
+                              icon: const Icon(Icons.waving_hand, size: 16),
+                              label: const Text('Send Quick Hi 👋', style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   )
@@ -1473,6 +1495,20 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildIcebreakerChip(String text) {
+    return ActionChip(
+      backgroundColor: AppTheme.surfaceColor,
+      side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.5)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      label: Text(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+      ),
+      onPressed: () => _sendMessage(text: text),
     );
   }
 }
