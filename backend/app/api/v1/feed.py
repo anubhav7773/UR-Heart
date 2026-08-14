@@ -143,7 +143,7 @@ async def get_feed(
             # WGS 84 Point with SRID 4326 (ST_MakePoint takes longitude, latitude)
             current_point = func.ST_SetSRID(func.ST_MakePoint(user_lng, user_lat), 4326)
             # PostGIS ST_Distance returns meters for geography; divide by 1000.0 for kilometers
-            distance_expr = (func.ST_Distance(func.cast(User.location_geom, func.geography), func.cast(current_point, func.geography)) / 1000.0).label("distance_km")
+            distance_expr = (func.ST_Distance(User.location_geom, current_point) / 1000.0).label("distance_km")
 
         db_candidates: List[tuple[User, Optional[float]]] = []
 
@@ -158,7 +158,7 @@ async def get_feed(
                     .where(
                         or_(
                             User.location_geom == None,
-                            func.ST_DWithin(func.cast(User.location_geom, func.geography), func.cast(current_point, func.geography), radius_meters)
+                            func.ST_DWithin(User.location_geom, current_point, radius_meters)
                         )
                     )
                     .options(selectinload(User.photos))
@@ -363,6 +363,7 @@ async def get_feed(
 
 
 @router.post("/swipe", response_model=APIResponse[SwipeData])
+@router.post("/swipe/", response_model=APIResponse[SwipeData])
 async def swipe_action(
     payload: SwipeRequest,
     current_user_id: str = Depends(get_current_user_id),
@@ -371,12 +372,35 @@ async def swipe_action(
     """
     Records user swipe action (reject/like/dm) in Supabase PostgreSQL `swipes` table,
     checks for mutual like, and creates a record in `matches` table on match.
+    Validates user session and target profile existence to prevent FK constraint failures.
     """
-    user_uuid = uuid.UUID(current_user_id)
-    target_uuid = uuid.UUID(payload.target_user_id)
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        target_uuid = uuid.UUID(payload.target_user_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID format.")
+
+    # Verify that authenticated caller exists in DB
+    current_user_res = await db.execute(select(User).where(User.id == user_uuid))
+    current_user = current_user_res.scalars().first()
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired, please log in again."
+        )
+
+    # Verify target profile exists in DB
+    target_user_res = await db.execute(select(User).where(User.id == target_uuid))
+    target_user_obj = target_user_res.scalars().first()
+    if target_user_obj is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target profile not found."
+        )
+
     orm_action = ORMSwipeActionEnum(payload.action.value)
 
-    # 1. Record Swipe in DB
+    # 1. Record Swipe in DB safely
     try:
         new_swipe = Swipe(
             swiper_id=user_uuid,
@@ -385,11 +409,17 @@ async def swipe_action(
         )
         db.add(new_swipe)
         await db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        await db.rollback()
+        print(f"[SWIPE INSERT ERROR] Failed to record swipe: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Swipe action could not be recorded."
+        )
 
     # 2. Check for Mutual Match if action is LIKE or DM
     is_match = False
+    match_id_str = ""
     if payload.action in (SwipeActionEnum.LIKE, SwipeActionEnum.DM):
         try:
             mutual_res = await db.execute(
@@ -414,7 +444,6 @@ async def swipe_action(
                     )
                 )
                 existing_match = match_res.scalars().first()
-                match_id_str = ""
                 if existing_match:
                     match_id_str = str(existing_match.id)
                 else:
@@ -427,18 +456,12 @@ async def swipe_action(
                     await db.refresh(new_match)
                     match_id_str = str(new_match.id)
 
-                # Fetch FCM tokens and names for both matched users
-                target_user_res = await db.execute(select(User).where(User.id == target_uuid))
-                target_user_obj = target_user_res.scalars().first()
-                swiper_res = await db.execute(select(User).where(User.id == user_uuid))
-                swiper_user_obj = swiper_res.scalars().first()
-
-                swiper_name = swiper_user_obj.full_name if (swiper_user_obj and swiper_user_obj.full_name) else "Someone"
-                target_name = target_user_obj.full_name if (target_user_obj and target_user_obj.full_name) else "Someone"
+                swiper_name = current_user.full_name if current_user.full_name else "Someone"
+                target_name = target_user_obj.full_name if target_user_obj.full_name else "Someone"
 
                 # Send push notification to Target User (User A)
-                target_fcm = getattr(target_user_obj, 'fcm_token', None) if target_user_obj else None
-                if target_user_obj and target_fcm:
+                target_fcm = getattr(target_user_obj, 'fcm_token', None)
+                if target_fcm:
                     await send_push_notification(
                         fcm_token=target_fcm,
                         title="It's a Match! 🎉",
@@ -447,8 +470,8 @@ async def swipe_action(
                     )
 
                 # Send push notification to Swiper User (User B)
-                swiper_fcm = getattr(swiper_user_obj, 'fcm_token', None) if swiper_user_obj else None
-                if swiper_user_obj and swiper_fcm:
+                swiper_fcm = getattr(current_user, 'fcm_token', None)
+                if swiper_fcm:
                     await send_push_notification(
                         fcm_token=swiper_fcm,
                         title="It's a Match! 🎉",
@@ -456,7 +479,8 @@ async def swipe_action(
                         data={"type": "match", "match_id": match_id_str}
                     )
         except Exception as e:
-            print(f"[SWIPE ERROR] {e}")
+            print(f"[MUTUAL MATCH ERROR] {e}")
+            await db.rollback()
 
     current_skips = _mock_user_skip_counts.get(current_user_id, 19)
     trigger_ad = False

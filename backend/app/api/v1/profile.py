@@ -43,6 +43,7 @@ else:
 @router.get("")
 @router.get("/")
 @router.get("/me")
+@router.get("/me/")
 async def get_user_profile(
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)

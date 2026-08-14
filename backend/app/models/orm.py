@@ -21,6 +21,8 @@ import enum
 
 class GeographyPoint(UserDefinedType):
     """PostGIS Geography Point (SRID 4326) spatial data type."""
+    cache_ok = True
+
     def get_col_spec(self, **kw):
         return "geography(Point, 4326)"
 
