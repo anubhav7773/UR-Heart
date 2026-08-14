@@ -16,6 +16,7 @@ from app.models.orm import (
     Swipe,
     Match,
     BlockedUser,
+    UserReport,
     SwipeActionEnum as ORMSwipeActionEnum,
     GenderEnum as ORMGenderEnum
 )
@@ -79,11 +80,16 @@ async def get_feed(
         excluded_ids = set(swiped_res.scalars().all())
         excluded_ids.add(user_uuid)
 
-        # 2. Exclude blocked users (both directions)
+        # 2. Exclude blocked users & reported users (both directions)
         blocked_res1 = await db.execute(select(BlockedUser.blocked_id).where(BlockedUser.blocker_id == user_uuid))
         blocked_res2 = await db.execute(select(BlockedUser.blocker_id).where(BlockedUser.blocked_id == user_uuid))
         excluded_ids.update(blocked_res1.scalars().all())
         excluded_ids.update(blocked_res2.scalars().all())
+
+        reported_res1 = await db.execute(select(UserReport.reported_id).where(UserReport.reporter_id == user_uuid))
+        reported_res2 = await db.execute(select(UserReport.reporter_id).where(UserReport.reported_id == user_uuid))
+        excluded_ids.update(reported_res1.scalars().all())
+        excluded_ids.update(reported_res2.scalars().all())
 
         stmt = (
             select(User)
@@ -141,6 +147,7 @@ async def get_feed(
                     area_name=user.area_name or "Ayodhya Region",
                     intent=IntentEnum(user.intent.value) if user.intent else IntentEnum.CASUAL,
                     photos=photos,
+                    is_verified=bool(user.is_verified),
                     is_verified_local=is_female or True,
                 )
             )

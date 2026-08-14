@@ -315,6 +315,7 @@ class ProfileCardData(BaseModel):
     area_name: str
     intent: IntentEnum
     photos: List[str]
+    is_verified: bool = False
     is_verified_local: bool = True
 
 

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/security/storage_manager.dart';
 import '../auth/auth_screen.dart';
+import '../settings/blocked_users_screen.dart';
+import 'edit_profile_screen.dart';
 import 'profile_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -517,6 +519,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Quick Settings Action Cards
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  ListTile(
+                    tileColor: Colors.grey[900],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    leading: const Icon(Icons.verified_user, color: Colors.blueAccent),
+                    title: const Text('Edit Profile & Video Verification', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Get official Verified Blue Tick badge ✓', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    onTap: () async {
+                      final updated = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                      );
+                      if (updated == true) {
+                        _fetchProfile();
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  ListTile(
+                    tileColor: Colors.grey[900],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    leading: const Icon(Icons.block, color: Colors.redAccent),
+                    title: const Text('Blocked Users', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('View and unblock restricted profiles', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const BlockedUsersScreen()),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -377,4 +377,9 @@ class ApiClient {
       'receiver_id': receiverId,
     });
   }
+
+  // 28. Get Profile
+  Future<Response> getProfile({String? userId}) async {
+    return await dio.get('/profile', queryParameters: userId != null ? {'user_id': userId} : null);
+  }
 }

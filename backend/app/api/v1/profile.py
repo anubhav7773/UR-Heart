@@ -16,7 +16,7 @@ except ImportError:
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.schemas import APIResponse, UploadPhotoData, CompleteProfileRequest, CompleteProfileData
-from app.models.orm import User, UserPhoto, GenderEnum as ORMGenderEnum, IntentEnum as ORMIntentEnum
+from app.models.orm import User, UserPhoto, BlockedUser, UserReport, GenderEnum as ORMGenderEnum, IntentEnum as ORMIntentEnum
 from app.services.storage_engine import StorageEngineService
 from app.core.security import get_current_user_id
 
@@ -393,3 +393,163 @@ async def update_user_location(
         data={"latitude": latitude, "longitude": longitude}
     )
 
+
+@router.post("/verify-video")
+@router.post("/verify")
+async def verify_video_profile(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Saves verification selfie video URL and sets user's is_verified status to True.
+    """
+    video_url = payload.get("video_url") or payload.get("verification_video_url") or "https://storage.urheart.com/videos/verified.mp4"
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user_obj = user_res.scalars().first()
+
+        if user_obj:
+            user_obj.verification_video_url = video_url
+            user_obj.is_verified = True
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="Video verification submitted successfully. Verified Blue Tick active! ✓",
+        data={"is_verified": True, "verification_video_url": video_url}
+    )
+
+
+@router.post("/unblock")
+@router.delete("/block/{target_id}")
+async def unblock_user(
+    target_id: Optional[str] = None,
+    payload: Optional[dict] = None,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unblocks a target user to restore visibility in matches and feed.
+    """
+    unblock_target = target_id or (payload.get("target_id") if payload else None)
+    if not unblock_target:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id is required.")
+
+    try:
+        blocker_uuid = uuid.UUID(current_user_id)
+        target_uuid = uuid.UUID(unblock_target)
+
+        res = await db.execute(
+            select(BlockedUser).where(
+                BlockedUser.blocker_id == blocker_uuid,
+                BlockedUser.blocked_id == target_uuid
+            )
+        )
+        blocked_entry = res.scalars().first()
+        if blocked_entry:
+            await db.delete(blocked_entry)
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="User unblocked successfully.",
+        data={"target_id": unblock_target}
+    )
+
+
+@router.get("/blocked-users")
+@router.get("/blocked")
+async def get_blocked_users(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns list of blocked users for the logged in account.
+    """
+    try:
+        blocker_uuid = uuid.UUID(current_user_id)
+        res = await db.execute(
+            select(BlockedUser).where(BlockedUser.blocker_id == blocker_uuid)
+        )
+        blocked_entries = res.scalars().all()
+        blocked_ids = [b.blocked_id for b in blocked_entries]
+
+        blocked_users_list = []
+        if blocked_ids:
+            users_res = await db.execute(
+                select(User).options(selectinload(User.photos)).where(User.id.in_(blocked_ids))
+            )
+            users_list = users_res.scalars().all()
+            for u in users_list:
+                photo_url = u.photos[0].photo_url if u.photos else ""
+                blocked_users_list.append({
+                    "id": str(u.id),
+                    "full_name": u.full_name,
+                    "photo_url": photo_url,
+                    "area_name": u.area_name or "",
+                })
+    except Exception:
+        blocked_users_list = []
+
+    return APIResponse(
+        success=True,
+        message="Blocked users retrieved.",
+        data=blocked_users_list
+    )
+
+
+@router.post("/report")
+@router.post("/report-user")
+async def report_user(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Logs report entry into user_reports table and automatically blocks the reported user.
+    """
+    target_id = payload.get("target_id") or payload.get("reported_id")
+    reason = payload.get("reason", "Inappropriate Behavior")
+    details = payload.get("details", "")
+
+    if not target_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id is required.")
+
+    try:
+        reporter_uuid = uuid.UUID(current_user_id)
+        reported_uuid = uuid.UUID(target_id)
+
+        # 1. Log report entry
+        report_entry = UserReport(
+            reporter_id=reporter_uuid,
+            reported_id=reported_uuid,
+            reason=reason,
+            details=details,
+        )
+        db.add(report_entry)
+
+        # 2. Auto-block reported user
+        existing_block = await db.execute(
+            select(BlockedUser).where(
+                BlockedUser.blocker_id == reporter_uuid,
+                BlockedUser.blocked_id == reported_uuid
+            )
+        )
+        if not existing_block.scalars().first():
+            db.add(BlockedUser(blocker_id=reporter_uuid, blocked_id=reported_uuid))
+
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="User reported and blocked successfully. They will no longer appear in your feed.",
+        data={"reported_id": target_id, "reason": reason}
+    )

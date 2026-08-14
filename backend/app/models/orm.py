@@ -80,6 +80,7 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verification_video_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_online: Mapped[bool] = mapped_column(Boolean, default=True)
     last_seen: Mapped[Optional[datetime]] = mapped_column(

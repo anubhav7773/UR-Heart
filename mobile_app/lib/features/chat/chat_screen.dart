@@ -42,11 +42,13 @@ class ChatRecipient {
   final String id;
   final String name;
   final String avatarUrl;
+  final bool isVerified;
 
   const ChatRecipient({
     required this.id,
     required this.name,
     this.avatarUrl = '',
+    this.isVerified = false,
   });
 
   factory ChatRecipient.fromConversation(Map<String, dynamic> conversation) {
@@ -62,14 +64,16 @@ class ChatRecipient {
               conversation['photo_url'] ??
               '')
           .toString(),
+      isVerified: conversation['is_verified'] ?? conversation['is_verified_local'] ?? false,
     );
   }
 
-  ChatRecipient copyWith({String? name, String? avatarUrl}) {
+  ChatRecipient copyWith({String? name, String? avatarUrl, bool? isVerified}) {
     return ChatRecipient(
       id: id,
       name: name ?? this.name,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      isVerified: isVerified ?? this.isVerified,
     );
   }
 }
@@ -335,6 +339,7 @@ class _ChatScreenState extends State<ChatScreen> {
               _recipientProfile = widget.recipientUser.copyWith(
                 name: name.isNotEmpty ? name : widget.recipientUser.name,
                 avatarUrl: avatarUrl,
+                isVerified: data['is_verified'] ?? data['is_verified_local'] ?? false,
               );
 
               final myPos = LocationService.instance.currentPosition;
@@ -621,8 +626,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.location_on, size: 14, color: AppTheme.secondaryColor),
-                          SizedBox(width: 4),
+                          const Icon(Icons.location_on, size: 14, color: AppTheme.secondaryColor),
+                          const SizedBox(width: 4),
                           Text(_recipientDistanceLabel, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         ],
                       ),
@@ -943,7 +948,15 @@ class _ChatScreenState extends State<ChatScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_displayRecipient.name, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Text(_displayRecipient.name, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                      if (_displayRecipient.isVerified) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.verified, color: Colors.blueAccent, size: 16),
+                      ],
+                    ],
+                  ),
                   Text(
                     _isTyping ? 'typing...' : 'Online • $_recipientDistanceLabel',
                     style: TextStyle(

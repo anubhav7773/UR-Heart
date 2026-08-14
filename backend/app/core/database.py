@@ -61,6 +61,7 @@ async def init_db() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude NUMERIC(10, 6);",
             "ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP WITH TIME ZONE;",
             "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_msg_id VARCHAR(64);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_video_url TEXT;",
         ]
         for query in migration_queries:
             try:

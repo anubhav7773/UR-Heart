@@ -3,7 +3,7 @@ import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/services/location_service.dart';
 import '../chat/chat_screen.dart';
-import '../subscription/subscription_sheet.dart';
+import '../profile/profile_view_dialog.dart';
 import 'native_ad_card_widget.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -22,7 +22,7 @@ class _FeedScreenState extends State<FeedScreen> {
   // Discovery Preference Filters State
   String _genderPref = 'everyone';
   RangeValues _ageRange = const RangeValues(18, 50);
-  double _maxDistanceKm = 50.0;
+  static const double _feedRadiusKm = 500.0;
 
   @override
   void initState() {
@@ -40,7 +40,7 @@ class _FeedScreenState extends State<FeedScreen> {
         genderPreference: _genderPref,
         minAge: _ageRange.start.round(),
         maxAge: _ageRange.end.round(),
-        maxDistanceKm: _maxDistanceKm,
+        maxDistanceKm: _feedRadiusKm,
         lat: pos?.latitude,
         lng: pos?.longitude,
       );
@@ -128,7 +128,6 @@ class _FeedScreenState extends State<FeedScreen> {
   void _showFilterBottomSheet() {
     String tempGender = _genderPref;
     RangeValues tempAge = _ageRange;
-    double tempDist = _maxDistanceKm;
 
     showModalBottomSheet(
       context: context,
@@ -218,28 +217,6 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Distance Radius Slider
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Maximum Distance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-                      Text(
-                        '${tempDist.round()} km',
-                        style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: tempDist,
-                    min: 1,
-                    max: 100,
-                    divisions: 99,
-                    activeColor: Colors.amber,
-                    inactiveColor: Colors.grey[800],
-                    onChanged: (val) => setModalState(() => tempDist = val),
-                  ),
-                  const SizedBox(height: 24),
-
                   // Apply Button
                   SizedBox(
                     width: double.infinity,
@@ -248,7 +225,6 @@ class _FeedScreenState extends State<FeedScreen> {
                         setState(() {
                           _genderPref = tempGender;
                           _ageRange = tempAge;
-                          _maxDistanceKm = tempDist;
                         });
                         Navigator.pop(context);
                         _loadFeed();
@@ -447,6 +423,25 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
+  void _showProfileViewer(Map<String, dynamic> profile) {
+    final photos = (profile['photos'] as List<dynamic>? ?? [])
+        .map((photo) => photo.toString())
+        .where((photo) => photo.isNotEmpty)
+        .take(5)
+        .toList();
+    if (photos.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => ProfileViewDialog(
+        name: (profile['full_name'] ?? profile['first_name'] ?? 'User').toString(),
+        age: (profile['age'] as num?)?.toInt() ?? 0,
+        distanceLabel: (profile['distance_label'] ?? 'Location unavailable').toString(),
+        photos: photos,
+        isVerified: profile['is_verified'] ?? profile['is_verified_local'] ?? false,
+      ),
+    );
+  }
+
   void _showInterstitialAdDialog() {
     showDialog(
       context: context,
@@ -579,7 +574,9 @@ class _FeedScreenState extends State<FeedScreen> {
                           children: [
                             // Network Image with Error and Loading Fallback Placeholders
                             if (imageUrl != null && imageUrl.isNotEmpty)
-                              Image.network(
+                              GestureDetector(
+                                onTap: () => _showProfileViewer(Map<String, dynamic>.from(profile as Map)),
+                                child: Image.network(
                                 imageUrl,
                                 fit: BoxFit.cover,
                                 loadingBuilder: (context, child, loadingProgress) {
@@ -605,6 +602,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                     ),
                                   );
                                 },
+                                ),
                               )
                             else
                               Container(
@@ -817,62 +815,14 @@ class _FeedScreenState extends State<FeedScreen> {
                                 ),
                                 const SizedBox(height: 20),
 
-                                // Action 1: Expand Radius (up to 100 km)
                                 ElevatedButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _maxDistanceKm = 100.0;
-                                    });
-                                    _loadFeed();
-                                  },
-                                  icon: const Icon(Icons.map_rounded, color: Colors.white, size: 18),
-                                  label: const Text('Expand Distance Radius (up to 100 km)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  onPressed: _loadFeed,
+                                  icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
+                                  label: const Text('Refresh Feed', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                                   style: ElevatedButton.styleFrom(
                                     minimumSize: const Size.fromHeight(48),
                                     backgroundColor: const Color(0xFFE91E63),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-
-                                // Action 2: Send Direct Invite Pass
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    showModalBottomSheet(
-                                      context: context,
-                                      isScrollControlled: true,
-                                      backgroundColor: Colors.transparent,
-                                      builder: (context) => const SubscriptionSheet(),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.bolt, color: Colors.black, size: 20),
-                                  label: const Text('Send a Direct Invite Pass (₹9) to Active Members', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  style: ElevatedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(48),
-                                    backgroundColor: Colors.amber[800],
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Daily Check-in Prompt
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.grey[800]!),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.schedule, size: 14, color: Colors.amber),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        "Check back at 8 PM for tonight's fresh matches!",
-                                        style: TextStyle(fontSize: 11, color: Colors.white70),
-                                      ),
-                                    ],
                                   ),
                                 ),
                               ],
