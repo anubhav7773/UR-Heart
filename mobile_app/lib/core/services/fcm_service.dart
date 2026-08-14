@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../network/api_client.dart';
+import '../security/storage_manager.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -43,7 +44,7 @@ class FcmService {
           print('FCM Notification permission granted.');
         }
 
-        // 2. Fetch FCM Token & Sync to Backend
+        // 2. Fetch FCM Token & Sync to Backend if logged in
         _fcmToken = await _fcm.getToken();
         if (kDebugMode) {
           print('FCM Token: $_fcmToken');
@@ -92,12 +93,19 @@ class FcmService {
 
   Future<void> _syncTokenToBackend(String token) async {
     try {
+      final authToken = await StorageManager.instance.getAuthToken();
+      if (authToken == null || authToken.trim().isEmpty) {
+        if (kDebugMode) {
+          print('FCM Token sync skipped: User is not authenticated yet.');
+        }
+        return;
+      }
       await ApiClient.instance.dio.post('/users/fcm-token', data: {'fcm_token': token});
       if (kDebugMode) {
         print('FCM Device Token synced to backend profile.');
       }
     } catch (e) {
-      // Background token sync fallback
+      if (kDebugMode) print('FCM sync error: $e');
     }
   }
 }

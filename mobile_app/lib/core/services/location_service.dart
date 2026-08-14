@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../network/api_client.dart';
+import '../security/storage_manager.dart';
 
 class LocationService {
   static final LocationService instance = LocationService._internal();
@@ -45,7 +46,7 @@ class LocationService {
         if (kDebugMode) {
           print('GPS Position Acquired: Lat=${_currentPosition!.latitude}, Lng=${_currentPosition!.longitude}');
         }
-        // Update user's current GPS location on backend
+        // Update user's current GPS location on backend if authenticated
         await _syncLocationToBackend(
           _currentPosition!.latitude,
           _currentPosition!.longitude,
@@ -66,6 +67,14 @@ class LocationService {
 
   Future<void> _syncLocationToBackend(double lat, double lng) async {
     try {
+      final authToken = await StorageManager.instance.getAuthToken();
+      if (authToken == null || authToken.trim().isEmpty) {
+        if (kDebugMode) {
+          print('GPS location sync skipped: User is not authenticated yet.');
+        }
+        return;
+      }
+
       await ApiClient.instance.dio.post('/users/location', data: {
         'latitude': lat,
         'longitude': lng,

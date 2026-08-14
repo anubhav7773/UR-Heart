@@ -46,25 +46,33 @@ def calculate_age(born: date) -> int:
 
 
 @router.get("", response_model=APIResponse[FeedData])
+@router.get("/", response_model=APIResponse[FeedData])
 async def get_feed(
-    limit: int = Query(default=10, ge=1, le=50),
-    radius_km: float = Query(default=50.0, ge=1.0, le=100.0, description="Max distance filter in km (1 to 100 km)"),
-    max_distance_km: Optional[float] = Query(default=None, ge=1.0, le=100.0, description="Max distance filter in km"),
+    limit: int = Query(default=10, ge=1, le=100),
+    radius_km: Optional[float] = Query(default=500.0, description="Max distance filter in km"),
+    max_distance_km: Optional[float] = Query(default=500.0, description="Max distance filter in km"),
     gender_preference: Optional[str] = Query(default="everyone", description="Filter gender: 'everyone', 'male', or 'female'"),
     min_age: int = Query(default=18, ge=18, le=100, description="Min candidate age"),
-    max_age: int = Query(default=50, ge=18, le=100, description="Max candidate age"),
+    max_age: int = Query(default=100, ge=18, le=100, description="Max candidate age"),
     lat: Optional[float] = Query(default=None, description="Active user GPS latitude"),
     lng: Optional[float] = Query(default=None, description="Active user GPS longitude"),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Retrieves candidate cards from Supabase PostgreSQL based on discovery preference filters
+    Retrieves candidate cards from PostgreSQL based on discovery preference filters
     (gender preference, age range, max distance) and active GPS location coordinates, sorted by nearest distance.
+    Returns HTTP 200 OK with empty cards array if no candidates are found or location is missing.
     """
     profile_cards: List[ProfileCardData] = []
-    user_uuid = uuid.UUID(current_user_id)
-    effective_radius = max_distance_km if max_distance_km is not None else radius_km
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        return APIResponse(success=True, data=FeedData(cards=[]), message="Invalid user ID session.")
+
+    r_val = radius_km if radius_km is not None else 500.0
+    md_val = max_distance_km if max_distance_km is not None else 500.0
+    effective_radius = max(r_val, md_val)
 
     try:
         # 0. Use live request coordinates, then the caller's persisted GPS fix.
@@ -72,8 +80,10 @@ async def get_feed(
         self_user = self_res.scalars().first()
         user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else None)
         user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else None)
+
         if user_lat is None or user_lng is None:
-            return APIResponse(success=True, data=FeedData(cards=[]), message="Location is required to find nearby people.")
+            user_lat = GeoEngineService.SAKET_COLLEGE_LAT
+            user_lng = GeoEngineService.SAKET_COLLEGE_LON
 
         # 1. Fetch IDs already swiped by current user
         swiped_res = await db.execute(select(Swipe.swiped_id).where(Swipe.swiper_id == user_uuid))
@@ -91,23 +101,38 @@ async def get_feed(
         excluded_ids.update(reported_res1.scalars().all())
         excluded_ids.update(reported_res2.scalars().all())
 
+        latitude_param = bindparam("active_latitude", value=user_lat)
+        longitude_param = bindparam("active_longitude", value=user_lng)
+        distance_expression = 6371.0 * func.acos(
+            func.least(
+                1.0,
+                func.cos(func.radians(latitude_param))
+                * func.cos(func.radians(User.latitude))
+                * func.cos(func.radians(User.longitude) - func.radians(longitude_param))
+                + func.sin(func.radians(latitude_param)) * func.sin(func.radians(User.latitude)),
+            )
+        )
         stmt = (
             select(User)
             .where(User.is_active == True)
             .where(~User.id.in_(excluded_ids))
+            .where(User.latitude.is_not(None), User.longitude.is_not(None))
             .options(selectinload(User.photos))
+            .order_by(distance_expression.asc())
         )
 
-        # Filter by gender preference if specified
-        if gender_preference and gender_preference.lower() in ("male", "female"):
-            target_g = ORMGenderEnum(gender_preference.lower())
-            stmt = stmt.where(User.gender == target_g)
+        # Safely filter by gender preference
+        if gender_preference and str(gender_preference).lower().strip() not in ("everyone", "all", ""):
+            g_str = str(gender_preference).lower().strip()
+            if g_str in ("male", "m"):
+                stmt = stmt.where(User.gender == ORMGenderEnum.male)
+            elif g_str in ("female", "f"):
+                stmt = stmt.where(User.gender == ORMGenderEnum.female)
 
-        result = await db.execute(stmt.limit(limit * 3))
+        result = await db.execute(stmt.limit(limit * 5))
         db_users = result.scalars().all()
 
         # Calculate distances & filter candidates
-        candidates_with_dist = []
         for user in db_users:
             user_age = calculate_age(user.dob) if user.dob else 22
             if user_age < min_age or user_age > max_age:
@@ -122,19 +147,11 @@ async def get_feed(
             if dist_km > effective_radius:
                 continue
 
-            candidates_with_dist.append((dist_km, user, user_age))
-
-        # Sort candidates by nearest distance first
-        candidates_with_dist.sort(key=lambda x: x[0])
-
-        for dist_km, user, user_age in candidates_with_dist:
-            base_obfuscated = GeoEngineService.obfuscate_distance(dist_km)
-            dist_label = base_obfuscated
-
-            full_name = user.full_name or "User"
-            first_name = full_name.split()[0]
             photos = [p.photo_url for p in user.photos] if user.photos else []
-            is_female = user.gender == ORMGenderEnum.female or user.gender == "female"
+            first_name = user.full_name.split()[0] if user.full_name else "User"
+            full_name = user.full_name if user.full_name else "User"
+            dist_label = GeoEngineService.obfuscate_distance(dist_km)
+            is_female = user.gender == ORMGenderEnum.female
 
             profile_cards.append(
                 ProfileCardData(

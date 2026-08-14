@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/services/fcm_service.dart';
+import '../../core/services/location_service.dart';
 
 class AppAuthProvider extends ChangeNotifier {
   static final AppAuthProvider instance = AppAuthProvider._internal();
@@ -23,6 +25,11 @@ class AppAuthProvider extends ChangeNotifier {
     _isProfileComplete = await StorageManager.instance.isProfileComplete();
     _isPremium = await StorageManager.instance.isPremium();
     _isAuthenticated = token != null && token.isNotEmpty;
+    if (_isAuthenticated) {
+      // Sync FCM token and location for active session
+      FcmService.instance.syncFcmToken();
+      LocationService.instance.updateUserLocation();
+    }
     notifyListeners();
   }
 
@@ -46,6 +53,10 @@ class AppAuthProvider extends ChangeNotifier {
     _isPremium = isPremium;
     _isAuthenticated = true;
     notifyListeners();
+
+    // 3. Immediately sync FCM Device Token & GPS location with valid Auth Bearer Header
+    FcmService.instance.syncFcmToken();
+    LocationService.instance.updateUserLocation();
   }
 
   Future<void> purgeSession() async {
