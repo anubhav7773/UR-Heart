@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -75,6 +75,13 @@ async def update_user_location(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
         user.latitude = latitude
         user.longitude = longitude
+        try:
+            await db.execute(
+                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography WHERE id = :uid"),
+                {"lng": longitude, "lat": latitude, "uid": user_id}
+            )
+        except Exception:
+            pass
         await db.commit()
     except HTTPException:
         raise

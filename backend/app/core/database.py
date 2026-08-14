@@ -21,6 +21,9 @@ engine = create_async_engine(
     db_url,
     echo=False,
     future=True,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=1800,
     pool_pre_ping=True,
     connect_args=connect_args,
 )
@@ -47,8 +50,14 @@ from sqlalchemy import text
 
 
 async def init_db() -> None:
-    """Helper function to create tables and auto-migrate missing columns in PostgreSQL."""
+    """Helper function to create tables, enable PostGIS, and auto-migrate missing columns in PostgreSQL."""
     async with engine.begin() as conn:
+        # Enable PostGIS extension first
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+        except Exception as e:
+            print(f"[PostGIS Initialization Notice] {e}")
+
         await conn.run_sync(Base.metadata.create_all)
 
         # Execute safe ALTER TABLE column additions for existing PostgreSQL tables
@@ -59,6 +68,9 @@ async def init_db() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMP WITH TIME ZONE;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude NUMERIC(10, 6);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude NUMERIC(10, 6);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS location_geom geography(Point, 4326);",
+            "UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(longitude::float, latitude::float), 4326)::geography WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND location_geom IS NULL;",
+            "CREATE INDEX IF NOT EXISTS idx_users_location_geom_gist ON users USING GIST (location_geom);",
             "ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP WITH TIME ZONE;",
             "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_msg_id VARCHAR(64);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_video_url TEXT;",
@@ -67,6 +79,8 @@ async def init_db() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token VARCHAR(512);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS dob DATE;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_url TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_duration_seconds INTEGER DEFAULT 0;",
         ]
         for query in migration_queries:
             try:

@@ -13,9 +13,16 @@ from sqlalchemy import (
     Numeric,
     func,
 )
+from sqlalchemy.types import UserDefinedType
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 import enum
+
+
+class GeographyPoint(UserDefinedType):
+    """PostGIS Geography Point (SRID 4326) spatial data type."""
+    def get_col_spec(self, **kw):
+        return "geography(Point, 4326)"
 
 
 class Base(DeclarativeBase):
@@ -90,6 +97,7 @@ class User(Base):
     village_pin_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     latitude: Mapped[Optional[float]] = mapped_column(Numeric(10, 6), nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Numeric(10, 6), nullable=True)
+    location_geom: Mapped[Optional[str]] = mapped_column(GeographyPoint(), nullable=True, default=None)
     is_location_masked: Mapped[bool] = mapped_column(Boolean, default=True)
 
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)

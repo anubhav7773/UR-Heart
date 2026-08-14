@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Query, Body, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
@@ -274,6 +274,15 @@ async def complete_profile(
         except Exception:
             pass
 
+    if user.latitude is not None and user.longitude is not None:
+        try:
+            await db.execute(
+                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography WHERE id = :uid"),
+                {"lng": float(user.longitude), "lat": float(user.latitude), "uid": user_uuid}
+            )
+        except Exception:
+            pass
+
     try:
         await db.commit()
     except Exception:
@@ -406,6 +415,13 @@ async def update_user_location(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
         user_obj.latitude = latitude
         user_obj.longitude = longitude
+        try:
+            await db.execute(
+                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography WHERE id = :uid"),
+                {"lng": longitude, "lat": latitude, "uid": user_uuid}
+            )
+        except Exception:
+            pass
         await db.commit()
     except HTTPException:
         raise
