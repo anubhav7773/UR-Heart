@@ -94,6 +94,8 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    fcm_token: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, default=None)
+
     photos: Mapped[List["UserPhoto"]] = relationship(
         "UserPhoto", back_populates="user", cascade="all, delete-orphan", order_by="UserPhoto.display_order", lazy="selectin"
     )

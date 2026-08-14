@@ -269,18 +269,20 @@ async def swipe_action(
                 target_name = target_user_obj.full_name if (target_user_obj and target_user_obj.full_name) else "Someone"
 
                 # Send push notification to Target User (User A)
-                if target_user_obj and target_user_obj.fcm_token:
+                target_fcm = getattr(target_user_obj, 'fcm_token', None) if target_user_obj else None
+                if target_user_obj and target_fcm:
                     await send_push_notification(
-                        fcm_token=target_user_obj.fcm_token,
+                        fcm_token=target_fcm,
                         title="It's a Match! 🎉",
                         body=f"You and {swiper_name} liked each other!",
                         data={"type": "match", "match_id": match_id_str}
                     )
 
                 # Send push notification to Swiper User (User B)
-                if swiper_user_obj and swiper_user_obj.fcm_token:
+                swiper_fcm = getattr(swiper_user_obj, 'fcm_token', None) if swiper_user_obj else None
+                if swiper_user_obj and swiper_fcm:
                     await send_push_notification(
-                        fcm_token=swiper_user_obj.fcm_token,
+                        fcm_token=swiper_fcm,
                         title="It's a Match! 🎉",
                         body=f"You and {target_name} liked each other!",
                         data={"type": "match", "match_id": match_id_str}

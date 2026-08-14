@@ -279,7 +279,7 @@ async def send_chat_message(
             sender_user = sender_res.scalars().first()
             sender_name = sender_user.full_name if sender_user else "Matched User"
 
-            recip_token = recip_user.fcm_token if recip_user else None
+            recip_token = getattr(recip_user, 'fcm_token', None) if recip_user else None
             print(f"[FCM] Dispatching push to user: {recipient_id}, token: {recip_token or 'None'}")
 
             if recip_user and recip_token:

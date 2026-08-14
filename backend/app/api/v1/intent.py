@@ -96,9 +96,10 @@ async def send_chai_invite(
         recip_user = recip_res.scalars().first()
 
         sender_name = sender_user.full_name if sender_user else "Someone"
-        if recip_user and recip_user.fcm_token:
+        recip_fcm = getattr(recip_user, 'fcm_token', None) if recip_user else None
+        if recip_user and recip_fcm:
             NotificationEngineService.send_chai_invite_notification(
-                target_fcm_token=recip_user.fcm_token,
+                target_fcm_token=recip_fcm,
                 sender_name=sender_name,
             )
     except Exception:
