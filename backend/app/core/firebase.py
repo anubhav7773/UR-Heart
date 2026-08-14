@@ -18,21 +18,21 @@ def initialize_firebase():
         return
 
     if not firebase_admin._apps:
-        # Check all possible env variable names
-        raw_json = (
-            os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-            or os.getenv("FIREBASE_CREDENTIALS_JSON")
-            or os.getenv("FIREBASE_CREDENTIALS")
-        )
-        if raw_json:
+        service_account_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON") or os.getenv("FIREBASE_CREDENTIALS_JSON") or os.getenv("FIREBASE_CREDENTIALS")
+        if service_account_env:
             try:
-                cert_info = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
-                cred = credentials.Certificate(cert_info)
+                cert_dict = json.loads(service_account_env) if isinstance(service_account_env, str) else service_account_env
+                cred = credentials.Certificate(cert_dict)
                 firebase_admin.initialize_app(cred)
-                print("[FCM_INIT] Successfully initialized Firebase with Service Account JSON.")
+                print("[FCM_INIT] Firebase initialized successfully with Service Account JSON.")
                 return
             except Exception as e:
-                print(f"[FCM_INIT_ERROR] Failed parsing credentials JSON: {e}")
+                print(f"[FCM_INIT_ERROR] JSON parsing failed: {e}")
+                try:
+                    firebase_admin.initialize_app()
+                    return
+                except Exception:
+                    pass
 
         # Try serviceAccountKey.json file in backend root
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -42,7 +42,7 @@ def initialize_firebase():
             try:
                 cred = credentials.Certificate(service_account_path)
                 firebase_admin.initialize_app(cred)
-                print(f"[FCM_INIT] Successfully initialized Firebase with credentials from {service_account_path}")
+                print(f"[FCM_INIT] Firebase initialized successfully with Service Account JSON from {service_account_path}")
                 return
             except Exception as e:
                 print(f"[FCM_INIT_ERROR] Error initializing Certificate from file: {e}")
@@ -51,9 +51,8 @@ def initialize_firebase():
         try:
             project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "ur-heart")
             firebase_admin.initialize_app(options={"projectId": project_id})
-            print(f"[FCM_INIT] Initialized Firebase with fallback project_id: {project_id}")
-        except Exception as e:
-            print(f"[FCM_INIT_ERROR] Fallback initialization notice: {e}")
+        except Exception:
+            pass
 
 initialize_firebase()
 
