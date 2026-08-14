@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/security/storage_manager.dart';
 import '../auth/auth_screen.dart';
 import '../settings/blocked_users_screen.dart';
+import '../../screens/admin_verification_screen.dart';
+import '../../screens/activity_screen.dart';
 import 'edit_profile_screen.dart';
 import 'profile_service.dart';
 
@@ -743,6 +745,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
+                  if ((_profileData?['email'] ?? FirebaseAuth.instance.currentUser?.email ?? '').toString().toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com' || _profileData?['is_admin'] == true) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.deepPurple.shade900.withValues(alpha: 0.7),
+                            const Color(0xFFE91E63).withValues(alpha: 0.7),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE91E63), width: 1.5),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.admin_panel_settings, color: Colors.amber, size: 28),
+                        title: const Text('🛡️ Admin Verification Panel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        subtitle: const Text('Review and approve pending selfie videos', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        trailing: const Icon(Icons.chevron_right, color: Colors.white),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminVerificationScreen()),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                  ListTile(
+                    tileColor: Colors.grey[900],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    leading: const Icon(Icons.history_toggle_off, color: Color(0xFFE91E63)),
+                    title: const Text('Activity (Matches / Liked / Passed)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('View your matches, likes, and passes history', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ActivityScreen()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
                   ListTile(
                     tileColor: Colors.grey[900],
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

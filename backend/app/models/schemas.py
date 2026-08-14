@@ -364,6 +364,7 @@ class SwipeRequest(BaseModel):
 
 class SwipeData(BaseModel):
     is_match: bool
+    match_id: Optional[str] = None
     persistent_skip_count: int
     trigger_interstitial_ad: bool
     ad_unit_id: Optional[str] = None

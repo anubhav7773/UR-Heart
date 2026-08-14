@@ -96,6 +96,7 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verification_status: Mapped[VerificationStatusEnum] = mapped_column(
         SQLEnum(VerificationStatusEnum, name="verification_status_enum", native_enum=False, values_callable=lambda obj: [e.value for e in obj]),
         default=VerificationStatusEnum.UNVERIFIED,

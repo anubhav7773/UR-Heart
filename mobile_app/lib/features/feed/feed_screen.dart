@@ -94,7 +94,9 @@ class _FeedScreenState extends State<FeedScreen> {
         await StorageManager.instance.saveSkipCount(skipCount);
 
         if (isMatch && mounted) {
-          _showMatchDialog();
+          final String matchId = (data['match_id'] ?? '').toString();
+          final profileMap = currentCard['profile'] as Map<String, dynamic>? ?? {};
+          _showMatchDialog(matchId: matchId, matchedProfile: profileMap);
         }
 
         if (triggerAd && mounted) {
@@ -385,38 +387,122 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  void _showMatchDialog() {
+  void _showMatchDialog({required String matchId, required Map<String, dynamic> matchedProfile}) {
+    final String targetName = (matchedProfile['full_name'] ?? matchedProfile['first_name'] ?? 'Your Match').toString();
+    final String targetUserId = (matchedProfile['user_id'] ?? '').toString();
+    final photos = (matchedProfile['photos'] as List<dynamic>? ?? []);
+    final String photoUrl = photos.isNotEmpty ? photos.first.toString() : '';
+    final bool isVerified = matchedProfile['is_verified'] == true;
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        backgroundColor: Colors.grey[950],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Color(0xFFE91E63), width: 1.5),
+        ),
+        title: const Column(
           children: [
-            Icon(Icons.favorite, color: Color(0xFFE91E63), size: 30),
-            SizedBox(width: 10),
-            Text('It\'s a Match!', style: TextStyle(color: Colors.white)),
+            Icon(Icons.favorite, color: Color(0xFFE91E63), size: 48),
+            SizedBox(height: 8),
+            Text(
+              'It\'s a Match! 🎉',
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
-        content: const Text(
-          'You both liked each other! You can now start chatting.',
-          style: TextStyle(color: Colors.white70),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE91E63), width: 3),
+              ),
+              child: ClipOval(
+                child: photoUrl.isNotEmpty
+                    ? Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 48, color: Colors.grey),
+                      )
+                    : const Icon(Icons.person, size: 48, color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  targetName,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                if (isVerified) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.verified, color: Colors.blue, size: 18),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You and $targetName liked each other! Start the conversation right now.',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Keep Swiping', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ConversationsScreen()),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE91E63)),
-            child: const Text('Send Message', style: TextStyle(color: Colors.white)),
+          Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (matchId.isNotEmpty && targetUserId.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            matchId: matchId,
+                            recipientUser: ChatRecipient(
+                              id: targetUserId,
+                              name: targetName,
+                              avatarUrl: photoUrl,
+                              isVerified: isVerified,
+                            ),
+                          ),
+                        ),
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ConversationsScreen()),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.chat_bubble, size: 18),
+                  label: const Text('Send Message 💬', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE91E63),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Keep Swiping', style: TextStyle(color: Colors.grey, fontSize: 14)),
+              ),
+            ],
           ),
         ],
       ),

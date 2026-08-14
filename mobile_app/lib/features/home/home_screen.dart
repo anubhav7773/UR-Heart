@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../feed/feed_screen.dart';
 import '../chat/chat_screen.dart';
+import '../../screens/activity_screen.dart';
 import '../profile/profile_screen.dart';
 
 class MainHomeScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   final List<Widget> _pages = const [
     FeedScreen(),
     ConversationsScreen(),
+    ActivityScreen(),
     ProfileScreen(),
   ];
 
@@ -60,7 +62,12 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
               activeIcon: Icon(Icons.chat_bubble, color: Color(0xFFE91E63)),
-              label: 'Matches',
+              label: 'Chats',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.favorite_border),
+              activeIcon: Icon(Icons.favorite, color: Color(0xFFE91E63)),
+              label: 'Activity',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

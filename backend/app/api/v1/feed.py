@@ -325,6 +325,7 @@ async def swipe_action(
                         )
                     )
                 )
+                existing_match = match_res.scalars().first()
                 match_id_str = ""
                 if existing_match:
                     match_id_str = str(existing_match.id)
@@ -366,8 +367,8 @@ async def swipe_action(
                         body=f"You and {target_name} liked each other!",
                         data={"type": "match", "match_id": match_id_str}
                     )
-        except Exception:
-            is_match = True
+        except Exception as e:
+            print(f"[SWIPE ERROR] {e}")
 
     current_skips = _mock_user_skip_counts.get(current_user_id, 19)
     trigger_ad = False
@@ -382,6 +383,7 @@ async def swipe_action(
 
     swipe_data = SwipeData(
         is_match=is_match,
+        match_id=match_id_str if is_match else None,
         persistent_skip_count=_mock_user_skip_counts.get(current_user_id, 0),
         trigger_interstitial_ad=trigger_ad,
         ad_unit_id=ad_unit,

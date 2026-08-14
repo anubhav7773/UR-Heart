@@ -66,3 +66,54 @@ async def get_current_user_id(
         )
 
     return user_id
+
+
+SUPER_ADMIN_EMAIL = "kshtriyaanubhav9120@gmail.com"
+
+
+async def get_current_user(
+    current_user_id: str = Depends(get_current_user_id),
+) -> str:
+    return current_user_id
+
+
+async def admin_required(
+    current_user_id: str = Depends(get_current_user_id),
+) -> str:
+    """
+    FastAPI dependency for verifying that the current authenticated user has admin privileges.
+    Validated by checking super admin email or admin flag against database.
+    """
+    import uuid
+    from sqlalchemy import select
+    from app.core.database import AsyncSessionLocal
+    from app.models.orm import User
+
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID token."
+        )
+
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(select(User).where(User.id == user_uuid))
+        user = res.scalars().first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found."
+            )
+
+        is_super_admin = bool(user.email and user.email.lower().strip() == SUPER_ADMIN_EMAIL.lower())
+        is_admin_flag = bool(getattr(user, "is_admin", False))
+
+        if not (is_super_admin or is_admin_flag):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin privileges required."
+            )
+
+    return current_user_id
+
