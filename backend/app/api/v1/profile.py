@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime, timezone
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Query, Body
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Query, Body, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -424,25 +424,13 @@ async def verify_video_profile(
     )
 
 
-@router.post("/unblock")
-@router.delete("/block/{target_id}")
-async def unblock_user(
-    target_id: Optional[str] = Query(default=None),
-    payload: Optional[dict] = Body(default=None),
-    current_user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Unblocks a target user to restore visibility in matches and feed.
-    Accepts target_id both via Query parameter and JSON body payload.
-    """
-    unblock_target = target_id or (payload.get("target_id") if isinstance(payload, dict) else None) or (payload.get("reported_id") if isinstance(payload, dict) else None)
-    if not unblock_target:
+async def _execute_unblock_logic(current_user_id: str, target_id_str: str, db: AsyncSession) -> dict:
+    if not target_id_str:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id parameter is required.")
 
     try:
         blocker_uuid = uuid.UUID(current_user_id)
-        target_uuid = uuid.UUID(unblock_target)
+        target_uuid = uuid.UUID(target_id_str)
 
         res = await db.execute(
             select(BlockedUser).where(
@@ -454,13 +442,67 @@ async def unblock_user(
         if blocked_entry:
             await db.delete(blocked_entry)
             await db.commit()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid target_id UUID format.")
     except Exception:
         await db.rollback()
 
+    return {"status": "success", "target_id": target_id_str}
+
+
+@router.post("/unblock/{target_id}")
+async def unblock_user_by_path(
+    target_id: str = Path(..., description="The ID of the user to unblock"),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unblocks a target user by path parameter /profile/unblock/{target_id}.
+    """
+    data = await _execute_unblock_logic(current_user_id, target_id, db)
     return APIResponse(
         success=True,
         message="User unblocked successfully.",
-        data={"status": "success", "target_id": unblock_target}
+        data=data
+    )
+
+
+@router.post("/unblock")
+async def unblock_user(
+    target_id: Optional[str] = Query(default=None),
+    payload: Optional[dict] = Body(default=None),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unblocks a target user via query parameter ?target_id=... or JSON body {"target_id": "..."}.
+    """
+    unblock_target = target_id or (payload.get("target_id") if isinstance(payload, dict) else None) or (payload.get("reported_id") if isinstance(payload, dict) else None)
+    if not unblock_target:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id parameter is required.")
+
+    data = await _execute_unblock_logic(current_user_id, unblock_target, db)
+    return APIResponse(
+        success=True,
+        message="User unblocked successfully.",
+        data=data
+    )
+
+
+@router.delete("/block/{target_id}")
+async def delete_block_user(
+    target_id: str = Path(..., description="The ID of the user to unblock"),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unblocks a target user via DELETE /profile/block/{target_id}.
+    """
+    data = await _execute_unblock_logic(current_user_id, target_id, db)
+    return APIResponse(
+        success=True,
+        message="User unblocked successfully.",
+        data=data
     )
 
 
