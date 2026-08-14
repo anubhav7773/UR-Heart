@@ -42,6 +42,13 @@ class SwipeActionEnum(str, enum.Enum):
     dm = "dm"
 
 
+class VerificationStatusEnum(str, enum.Enum):
+    UNVERIFIED = "UNVERIFIED"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class SachetPlanTypeEnum(str, enum.Enum):
     chai_invite = "chai_invite"  # ₹9
     photo_pass = "photo_pass"    # ₹19
@@ -88,7 +95,12 @@ class User(Base):
     premium_expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    verification_status: Mapped[VerificationStatusEnum] = mapped_column(
+        SQLEnum(VerificationStatusEnum, name="verification_status_enum", native_enum=False, values_callable=lambda obj: [e.value for e in obj]),
+        default=VerificationStatusEnum.UNVERIFIED,
+        nullable=False,
+    )
     verification_video_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_online: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -92,6 +92,7 @@ from app.api.v1.intent import router as intent_router
 from app.api.v1.ads import router as ads_router
 from app.api.v1.payments import router as payments_router
 from app.api.v1.safety import router as safety_router
+from app.api.v1.verification import router as verification_router
 
 api_v1_prefix = settings.API_V1_STR
 app.include_router(auth_router, prefix=api_v1_prefix)
@@ -104,6 +105,8 @@ app.include_router(intent_router, prefix=api_v1_prefix)
 app.include_router(ads_router, prefix=api_v1_prefix)
 app.include_router(payments_router, prefix=api_v1_prefix)
 app.include_router(safety_router, prefix=api_v1_prefix)
+app.include_router(verification_router, prefix=api_v1_prefix)
+app.include_router(verification_router, prefix="")
 
 
 @app.get("/", status_code=200, tags=["Root"])

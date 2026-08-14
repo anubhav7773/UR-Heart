@@ -118,4 +118,58 @@ class ProfileService {
       options: options,
     );
   }
+
+  /// Uploads user's 5-second selfie video for verification (`POST /api/v1/verification/upload-video`)
+  Future<Map<String, dynamic>?> uploadVerificationVideo(File videoFile) async {
+    final token = await _getAuthToken();
+    final fileName = videoFile.path.split('/').last.split('\\').last;
+    final formData = FormData.fromMap({
+      "file": await MultipartFile.fromFile(videoFile.path, filename: fileName),
+    });
+
+    final options = Options(
+      headers: {
+        if (token != null && token.isNotEmpty)
+          'Authorization': 'Bearer $token',
+      },
+    );
+
+    final response = await _dio.post(
+      '/verification/upload-video',
+      data: formData,
+      options: options,
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = response.data;
+      if (data is Map<String, dynamic> && data['data'] != null) {
+        return data['data'] as Map<String, dynamic>;
+      }
+    }
+    return null;
+  }
+
+  /// Fetches verification status (`GET /api/v1/verification/status`)
+  Future<Map<String, dynamic>?> getVerificationStatus() async {
+    final token = await _getAuthToken();
+    final options = Options(
+      headers: {
+        if (token != null && token.isNotEmpty)
+          'Authorization': 'Bearer $token',
+      },
+    );
+
+    final response = await _dio.get(
+      '/verification/status',
+      options: options,
+    );
+
+    if (response.statusCode == 200) {
+      final data = response.data;
+      if (data is Map<String, dynamic> && data['data'] != null) {
+        return data['data'] as Map<String, dynamic>;
+      }
+    }
+    return null;
+  }
 }

@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import 'profile_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -20,9 +22,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isVerified = false;
+  String _verificationStatus = 'UNVERIFIED';
   bool _isUploadingVideo = false;
 
   final ImagePicker _picker = ImagePicker();
+  final ProfileService _profileService = ProfileService();
 
   @override
   void initState() {
@@ -47,7 +51,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _nameController.text = data['full_name'] ?? '';
         _bioController.text = data['bio'] ?? '';
         _areaController.text = data['area_name'] ?? '';
-        _isVerified = data['is_verified'] ?? false;
+        _isVerified = data['is_verified'] == true;
+        _verificationStatus = (data['verification_status'] ?? 'UNVERIFIED').toString().toUpperCase();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -63,28 +68,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final XFile? video = await _picker.pickVideo(
         source: ImageSource.camera,
         maxDuration: const Duration(seconds: 10),
+        preferredCameraDevice: CameraDevice.front,
       );
 
       if (video != null) {
         setState(() => _isUploadingVideo = true);
 
-        // Upload verification video payload to backend
-        final response = await ApiClient.instance.dio.post('/profile/verify-video', data: {
-          'video_url': 'https://storage.urheart.com/videos/${DateTime.now().millisecondsSinceEpoch}_verify.mp4',
-        });
+        final res = await _profileService.uploadVerificationVideo(File(video.path));
 
         if (mounted) {
-          if (response.statusCode == 200) {
-            setState(() {
-              _isVerified = true;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Video Verification Submitted! Verified Blue Tick Active ✓'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
+          setState(() {
+            _verificationStatus = 'PENDING';
+            _isVerified = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res?['message'] ?? 'Video Verification Submitted! Status is now PENDING review.'),
+              backgroundColor: Colors.green,
+            ),
+          );
         }
       }
     } catch (e) {
@@ -179,11 +181,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  _isVerified ? 'Profile Verified ✓' : 'Get Verified Blue Tick',
+                                  _isVerified
+                                      ? 'Profile Verified ✓'
+                                      : _verificationStatus == 'PENDING'
+                                          ? 'Verification Under Review ⏳'
+                                          : _verificationStatus == 'REJECTED'
+                                              ? 'Verification Rejected ❌'
+                                              : 'Get Verified Blue Tick',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: _isVerified ? Colors.blueAccent : Colors.white,
+                                    color: _isVerified
+                                        ? Colors.blueAccent
+                                        : _verificationStatus == 'PENDING'
+                                            ? Colors.amber
+                                            : _verificationStatus == 'REJECTED'
+                                                ? Colors.redAccent
+                                                : Colors.white,
                                   ),
                                 ),
                               ),
@@ -192,8 +206,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 8),
                           Text(
                             _isVerified
-                                ? 'Your identity is verified. Your Blue Tick badge is visible on your profile and chat.'
-                                : 'Record a 5-second selfie video to unlock the official Verified Blue Tick badge.',
+                                ? 'Your identity is verified. Your Blue Tick badge is visible on your profile and discovery cards.'
+                                : _verificationStatus == 'PENDING'
+                                    ? 'Your selfie video has been submitted and is currently being reviewed by our moderation team (takes up to 24h).'
+                                    : _verificationStatus == 'REJECTED'
+                                        ? 'Your previous selfie video did not pass community quality guidelines. Please record a clearer video.'
+                                        : 'Record a 5-second selfie video to unlock the official Verified Blue Tick badge.',
                             style: const TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
                           ),
                           const SizedBox(height: 14),
@@ -204,7 +222,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               icon: _isUploadingVideo
                                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                                   : Icon(_isVerified ? Icons.videocam_outlined : Icons.camera_front, size: 20),
-                              label: Text(_isVerified ? 'Re-record Verification Video' : 'Record 5s Selfie Video 📹'),
+                              label: Text(_isVerified
+                                  ? 'Re-record Verification Video'
+                                  : _verificationStatus == 'PENDING'
+                                      ? 'Re-upload Verification Video'
+                                      : 'Record 5s Selfie Video 📹'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _isVerified ? Colors.blue.shade800 : AppTheme.primaryColor,
                                 padding: const EdgeInsets.symmetric(vertical: 12),

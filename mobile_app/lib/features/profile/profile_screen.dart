@@ -324,6 +324,211 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _startVideoVerification() async {
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: 10),
+        preferredCameraDevice: CameraDevice.front,
+      );
+
+      if (video != null) {
+        setState(() => _isLoading = true);
+        final File videoFile = File(video.path);
+        final res = await _profileService.uploadVerificationVideo(videoFile);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res?['message'] ?? 'Selfie video uploaded! Verification status is now PENDING review.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Video verification notice: ${e.toString()}'),
+            backgroundColor: Colors.amber[800],
+          ),
+        );
+      }
+    } finally {
+      _fetchProfile();
+    }
+  }
+
+  Widget _buildVerificationCard(bool isVerified, String verificationStatus) {
+    if (isVerified || verificationStatus == 'APPROVED') {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.blue.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue.withValues(alpha: 0.4)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.verified_user, color: Colors.blue, size: 28),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Profile Verified',
+                    style: TextStyle(fontSize: 14, color: Colors.blue, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Your identity & selfie video are approved with the Blue Badge.',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (verificationStatus == 'PENDING') {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.hourglass_top, color: Colors.amber, size: 28),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Verification Under Review',
+                    style: TextStyle(fontSize: 14, color: Colors.amber, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Your selfie video has been submitted. Moderation review takes up to 24h.',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (verificationStatus == 'REJECTED') {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.redAccent, size: 28),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Verification Rejected',
+                        style: TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Your selfie video did not pass clarity guidelines. Please record again.',
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _startVideoVerification,
+                icon: const Icon(Icons.videocam, size: 18),
+                label: const Text('Record Selfie Video Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE91E63),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // UNVERIFIED
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFFE91E63).withValues(alpha: 0.2),
+              Colors.deepPurple.withValues(alpha: 0.2),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.verified, color: Color(0xFFE91E63), size: 26),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Get Verified & Stand Out',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Record a quick 5-second selfie video to earn the blue checkmark badge & get 3x more matches!',
+              style: TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _startVideoVerification,
+                icon: const Icon(Icons.videocam, size: 18),
+                label: const Text('Verify Now (5-Sec Selfie)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE91E63),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -336,11 +541,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final photos = (_profileData?['photos'] as List<dynamic>?) ?? [];
     final String mainPhoto = photos.isNotEmpty ? photos.first as String : '';
     final String fullName = _profileData?['full_name'] ?? 'RuralHeart User';
-    final int age = _profileData?['age'] ?? 22;
+    final int? age = _profileData?['age'];
     final String bio = _profileData?['bio'] ?? 'No bio added yet.';
     final String gender = (_profileData?['gender'] ?? 'male').toString().toUpperCase();
     final String areaName = _profileData?['area_name'] ?? 'Ayodhya';
     final String intent = _profileData?['intent'] ?? 'casual';
+    final bool isVerified = _profileData?['is_verified'] == true;
+    final String verificationStatus = (_profileData?['verification_status'] ?? 'UNVERIFIED').toString().toUpperCase();
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -384,7 +591,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               width: 130,
                               height: 130,
                               errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(Icons.person, size: 70, color: Colors.grey),
+                                   const Icon(Icons.person, size: 70, color: Colors.grey),
                             )
                           : const Icon(Icons.person, size: 70, color: Colors.grey),
                     ),
@@ -409,16 +616,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // User Name & Verified Badge
+            // User Name & Verified Badge (Only if verified)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  '$fullName, $age',
+                  age != null && age > 0 ? '$fullName, $age' : fullName,
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
-                const SizedBox(width: 6),
-                const Icon(Icons.verified, color: Colors.blue, size: 22),
+                if (isVerified) ...[
+                  const SizedBox(width: 6),
+                  const Icon(Icons.verified, color: Colors.blue, size: 22),
+                ],
               ],
             ),
             const SizedBox(height: 6),
@@ -439,7 +648,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Video Verification Status Card
+            _buildVerificationCard(isVerified, verificationStatus),
+            const SizedBox(height: 16),
 
             // Intent Goal Badge Card
             Container(

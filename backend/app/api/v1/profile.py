@@ -84,6 +84,9 @@ async def get_user_profile(
         "longitude": float(user.longitude) if user.longitude is not None else None,
         "photos": photo_urls,
         "is_profile_complete": bool(len(photo_urls) >= 1),
+        "is_verified": bool(user.is_verified and getattr(user, 'verification_status', None) and user.verification_status.value == "APPROVED"),
+        "verification_status": user.verification_status.value if getattr(user, 'verification_status', None) else "UNVERIFIED",
+        "verification_video_url": user.verification_video_url,
     }
 
     return APIResponse(

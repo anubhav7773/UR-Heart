@@ -437,7 +437,7 @@ class _FeedScreenState extends State<FeedScreen> {
         age: (profile['age'] as num?)?.toInt() ?? 0,
         distanceLabel: (profile['distance_label'] ?? 'Location unavailable').toString(),
         photos: photos,
-        isVerified: profile['is_verified'] ?? profile['is_verified_local'] ?? false,
+        isVerified: profile['is_verified'] == true,
       ),
     );
   }
@@ -509,8 +509,8 @@ class _FeedScreenState extends State<FeedScreen> {
     final String? imageUrl = (photosList != null && photosList.isNotEmpty) ? photosList.first as String? : null;
     final String targetUserId = profile?['user_id'] ?? '';
     final String firstName = profile?['first_name'] ?? 'User';
-    final bool isVerifiedLocal = profile?['is_verified_local'] ?? true;
-    final String distanceLabel = profile?['distance_label'] ?? 'Nearby';
+    final bool isVerified = profile?['is_verified'] == true;
+    final String distanceLabel = profile?['distance_label'] ?? (profile?['distance_km'] != null ? '${profile!['distance_km']} km away' : 'Nearby');
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -649,7 +649,7 @@ class _FeedScreenState extends State<FeedScreen> {
                               right: 16,
                               child: Row(
                                 children: [
-                                  if (isVerifiedLocal)
+                                  if (isVerified)
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
@@ -741,8 +741,10 @@ class _FeedScreenState extends State<FeedScreen> {
                                             color: Colors.white,
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        const Icon(Icons.verified, color: Colors.blue, size: 22),
+                                        if (isVerified) ...[
+                                          const SizedBox(width: 8),
+                                          const Icon(Icons.verified, color: Colors.blue, size: 22),
+                                        ],
                                       ],
                                     ),
                                     const SizedBox(height: 4),

@@ -1,3 +1,4 @@
+import math
 import uuid
 from datetime import date
 from typing import List, Optional
@@ -18,7 +19,8 @@ from app.models.orm import (
     BlockedUser,
     UserReport,
     SwipeActionEnum as ORMSwipeActionEnum,
-    GenderEnum as ORMGenderEnum
+    GenderEnum as ORMGenderEnum,
+    VerificationStatusEnum as ORMVerificationStatusEnum,
 )
 from app.models.schemas import (
     APIResponse,
@@ -30,6 +32,7 @@ from app.models.schemas import (
     SwipeData,
     IntentEnum,
     SwipeActionEnum,
+    VerificationStatusEnum,
     calculate_dynamic_age,
 )
 from app.services.geo_engine import GeoEngineService
@@ -47,6 +50,20 @@ def calculate_age(born: Optional[date]) -> Optional[int]:
         return None
     today = date.today()
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
+def compute_distance_km(lat1, lon1, lat2, lon2) -> Optional[float]:
+    if None in (lat1, lon1, lat2, lon2):
+        return None
+    try:
+        R = 6371.0  # Earth radius in KM
+        dlat = math.radians(float(lat2) - float(lat1))
+        dlon = math.radians(float(lon2) - float(lon1))
+        a = math.sin(dlat / 2)**2 + math.cos(math.radians(float(lat1))) * math.cos(math.radians(float(lat2))) * math.sin(dlon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return round(R * c, 1)
+    except Exception:
+        return None
 
 
 @router.get("", response_model=APIResponse[FeedData])
@@ -134,20 +151,27 @@ async def get_feed(
             if user_age is not None and (user_age < min_age or user_age > max_age):
                 continue
 
-            # Calculate distance if coordinates exist
+            # Calculate accurate Haversine distance
             dist_km = None
             if user_lat is not None and user_lng is not None and user.latitude is not None and user.longitude is not None:
                 cand_lat = float(user.latitude)
                 cand_lng = float(user.longitude)
-                dist_km = GeoEngineService.calculate_haversine_distance(user_lat, user_lng, cand_lat, cand_lng)
-                if dist_km > effective_radius and len(profile_cards) >= limit:
+                dist_km = compute_distance_km(user_lat, user_lng, cand_lat, cand_lng)
+                if dist_km is not None and dist_km > effective_radius and len(profile_cards) >= limit:
                     continue
 
-            dist_label = GeoEngineService.obfuscate_distance(dist_km) if dist_km is not None else "Nearby"
+            if dist_km is not None:
+                dist_label = "< 1 km away" if dist_km < 1.0 else f"{dist_km} km away"
+            else:
+                dist_label = "Nearby"
+
             photos = [p.photo_url for p in user.photos] if user.photos else []
             first_name = user.full_name.split()[0] if user.full_name else "User"
             full_name = user.full_name if user.full_name else "User"
-            is_female = user.gender == ORMGenderEnum.female
+            
+            # Strict verification badge check: approved only
+            v_status_val = user.verification_status.value if getattr(user, 'verification_status', None) else "UNVERIFIED"
+            is_approved = bool(user.is_verified and getattr(user, 'verification_status', None) == ORMVerificationStatusEnum.APPROVED)
 
             profile_cards.append(
                 ProfileCardData(
@@ -156,13 +180,15 @@ async def get_feed(
                     full_name=full_name,
                     age=user_age,
                     date_of_birth=user.dob,
+                    distance_km=dist_km,
                     distance_label=dist_label,
                     bio=user.bio or "Looking for genuine connection on UR Heart.",
                     area_name=user.area_name or "Ayodhya Region",
                     intent=IntentEnum(user.intent.value) if user.intent else IntentEnum.CASUAL,
                     photos=photos,
-                    is_verified=bool(user.is_verified),
-                    is_verified_local=is_female or True,
+                    is_verified=is_approved,
+                    verification_status=VerificationStatusEnum(v_status_val),
+                    is_verified_local=is_approved,
                 )
             )
             added_user_ids.add(user.id)
@@ -187,6 +213,20 @@ async def get_feed(
                 f_photos = [p.photo_url for p in fallback_user.photos] if fallback_user.photos else []
                 f_first_name = fallback_user.full_name.split()[0] if fallback_user.full_name else "User"
                 f_full_name = fallback_user.full_name if fallback_user.full_name else "User"
+
+                # Calculate fallback distance if coordinates available
+                f_dist_km = None
+                if user_lat is not None and user_lng is not None and fallback_user.latitude is not None and fallback_user.longitude is not None:
+                    f_dist_km = compute_distance_km(user_lat, user_lng, float(fallback_user.latitude), float(fallback_user.longitude))
+
+                if f_dist_km is not None:
+                    f_dist_label = "< 1 km away" if f_dist_km < 1.0 else f"{f_dist_km} km away"
+                else:
+                    f_dist_label = "Nearby"
+
+                f_status_val = fallback_user.verification_status.value if getattr(fallback_user, 'verification_status', None) else "UNVERIFIED"
+                f_is_approved = bool(fallback_user.is_verified and getattr(fallback_user, 'verification_status', None) == ORMVerificationStatusEnum.APPROVED)
+
                 profile_cards.append(
                     ProfileCardData(
                         user_id=str(fallback_user.id),
@@ -194,13 +234,15 @@ async def get_feed(
                         full_name=f_full_name,
                         age=f_age,
                         date_of_birth=fallback_user.dob,
-                        distance_label="Nearby",
+                        distance_km=f_dist_km,
+                        distance_label=f_dist_label,
                         bio=fallback_user.bio or "Looking for genuine connection on UR Heart.",
                         area_name=fallback_user.area_name or "Ayodhya Region",
                         intent=IntentEnum(fallback_user.intent.value) if fallback_user.intent else IntentEnum.CASUAL,
                         photos=f_photos,
-                        is_verified=bool(fallback_user.is_verified),
-                        is_verified_local=True,
+                        is_verified=f_is_approved,
+                        verification_status=VerificationStatusEnum(f_status_val),
+                        is_verified_local=f_is_approved,
                     )
                 )
                 added_user_ids.add(fallback_user.id)

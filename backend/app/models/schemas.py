@@ -44,6 +44,13 @@ class SwipeActionEnum(str, Enum):
     DM = "dm"
 
 
+class VerificationStatusEnum(str, Enum):
+    UNVERIFIED = "UNVERIFIED"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class AdEventTypeEnum(str, Enum):
     IMPRESSION = "impression"
     CLICK = "click"
@@ -308,6 +315,8 @@ class UserRead(BaseModel):
     village_pin_code: Optional[str] = None
     is_premium: bool = False
     is_verified: bool = False
+    verification_status: VerificationStatusEnum = VerificationStatusEnum.UNVERIFIED
+    verification_video_url: Optional[str] = None
     is_active: bool = True
     photos: List[PhotoRead] = []
 
@@ -321,13 +330,15 @@ class ProfileCardData(BaseModel):
     full_name: Optional[str] = None
     age: Optional[int] = None
     date_of_birth: Optional[date] = None
+    distance_km: Optional[float] = None
     distance_label: str
     bio: str
     area_name: str
     intent: IntentEnum
     photos: List[str]
     is_verified: bool = False
-    is_verified_local: bool = True
+    verification_status: VerificationStatusEnum = VerificationStatusEnum.UNVERIFIED
+    is_verified_local: bool = False
 
 
 class AdConfigSlot(BaseModel):
@@ -507,3 +518,16 @@ class VerifyPaymentData(BaseModel):
     verified: bool = True
     plan_type: str
     message: str = "Payment verified successfully."
+
+
+# 16. Video Verification Schemas
+class VideoVerificationResponse(BaseModel):
+    verification_status: VerificationStatusEnum
+    verification_video_url: Optional[str] = None
+    is_verified: bool = False
+    message: str
+
+
+class AdminVerificationReviewRequest(BaseModel):
+    action: str = Field(..., description="'APPROVE' or 'REJECT'")
+
