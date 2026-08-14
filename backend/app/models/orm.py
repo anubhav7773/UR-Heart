@@ -58,7 +58,16 @@ class User(Base):
     phone_number: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    dob: Mapped[date] = mapped_column(Date, nullable=False)
+    dob: Mapped[Optional[date]] = mapped_column(Date, nullable=True, default=None)
+
+    @property
+    def date_of_birth(self) -> Optional[date]:
+        return self.dob
+
+    @date_of_birth.setter
+    def date_of_birth(self, value: Optional[date]) -> None:
+        self.dob = value
+
     gender: Mapped[GenderEnum] = mapped_column(
         SQLEnum(GenderEnum, name="gender_type"), nullable=False
     )

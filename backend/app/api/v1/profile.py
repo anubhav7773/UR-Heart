@@ -65,13 +65,14 @@ async def get_user_profile(
 
     photos = user.photos if user.photos else []
     today = date.today()
-    age = today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day)) if user.dob else 22
+    age = today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day)) if user.dob else None
     photo_urls = [p.photo_url for p in photos]
 
     profile_data = {
         "user_id": str(user.id),
         "full_name": user.full_name or "UR Heart User",
-        "dob": user.dob.isoformat() if user.dob else "2000-01-01",
+        "dob": user.dob.isoformat() if user.dob else None,
+        "date_of_birth": user.dob.isoformat() if user.dob else None,
         "age": age,
         "gender": user.gender.value if user.gender else "male",
         "interested_in": user.interested_in.value if user.interested_in else "female",
@@ -199,7 +200,7 @@ async def complete_profile(
         user = None
 
     full_name = payload.full_name if payload.full_name is not None else (user.full_name if user else "User")
-    dob_val = payload.dob if payload.dob is not None else (user.dob if user else date(2000, 1, 1))
+    dob_val = payload.dob or payload.date_of_birth or (user.dob if user else None)
     gender_val = ORMGenderEnum(payload.gender.value) if payload.gender else (user.gender if user else ORMGenderEnum.male)
     interested_val = ORMGenderEnum(payload.interested_in.value) if payload.interested_in else (user.interested_in if user else ORMGenderEnum.female)
     intent_val = ORMIntentEnum(payload.intent.value) if payload.intent else (user.intent if user else ORMIntentEnum.casual)
@@ -227,7 +228,8 @@ async def complete_profile(
         db.add(user)
     else:
         user.full_name = full_name
-        user.dob = dob_val
+        if dob_val is not None:
+            user.dob = dob_val
         user.gender = gender_val
         user.interested_in = interested_val
         user.intent = intent_val

@@ -24,11 +24,54 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final TextEditingController _areaController = TextEditingController();
   final TextEditingController _pinController = TextEditingController();
 
-  final DateTime _selectedDob = DateTime(2002, 1, 1);
-  final String _gender = 'male';
-  final String _interestedIn = 'female';
+  DateTime _selectedDob = DateTime(2001, 1, 1);
+  String _gender = 'male';
+  String _interestedIn = 'female';
   String _intent = 'casual';
   bool _isSubmitting = false;
+
+  int get _computedAge {
+    final now = DateTime.now();
+    int age = now.year - _selectedDob.year;
+    if (now.month < _selectedDob.month || (now.month == _selectedDob.month && now.day < _selectedDob.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final now = DateTime.now();
+    final lastDate = DateTime(now.year - 18, now.month, now.day);
+    final firstDate = DateTime(1940);
+    final initialDate = _selectedDob.isAfter(lastDate) ? lastDate : _selectedDob;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'Select Date of Birth (18+ only)',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFFE91E63),
+              onPrimary: Colors.white,
+              surface: Color(0xFF1E1E1E),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDob = picked;
+      });
+    }
+  }
 
   final List<String?> _photoPaths = [
     null,
@@ -82,6 +125,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _submitOnboarding() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_computedAge < 18) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be at least 18 years old to join UR Heart.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     final filledPhotos = _photoPaths.where((p) => p != null && p.isNotEmpty).toList();
     if (filledPhotos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -96,9 +149,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      final dobStr = _selectedDob.toIso8601String().split('T').first;
       final payload = {
         'full_name': _nameController.text.trim(),
-        'dob': _selectedDob.toIso8601String().split('T').first,
+        'dob': dobStr,
+        'date_of_birth': dobStr,
         'gender': _gender,
         'interested_in': _interestedIn,
         'intent': _intent,
@@ -277,6 +332,91 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
+                InkWell(
+                  onTap: _pickDateOfBirth,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[800]!),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Date of Birth (18+ only)',
+                              style: TextStyle(color: Colors.grey, fontSize: 12),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_selectedDob.day.toString().padLeft(2, '0')}/${_selectedDob.month.toString().padLeft(2, '0')}/${_selectedDob.year}  (Age: $_computedAge)',
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        const Icon(Icons.calendar_month, color: Color(0xFFE91E63)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'I am',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('👨 Male'),
+                      selected: _gender == 'male',
+                      selectedColor: const Color(0xFFE91E63),
+                      onSelected: (sel) => setState(() => _gender = 'male'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('👩 Female'),
+                      selected: _gender == 'female',
+                      selectedColor: const Color(0xFFE91E63),
+                      onSelected: (sel) => setState(() => _gender = 'female'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('✨ Other'),
+                      selected: _gender == 'other',
+                      selectedColor: const Color(0xFFE91E63),
+                      onSelected: (sel) => setState(() => _gender = 'other'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Looking for',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('👩 Women'),
+                      selected: _interestedIn == 'female',
+                      selectedColor: const Color(0xFFE91E63),
+                      onSelected: (sel) => setState(() => _interestedIn = 'female'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('👨 Men'),
+                      selected: _interestedIn == 'male',
+                      selectedColor: const Color(0xFFE91E63),
+                      onSelected: (sel) => setState(() => _interestedIn = 'male'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
                 TextFormField(
                   controller: _bioController,
                   maxLines: 3,

@@ -63,6 +63,8 @@ async def init_db() -> None:
             "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_msg_id VARCHAR(64);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_video_url TEXT;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token VARCHAR(512);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS dob DATE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;",
         ]
         for query in migration_queries:
             try:

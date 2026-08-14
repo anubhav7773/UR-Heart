@@ -96,7 +96,7 @@ class _ProfileViewDialogState extends State<ProfileViewDialog> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '${widget.name}, ${widget.age}',
+                        widget.age > 0 ? '${widget.name}, ${widget.age}' : widget.name,
                         style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                       if (widget.isVerified) ...[

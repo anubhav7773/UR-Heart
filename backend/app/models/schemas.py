@@ -168,9 +168,17 @@ class PhotoInput(BaseModel):
             return 1
 
 
+def calculate_dynamic_age(born: Optional[date]) -> Optional[int]:
+    if not born:
+        return None
+    today = date.today()
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
 class CompleteProfileRequest(BaseModel):
     full_name: Optional[str] = None
     dob: Optional[date] = None
+    date_of_birth: Optional[date] = None
     gender: Optional[GenderEnum] = None
     interested_in: Optional[GenderEnum] = None
     intent: Optional[IntentEnum] = None
@@ -188,16 +196,16 @@ class CompleteProfileRequest(BaseModel):
             return "User"
         return str(v)
 
-    @field_validator("dob", mode="before")
+    @field_validator("dob", "date_of_birth", mode="before")
     @classmethod
     def validate_dob(cls, v):
         if not v or v == "":
-            return date(2000, 1, 1)
+            return None
         if isinstance(v, str):
             try:
                 return date.fromisoformat(v.split("T")[0])
             except Exception:
-                return date(2000, 1, 1)
+                return None
         return v
 
     @field_validator("gender", mode="before")
@@ -289,7 +297,9 @@ class PhotoRead(BaseModel):
 class UserRead(BaseModel):
     id: str
     full_name: str
-    dob: date
+    dob: Optional[date] = None
+    date_of_birth: Optional[date] = None
+    age: Optional[int] = None
     gender: GenderEnum
     interested_in: GenderEnum
     intent: IntentEnum
@@ -309,7 +319,8 @@ class ProfileCardData(BaseModel):
     user_id: str
     first_name: str
     full_name: Optional[str] = None
-    age: int
+    age: Optional[int] = None
+    date_of_birth: Optional[date] = None
     distance_label: str
     bio: str
     area_name: str

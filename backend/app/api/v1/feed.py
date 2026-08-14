@@ -3,7 +3,7 @@ from datetime import date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -30,6 +30,7 @@ from app.models.schemas import (
     SwipeData,
     IntentEnum,
     SwipeActionEnum,
+    calculate_dynamic_age,
 )
 from app.services.geo_engine import GeoEngineService
 from app.services.ad_engine import AdEngineService
@@ -41,7 +42,9 @@ router = APIRouter(prefix="/feed", tags=["Discovery Feed & Swiping Engine"])
 _mock_user_skip_counts = {}
 
 
-def calculate_age(born: date) -> int:
+def calculate_age(born: Optional[date]) -> Optional[int]:
+    if not born:
+        return None
     today = date.today()
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
@@ -62,10 +65,12 @@ async def get_feed(
 ):
     """
     Retrieves candidate cards from PostgreSQL based on discovery preference filters
-    (gender preference, age range, max distance) and active GPS location coordinates, sorted by nearest distance.
-    Returns HTTP 200 OK with empty cards array if no candidates are found or location is missing.
+    (gender preference, age range, max distance) and active GPS location coordinates.
+    Gracefully falls back to latest active users if location is unavailable or candidates are few.
     """
     profile_cards: List[ProfileCardData] = []
+    added_user_ids = set()
+
     try:
         user_uuid = uuid.UUID(current_user_id)
     except Exception:
@@ -76,15 +81,11 @@ async def get_feed(
     effective_radius = max(r_val, md_val)
 
     try:
-        # 0. Use live request coordinates, then the caller's persisted GPS fix.
+        # 0. Fetch caller user record
         self_res = await db.execute(select(User).where(User.id == user_uuid))
         self_user = self_res.scalars().first()
         user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else None)
         user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else None)
-
-        if user_lat is None or user_lng is None:
-            user_lat = GeoEngineService.SAKET_COLLEGE_LAT
-            user_lng = GeoEngineService.SAKET_COLLEGE_LON
 
         # 1. Fetch IDs already swiped by current user
         swiped_res = await db.execute(select(Swipe.swiped_id).where(Swipe.swiper_id == user_uuid))
@@ -102,56 +103,50 @@ async def get_feed(
         excluded_ids.update(reported_res1.scalars().all())
         excluded_ids.update(reported_res2.scalars().all())
 
-        latitude_param = bindparam("active_latitude", value=user_lat)
-        longitude_param = bindparam("active_longitude", value=user_lng)
-        distance_expression = 6371.0 * func.acos(
-            func.least(
-                1.0,
-                func.cos(func.radians(latitude_param))
-                * func.cos(func.radians(User.latitude))
-                * func.cos(func.radians(User.longitude) - func.radians(longitude_param))
-                + func.sin(func.radians(latitude_param)) * func.sin(func.radians(User.latitude)),
-            )
-        )
+        # Resolve gender filter
+        resolved_gender = None
+        if gender_preference and str(gender_preference).lower().strip() not in ("everyone", "all", "any", ""):
+            g_str = str(gender_preference).lower().strip()
+            if g_str in ("male", "m"):
+                resolved_gender = ORMGenderEnum.male
+            elif g_str in ("female", "f"):
+                resolved_gender = ORMGenderEnum.female
+
+        # 3. Primary Query: Active candidates
         stmt = (
             select(User)
             .where(User.is_active == True)
             .where(~User.id.in_(excluded_ids))
-            .where(User.latitude.is_not(None), User.longitude.is_not(None))
             .options(selectinload(User.photos))
-            .order_by(distance_expression.asc())
+            .order_by(User.created_at.desc())
         )
+        if resolved_gender:
+            stmt = stmt.where(User.gender == resolved_gender)
 
-        # Safely filter by gender preference
-        if gender_preference and str(gender_preference).lower().strip() not in ("everyone", "all", ""):
-            g_str = str(gender_preference).lower().strip()
-            if g_str in ("male", "m"):
-                stmt = stmt.where(User.gender == ORMGenderEnum.male)
-            elif g_str in ("female", "f"):
-                stmt = stmt.where(User.gender == ORMGenderEnum.female)
-
-        result = await db.execute(stmt.limit(limit * 5))
+        result = await db.execute(stmt.limit(limit * 3))
         db_users = result.scalars().all()
 
-        # Calculate distances & filter candidates
         for user in db_users:
-            user_age = calculate_age(user.dob) if user.dob else 22
-            if user_age < min_age or user_age > max_age:
+            if user.id in added_user_ids:
                 continue
 
-            if user.latitude is None or user.longitude is None:
-                continue
-            cand_lat = float(user.latitude)
-            cand_lng = float(user.longitude)
-            dist_km = GeoEngineService.calculate_haversine_distance(user_lat, user_lng, cand_lat, cand_lng)
-
-            if dist_km > effective_radius:
+            user_age = calculate_age(user.dob)
+            if user_age is not None and (user_age < min_age or user_age > max_age):
                 continue
 
+            # Calculate distance if coordinates exist
+            dist_km = None
+            if user_lat is not None and user_lng is not None and user.latitude is not None and user.longitude is not None:
+                cand_lat = float(user.latitude)
+                cand_lng = float(user.longitude)
+                dist_km = GeoEngineService.calculate_haversine_distance(user_lat, user_lng, cand_lat, cand_lng)
+                if dist_km > effective_radius and len(profile_cards) >= limit:
+                    continue
+
+            dist_label = GeoEngineService.obfuscate_distance(dist_km) if dist_km is not None else "Nearby"
             photos = [p.photo_url for p in user.photos] if user.photos else []
             first_name = user.full_name.split()[0] if user.full_name else "User"
             full_name = user.full_name if user.full_name else "User"
-            dist_label = GeoEngineService.obfuscate_distance(dist_km)
             is_female = user.gender == ORMGenderEnum.female
 
             profile_cards.append(
@@ -160,6 +155,7 @@ async def get_feed(
                     first_name=first_name,
                     full_name=full_name,
                     age=user_age,
+                    date_of_birth=user.dob,
                     distance_label=dist_label,
                     bio=user.bio or "Looking for genuine connection on UR Heart.",
                     area_name=user.area_name or "Ayodhya Region",
@@ -169,9 +165,50 @@ async def get_feed(
                     is_verified_local=is_female or True,
                 )
             )
+            added_user_ids.add(user.id)
             if len(profile_cards) >= limit:
                 break
-    except Exception:
+
+        # 4. Fallback Query: If fewer than limit cards, pull remaining active users
+        if len(profile_cards) < limit:
+            fallback_stmt = (
+                select(User)
+                .where(User.is_active == True)
+                .where(~User.id.in_(excluded_ids))
+                .options(selectinload(User.photos))
+                .order_by(User.created_at.desc())
+                .limit(limit * 2)
+            )
+            fallback_res = await db.execute(fallback_stmt)
+            for fallback_user in fallback_res.scalars().all():
+                if fallback_user.id in added_user_ids:
+                    continue
+                f_age = calculate_age(fallback_user.dob)
+                f_photos = [p.photo_url for p in fallback_user.photos] if fallback_user.photos else []
+                f_first_name = fallback_user.full_name.split()[0] if fallback_user.full_name else "User"
+                f_full_name = fallback_user.full_name if fallback_user.full_name else "User"
+                profile_cards.append(
+                    ProfileCardData(
+                        user_id=str(fallback_user.id),
+                        first_name=f_first_name,
+                        full_name=f_full_name,
+                        age=f_age,
+                        date_of_birth=fallback_user.dob,
+                        distance_label="Nearby",
+                        bio=fallback_user.bio or "Looking for genuine connection on UR Heart.",
+                        area_name=fallback_user.area_name or "Ayodhya Region",
+                        intent=IntentEnum(fallback_user.intent.value) if fallback_user.intent else IntentEnum.CASUAL,
+                        photos=f_photos,
+                        is_verified=bool(fallback_user.is_verified),
+                        is_verified_local=True,
+                    )
+                )
+                added_user_ids.add(fallback_user.id)
+                if len(profile_cards) >= limit:
+                    break
+
+    except Exception as e:
+        print(f"[FEED ERROR] Error generating feed for user {current_user_id}: {e}")
         await db.rollback()
 
     cards: List[FeedCardItem] = []
