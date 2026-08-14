@@ -41,9 +41,11 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
 
   Future<void> _unblockUser(String targetId, String name) async {
     try {
-      final response = await ApiClient.instance.dio.post('/profile/unblock', data: {
-        'target_id': targetId,
-      });
+      final response = await ApiClient.instance.dio.post(
+        '/profile/unblock',
+        queryParameters: {'target_id': targetId},
+        data: {'target_id': targetId},
+      );
 
       if (response.statusCode == 200) {
         setState(() {

@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime, timezone
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -427,17 +427,18 @@ async def verify_video_profile(
 @router.post("/unblock")
 @router.delete("/block/{target_id}")
 async def unblock_user(
-    target_id: Optional[str] = None,
-    payload: Optional[dict] = None,
+    target_id: Optional[str] = Query(default=None),
+    payload: Optional[dict] = Body(default=None),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Unblocks a target user to restore visibility in matches and feed.
+    Accepts target_id both via Query parameter and JSON body payload.
     """
-    unblock_target = target_id or (payload.get("target_id") if payload else None)
+    unblock_target = target_id or (payload.get("target_id") if isinstance(payload, dict) else None) or (payload.get("reported_id") if isinstance(payload, dict) else None)
     if not unblock_target:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id is required.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_id parameter is required.")
 
     try:
         blocker_uuid = uuid.UUID(current_user_id)
@@ -459,7 +460,7 @@ async def unblock_user(
     return APIResponse(
         success=True,
         message="User unblocked successfully.",
-        data={"target_id": unblock_target}
+        data={"status": "success", "target_id": unblock_target}
     )
 
 

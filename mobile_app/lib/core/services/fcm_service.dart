@@ -91,6 +91,10 @@ class FcmService {
     } catch (_) {}
   }
 
+  Future<void> onLoginSuccess() async {
+    await syncFcmToken();
+  }
+
   Future<void> _syncTokenToBackend(String token) async {
     try {
       final authToken = await StorageManager.instance.getAuthToken();
