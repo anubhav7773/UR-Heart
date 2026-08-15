@@ -324,6 +324,9 @@ class UserRead(BaseModel):
     voice_bio_url: Optional[str] = None
     voice_bio_duration_seconds: Optional[int] = 0
     is_active: bool = True
+    is_online: bool = False
+    last_seen: Optional[datetime] = None
+    last_active_at: Optional[datetime] = None
     photos: List[PhotoRead] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -349,6 +352,9 @@ class ProfileCardData(BaseModel):
     boosted_until: Optional[datetime] = None
     voice_bio_url: Optional[str] = None
     voice_bio_duration_seconds: Optional[int] = 0
+    is_online: bool = False
+    last_seen: Optional[datetime] = None
+    last_active_at: Optional[datetime] = None
 
 
 class AdConfigSlot(BaseModel):
@@ -439,7 +445,9 @@ class ChaiStatusData(BaseModel):
 
 
 class SendChaiInviteRequest(BaseModel):
-    receiver_id: str = Field(..., description="Target user ID to invite for tea")
+    receiver_id: Optional[str] = Field(None, description="Target user ID to invite for tea")
+    match_id: Optional[str] = Field(None, description="Match ID if sending invite from chat")
+    message: Optional[str] = Field("Chai date ke liye kab chalein? ☕", description="Invite message")
 
 
 class SendChaiInviteData(BaseModel):
@@ -448,7 +456,23 @@ class SendChaiInviteData(BaseModel):
     message: str = "₹9 Chai Invite sent successfully!"
 
 
-# 10. Safe WhatsApp Bridge Schemas
+# 10. Safe WhatsApp Bridge & Two-Way Consent Schemas
+class ChatConsentRequest(BaseModel):
+    share_whatsapp: bool = False
+    share_location: bool = False
+
+
+class ChatConsentStatusData(BaseModel):
+    whatsapp_unlocked: bool = False
+    location_unlocked: bool = False
+    my_whatsapp_consent: bool = False
+    my_location_consent: bool = False
+    partner_whatsapp_consent: bool = False
+    partner_location_consent: bool = False
+    partner_phone: Optional[str] = None
+    partner_maps_url: Optional[str] = None
+
+
 class WhatsAppBridgeStatusData(BaseModel):
     match_id: str
     mutual_message_count: int
@@ -485,6 +509,9 @@ class MatchRead(BaseModel):
     target_user_photo: str
     mutual_message_count: int = 0
     is_whatsapp_unlocked: bool = False
+    is_online: bool = False
+    last_seen: Optional[str] = None
+    last_active_at: Optional[str] = None
     last_message: Optional[str] = None
     updated_at: str
 

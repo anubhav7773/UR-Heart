@@ -95,11 +95,20 @@ async def init_db() -> None:
         -- Spatial Index
         CREATE INDEX IF NOT EXISTS idx_users_location_geom_gist ON users USING GIST (location_geom);
 
-        -- New columns for matches table (Safe WhatsApp double consent)
+        -- New columns for matches table (Safe WhatsApp & Location double consent)
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_whatsapp_consent BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_whatsapp_consent BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_location_consent BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_location_consent BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_whatsapp_unlocked BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_location_unlocked BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS mutual_message_count INT DEFAULT 0;
+
+        -- Performance Indexes
+        CREATE INDEX IF NOT EXISTS idx_messages_match_created ON chat_messages (match_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_swipes_swiper_swiped ON swipes (swiper_id, swiped_id);
+        CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users (last_seen DESC);
+        CREATE INDEX IF NOT EXISTS idx_matches_users ON matches (user1_id, user2_id);
 
         -- Chat messages table
         ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_msg_id VARCHAR(64);
@@ -156,7 +165,10 @@ async def init_db() -> None:
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_whatsapp_consent BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_whatsapp_consent BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_location_consent BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_location_consent BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_whatsapp_unlocked BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_location_unlocked BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS mutual_message_count INT DEFAULT 0;",
         "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_msg_id VARCHAR(64);",
         "ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP WITH TIME ZONE;",
@@ -166,6 +178,10 @@ async def init_db() -> None:
         "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS rewarded_claims_today INT DEFAULT 0;",
         "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS last_rewarded_claim_at TIMESTAMPTZ DEFAULT NULL;",
         "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();",
+        "CREATE INDEX IF NOT EXISTS idx_messages_match_created ON chat_messages (match_id, created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_swipes_swiper_swiped ON swipes (swiper_id, swiped_id);",
+        "CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users (last_seen DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_matches_users ON matches (user1_id, user2_id);",
     ]
 
     for query in individual_queries:

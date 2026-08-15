@@ -11,6 +11,7 @@ import '../chat/chat_screen.dart';
 import '../profile/profile_view_dialog.dart';
 import '../subscription/subscription_sheet.dart';
 import 'native_ad_card_widget.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -632,10 +633,14 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
               child: ClipOval(
                 child: photoUrl.isNotEmpty
-                    ? Image.network(
-                        photoUrl,
+                    ? CachedNetworkImage(
+                        imageUrl: photoUrl,
+                        memCacheWidth: 180,
+                        memCacheHeight: 180,
+                        maxWidthDiskCache: 360,
+                        maxHeightDiskCache: 360,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 48, color: Colors.grey),
+                        errorWidget: (_, __, ___) => const Icon(Icons.person, size: 48, color: Colors.grey),
                       )
                     : const Icon(Icons.person, size: 48, color: Colors.grey),
               ),
@@ -863,47 +868,49 @@ class _FeedScreenState extends State<FeedScreen> {
                             adUnitId: currentCard?['ad_config']?['ad_unit_id'] ?? 'ca-app-pub-5734148065484801/7497381449',
                           )
                         : (profile != null
-                            ? Container(
-                                clipBehavior: Clip.antiAlias,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(24),
-                                  color: Colors.grey[900],
-                                ),
-                                child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            // Network Image with Error and Loading Fallback Placeholders
-                            if (imageUrl != null && imageUrl.isNotEmpty)
-                              GestureDetector(
-                                onTap: () => _showProfileViewer(Map<String, dynamic>.from(profile as Map)),
-                                child: Image.network(
-                                imageUrl,
-                                fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Container(
+                            ? RepaintBoundary(
+                                child: Container(
+                                  clipBehavior: Clip.antiAlias,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(24),
                                     color: Colors.grey[900],
-                                    child: const Center(
-                                      child: CircularProgressIndicator(color: Color(0xFFE91E63)),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [Colors.grey[850]!, Colors.grey[900]!],
-                                      ),
-                                    ),
-                                    child: const Center(
-                                      child: Icon(Icons.person, size: 100, color: Colors.white24),
-                                    ),
-                                  );
-                                },
-                                ),
-                              )
+                                  ),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      // Cached Network Image with Error and Loading Fallback Placeholders
+                                      if (imageUrl != null && imageUrl.isNotEmpty)
+                                        GestureDetector(
+                                          onTap: () => _showProfileViewer(Map<String, dynamic>.from(profile as Map)),
+                                          child: CachedNetworkImage(
+                                            imageUrl: imageUrl,
+                                            memCacheWidth: 450,
+                                            memCacheHeight: 600,
+                                            maxWidthDiskCache: 800,
+                                            maxHeightDiskCache: 1200,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) => Container(
+                                              color: Colors.grey[900],
+                                              child: const Center(
+                                                child: CircularProgressIndicator(color: Color(0xFFE91E63)),
+                                              ),
+                                            ),
+                                            errorWidget: (context, url, error) {
+                                              return Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    begin: Alignment.topCenter,
+                                                    end: Alignment.bottomCenter,
+                                                    colors: [Colors.grey[850]!, Colors.grey[900]!],
+                                                  ),
+                                                ),
+                                                child: const Center(
+                                                  child: Icon(Icons.person, size: 100, color: Colors.white24),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        )
                             else
                               Container(
                                 color: Colors.grey[900],
@@ -1166,8 +1173,9 @@ class _FeedScreenState extends State<FeedScreen> {
                             ),
                           ],
                         ),
-                      )
-                    : Container()))
+                      ),
+                    )
+                  : Container()))
                     : Center(
                         child: SingleChildScrollView(
                           child: Container(

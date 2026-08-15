@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/security/flutter_windowmanager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_client.dart';
@@ -11,6 +12,7 @@ import '../../core/theme/app_theme.dart';
 import '../subscription/subscription_sheet.dart';
 import 'chat_provider.dart';
 import 'message_bubble.dart';
+import 'widgets/consent_dialog.dart';
 
 class ChatMessage {
   final String id;
@@ -47,15 +49,28 @@ class ChatRecipient {
   final String name;
   final String avatarUrl;
   final bool isVerified;
+  final bool isOnline;
+  final DateTime? lastActiveAt;
 
   const ChatRecipient({
     required this.id,
     required this.name,
     this.avatarUrl = '',
     this.isVerified = false,
+    this.isOnline = false,
+    this.lastActiveAt,
   });
 
   factory ChatRecipient.fromConversation(Map<String, dynamic> conversation) {
+    DateTime? lastActive;
+    final lastSeenStr = conversation['last_active_at'] ?? conversation['last_seen'];
+    if (lastSeenStr != null) {
+      try {
+        lastActive = DateTime.parse(lastSeenStr.toString()).toLocal();
+      } catch (_) {}
+    }
+    final bool isOnline = conversation['is_online'] == true;
+
     return ChatRecipient(
       id: (conversation['target_user_id'] ?? conversation['target_id'] ?? '').toString(),
       name: (conversation['target_user_name'] ??
@@ -69,16 +84,48 @@ class ChatRecipient {
               '')
           .toString(),
       isVerified: conversation['is_verified'] ?? conversation['is_verified_local'] ?? false,
+      isOnline: isOnline,
+      lastActiveAt: lastActive,
     );
   }
 
-  ChatRecipient copyWith({String? name, String? avatarUrl, bool? isVerified}) {
+  ChatRecipient copyWith({
+    String? name,
+    String? avatarUrl,
+    bool? isVerified,
+    bool? isOnline,
+    DateTime? lastActiveAt,
+  }) {
     return ChatRecipient(
       id: id,
       name: name ?? this.name,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isVerified: isVerified ?? this.isVerified,
+      isOnline: isOnline ?? this.isOnline,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );
+  }
+}
+
+String formatRelativePresence(bool isOnline, DateTime? lastActive) {
+  if (isOnline) return 'Online';
+  if (lastActive == null) return 'Offline';
+
+  final diff = DateTime.now().difference(lastActive);
+  if (diff.inSeconds < 180) {
+    return 'Online';
+  } else if (diff.inMinutes < 60) {
+    final mins = diff.inMinutes;
+    return 'Active ${mins <= 1 ? 1 : mins}m ago';
+  } else if (diff.inHours < 24) {
+    final hours = diff.inHours;
+    return 'Active ${hours}h ago';
+  } else if (diff.inDays == 1) {
+    return 'Active yesterday';
+  } else if (diff.inDays < 7) {
+    return 'Active ${diff.inDays}d ago';
+  } else {
+    return 'Active recently';
   }
 }
 
@@ -225,7 +272,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           CircleAvatar(
                             radius: 26,
                             backgroundColor: AppTheme.primaryColor,
-                            backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                            backgroundImage: avatarUrl.isNotEmpty
+                                ? CachedNetworkImageProvider(
+                                    avatarUrl,
+                                    maxHeight: 120,
+                                    maxWidth: 120,
+                                  )
+                                : null,
                             child: avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
                           ),
                           Positioned(
@@ -284,13 +337,19 @@ class _ChatScreenState extends State<ChatScreen> {
   Timer? _inChatAdTimer;
   int _secondsActive = 0;
 
-  // Safe WhatsApp Bridge State
+  // Safe WhatsApp & Location Bridge State
   int _mutualMessageCount = 0;
   bool _myWhatsAppConsent = false;
   bool _partnerWhatsAppConsent = false;
-  bool _isConsentLoading = false;
   bool _isWhatsAppUnlocked = false;
   String? _unlockedPhoneNumber;
+
+  bool _myLocationConsent = false;
+  bool _partnerLocationConsent = false;
+  bool _isLocationUnlocked = false;
+  String? _partnerMapsUrl;
+
+  bool _isConsentLoading = false;
 
   final List<ChatMessage> _messages = [];
   final Set<String> _processedMessageIds = {};
@@ -313,7 +372,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _recipientDistanceLabel = 'Location unavailable');
       }
     });
-    _fetchWhatsAppBridgeStatus();
+    _fetchConsentStatus();
     _fetchRecipientProfile();
     _fetchMessages();
     _startRealtimeStreamListener();
@@ -364,10 +423,21 @@ class _ChatScreenState extends State<ChatScreen> {
               if (photos != null && photos.isNotEmpty) {
                 avatarUrl = photos.first.toString();
               }
+              DateTime? lastActive;
+              final lastSeenStr = data['last_active_at'] ?? data['last_seen'];
+              if (lastSeenStr != null) {
+                try {
+                  lastActive = DateTime.parse(lastSeenStr.toString()).toLocal();
+                } catch (_) {}
+              }
+              final bool isOnline = data['is_online'] == true;
+
               _recipientProfile = widget.recipientUser.copyWith(
                 name: name.isNotEmpty ? name : widget.recipientUser.name,
                 avatarUrl: avatarUrl,
                 isVerified: data['is_verified'] ?? data['is_verified_local'] ?? false,
+                isOnline: isOnline,
+                lastActiveAt: lastActive,
               );
 
               final myPos = LocationService.instance.currentPosition;
@@ -500,6 +570,28 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _fetchConsentStatus() async {
+    try {
+      final response = await ApiClient.instance.getChatConsent(matchId: widget.matchId);
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'];
+        setState(() {
+          _myWhatsAppConsent = data['my_whatsapp_consent'] ?? false;
+          _partnerWhatsAppConsent = data['partner_whatsapp_consent'] ?? false;
+          _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? false;
+          _unlockedPhoneNumber = data['partner_phone'];
+
+          _myLocationConsent = data['my_location_consent'] ?? false;
+          _partnerLocationConsent = data['partner_location_consent'] ?? false;
+          _isLocationUnlocked = data['location_unlocked'] ?? false;
+          _partnerMapsUrl = data['partner_maps_url'];
+        });
+      }
+    } catch (_) {
+      _fetchWhatsAppBridgeStatus();
+    }
+  }
+
   Future<void> _fetchWhatsAppBridgeStatus() async {
     try {
       final response = await ApiClient.instance.getWhatsAppBridgeStatus(matchId: widget.matchId);
@@ -513,121 +605,123 @@ class _ChatScreenState extends State<ChatScreen> {
           _unlockedPhoneNumber = data['phone_number'];
         });
       }
-    } catch (e) {
-      // Fallback state initialization
-    }
+    } catch (_) {}
   }
 
-  Future<void> _handleWhatsAppConsentAction() async {
-    if (_isWhatsAppUnlocked && _unlockedPhoneNumber != null && _unlockedPhoneNumber!.isNotEmpty) {
-      final cleanPhone = _unlockedPhoneNumber!.replaceAll('+', '').replaceAll(' ', '').replaceAll('-', '');
-      final uri = Uri.parse('https://wa.me/$cleanPhone');
-      try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          await launchUrl(Uri.parse('whatsapp://send?phone=$cleanPhone'), mode: LaunchMode.externalApplication);
-        }
-      } catch (e) {
+  Future<void> _openSafeShareDialog() async {
+    final result = await ConsentDialog.show(
+      context: context,
+      initialShareWhatsapp: _myWhatsAppConsent,
+      initialShareLocation: _myLocationConsent,
+      partnerName: _displayRecipient.name,
+      partnerWhatsAppConsent: _partnerWhatsAppConsent,
+      partnerLocationConsent: _partnerLocationConsent,
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() => _isConsentLoading = true);
+    try {
+      final response = await ApiClient.instance.submitChatConsent(
+        matchId: widget.matchId,
+        shareWhatsapp: result.shareWhatsapp,
+        shareLocation: result.shareLocation,
+      );
+
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'];
+        setState(() {
+          _myWhatsAppConsent = data['my_whatsapp_consent'] ?? result.shareWhatsapp;
+          _myLocationConsent = data['my_location_consent'] ?? result.shareLocation;
+          _partnerWhatsAppConsent = data['partner_whatsapp_consent'] ?? false;
+          _partnerLocationConsent = data['partner_location_consent'] ?? false;
+          _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? false;
+          _isLocationUnlocked = data['location_unlocked'] ?? false;
+          _unlockedPhoneNumber = data['partner_phone'];
+          _partnerMapsUrl = data['partner_maps_url'];
+        });
+
         if (mounted) {
+          String feedback = '✅ Sharing preferences updated.';
+          if (_isWhatsAppUnlocked && _isLocationUnlocked) {
+            feedback = '🎉 WhatsApp & Google Maps Route Unlocked!';
+          } else if (_isWhatsAppUnlocked) {
+            feedback = '🎉 WhatsApp Unlocked! You can now chat directly.';
+          } else if (_isLocationUnlocked) {
+            feedback = '🎉 Live Route on Google Maps Unlocked!';
+          } else if (result.shareWhatsapp || result.shareLocation) {
+            feedback = '✅ Consent recorded. Waiting for ${_displayRecipient.name}\'s consent.';
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not launch WhatsApp: $e')),
+            SnackBar(
+              content: Text(feedback),
+              backgroundColor: (_isWhatsAppUnlocked || _isLocationUnlocked)
+                  ? Colors.green.shade700
+                  : Colors.amber.shade800,
+            ),
           );
         }
       }
-      return;
-    }
-
-    if (_mutualMessageCount < 15) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('At least 15 mutual messages required. (${15 - _mutualMessageCount} more needed)'),
-          backgroundColor: Colors.blueGrey,
-        ),
-      );
-      return;
-    }
-
-    if (!_myWhatsAppConsent) {
-      final bool? confirm = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: AppTheme.cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.lock_open_rounded, color: Colors.greenAccent, size: 26),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Share WhatsApp Contact',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            'You have exchanged $_mutualMessageCount messages! Do you want to share your WhatsApp contact with ${_displayRecipient.name}?',
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.greenAccent.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Yes, Share Contact 💬'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirm == true && mounted) {
-        setState(() => _isConsentLoading = true);
-        try {
-          final response = await ApiClient.instance.giveWhatsAppConsent(matchId: widget.matchId);
-          if (response.data != null && response.data['data'] != null) {
-            final data = response.data['data'];
-            setState(() {
-              _myWhatsAppConsent = data['my_consent'] ?? true;
-              _partnerWhatsAppConsent = data['partner_consent'] ?? false;
-              _isWhatsAppUnlocked = data['is_whatsapp_unlocked'] ?? false;
-              _unlockedPhoneNumber = data['phone_number'];
-            });
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(_isWhatsAppUnlocked
-                      ? '🎉 Both users consented! WhatsApp is unlocked.'
-                      : '✅ Consent recorded. Waiting for ${_displayRecipient.name}\'s consent.'),
-                  backgroundColor: _isWhatsAppUnlocked ? Colors.green : Colors.amber.shade800,
-                ),
-              );
-            }
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to record consent: $e')),
-            );
-          }
-        } finally {
-          if (mounted) setState(() => _isConsentLoading = false);
-        }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update consent: $e')),
+        );
       }
-    } else if (!_partnerWhatsAppConsent) {
+    } finally {
+      if (mounted) setState(() => _isConsentLoading = false);
+    }
+  }
+
+  Future<void> _launchWhatsAppChat() async {
+    if (_unlockedPhoneNumber == null || _unlockedPhoneNumber!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('⏳ You have already consented. Waiting for ${_displayRecipient.name} to consent.'),
-          backgroundColor: Colors.amber.shade800,
-        ),
+        const SnackBar(content: Text('WhatsApp phone number not available yet.')),
       );
+      return;
+    }
+    final cleanPhone = _unlockedPhoneNumber!.replaceAll('+', '').replaceAll(' ', '').replaceAll('-', '');
+    final uri = Uri.parse('whatsapp://send?phone=$cleanPhone');
+    final webUri = Uri.parse('https://wa.me/$cleanPhone');
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not launch WhatsApp: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchGoogleMapsRoute() async {
+    if (_partnerMapsUrl == null || _partnerMapsUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Google Maps route not available yet.')),
+      );
+      return;
+    }
+    final uri = Uri.parse(_partnerMapsUrl!);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not launch Google Maps: $e')),
+        );
+      }
     }
   }
 
@@ -693,7 +787,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendChaiInviteDirect() async {
     try {
-      await ApiClient.instance.postSendChaiInvite(receiverId: widget.recipientUser.id);
+      await ApiClient.instance.postSendChaiInvite(
+        receiverId: widget.recipientUser.id,
+        matchId: widget.matchId,
+        message: '⚡ I sent you a ₹9 Direct Invite Pass!',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -742,11 +840,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     CircleAvatar(
                       radius: 60,
                       backgroundColor: AppTheme.primaryColor,
-                      backgroundImage: _displayRecipient.avatarUrl.isNotEmpty ? NetworkImage(_displayRecipient.avatarUrl) : null,
+                      backgroundImage: _displayRecipient.avatarUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(
+                              _displayRecipient.avatarUrl,
+                              maxHeight: 240,
+                              maxWidth: 240,
+                            )
+                          : null,
                       child: _displayRecipient.avatarUrl.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
                     ),
-                    const SizedBox(height: 16),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -754,27 +856,52 @@ class _ChatScreenState extends State<ChatScreen> {
                           _displayRecipient.name,
                           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.verified, color: Colors.blueAccent, size: 20),
+                        if (_displayRecipient.isVerified) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.verified, color: Colors.blueAccent, size: 20),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
 
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black45,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[700]!),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on, size: 14, color: AppTheme.secondaryColor),
-                          const SizedBox(width: 4),
-                          Text(_recipientDistanceLabel, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                        ],
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _displayRecipient.isOnline ? Colors.greenAccent : Colors.grey,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          formatRelativePresence(_displayRecipient.isOnline, _displayRecipient.lastActiveAt),
+                          style: TextStyle(
+                            color: _displayRecipient.isOnline ? Colors.greenAccent : Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black45,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[700]!),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.location_on, size: 13, color: AppTheme.secondaryColor),
+                              const SizedBox(width: 4),
+                              Text(_recipientDistanceLabel, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
 
@@ -1070,7 +1197,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: AppTheme.primaryColor,
-                    backgroundImage: _displayRecipient.avatarUrl.isNotEmpty ? NetworkImage(_displayRecipient.avatarUrl) : null,
+                    backgroundImage: _displayRecipient.avatarUrl.isNotEmpty
+                        ? CachedNetworkImageProvider(
+                            _displayRecipient.avatarUrl,
+                            maxHeight: 120,
+                            maxWidth: 120,
+                          )
+                        : null,
                     child: _displayRecipient.avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
                   ),
                   Positioned(
@@ -1080,7 +1213,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: Colors.greenAccent,
+                        color: _displayRecipient.isOnline ? Colors.greenAccent : Colors.grey,
                         shape: BoxShape.circle,
                         border: Border.all(color: AppTheme.surfaceColor, width: 1.5),
                       ),
@@ -1102,10 +1235,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                   ),
                   Text(
-                    _isTyping ? 'typing...' : 'Online • $_recipientDistanceLabel',
+                    _isTyping
+                        ? 'typing...'
+                        : '${formatRelativePresence(_displayRecipient.isOnline, _displayRecipient.lastActiveAt)} • $_recipientDistanceLabel',
                     style: TextStyle(
                       fontSize: 11,
-                      color: _isTyping ? AppTheme.primaryColor : Colors.greenAccent,
+                      color: _isTyping
+                          ? AppTheme.primaryColor
+                          : (_displayRecipient.isOnline ? Colors.greenAccent : Colors.white70),
                     ),
                   ),
                 ],
@@ -1114,6 +1251,24 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         actions: [
+          // 🔒 Safe Share Action
+          TextButton.icon(
+            key: const Key('safe_share_action_button'),
+            onPressed: _openSafeShareDialog,
+            icon: const Icon(Icons.shield_outlined, color: Colors.tealAccent, size: 18),
+            label: const Text(
+              '🔒 Safe Share',
+              style: TextStyle(
+                color: Colors.tealAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
           // Quick Action: Send ₹9 Direct Pass
           IconButton(
             tooltip: 'Send ₹9 Direct Pass',
@@ -1195,146 +1350,165 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-          // Safe WhatsApp Bridge Double-Consent Header Widget
+          // Safe Two-Way Consent Bridge (WhatsApp & Live Route) Header Widget
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             color: AppTheme.surfaceColor,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _isWhatsAppUnlocked
+                color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                     ? Colors.green.withValues(alpha: 0.15)
-                    : _mutualMessageCount >= 15
-                        ? (_myWhatsAppConsent && !_partnerWhatsAppConsent)
-                            ? Colors.amber.withValues(alpha: 0.15)
-                            : Colors.teal.withValues(alpha: 0.15)
-                        : Colors.blue.withValues(alpha: 0.15),
+                    : (_myWhatsAppConsent || _myLocationConsent)
+                        ? Colors.amber.withValues(alpha: 0.15)
+                        : Colors.teal.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: _isWhatsAppUnlocked
+                  color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                       ? Colors.greenAccent
-                      : _mutualMessageCount >= 15
-                          ? (_myWhatsAppConsent && !_partnerWhatsAppConsent)
-                              ? Colors.amber
-                              : Colors.tealAccent
-                          : Colors.blueAccent,
+                      : (_myWhatsAppConsent || _myLocationConsent)
+                          ? Colors.amber
+                          : Colors.tealAccent,
                   width: 1,
                 ),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Icon(
-                    _isWhatsAppUnlocked
-                        ? Icons.lock_open_rounded
-                        : _mutualMessageCount >= 15
-                            ? (_myWhatsAppConsent && !_partnerWhatsAppConsent)
+                  Row(
+                    children: [
+                      Icon(
+                        (_isWhatsAppUnlocked && _isLocationUnlocked)
+                            ? Icons.lock_open_rounded
+                            : (_myWhatsAppConsent || _myLocationConsent)
                                 ? Icons.hourglass_top_rounded
-                                : Icons.handshake_outlined
-                            : Icons.shield_moon_outlined,
-                    color: _isWhatsAppUnlocked
-                        ? Colors.greenAccent
-                        : _mutualMessageCount >= 15
-                            ? (_myWhatsAppConsent && !_partnerWhatsAppConsent)
+                                : Icons.shield_outlined,
+                        color: (_isWhatsAppUnlocked || _isLocationUnlocked)
+                            ? Colors.greenAccent
+                            : (_myWhatsAppConsent || _myLocationConsent)
                                 ? Colors.amber
-                                : Colors.tealAccent
-                            : Colors.blueAccent,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isWhatsAppUnlocked
-                              ? 'Safe WhatsApp Bridge Unlocked!'
-                              : _mutualMessageCount >= 15
-                                  ? (_myWhatsAppConsent && !_partnerWhatsAppConsent)
-                                      ? 'Consent Granted 🤝'
-                                      : 'Safe WhatsApp Bridge Ready!'
-                                  : 'Safe WhatsApp Bridge Protection',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                                : Colors.tealAccent,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (_isWhatsAppUnlocked && _isLocationUnlocked)
+                                  ? '🎉 Safe Contact & Live Route Unlocked!'
+                                  : _isWhatsAppUnlocked
+                                      ? '🎉 Safe WhatsApp Unlocked!'
+                                      : _isLocationUnlocked
+                                          ? '🎉 Live Route on Maps Unlocked!'
+                                          : (_myWhatsAppConsent || _myLocationConsent)
+                                              ? 'Consent Shared 🤝'
+                                              : 'Safe Contact & Route Sharing',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              (_isWhatsAppUnlocked && _isLocationUnlocked)
+                                  ? 'WhatsApp & Turn-by-Turn Route are ready.'
+                                  : _isWhatsAppUnlocked
+                                      ? 'WhatsApp: ${_unlockedPhoneNumber ?? "Contact Available"}'
+                                      : _isLocationUnlocked
+                                          ? 'Google Maps navigation is ready.'
+                                          : (_myWhatsAppConsent || _myLocationConsent)
+                                              ? 'Waiting for ${_displayRecipient.name}\'s consent ⏳'
+                                              : 'Mutual consent is required to share number & route.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: (_isWhatsAppUnlocked || _isLocationUnlocked)
+                                    ? Colors.greenAccent
+                                    : (_myWhatsAppConsent || _myLocationConsent)
+                                        ? Colors.amber
+                                        : Colors.tealAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_isConsentLoading)
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.tealAccent),
+                        )
+                      else if (!_isWhatsAppUnlocked && !_isLocationUnlocked)
+                        ElevatedButton.icon(
+                          onPressed: _openSafeShareDialog,
+                          icon: const Icon(Icons.lock_open, size: 14),
+                          label: Text(
+                            (_myWhatsAppConsent || _myLocationConsent) ? 'Edit 🔒' : 'Share 🔒',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: (_myWhatsAppConsent || _myLocationConsent)
+                                ? Colors.amber.shade800
+                                : const Color(0xFF00BFA5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _isWhatsAppUnlocked
-                              ? 'WhatsApp: ${_unlockedPhoneNumber ?? "Contact Available"}'
-                              : _mutualMessageCount >= 15
-                                  ? (_myWhatsAppConsent && !_partnerWhatsAppConsent)
-                                      ? 'Waiting for ${_displayRecipient.name}\'s consent ⏳'
-                                      : '15+ messages reached. Tap to unlock contact sharing.'
-                                  : 'Mutual Messages: $_mutualMessageCount/15 to unlock consent',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _isWhatsAppUnlocked
-                                ? Colors.greenAccent
-                                : _mutualMessageCount >= 15
-                                    ? (_myWhatsAppConsent && !_partnerWhatsAppConsent)
-                                        ? Colors.amber
-                                        : Colors.tealAccent
-                                    : Colors.white70,
+                    ],
+                  ),
+                  if (_isWhatsAppUnlocked || _isLocationUnlocked) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        if (_isWhatsAppUnlocked)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _launchWhatsAppChat,
+                              icon: const Icon(Icons.chat, size: 14),
+                              label: const Text(
+                                '💬 Chat on WhatsApp',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.greenAccent.shade700,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
                           ),
+                        if (_isWhatsAppUnlocked && _isLocationUnlocked)
+                          const SizedBox(width: 8),
+                        if (_isLocationUnlocked)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _launchGoogleMapsRoute,
+                              icon: const Icon(Icons.navigation, size: 14),
+                              label: const Text(
+                                '📍 Open Route in Google Maps',
+                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blueAccent.shade700,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: 'Manage Sharing',
+                          icon: const Icon(Icons.tune, color: Colors.white70, size: 18),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: _openSafeShareDialog,
                         ),
                       ],
                     ),
-                  ),
-                  if (_isConsentLoading)
-                    const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.tealAccent),
-                    )
-                  else if (_isWhatsAppUnlocked)
-                    ElevatedButton.icon(
-                      onPressed: _handleWhatsAppConsentAction,
-                      icon: const Icon(Icons.chat, size: 14),
-                      label: const Text('Open 📲', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.greenAccent.shade700,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    )
-                  else if (_mutualMessageCount >= 15)
-                    if (!_myWhatsAppConsent)
-                      ElevatedButton.icon(
-                        onPressed: _handleWhatsAppConsentAction,
-                        icon: const Icon(Icons.lock_open, size: 14),
-                        label: const Text('Unlock 💬', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00BFA5),
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      )
-                    else
-                      OutlinedButton(
-                        onPressed: _handleWhatsAppConsentAction,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.amber,
-                          side: const BorderSide(color: Colors.amber),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Waiting ⏳', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      )
-                  else
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: CircularProgressIndicator(
-                        value: (_mutualMessageCount / 15).clamp(0.0, 1.0),
-                        strokeWidth: 3,
-                        color: Colors.blueAccent,
-                        backgroundColor: Colors.grey[800],
-                      ),
-                    ),
+                  ],
                 ],
               ),
             ),
@@ -1408,6 +1582,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   )
                 : ListView.builder(
                     controller: _scrollController,
+                    cacheExtent: 500,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {

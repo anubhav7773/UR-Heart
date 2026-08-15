@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
@@ -600,13 +601,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: ClipOval(
                       child: mainPhoto.isNotEmpty
-                          ? Image.network(
-                              _getCacheBusterUrl(mainPhoto),
+                          ? CachedNetworkImage(
+                              imageUrl: _getCacheBusterUrl(mainPhoto),
                               key: UniqueKey(),
                               fit: BoxFit.cover,
                               width: 130,
                               height: 130,
-                              errorBuilder: (context, error, stackTrace) =>
+                              memCacheWidth: 260,
+                              memCacheHeight: 260,
+                              maxWidthDiskCache: 600,
+                              maxHeightDiskCache: 600,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[900],
+                                child: const Center(
+                                  child: CircularProgressIndicator(color: Color(0xFFE91E63), strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (context, error, stackTrace) =>
                                    const Icon(Icons.person, size: 70, color: Colors.grey),
                             )
                           : const Icon(Icons.person, size: 70, color: Colors.grey),
@@ -647,6 +658,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
             const SizedBox(height: 6),
+
+            // Active Now Status Badge
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.greenAccent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'Active Now',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.greenAccent,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '•  $areaName',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
 
             // Active Super Boost Countdown Badge
             if (_isBoosted && _boostBadgeText != null)
@@ -971,11 +1015,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
-                        child: Image.network(
-                          _getCacheBusterUrl(pUrl),
+                        child: CachedNetworkImage(
+                          imageUrl: _getCacheBusterUrl(pUrl),
                           key: UniqueKey(),
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
+                          memCacheWidth: 200,
+                          memCacheHeight: 200,
+                          maxWidthDiskCache: 400,
+                          maxHeightDiskCache: 400,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[900],
+                            child: const Center(
+                              child: CircularProgressIndicator(color: Color(0xFFE91E63), strokeWidth: 2),
+                            ),
+                          ),
+                          errorWidget: (context, error, stackTrace) => Container(
                             color: Colors.grey[900],
                             child: const Icon(Icons.broken_image, color: Colors.grey),
                           ),

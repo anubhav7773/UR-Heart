@@ -178,10 +178,14 @@ class ApiClient {
 
   // 9. Send ₹9 Chai Invite
   Future<Response> sendChaiInvite({
-    required String receiverId,
+    String? receiverId,
+    String? matchId,
+    String? message,
   }) async {
     return await dio.post('/intent/send-chai-invite', data: {
-      'receiver_id': receiverId,
+      if (receiverId != null) 'receiver_id': receiverId,
+      if (matchId != null) 'match_id': matchId,
+      if (message != null) 'message': message,
     });
   }
 
@@ -197,6 +201,25 @@ class ApiClient {
     required String matchId,
   }) async {
     return await dio.post('/chat/whatsapp-consent/$matchId');
+  }
+
+  // 10c. Submit Two-Way Consent for WhatsApp & Live Route on Google Maps
+  Future<Response> submitChatConsent({
+    required String matchId,
+    required bool shareWhatsapp,
+    required bool shareLocation,
+  }) async {
+    return await dio.post('/chat/consent/$matchId', data: {
+      'share_whatsapp': shareWhatsapp,
+      'share_location': shareLocation,
+    });
+  }
+
+  // 10d. Get Two-Way Consent Status for WhatsApp & Location
+  Future<Response> getChatConsent({
+    required String matchId,
+  }) async {
+    return await dio.get('/chat/consent/$matchId');
   }
 
   // 11. Remote Ad Configuration
@@ -428,9 +451,15 @@ class ApiClient {
   }
 
   // 27. Send Chai Invite (POST /intent/send-chai-invite)
-  Future<Response> postSendChaiInvite({required String receiverId}) async {
+  Future<Response> postSendChaiInvite({
+    String? receiverId,
+    String? matchId,
+    String? message,
+  }) async {
     return await dio.post('/intent/send-chai-invite', data: {
-      'receiver_id': receiverId,
+      if (receiverId != null) 'receiver_id': receiverId,
+      if (matchId != null) 'match_id': matchId,
+      if (message != null) 'message': message,
     });
   }
 

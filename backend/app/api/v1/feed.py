@@ -103,9 +103,16 @@ async def get_feed(
     effective_radius = max(r_val, md_val)
 
     try:
-        # 0. Fetch caller user record
+        # 0. Fetch caller user record and update presence
         self_res = await db.execute(select(User).where(User.id == user_uuid))
         self_user = self_res.scalars().first()
+        if self_user:
+            self_user.last_seen = datetime.now(timezone.utc)
+            self_user.is_online = True
+            try:
+                await db.commit()
+            except Exception:
+                pass
         user_lat = lat if lat is not None else (float(self_user.latitude) if self_user and self_user.latitude is not None else None)
         user_lng = lng if lng is not None else (float(self_user.longitude) if self_user and self_user.longitude is not None else None)
 
@@ -226,6 +233,13 @@ async def get_feed(
             is_approved = bool(user.is_verified and getattr(user, 'verification_status', None) == ORMVerificationStatusEnum.APPROVED)
             is_boosted = bool(user.boosted_until and user.boosted_until > now_dt)
 
+            target_active = user.last_seen or user.created_at
+            card_is_online = False
+            if target_active:
+                if target_active.tzinfo is None:
+                    target_active = target_active.replace(tzinfo=timezone.utc)
+                card_is_online = (now_dt - target_active).total_seconds() < 180
+
             profile_cards.append(
                 ProfileCardData(
                     user_id=str(user.id),
@@ -246,6 +260,9 @@ async def get_feed(
                     boosted_until=user.boosted_until,
                     voice_bio_url=user.voice_bio_url,
                     voice_bio_duration_seconds=user.voice_bio_duration_seconds or 0,
+                    is_online=card_is_online,
+                    last_seen=target_active,
+                    last_active_at=target_active,
                 )
             )
             added_user_ids.add(user.id)
@@ -311,6 +328,13 @@ async def get_feed(
                 f_is_approved = bool(fallback_user.is_verified and getattr(fallback_user, 'verification_status', None) == ORMVerificationStatusEnum.APPROVED)
                 f_is_boosted = bool(fallback_user.boosted_until and fallback_user.boosted_until > now_dt)
 
+                fb_active = fallback_user.last_seen or fallback_user.created_at
+                fb_is_online = False
+                if fb_active:
+                    if fb_active.tzinfo is None:
+                        fb_active = fb_active.replace(tzinfo=timezone.utc)
+                    fb_is_online = (now_dt - fb_active).total_seconds() < 180
+
                 profile_cards.append(
                     ProfileCardData(
                         user_id=str(fallback_user.id),
@@ -331,6 +355,9 @@ async def get_feed(
                         boosted_until=fallback_user.boosted_until,
                         voice_bio_url=fallback_user.voice_bio_url,
                         voice_bio_duration_seconds=fallback_user.voice_bio_duration_seconds or 0,
+                        is_online=fb_is_online,
+                        last_seen=fb_active,
+                        last_active_at=fb_active,
                     )
                 )
                 added_user_ids.add(fallback_user.id)

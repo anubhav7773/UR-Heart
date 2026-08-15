@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
 
 class MessageBubbleWidget extends StatelessWidget {
@@ -35,7 +36,11 @@ class MessageBubbleWidget extends StatelessWidget {
               radius: 14,
               backgroundColor: Colors.grey[800],
               backgroundImage: (senderAvatarUrl != null && senderAvatarUrl!.isNotEmpty)
-                  ? NetworkImage(senderAvatarUrl!)
+                  ? CachedNetworkImageProvider(
+                      senderAvatarUrl!,
+                      maxHeight: 120,
+                      maxWidth: 120,
+                    )
                   : null,
               child: (senderAvatarUrl == null || senderAvatarUrl!.isEmpty)
                   ? const Icon(Icons.person, size: 16, color: Colors.white70)
@@ -74,40 +79,39 @@ class MessageBubbleWidget extends StatelessWidget {
                   if (hasMedia) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        mediaUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: mediaUrl!,
                         width: 220,
                         height: 180,
+                        memCacheWidth: 440,
+                        memCacheHeight: 360,
+                        maxWidthDiskCache: 600,
+                        maxHeightDiskCache: 600,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
-                            width: 220,
-                            height: 180,
-                            color: Colors.black26,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
+                        placeholder: (context, url) => Container(
+                          width: 220,
+                          height: 180,
+                          color: Colors.black26,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
                             ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 220,
-                            height: 140,
-                            color: Colors.black38,
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.broken_image_rounded, color: Colors.white54, size: 32),
-                                SizedBox(height: 4),
-                                Text('Media unavailable', style: TextStyle(fontSize: 11, color: Colors.white54)),
-                              ],
-                            ),
-                          );
-                        },
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          width: 220,
+                          height: 140,
+                          color: Colors.black38,
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.broken_image_rounded, color: Colors.white54, size: 32),
+                              SizedBox(height: 4),
+                              Text('Media unavailable', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     if (message.isNotEmpty) const SizedBox(height: 8),

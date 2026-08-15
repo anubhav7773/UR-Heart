@@ -18,6 +18,8 @@ from app.models.schemas import (
     SendMessageRequest,
     UploadMediaData,
     WhatsAppBridgeStatusData,
+    ChatConsentRequest,
+    ChatConsentStatusData,
     IcebreakerItem,
     IcebreakerListData,
 )
@@ -92,7 +94,7 @@ async def get_matches(
 ):
     """
     Fetches all active matches for the authenticated user with target user profile details.
-    Safely excludes blocked users and handles empty matches table with HTTP 200 empty list.
+    Optimized with single batch queries to eliminate N+1 latency.
     """
     match_list: List[MatchRead] = []
     try:
@@ -106,52 +108,80 @@ async def get_matches(
         matches_res = await db.execute(
             select(Match).where(
                 or_(Match.user1_id == user_uuid, Match.user2_id == user_uuid)
-            )
+            ).order_by(Match.created_at.desc())
         )
         matches = matches_res.scalars().all()
+        if not matches:
+            return APIResponse(success=True, data=[])
 
+        # Filter valid matches and collect IDs for batch loading
+        valid_matches = []
+        target_ids = set()
+        match_ids = []
         for m in matches:
-            try:
-                target_id = m.user2_id if m.user1_id == user_uuid else m.user1_id
-                if target_id in blocked_ids:
-                    continue
+            target_id = m.user2_id if m.user1_id == user_uuid else m.user1_id
+            if target_id not in blocked_ids:
+                valid_matches.append((m, target_id))
+                target_ids.add(target_id)
+                match_ids.append(m.id)
 
-                target_res = await db.execute(
-                    select(User).where(User.id == target_id).options(selectinload(User.photos))
-                )
-                target_user = target_res.scalars().first()
+        if not valid_matches:
+            return APIResponse(success=True, data=[])
 
-                target_name = target_user.full_name if target_user else "Matched User"
-                target_photo = (
-                    target_user.photos[0].photo_url
-                    if target_user and target_user.photos
-                    else ""
-                )
+        # 1. Batch fetch target users with photos in 1 query
+        users_res = await db.execute(
+            select(User).where(User.id.in_(target_ids)).options(selectinload(User.photos))
+        )
+        users_map = {u.id: u for u in users_res.scalars().all()}
 
-                # Get last message
-                last_msg_res = await db.execute(
-                    select(ChatMessage)
-                    .where(ChatMessage.match_id == m.id)
-                    .order_by(ChatMessage.created_at.desc())
-                    .limit(1)
-                )
-                last_msg = last_msg_res.scalars().first()
-                last_text = last_msg.content if last_msg else "Matched! Send a message."
+        # 2. Batch fetch latest messages for all matches in 1 query
+        messages_res = await db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.match_id.in_(match_ids))
+            .order_by(ChatMessage.created_at.desc())
+        )
+        all_msgs = messages_res.scalars().all()
+        latest_msgs_map: dict[uuid.UUID, ChatMessage] = {}
+        for msg in all_msgs:
+            if msg.match_id not in latest_msgs_map:
+                latest_msgs_map[msg.match_id] = msg
 
-                match_list.append(
-                    MatchRead(
-                        id=str(m.id),
-                        target_user_id=str(target_id),
-                        target_user_name=target_name,
-                        target_user_photo=target_photo,
-                        mutual_message_count=m.mutual_message_count,
-                        is_whatsapp_unlocked=m.is_whatsapp_unlocked,
-                        last_message=last_text,
-                        updated_at=m.created_at.isoformat() if m.created_at else "",
-                    )
+        now_utc = datetime.now(timezone.utc)
+
+        for m, target_id in valid_matches:
+            target_user = users_map.get(target_id)
+            target_name = target_user.full_name if target_user else "Matched User"
+            target_photo = (
+                target_user.photos[0].photo_url
+                if target_user and target_user.photos
+                else ""
+            )
+
+            t_active = (target_user.last_seen or target_user.created_at) if target_user else None
+            t_online = False
+            if t_active:
+                if t_active.tzinfo is None:
+                    t_active = t_active.replace(tzinfo=timezone.utc)
+                t_online = (now_utc - t_active).total_seconds() < 180
+
+            last_msg = latest_msgs_map.get(m.id)
+            last_text = last_msg.content if last_msg else "Matched! Send a message."
+
+            match_list.append(
+                MatchRead(
+                    id=str(m.id),
+                    target_user_id=str(target_id),
+                    target_user_name=target_name,
+                    target_user_photo=target_photo,
+                    mutual_message_count=m.mutual_message_count,
+                    is_whatsapp_unlocked=m.is_whatsapp_unlocked,
+                    is_online=t_online,
+                    last_seen=t_active.isoformat() if t_active else None,
+                    last_active_at=t_active.isoformat() if t_active else None,
+                    last_message=last_text,
+                    updated_at=m.created_at.isoformat() if m.created_at else "",
                 )
-            except Exception:
-                pass
+            )
     except Exception:
         await db.rollback()
         match_list = []
@@ -247,6 +277,13 @@ async def send_chat_message(
         match_obj.mutual_message_count += 1
         if match_obj.mutual_message_count >= 15:
             match_obj.is_whatsapp_unlocked = True
+
+    # Touch sender's online presence
+    sender_res = await db.execute(select(User).where(User.id == sender_uuid))
+    sender_user = sender_res.scalars().first()
+    if sender_user:
+        sender_user.last_seen = datetime.now(timezone.utc)
+        sender_user.is_online = True
 
     await db.commit()
     await db.refresh(new_msg)
@@ -496,6 +533,162 @@ async def give_whatsapp_consent(
     )
 
 
+@router.get("/consent/{match_id}", response_model=APIResponse[ChatConsentStatusData])
+async def get_chat_consent_status(
+    match_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieves the current mutual consent status for WhatsApp and Location sharing in a match.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        match_uuid = uuid.UUID(match_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid match ID or user ID format."
+        )
+
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    match_obj = match_res.scalars().first()
+
+    if not match_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match conversation not found."
+        )
+
+    if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an authorized participant in this conversation."
+        )
+
+    is_user1 = (match_obj.user1_id == user_uuid)
+    my_whatsapp = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
+    my_location = match_obj.user1_location_consent if is_user1 else match_obj.user2_location_consent
+    partner_whatsapp = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
+    partner_location = match_obj.user2_location_consent if is_user1 else match_obj.user1_location_consent
+
+    whatsapp_unlocked = bool(match_obj.user1_whatsapp_consent and match_obj.user2_whatsapp_consent) or bool(match_obj.is_whatsapp_unlocked)
+    location_unlocked = bool(match_obj.user1_location_consent and match_obj.user2_location_consent) or bool(match_obj.is_location_unlocked)
+
+    partner_phone = None
+    partner_maps_url = None
+
+    if whatsapp_unlocked or location_unlocked:
+        target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
+        target_res = await db.execute(select(User).where(User.id == target_id))
+        target_user = target_res.scalars().first()
+        if target_user:
+            if whatsapp_unlocked and target_user.phone_number:
+                partner_phone = target_user.phone_number
+            if location_unlocked and target_user.latitude is not None and target_user.longitude is not None:
+                partner_maps_url = f"https://www.google.com/maps/dir/?api=1&destination={target_user.latitude},{target_user.longitude}"
+
+    return APIResponse(
+        success=True,
+        data=ChatConsentStatusData(
+            whatsapp_unlocked=whatsapp_unlocked,
+            location_unlocked=location_unlocked,
+            my_whatsapp_consent=my_whatsapp,
+            my_location_consent=my_location,
+            partner_whatsapp_consent=partner_whatsapp,
+            partner_location_consent=partner_location,
+            partner_phone=partner_phone,
+            partner_maps_url=partner_maps_url,
+        )
+    )
+
+
+@router.post("/consent/{match_id}", response_model=APIResponse[ChatConsentStatusData])
+async def submit_chat_consent(
+    match_id: str,
+    payload: ChatConsentRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submits current user's consent flags for sharing WhatsApp and/or Live Route on Google Maps.
+    Unlocks contact phone and/or turn-by-turn route once mutual consent is achieved.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        match_uuid = uuid.UUID(match_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid match ID or user ID format."
+        )
+
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    match_obj = match_res.scalars().first()
+
+    if not match_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match conversation not found."
+        )
+
+    if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an authorized participant in this conversation."
+        )
+
+    is_user1 = (match_obj.user1_id == user_uuid)
+    if is_user1:
+        match_obj.user1_whatsapp_consent = payload.share_whatsapp
+        match_obj.user1_location_consent = payload.share_location
+    else:
+        match_obj.user2_whatsapp_consent = payload.share_whatsapp
+        match_obj.user2_location_consent = payload.share_location
+
+    # Determine mutual unlocked states
+    whatsapp_unlocked = bool(match_obj.user1_whatsapp_consent and match_obj.user2_whatsapp_consent)
+    location_unlocked = bool(match_obj.user1_location_consent and match_obj.user2_location_consent)
+    match_obj.is_whatsapp_unlocked = whatsapp_unlocked
+    match_obj.is_location_unlocked = location_unlocked
+
+    await db.commit()
+    await db.refresh(match_obj)
+
+    partner_phone = None
+    partner_maps_url = None
+
+    if whatsapp_unlocked or location_unlocked:
+        target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
+        target_res = await db.execute(select(User).where(User.id == target_id))
+        target_user = target_res.scalars().first()
+        if target_user:
+            if whatsapp_unlocked and target_user.phone_number:
+                partner_phone = target_user.phone_number
+            if location_unlocked and target_user.latitude is not None and target_user.longitude is not None:
+                partner_maps_url = f"https://www.google.com/maps/dir/?api=1&destination={target_user.latitude},{target_user.longitude}"
+
+    my_whatsapp = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
+    my_location = match_obj.user1_location_consent if is_user1 else match_obj.user2_location_consent
+    partner_whatsapp = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
+    partner_location = match_obj.user2_location_consent if is_user1 else match_obj.user1_location_consent
+
+    return APIResponse(
+        success=True,
+        message="Consent updated successfully.",
+        data=ChatConsentStatusData(
+            whatsapp_unlocked=whatsapp_unlocked,
+            location_unlocked=location_unlocked,
+            my_whatsapp_consent=my_whatsapp,
+            my_location_consent=my_location,
+            partner_whatsapp_consent=partner_whatsapp,
+            partner_location_consent=partner_location,
+            partner_phone=partner_phone,
+            partner_maps_url=partner_maps_url,
+        )
+    )
+
+
 @router.get("/icebreakers", response_model=APIResponse[IcebreakerListData])
 async def get_icebreakers():
     """
@@ -514,3 +707,4 @@ async def get_icebreakers():
         message="Icebreakers retrieved successfully.",
         data=IcebreakerListData(icebreakers=starters)
     )
+

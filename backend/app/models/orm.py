@@ -130,6 +130,14 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    @property
+    def last_active_at(self) -> Optional[datetime]:
+        return self.last_seen
+
+    @last_active_at.setter
+    def last_active_at(self, value: Optional[datetime]) -> None:
+        self.last_seen = value
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -255,7 +263,10 @@ class Match(Base):
     mutual_message_count: Mapped[int] = mapped_column(Integer, default=0)
     user1_whatsapp_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     user2_whatsapp_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    user1_location_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    user2_location_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_whatsapp_unlocked: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_location_unlocked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/security/flutter_windowmanager.dart';
 
 class ProfileViewDialog extends StatefulWidget {
@@ -93,10 +94,17 @@ class _ProfileViewDialogState extends State<ProfileViewDialog> {
                     ),
                   ),
                 ),
-                child: Image.network(
-                  photos[index],
+                child: CachedNetworkImage(
+                  imageUrl: photos[index],
+                  memCacheWidth: 600,
+                  memCacheHeight: 800,
+                  maxWidthDiskCache: 1000,
+                  maxHeightDiskCache: 1200,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Center(
+                  placeholder: (_, __) => const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFE91E63)),
+                  ),
+                  errorWidget: (_, __, ___) => const Center(
                     child: Icon(Icons.person, color: Colors.white24, size: 96),
                   ),
                 ),
@@ -230,7 +238,20 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
                 controller: _controller,
                 itemCount: widget.photos.length,
                 itemBuilder: (_, index) => InteractiveViewer(
-                  child: Center(child: Image.network(widget.photos[index], fit: BoxFit.contain)),
+                  child: Center(
+                    child: CachedNetworkImage(
+                      imageUrl: widget.photos[index],
+                      memCacheWidth: 800,
+                      memCacheHeight: 1200,
+                      fit: BoxFit.contain,
+                      placeholder: (_, __) => const Center(
+                        child: CircularProgressIndicator(color: Color(0xFFE91E63)),
+                      ),
+                      errorWidget: (_, __, ___) => const Center(
+                        child: Icon(Icons.person, color: Colors.white24, size: 96),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               Positioned(

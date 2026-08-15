@@ -45,30 +45,50 @@ else:
 @router.get("/me")
 @router.get("/me/")
 async def get_user_profile(
+    user_id: Optional[str] = Query(None),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Retrieves logged-in user profile details for current token's user_id from PostgreSQL.
-    Raises HTTP 404 if user profile does not exist. Never falls back to dummy user.
+    Retrieves user profile details for either user_id query parameter or the authenticated user.
+    Calculates dynamic online presence based on 3-minute activity window.
     """
     try:
-        user_uuid = uuid.UUID(current_user_id)
+        target_id_str = user_id if user_id and user_id.strip() else current_user_id
+        target_uuid = uuid.UUID(target_id_str)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid user ID format."
         )
 
-    stmt = select(User).options(selectinload(User.photos)).where(User.id == user_uuid)
+    stmt = select(User).options(selectinload(User.photos)).where(User.id == target_uuid)
     res = await db.execute(stmt)
     user = res.scalars().first()
 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User profile for ID '{current_user_id}' not found."
+            detail=f"User profile for ID '{target_id_str}' not found."
         )
+
+    now_utc = datetime.now(timezone.utc)
+
+    # If the user is fetching their own profile, touch last_seen
+    if str(user.id) == current_user_id:
+        user.last_seen = now_utc
+        user.is_online = True
+        try:
+            await db.commit()
+        except Exception:
+            pass
+
+    last_active = user.last_seen or user.created_at
+    is_online = False
+    if last_active:
+        if last_active.tzinfo is None:
+            last_active = last_active.replace(tzinfo=timezone.utc)
+        is_online = (now_utc - last_active).total_seconds() < 180
 
     photos = user.photos if user.photos else []
     today = date.today()
@@ -91,6 +111,9 @@ async def get_user_profile(
         "longitude": float(user.longitude) if user.longitude is not None else None,
         "photos": photo_urls,
         "is_profile_complete": bool(len(photo_urls) >= 1),
+        "is_online": is_online,
+        "last_seen": last_active.isoformat() if last_active else None,
+        "last_active_at": last_active.isoformat() if last_active else None,
         "is_verified": bool(user.is_verified and getattr(user, 'verification_status', None) and user.verification_status.value == "APPROVED"),
         "verification_status": user.verification_status.value if getattr(user, 'verification_status', None) else "UNVERIFIED",
         "verification_video_url": user.verification_video_url,
