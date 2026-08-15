@@ -529,6 +529,11 @@ class ChatMessageRead(BaseModel):
     content: Optional[str] = None
     media_url: Optional[str] = None
     media_type: str = "text"
+    status: str = "sent"  # 'sent', 'delivered', 'read'
+    is_sent: bool = True
+    is_delivered: bool = False
+    is_read: bool = False
+    read_at: Optional[str] = None
     created_at: str
 
     model_config = ConfigDict(from_attributes=True)

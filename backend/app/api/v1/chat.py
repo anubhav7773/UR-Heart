@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, update
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -39,51 +39,122 @@ def _utc_iso(value: Optional[datetime] = None) -> str:
 
 
 class ConnectionManager:
-    """Real-Time WebSocket Connection Manager for instant chat broadcasting."""
+    """Real-Time WebSocket Connection Manager for instant chat, consent & tick broadcasting."""
 
     def __init__(self):
-        self.active_connections: dict[str, list[WebSocket]] = {}
+        # match_id -> set of active WebSockets
+        self.match_connections: dict[str, set[WebSocket]] = {}
+        # user_id -> set of active WebSockets
+        self.user_connections: dict[str, set[WebSocket]] = {}
+        # websocket -> (match_id, Optional[user_id])
+        self.socket_info: dict[WebSocket, tuple[str, Optional[str]]] = {}
 
-    async def connect(self, match_id: str, websocket: WebSocket):
+    async def connect(self, match_id: str, websocket: WebSocket, user_id: Optional[str] = None):
         await websocket.accept()
-        if match_id not in self.active_connections:
-            self.active_connections[match_id] = []
-        self.active_connections[match_id].append(websocket)
+        if match_id not in self.match_connections:
+            self.match_connections[match_id] = set()
+        self.match_connections[match_id].add(websocket)
 
-    def disconnect(self, match_id: str, websocket: WebSocket):
-        if match_id in self.active_connections:
-            if websocket in self.active_connections[match_id]:
-                self.active_connections[match_id].remove(websocket)
+        if user_id:
+            if user_id not in self.user_connections:
+                self.user_connections[user_id] = set()
+            self.user_connections[user_id].add(websocket)
 
-    async def broadcast(self, match_id: str, message: dict, sender_ws: Optional[WebSocket] = None):
-        if match_id in self.active_connections:
-            for connection in list(self.active_connections[match_id]):
-                if connection == sender_ws:
-                    continue  # Never echo message back to its originator socket
-                try:
-                    await connection.send_json(message)
-                except Exception:
-                    pass
+        self.socket_info[websocket] = (match_id, user_id)
+
+    def disconnect(self, websocket: WebSocket):
+        info = self.socket_info.pop(websocket, None)
+        if info:
+            match_id, user_id = info
+            if match_id in self.match_connections and websocket in self.match_connections[match_id]:
+                self.match_connections[match_id].remove(websocket)
+                if not self.match_connections[match_id]:
+                    del self.match_connections[match_id]
+            if user_id and user_id in self.user_connections and websocket in self.user_connections[user_id]:
+                self.user_connections[user_id].remove(websocket)
+                if not self.user_connections[user_id]:
+                    del self.user_connections[user_id]
+
+    def is_user_in_match(self, match_id: str, user_id: str) -> bool:
+        """Checks if a user currently has an active socket listening on this specific match."""
+        sockets = self.match_connections.get(match_id, set())
+        for ws in sockets:
+            info = self.socket_info.get(ws)
+            if info and info[1] == user_id:
+                return True
+        return False
+
+    def is_user_online(self, user_id: str) -> bool:
+        """Checks if a user currently has any active WebSocket connection."""
+        return bool(self.user_connections.get(user_id))
+
+    async def broadcast_to_match(self, match_id: str, payload: dict, sender_ws: Optional[WebSocket] = None):
+        sockets = list(self.match_connections.get(match_id, set()))
+        for ws in sockets:
+            if ws == sender_ws:
+                continue
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                self.disconnect(ws)
+
+    async def broadcast_to_user(self, user_id: str, payload: dict):
+        sockets = list(self.user_connections.get(user_id, set()))
+        for ws in sockets:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                self.disconnect(ws)
 
 
 ws_manager = ConnectionManager()
 
 
 @router.websocket("/ws/{match_id}")
-async def chat_websocket_endpoint(websocket: WebSocket, match_id: str):
+async def chat_websocket_endpoint(
+    websocket: WebSocket,
+    match_id: str,
+    user_id: Optional[str] = None
+):
     """
-    Bidirectional real-time WebSocket connection for instant chat message delivery.
-    Skips echoing back to originator socket to prevent client duplication loops.
+    Bidirectional real-time WebSocket connection for instant chat message delivery,
+    WhatsApp/Location consent sync, typing indicators, and double blue ticks.
     """
-    await ws_manager.connect(match_id, websocket)
+    await ws_manager.connect(match_id, websocket, user_id=user_id)
     try:
         while True:
             data = await websocket.receive_json()
-            await ws_manager.broadcast(match_id, data, sender_ws=websocket)
+            event_type = data.get("type", "message") if isinstance(data, dict) else "message"
+
+            if event_type == "read_receipt":
+                reader = data.get("reader_id") or data.get("user_id") or user_id
+                await ws_manager.broadcast_to_match(
+                    match_id,
+                    {
+                        "type": "messages_read",
+                        "match_id": match_id,
+                        "reader_id": str(reader) if reader else None,
+                        "read_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    sender_ws=websocket
+                )
+            elif event_type == "typing":
+                await ws_manager.broadcast_to_match(
+                    match_id,
+                    {
+                        "type": "typing",
+                        "match_id": match_id,
+                        "user_id": data.get("user_id") or user_id,
+                        "is_typing": data.get("is_typing", True),
+                    },
+                    sender_ws=websocket
+                )
+            else:
+                await ws_manager.broadcast_to_match(match_id, data, sender_ws=websocket)
     except WebSocketDisconnect:
-        ws_manager.disconnect(match_id, websocket)
+        ws_manager.disconnect(websocket)
     except Exception:
-        ws_manager.disconnect(match_id, websocket)
+        ws_manager.disconnect(websocket)
 
 
 @router.get("/matches", response_model=APIResponse[List[MatchRead]])
@@ -196,7 +267,7 @@ async def get_chat_messages(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Retrieves message history for a specified match ID.
+    Retrieves message history for a specified match ID with delivery status & read ticks.
     """
     try:
         match_uuid = uuid.UUID(match_id)
@@ -218,6 +289,11 @@ async def get_chat_messages(
             media_url=msg.media_url,
             media_type=msg.media_type or "text",
             client_msg_id=msg.client_msg_id,
+            status=msg.status or "sent",
+            is_sent=True,
+            is_delivered=bool(msg.is_delivered or msg.status in ("delivered", "read")),
+            is_read=bool(msg.is_read or msg.status == "read"),
+            read_at=_utc_iso(msg.read_at) if msg.read_at else None,
             created_at=_utc_iso(msg.created_at),
         )
         for msg in messages
@@ -226,6 +302,7 @@ async def get_chat_messages(
 
 
 @router.post("/send", response_model=APIResponse[ChatMessageRead])
+@router.post("/message", response_model=APIResponse[ChatMessageRead])
 async def send_chat_message(
     payload: SendMessageRequest,
     background_tasks: BackgroundTasks,
@@ -235,6 +312,7 @@ async def send_chat_message(
     """
     Sends a new text or media message within an active match.
     Enforces absolute deduplication via unique client_msg_id.
+    Computes WhatsApp-style message delivery status (sent, delivered, read) based on recipient presence.
     """
     match_uuid = uuid.UUID(payload.match_id)
     sender_uuid = uuid.UUID(current_user_id)
@@ -256,9 +334,57 @@ async def send_chat_message(
                     content=existing_msg.content,
                     media_url=existing_msg.media_url,
                     media_type=existing_msg.media_type,
+                    status=existing_msg.status or "sent",
+                    is_sent=True,
+                    is_delivered=bool(existing_msg.is_delivered or existing_msg.status in ("delivered", "read")),
+                    is_read=bool(existing_msg.is_read or existing_msg.status == "read"),
+                    read_at=_utc_iso(existing_msg.read_at) if existing_msg.read_at else None,
                     created_at=_utc_iso(existing_msg.created_at),
                 )
             )
+
+    # 1. Fetch match to determine recipient
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    match_obj = match_res.scalars().first()
+    recipient_id = None
+    if match_obj:
+        recipient_id = match_obj.user2_id if match_obj.user1_id == sender_uuid else match_obj.user1_id
+
+    # 2. Determine recipient presence and message status
+    is_recip_in_match = False
+    is_recip_online = False
+    if recipient_id:
+        recip_str = str(recipient_id)
+        is_recip_in_match = ws_manager.is_user_in_match(str(match_uuid), recip_str)
+        is_recip_online = is_recip_in_match or ws_manager.is_user_online(recip_str)
+
+        if not is_recip_online:
+            recip_res = await db.execute(select(User).where(User.id == recipient_id))
+            recip_user = recip_res.scalars().first()
+            if recip_user and recip_user.is_online:
+                if recip_user.last_seen:
+                    t_last = recip_user.last_seen
+                    if t_last.tzinfo is None:
+                        t_last = t_last.replace(tzinfo=timezone.utc)
+                    if (datetime.now(timezone.utc) - t_last).total_seconds() < 180:
+                        is_recip_online = True
+
+    now_utc = datetime.now(timezone.utc)
+    if is_recip_in_match:
+        msg_status = "read"
+        is_delivered = True
+        is_read = True
+        read_at = now_utc
+    elif is_recip_online:
+        msg_status = "delivered"
+        is_delivered = True
+        is_read = False
+        read_at = None
+    else:
+        msg_status = "sent"
+        is_delivered = False
+        is_read = False
+        read_at = None
 
     new_msg = ChatMessage(
         match_id=match_uuid,
@@ -267,12 +393,14 @@ async def send_chat_message(
         content=payload.content,
         media_url=payload.media_url,
         media_type=payload.media_type or "text",
+        status=msg_status,
+        is_delivered=is_delivered,
+        is_read=is_read,
+        read_at=read_at,
     )
     db.add(new_msg)
 
     # Increment message count on match for WhatsApp bridge unlocking
-    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
-    match_obj = match_res.scalars().first()
     if match_obj:
         match_obj.mutual_message_count += 1
         if match_obj.mutual_message_count >= 15:
@@ -292,9 +420,10 @@ async def send_chat_message(
 
     # Broadcast message to active WebSocket connection
     try:
-        await ws_manager.broadcast(
+        await ws_manager.broadcast_to_match(
             payload.match_id,
             {
+                "type": "message",
                 "id": str(new_msg.id),
                 "match_id": str(new_msg.match_id),
                 "sender_id": str(new_msg.sender_id),
@@ -302,6 +431,11 @@ async def send_chat_message(
                 "content": new_msg.content,
                 "media_url": new_msg.media_url,
                 "media_type": new_msg.media_type,
+                "status": new_msg.status,
+                "is_sent": True,
+                "is_delivered": new_msg.is_delivered,
+                "is_read": new_msg.is_read,
+                "read_at": _utc_iso(new_msg.read_at) if new_msg.read_at else None,
                 "created_at": iso_created_at,
             }
         )
@@ -310,12 +444,9 @@ async def send_chat_message(
 
     # Trigger push notification to recipient
     try:
-        if match_obj:
-            recipient_id = match_obj.user2_id if match_obj.user1_id == sender_uuid else match_obj.user1_id
+        if match_obj and recipient_id:
             recip_res = await db.execute(select(User).where(User.id == recipient_id))
             recip_user = recip_res.scalars().first()
-            sender_res = await db.execute(select(User).where(User.id == sender_uuid))
-            sender_user = sender_res.scalars().first()
             sender_name = sender_user.full_name if sender_user else "Matched User"
 
             recip_token = getattr(recip_user, 'fcm_token', None) if recip_user else None
@@ -349,6 +480,11 @@ async def send_chat_message(
             content=new_msg.content,
             media_url=new_msg.media_url,
             media_type=new_msg.media_type,
+            status=new_msg.status,
+            is_sent=True,
+            is_delivered=new_msg.is_delivered,
+            is_read=new_msg.is_read,
+            read_at=_utc_iso(new_msg.read_at) if new_msg.read_at else None,
             created_at=_utc_iso(new_msg.created_at),
         )
     )
@@ -673,6 +809,26 @@ async def submit_chat_consent(
     partner_whatsapp = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
     partner_location = match_obj.user2_location_consent if is_user1 else match_obj.user1_location_consent
 
+    # Broadcast real-time consent update event to all active match sockets and partner
+    consent_payload = {
+        "type": "consent_update",
+        "match_id": match_id,
+        "whatsapp_unlocked": whatsapp_unlocked,
+        "location_unlocked": location_unlocked,
+        "my_whatsapp_consent": my_whatsapp,
+        "my_location_consent": my_location,
+        "partner_whatsapp_consent": partner_whatsapp,
+        "partner_location_consent": partner_location,
+        "partner_phone": partner_phone,
+        "partner_maps_url": partner_maps_url,
+    }
+    try:
+        await ws_manager.broadcast_to_match(match_id, consent_payload)
+        target_id_str = str(match_obj.user2_id if is_user1 else match_obj.user1_id)
+        await ws_manager.broadcast_to_user(target_id_str, consent_payload)
+    except Exception:
+        pass
+
     return APIResponse(
         success=True,
         message="Consent updated successfully.",
@@ -687,6 +843,57 @@ async def submit_chat_consent(
             partner_maps_url=partner_maps_url,
         )
     )
+
+
+@router.post("/{match_id}/read")
+@router.post("/read/{match_id}")
+async def mark_messages_as_read(
+    match_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Marks all unread incoming messages in a match as read and broadcasts real-time read receipts (double blue ticks).
+    """
+    try:
+        match_uuid = uuid.UUID(match_id)
+        current_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid UUID format.")
+
+    now_utc = datetime.now(timezone.utc)
+    stmt = (
+        update(ChatMessage)
+        .where(
+            ChatMessage.match_id == match_uuid,
+            ChatMessage.sender_id != current_uuid,
+            ChatMessage.is_read == False,
+        )
+        .values(
+            is_read=True,
+            is_delivered=True,
+            status="read",
+            read_at=now_utc,
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    # Broadcast read receipt to match socket
+    try:
+        await ws_manager.broadcast_to_match(
+            match_id,
+            {
+                "type": "messages_read",
+                "match_id": match_id,
+                "reader_id": current_user_id,
+                "read_at": now_utc.isoformat(),
+            }
+        )
+    except Exception:
+        pass
+
+    return APIResponse(success=True, message="Messages marked as read.")
 
 
 @router.get("/icebreakers", response_model=APIResponse[IcebreakerListData])

@@ -10,6 +10,8 @@ class ApiClient {
 
   // Base URL configuration for Render production deployment
   static String get defaultBaseUrl => 'https://ur-heart.onrender.com/api/v1';
+  static String get baseUrl => defaultBaseUrl;
+  String get currentBaseUrl => dio.options.baseUrl;
 
   ApiClient._internal() {
     dio = Dio(
@@ -291,6 +293,11 @@ class ApiClient {
   // 16. Fetch Chat Message History for Match
   Future<Response> getMessages(String matchId) async {
     return await dio.get('/chat/messages/$matchId');
+  }
+
+  // 16b. Mark Messages as Read (Double Blue Ticks)
+  Future<Response> markMessagesAsRead(String matchId) async {
+    return await dio.post('/chat/$matchId/read');
   }
 
   // 17. Send Chat Message (Text / Media)

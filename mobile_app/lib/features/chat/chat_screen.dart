@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:web_socket_channel/io.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../core/security/flutter_windowmanager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_client.dart';
@@ -22,6 +25,7 @@ class ChatMessage {
   final String? mediaUrl;
   final bool isViewOnce;
   final DateTime timestamp;
+  final String status;
   final bool isSent;
   final bool isDelivered;
   final bool isRead;
@@ -34,9 +38,10 @@ class ChatMessage {
     this.mediaUrl,
     this.isViewOnce = false,
     required this.timestamp,
+    this.status = 'sent',
     this.isSent = true,
-    this.isDelivered = true,
-    this.isRead = true,
+    this.isDelivered = false,
+    this.isRead = false,
   });
 }
 
@@ -354,6 +359,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   final Set<String> _processedMessageIds = {};
   Timer? _realtimePollingTimer;
+  WebSocketChannel? _wsChannel;
+  StreamSubscription? _wsSubscription;
 
   ChatRecipient? _recipientProfile;
   bool _isRecipientProfileLoading = true;
@@ -467,12 +474,125 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _startRealtimeStreamListener() {
+    _connectWebSocket();
     _realtimePollingTimer?.cancel();
-    _realtimePollingTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    // Watchdog timer (every 10s) in case WebSocket connection drops
+    _realtimePollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) {
         _fetchMessages(silent: true);
+        _fetchConsentStatus();
       }
     });
+  }
+
+  void _connectWebSocket() {
+    try {
+      _wsSubscription?.cancel();
+      _wsChannel?.sink.close();
+
+      final baseUri = Uri.parse(ApiClient.baseUrl);
+      final isHttps = baseUri.scheme == 'https';
+      final wsScheme = isHttps ? 'wss' : 'ws';
+      final wsHost = baseUri.host;
+      final wsPort = baseUri.hasPort ? ':${baseUri.port}' : '';
+      final wsUrl = '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?user_id=$_currentUserId';
+
+      _wsChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
+      _wsSubscription = _wsChannel?.stream.listen(
+        (rawData) {
+          _handleIncomingWebSocketData(rawData);
+        },
+        onError: (err) {
+          if (kDebugMode) print('[Chat WS Error] $err');
+        },
+        onDone: () {
+          if (kDebugMode) print('[Chat WS Closed]');
+        },
+      );
+    } catch (e) {
+      if (kDebugMode) print('[Chat WS Connect Error] $e');
+    }
+  }
+
+  void _handleIncomingWebSocketData(dynamic rawData) {
+    try {
+      Map<String, dynamic> data;
+      if (rawData is String) {
+        data = jsonDecode(rawData);
+      } else if (rawData is Map) {
+        data = Map<String, dynamic>.from(rawData);
+      } else {
+        return;
+      }
+
+      final String type = (data['type'] ?? 'message').toString();
+
+      if (type == 'consent_update') {
+        if (mounted) {
+          setState(() {
+            _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? _isWhatsAppUnlocked;
+            _isLocationUnlocked = data['location_unlocked'] ?? _isLocationUnlocked;
+            if (data['my_whatsapp_consent'] != null) _myWhatsAppConsent = data['my_whatsapp_consent'];
+            if (data['my_location_consent'] != null) _myLocationConsent = data['my_location_consent'];
+            if (data['partner_whatsapp_consent'] != null) _partnerWhatsAppConsent = data['partner_whatsapp_consent'];
+            if (data['partner_location_consent'] != null) _partnerLocationConsent = data['partner_location_consent'];
+            if (data['partner_phone'] != null) _unlockedPhoneNumber = data['partner_phone'];
+            if (data['partner_maps_url'] != null) _partnerMapsUrl = data['partner_maps_url'];
+          });
+        }
+      } else if (type == 'messages_read') {
+        if (mounted) {
+          setState(() {
+            for (int i = 0; i < _messages.length; i++) {
+              final msg = _messages[i];
+              final isMe = (_currentUserId.isNotEmpty && msg.senderId == _currentUserId) || msg.senderId == 'current_user_id';
+              if (isMe) {
+                _messages[i] = ChatMessage(
+                  id: msg.id,
+                  clientMsgId: msg.clientMsgId,
+                  senderId: msg.senderId,
+                  text: msg.text,
+                  mediaUrl: msg.mediaUrl,
+                  isViewOnce: msg.isViewOnce,
+                  timestamp: msg.timestamp,
+                  status: 'read',
+                  isSent: true,
+                  isDelivered: true,
+                  isRead: true,
+                );
+              }
+            }
+          });
+        }
+      } else if (type == 'message' || data.containsKey('content') || data.containsKey('id')) {
+        bool changed = false;
+        if (mounted) {
+          setState(() {
+            changed = _upsertServerMessage(data);
+          });
+          if (changed) {
+            _scrollToBottom();
+            final senderId = (data['sender_id'] ?? '').toString();
+            if (senderId.isNotEmpty && senderId != _currentUserId && senderId != 'current_user_id') {
+              _emitReadReceipt();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('[Chat WS Parse Error] $e');
+    }
+  }
+
+  void _emitReadReceipt() {
+    try {
+      _wsChannel?.sink.add(jsonEncode({
+        'type': 'read_receipt',
+        'match_id': widget.matchId,
+        'reader_id': _currentUserId,
+      }));
+      ApiClient.instance.markMessagesAsRead(widget.matchId);
+    } catch (_) {}
   }
 
   Future<void> _fetchMessages({bool silent = false}) async {
@@ -488,6 +608,9 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         });
         if (changed || (!silent && _messages.isNotEmpty)) _scrollToBottom();
+
+        // Mark incoming messages as read
+        _emitReadReceipt();
       }
     } catch (_) {}
   }
@@ -506,6 +629,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final clientMsgId = (data['client_msg_id'] ?? '').toString();
     if (dbId.isEmpty) return false;
 
+    final String rawStatus = (data['status'] ?? 'sent').toString();
+    final bool isDelivered = data['is_delivered'] == true || rawStatus == 'delivered' || rawStatus == 'read';
+    final bool isRead = data['is_read'] == true || rawStatus == 'read';
+
     final serverMessage = ChatMessage(
       id: dbId,
       clientMsgId: clientMsgId.isEmpty ? null : clientMsgId,
@@ -513,9 +640,23 @@ class _ChatScreenState extends State<ChatScreen> {
       text: (data['content'] ?? '').toString(),
       mediaUrl: data['media_url']?.toString(),
       timestamp: _parseLocalTimestamp((data['created_at'] ?? '').toString()),
+      status: isRead ? 'read' : (isDelivered ? 'delivered' : rawStatus),
       isSent: true,
+      isDelivered: isDelivered,
+      isRead: isRead,
     );
-    if (_processedMessageIds.contains(dbId)) return false;
+    if (_processedMessageIds.contains(dbId)) {
+      final existingIdx = _messages.indexWhere((m) => m.id == dbId);
+      if (existingIdx != -1) {
+        if (_messages[existingIdx].status != serverMessage.status ||
+            _messages[existingIdx].isRead != serverMessage.isRead ||
+            _messages[existingIdx].isDelivered != serverMessage.isDelivered) {
+          _messages[existingIdx] = serverMessage;
+          return true;
+        }
+      }
+      return false;
+    }
 
     final optimisticIndex = clientMsgId.isEmpty
         ? -1
@@ -548,6 +689,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _disableScreenshotProtection();
+    _wsSubscription?.cancel();
+    _wsChannel?.sink.close();
     _realtimePollingTimer?.cancel();
     _inChatAdTimer?.cancel();
     _messageController.dispose();
@@ -1002,7 +1145,10 @@ class _ChatScreenState extends State<ChatScreen> {
       text: content,
       mediaUrl: mediaUrl,
       timestamp: DateTime.now(),
+      status: 'sending',
       isSent: false,
+      isDelivered: false,
+      isRead: false,
     );
 
     setState(() {
@@ -1593,6 +1739,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         time: timeStr,
                         mediaUrl: msg.mediaUrl,
                         senderAvatarUrl: _displayRecipient.avatarUrl,
+                        status: msg.status,
+                        isSent: msg.isSent,
+                        isDelivered: msg.isDelivered,
+                        isRead: msg.isRead,
                       );
                     },
                   ),

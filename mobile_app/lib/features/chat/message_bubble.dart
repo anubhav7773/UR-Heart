@@ -9,6 +9,10 @@ class MessageBubbleWidget extends StatelessWidget {
   final String? mediaUrl;
   final String? mediaType;
   final String? senderAvatarUrl;
+  final String status;
+  final bool isSent;
+  final bool isDelivered;
+  final bool isRead;
 
   const MessageBubbleWidget({
     super.key,
@@ -18,6 +22,10 @@ class MessageBubbleWidget extends StatelessWidget {
     this.mediaUrl,
     this.mediaType,
     this.senderAvatarUrl,
+    this.status = 'sent',
+    this.isSent = true,
+    this.isDelivered = false,
+    this.isRead = false,
   });
 
   @override
@@ -149,11 +157,7 @@ class MessageBubbleWidget extends StatelessWidget {
                       ),
                       if (isMe) ...[
                         const SizedBox(width: 4),
-                        const Icon(
-                          Icons.done_all_rounded,
-                          size: 14,
-                          color: Colors.lightBlueAccent,
-                        ),
+                        _buildStatusIcon(),
                       ],
                     ],
                   ),
@@ -166,5 +170,37 @@ class MessageBubbleWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildStatusIcon() {
+    if (status == 'read' || isRead) {
+      // Double Blue Tick: Read
+      return const Icon(
+        Icons.done_all_rounded,
+        size: 14,
+        color: Colors.lightBlueAccent,
+      );
+    } else if (status == 'delivered' || isDelivered) {
+      // Double Grey Tick: Delivered to recipient device/socket
+      return const Icon(
+        Icons.done_all_rounded,
+        size: 14,
+        color: Colors.white70,
+      );
+    } else if (status == 'sent' || isSent) {
+      // Single Grey Tick: Sent to server
+      return const Icon(
+        Icons.done_rounded,
+        size: 14,
+        color: Colors.white70,
+      );
+    } else {
+      // Sending: Clock
+      return const Icon(
+        Icons.access_time_rounded,
+        size: 12,
+        color: Colors.white60,
+      );
+    }
   }
 }
