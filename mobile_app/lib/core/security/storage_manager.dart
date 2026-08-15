@@ -47,6 +47,17 @@ class StorageManager {
     return val == 'true';
   }
 
+  static const String keyIsAdmin = 'is_admin';
+
+  Future<void> setAdminStatus(bool isAdmin) async {
+    await _storage.write(key: keyIsAdmin, value: isAdmin.toString());
+  }
+
+  Future<bool> isAdmin() async {
+    final val = await _storage.read(key: keyIsAdmin);
+    return val == 'true';
+  }
+
   Future<void> saveSkipCount(int count) async {
     await _storage.write(key: keySkipCount, value: count.toString());
   }

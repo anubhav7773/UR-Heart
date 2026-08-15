@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
-import '../../core/security/storage_manager.dart';
+import '../auth/auth_provider.dart';
 import '../auth/auth_screen.dart';
 import '../settings/blocked_users_screen.dart';
 import '../subscription/subscription_sheet.dart';
@@ -101,7 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         await FirebaseAuth.instance.signOut();
       } catch (_) {}
-      await StorageManager.instance.clearAll();
+      await AppAuthProvider.instance.logout();
 
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

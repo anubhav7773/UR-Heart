@@ -73,6 +73,7 @@ class SocialLoginData(BaseModel):
     expires_in: int = 1296000
     is_profile_complete: bool
     is_premium: bool
+    is_admin: bool = False
 
 
 class FirebaseLoginRequest(BaseModel):
@@ -88,6 +89,7 @@ class FirebaseLoginData(BaseModel):
     expires_in: int = 1296000
     is_profile_complete: bool
     is_premium: bool
+    is_admin: bool = False
 
 
 # Phone OTP Schemas
@@ -115,6 +117,7 @@ class VerifyOTPData(BaseModel):
     expires_in: int = 1296000
     is_profile_complete: bool
     is_premium: bool
+    is_admin: bool = False
 
 
 # Email Password Firebase Schemas
@@ -132,6 +135,7 @@ class EmailSignupData(BaseModel):
     expires_in: int = 1296000
     is_profile_complete: bool = False
     is_premium: bool = False
+    is_admin: bool = False
 
 
 class EmailLoginTokenRequest(BaseModel):
@@ -149,6 +153,7 @@ class EmailLoginTokenData(BaseModel):
     expires_in: int = 1296000
     is_profile_complete: bool
     is_premium: bool
+    is_admin: bool = False
 
 
 class EmailPasswordLoginRequest(BaseModel):
@@ -321,6 +326,7 @@ class UserRead(BaseModel):
     photo_pass_until: Optional[datetime] = None
     bonus_swipes: int = 0
     is_verified: bool = False
+    is_admin: bool = False
     verification_status: VerificationStatusEnum = VerificationStatusEnum.UNVERIFIED
     verification_video_url: Optional[str] = None
     voice_bio_url: Optional[str] = None
@@ -349,6 +355,7 @@ class ProfileCardData(BaseModel):
     intent: IntentEnum
     photos: List[str]
     is_verified: bool = False
+    is_admin: bool = False
     verification_status: VerificationStatusEnum = VerificationStatusEnum.UNVERIFIED
     is_verified_local: bool = False
     is_boosted: bool = False

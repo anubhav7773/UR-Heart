@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/services/security_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
 import '../auth/auth_screen.dart';
@@ -38,6 +39,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     );
 
     _controller.forward();
+    WindowSecurityService.syncFromStorage();
     _checkAuthStateAndNavigate();
   }
 

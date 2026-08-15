@@ -39,6 +39,7 @@ class _AuthScreenState extends State<AuthScreen> {
     final userId = data['user_id'] as String;
     final bool isComplete = data['is_profile_complete'] ?? false;
     final bool isPremium = data['is_premium'] ?? false;
+    final bool isAdmin = data['is_admin'] ?? false;
 
     // Purge previous SharedPreferences and FlutterSecureStorage memory & save dynamic credentials
     await AppAuthProvider.instance.handleLoginSuccess(
@@ -46,6 +47,7 @@ class _AuthScreenState extends State<AuthScreen> {
       userId: userId,
       isProfileComplete: isComplete,
       isPremium: isPremium,
+      isAdmin: isAdmin,
     );
 
     if (!mounted) return;

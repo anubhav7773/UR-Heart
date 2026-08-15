@@ -1,8 +1,6 @@
-import 'dart:io' show Platform;
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../core/security/flutter_windowmanager.dart';
+import '../../core/services/security_service.dart';
 import '../../core/ads/ad_manager.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
@@ -57,28 +55,11 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void dispose() {
     _feedAudioPlayer.dispose();
-    _disableScreenshotProtection();
     super.dispose();
   }
 
   Future<void> _enableScreenshotProtection() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
-      } catch (e) {
-        if (kDebugMode) print('Could not enable FLAG_SECURE: $e');
-      }
-    }
-  }
-
-  Future<void> _disableScreenshotProtection() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
-      } catch (e) {
-        if (kDebugMode) print('Could not clear FLAG_SECURE: $e');
-      }
-    }
+    await WindowSecurityService.syncFromStorage();
   }
 
   Future<void> _loadFeed() async {

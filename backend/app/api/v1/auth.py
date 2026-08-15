@@ -34,6 +34,16 @@ from app.models.schemas import (
 
 router = APIRouter(prefix="", tags=["Authentication & Onboarding"])
 
+# Designated Creator & Admin Account Credentials
+ADMIN_EMAILS = {"kshtriyaanubhav9120@gmail.com"}
+
+
+def is_admin_identifier(email: Optional[str], phone: Optional[str] = None) -> bool:
+    if email and email.strip().lower() in ADMIN_EMAILS:
+        return True
+    return False
+
+
 # Fast2SMS SMS Gateway Credentials & Active OTP In-Memory Store (5-Min Expiry)
 FAST2SMS_API_KEY = "XpyeJ4EN26nsazjOgVWCS70xFDLKYUMuocqPTRdwtHGirlbBZAzacATYetJ8CMpLUjDIoRNiSbvkwXP3"
 _active_otp_store = {}
@@ -107,6 +117,12 @@ async def social_login(
 
         user_id = str(user.id)
         is_premium = user.is_premium
+        is_admin = bool(getattr(user, "is_admin", False))
+        if user.email and is_admin_identifier(user.email):
+            if not user.is_admin:
+                user.is_admin = True
+                await db.commit()
+            is_admin = True
         photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
         photos = photo_count_res.scalars().all()
         is_complete = len(photos) == 5
@@ -122,6 +138,7 @@ async def social_login(
         expires_in=1296000,
         is_profile_complete=is_complete,
         is_premium=is_premium,
+        is_admin=is_admin,
     )
     return APIResponse(success=True, data=data)
 
@@ -220,6 +237,12 @@ async def firebase_login(
 
         user_id = str(user.id)
         is_premium = bool(user.is_premium)
+        is_admin = bool(getattr(user, "is_admin", False))
+        if user.email and is_admin_identifier(user.email):
+            if not user.is_admin:
+                user.is_admin = True
+                await db.commit()
+            is_admin = True
         photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
         photos = photo_count_res.scalars().all()
         is_complete = bool(len(photos) >= 1)
@@ -232,6 +255,12 @@ async def firebase_login(
             if user:
                 user_id = str(user.id)
                 is_premium = bool(user.is_premium)
+                is_admin = bool(getattr(user, "is_admin", False))
+                if user.email and is_admin_identifier(user.email):
+                    if not user.is_admin:
+                        user.is_admin = True
+                        await db.commit()
+                    is_admin = True
         except Exception:
             pass
 
@@ -244,6 +273,7 @@ async def firebase_login(
         expires_in=1296000,
         is_profile_complete=is_complete,
         is_premium=is_premium,
+        is_admin=is_admin,
     )
     logger.info(f"[Firebase-Login] Auth handshake successful for user_id={user_id}")
     return APIResponse(success=True, data=data)
@@ -323,6 +353,12 @@ async def email_signup(
 
         user_id = str(user.id)
         is_premium = user.is_premium
+        is_admin = bool(getattr(user, "is_admin", False))
+        if user.email and is_admin_identifier(user.email):
+            if not user.is_admin:
+                user.is_admin = True
+                await db.commit()
+            is_admin = True
     except Exception as db_err:
         logger.warning(f"[Email-Signup] Supabase DB lookup warning: {db_err}")
 
@@ -335,6 +371,7 @@ async def email_signup(
             access_token=access_token,
             is_profile_complete=is_complete,
             is_premium=is_premium,
+            is_admin=is_admin,
         )
     )
 
@@ -412,6 +449,12 @@ async def email_login_endpoint(
 
         user_id = str(user.id)
         is_premium = user.is_premium
+        is_admin = bool(getattr(user, "is_admin", False))
+        if user.email and is_admin_identifier(user.email):
+            if not user.is_admin:
+                user.is_admin = True
+                await db.commit()
+            is_admin = True
         photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
         photos = photo_count_res.scalars().all()
         is_complete = len(photos) == 5
@@ -427,6 +470,7 @@ async def email_login_endpoint(
             access_token=access_token,
             is_profile_complete=is_complete,
             is_premium=is_premium,
+            is_admin=is_admin,
         )
     )
 
@@ -577,6 +621,12 @@ async def verify_otp(
 
         user_id = str(user.id)
         is_premium = user.is_premium
+        is_admin = bool(getattr(user, "is_admin", False))
+        if user.email and is_admin_identifier(user.email):
+            if not user.is_admin:
+                user.is_admin = True
+                await db.commit()
+            is_admin = True
         photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
         photos = photo_count_res.scalars().all()
         is_complete = len(photos) == 5
@@ -592,6 +642,7 @@ async def verify_otp(
         expires_in=1296000,
         is_profile_complete=is_complete,
         is_premium=is_premium,
+        is_admin=is_admin,
     )
     return APIResponse(success=True, data=data)
 
@@ -636,6 +687,12 @@ async def email_login(
 
         user_id = str(user.id)
         is_premium = user.is_premium
+        is_admin = bool(getattr(user, "is_admin", False))
+        if user.email and is_admin_identifier(user.email):
+            if not user.is_admin:
+                user.is_admin = True
+                await db.commit()
+            is_admin = True
         photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
         photos = photo_count_res.scalars().all()
         is_complete = len(photos) == 5
@@ -651,6 +708,7 @@ async def email_login(
         expires_in=1296000,
         is_profile_complete=is_complete,
         is_premium=is_premium,
+        is_admin=is_admin,
     )
     return APIResponse(success=True, data=data)
 

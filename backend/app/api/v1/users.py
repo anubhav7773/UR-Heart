@@ -120,6 +120,7 @@ def _serialize_user_profile(user: User) -> dict:
         "intent": user.intent.value if user.intent else "casual",
         "photos": photos,
         "is_verified": is_approved,
+        "is_admin": bool(getattr(user, "is_admin", False)),
     }
 
 

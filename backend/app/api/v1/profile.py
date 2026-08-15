@@ -116,6 +116,7 @@ async def get_user_profile(
         "last_seen": last_active.isoformat() if last_active else None,
         "last_active_at": last_active.isoformat() if last_active else None,
         "is_verified": bool(user.is_verified and getattr(user, 'verification_status', None) and user.verification_status.value == "APPROVED"),
+        "is_admin": bool(getattr(user, "is_admin", False)),
         "verification_status": user.verification_status.value if getattr(user, 'verification_status', None) else "UNVERIFIED",
         "verification_video_url": user.verification_video_url,
         "voice_bio_url": user.voice_bio_url,

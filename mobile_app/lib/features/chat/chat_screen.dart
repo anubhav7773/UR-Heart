@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import '../../core/security/flutter_windowmanager.dart';
+import '../../core/services/security_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
@@ -389,23 +388,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _enableScreenshotProtection() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
-      } catch (e) {
-        if (kDebugMode) print('Could not enable FLAG_SECURE: $e');
-      }
-    }
-  }
-
-  Future<void> _disableScreenshotProtection() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
-      } catch (e) {
-        if (kDebugMode) print('Could not clear FLAG_SECURE: $e');
-      }
-    }
+    await WindowSecurityService.syncFromStorage();
   }
 
   Future<void> _fetchRecipientProfile() async {
@@ -694,7 +677,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    _disableScreenshotProtection();
     _wsSubscription?.cancel();
     _wsChannel?.sink.close();
     _realtimePollingTimer?.cancel();

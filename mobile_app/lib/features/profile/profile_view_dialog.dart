@@ -1,9 +1,7 @@
-import 'dart:io' show Platform;
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/security/flutter_windowmanager.dart';
+import '../../core/services/security_service.dart';
 
 class ProfileViewDialog extends StatefulWidget {
   final String name;
@@ -48,29 +46,12 @@ class _ProfileViewDialogState extends State<ProfileViewDialog> {
   @override
   void dispose() {
     _audioPlayer.dispose();
-    _disableScreenshotProtection();
     _pageController.dispose();
     super.dispose();
   }
 
   Future<void> _enableScreenshotProtection() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
-      } catch (e) {
-        if (kDebugMode) print('Could not enable FLAG_SECURE: $e');
-      }
-    }
-  }
-
-  Future<void> _disableScreenshotProtection() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
-      } catch (e) {
-        if (kDebugMode) print('Could not clear FLAG_SECURE: $e');
-      }
-    }
+    await WindowSecurityService.syncFromStorage();
   }
 
   @override
