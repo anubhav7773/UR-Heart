@@ -472,8 +472,39 @@ class ChatConsentStatusData(BaseModel):
     my_location_consent: bool = False
     partner_whatsapp_consent: bool = False
     partner_location_consent: bool = False
+    my_payment_done: bool = False
+    partner_payment_done: bool = False
+    is_fully_unlocked: bool = False
+    total_messages: int = 0
+    is_milestone_reached: bool = False
     partner_phone: Optional[str] = None
     partner_maps_url: Optional[str] = None
+
+
+class SafeBridgeStatusData(BaseModel):
+    match_id: str
+    total_messages: int = 0
+    is_milestone_reached: bool = False
+    required_messages: int = 15
+    my_consent: bool = False
+    my_whatsapp_consent: bool = False
+    my_location_consent: bool = False
+    partner_consent: bool = False
+    partner_whatsapp_consent: bool = False
+    partner_location_consent: bool = False
+    my_payment_done: bool = False
+    partner_payment_done: bool = False
+    is_fully_unlocked: bool = False
+    whatsapp_unlocked: bool = False
+    location_unlocked: bool = False
+    partner_phone: Optional[str] = None
+    partner_maps_url: Optional[str] = None
+
+
+class SafeBridgePaymentRequest(BaseModel):
+    match_id: str
+    payment_id: str
+    amount: float = 499.0
 
 
 class WhatsAppBridgeStatusData(BaseModel):
@@ -483,7 +514,10 @@ class WhatsAppBridgeStatusData(BaseModel):
     my_consent: bool = False
     partner_consent: bool = False
     is_whatsapp_unlocked: bool = False
-    phone_number: Optional[str] = Field(None, description="Unlocked WhatsApp phone number when both users have consented")
+    my_payment_done: bool = False
+    partner_payment_done: bool = False
+    is_fully_unlocked: bool = False
+    phone_number: Optional[str] = Field(None, description="Unlocked WhatsApp phone number when both users have consented & paid")
 
 
 # 11. Sachet Micro-Transaction Schemas

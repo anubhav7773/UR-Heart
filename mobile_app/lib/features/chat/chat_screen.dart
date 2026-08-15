@@ -15,7 +15,7 @@ import '../../core/theme/app_theme.dart';
 import '../subscription/subscription_sheet.dart';
 import 'chat_provider.dart';
 import 'message_bubble.dart';
-import 'widgets/consent_dialog.dart';
+import 'widgets/safe_bridge_paywall_sheet.dart';
 
 class ChatMessage {
   final String id;
@@ -354,6 +354,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLocationUnlocked = false;
   String? _partnerMapsUrl;
 
+  bool _myBridgePaid = false;
+  bool _partnerBridgePaid = false;
+
   bool _isConsentLoading = false;
 
   final List<ChatMessage> _messages = [];
@@ -527,15 +530,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final String type = (data['type'] ?? 'message').toString();
 
-      if (type == 'consent_update') {
+      if (type == 'consent_update' || type == 'bridge_payment_update') {
         if (mounted) {
           setState(() {
-            _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? _isWhatsAppUnlocked;
-            _isLocationUnlocked = data['location_unlocked'] ?? _isLocationUnlocked;
+            if (data['total_messages'] != null) _mutualMessageCount = data['total_messages'];
+            _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? (data['is_fully_unlocked'] ?? _isWhatsAppUnlocked);
+            _isLocationUnlocked = data['location_unlocked'] ?? (data['is_fully_unlocked'] ?? _isLocationUnlocked);
             if (data['my_whatsapp_consent'] != null) _myWhatsAppConsent = data['my_whatsapp_consent'];
             if (data['my_location_consent'] != null) _myLocationConsent = data['my_location_consent'];
             if (data['partner_whatsapp_consent'] != null) _partnerWhatsAppConsent = data['partner_whatsapp_consent'];
             if (data['partner_location_consent'] != null) _partnerLocationConsent = data['partner_location_consent'];
+            if (data['my_payment_done'] != null) _myBridgePaid = data['my_payment_done'];
+            if (data['partner_payment_done'] != null) _partnerBridgePaid = data['partner_payment_done'];
             if (data['partner_phone'] != null) _unlockedPhoneNumber = data['partner_phone'];
             if (data['partner_maps_url'] != null) _partnerMapsUrl = data['partner_maps_url'];
           });
@@ -714,24 +720,29 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _fetchConsentStatus() async {
+    setState(() => _isConsentLoading = true);
     try {
-      final response = await ApiClient.instance.getChatConsent(matchId: widget.matchId);
+      final response = await ApiClient.instance.getBridgeStatus(widget.matchId);
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'];
         setState(() {
+          _mutualMessageCount = data['total_messages'] ?? _mutualMessageCount;
           _myWhatsAppConsent = data['my_whatsapp_consent'] ?? false;
           _partnerWhatsAppConsent = data['partner_whatsapp_consent'] ?? false;
-          _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? false;
-          _unlockedPhoneNumber = data['partner_phone'];
-
           _myLocationConsent = data['my_location_consent'] ?? false;
           _partnerLocationConsent = data['partner_location_consent'] ?? false;
+          _myBridgePaid = data['my_payment_done'] ?? false;
+          _partnerBridgePaid = data['partner_payment_done'] ?? false;
+          _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? false;
           _isLocationUnlocked = data['location_unlocked'] ?? false;
+          _unlockedPhoneNumber = data['partner_phone'];
           _partnerMapsUrl = data['partner_maps_url'];
         });
       }
     } catch (_) {
       _fetchWhatsAppBridgeStatus();
+    } finally {
+      if (mounted) setState(() => _isConsentLoading = false);
     }
   }
 
@@ -741,80 +752,37 @@ class _ChatScreenState extends State<ChatScreen> {
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'];
         setState(() {
-          _mutualMessageCount = data['mutual_message_count'] ?? 0;
+          _mutualMessageCount = data['total_messages'] ?? (data['mutual_message_count'] ?? 0);
           _myWhatsAppConsent = data['my_consent'] ?? false;
           _partnerWhatsAppConsent = data['partner_consent'] ?? false;
-          _isWhatsAppUnlocked = data['is_whatsapp_unlocked'] ?? false;
-          _unlockedPhoneNumber = data['phone_number'];
+          _myBridgePaid = data['my_payment_done'] ?? false;
+          _partnerBridgePaid = data['partner_payment_done'] ?? false;
+          _isWhatsAppUnlocked = data['is_whatsapp_unlocked'] ?? (data['is_fully_unlocked'] ?? false);
+          _unlockedPhoneNumber = data['phone_number'] ?? data['partner_phone'];
         });
       }
     } catch (_) {}
   }
 
   Future<void> _openSafeShareDialog() async {
-    final result = await ConsentDialog.show(
+    await SafeBridgePaywallSheet.show(
       context: context,
-      initialShareWhatsapp: _myWhatsAppConsent,
-      initialShareLocation: _myLocationConsent,
+      matchId: widget.matchId,
       partnerName: _displayRecipient.name,
-      partnerWhatsAppConsent: _partnerWhatsAppConsent,
-      partnerLocationConsent: _partnerLocationConsent,
+      totalMessages: _mutualMessageCount,
+      initialMyWhatsapp: _myWhatsAppConsent,
+      initialMyLocation: _myLocationConsent,
+      initialPartnerWhatsapp: _partnerWhatsAppConsent,
+      initialPartnerLocation: _partnerLocationConsent,
+      initialMyPaid: _myBridgePaid,
+      initialPartnerPaid: _partnerBridgePaid,
+      initialIsUnlocked: _isWhatsAppUnlocked || _isLocationUnlocked,
+      initialPartnerPhone: _unlockedPhoneNumber,
+      initialPartnerMapsUrl: _partnerMapsUrl,
+      onStateChanged: () {
+        _fetchConsentStatus();
+      },
     );
-
-    if (result == null || !mounted) return;
-
-    setState(() => _isConsentLoading = true);
-    try {
-      final response = await ApiClient.instance.submitChatConsent(
-        matchId: widget.matchId,
-        shareWhatsapp: result.shareWhatsapp,
-        shareLocation: result.shareLocation,
-      );
-
-      if (response.data != null && response.data['data'] != null) {
-        final data = response.data['data'];
-        setState(() {
-          _myWhatsAppConsent = data['my_whatsapp_consent'] ?? result.shareWhatsapp;
-          _myLocationConsent = data['my_location_consent'] ?? result.shareLocation;
-          _partnerWhatsAppConsent = data['partner_whatsapp_consent'] ?? false;
-          _partnerLocationConsent = data['partner_location_consent'] ?? false;
-          _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? false;
-          _isLocationUnlocked = data['location_unlocked'] ?? false;
-          _unlockedPhoneNumber = data['partner_phone'];
-          _partnerMapsUrl = data['partner_maps_url'];
-        });
-
-        if (mounted) {
-          String feedback = '✅ Sharing preferences updated.';
-          if (_isWhatsAppUnlocked && _isLocationUnlocked) {
-            feedback = '🎉 WhatsApp & Google Maps Route Unlocked!';
-          } else if (_isWhatsAppUnlocked) {
-            feedback = '🎉 WhatsApp Unlocked! You can now chat directly.';
-          } else if (_isLocationUnlocked) {
-            feedback = '🎉 Live Route on Google Maps Unlocked!';
-          } else if (result.shareWhatsapp || result.shareLocation) {
-            feedback = '✅ Consent recorded. Waiting for ${_displayRecipient.name}\'s consent.';
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(feedback),
-              backgroundColor: (_isWhatsAppUnlocked || _isLocationUnlocked)
-                  ? Colors.green.shade700
-                  : Colors.amber.shade800,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update consent: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isConsentLoading = false);
-    }
   }
 
   Future<void> _launchWhatsAppChat() async {
@@ -1157,8 +1125,15 @@ class _ChatScreenState extends State<ChatScreen> {
       _messageController.clear();
       _mutualMessageCount++;
 
-      if (_mutualMessageCount >= 15 && !_isWhatsAppUnlocked) {
-        _isWhatsAppUnlocked = true;
+      // 15-Message Milestone Celebration
+      if (_mutualMessageCount == 15) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 15 Messages Complete! Safe WhatsApp & Location Bridge is now available.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     });
 
@@ -1421,13 +1396,33 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem<String>(
+              PopupMenuItem<String>(
                 value: 'safe_share',
                 child: Row(
                   children: [
-                    Icon(Icons.security, color: Colors.greenAccent, size: 18),
-                    SizedBox(width: 10),
-                    Text('Safe Share (WhatsApp/Location)', style: TextStyle(color: Colors.white)),
+                    Icon(
+                      (_isWhatsAppUnlocked || _isLocationUnlocked)
+                          ? Icons.lock_open_rounded
+                          : (_mutualMessageCount < 15 ? Icons.lock_clock : Icons.shield_outlined),
+                      color: (_isWhatsAppUnlocked || _isLocationUnlocked)
+                          ? Colors.greenAccent
+                          : (_mutualMessageCount < 15 ? Colors.amber : Colors.tealAccent),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _mutualMessageCount < 15
+                            ? 'Safe Share ($_mutualMessageCount/15)'
+                            : 'Safe Share (WhatsApp/Maps)',
+                        style: TextStyle(
+                          color: (_isWhatsAppUnlocked || _isLocationUnlocked)
+                              ? Colors.greenAccent
+                              : Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1493,7 +1488,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-          // Safe Two-Way Consent Bridge (WhatsApp & Live Route) Header Widget
+          // Safe Two-Way Consent Bridge & Dual ₹499 Paywall Header Widget
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             color: AppTheme.surfaceColor,
@@ -1502,16 +1497,20 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: BoxDecoration(
                 color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                     ? Colors.green.withValues(alpha: 0.15)
-                    : (_myWhatsAppConsent || _myLocationConsent)
-                        ? Colors.amber.withValues(alpha: 0.15)
-                        : Colors.teal.withValues(alpha: 0.15),
+                    : (_mutualMessageCount < 15)
+                        ? Colors.amber.withValues(alpha: 0.12)
+                        : (_myBridgePaid && _partnerBridgePaid)
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : Colors.teal.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                       ? Colors.greenAccent
-                      : (_myWhatsAppConsent || _myLocationConsent)
-                          ? Colors.amber
-                          : Colors.tealAccent,
+                      : (_mutualMessageCount < 15)
+                          ? Colors.amber.shade700
+                          : (_myBridgePaid && _partnerBridgePaid)
+                              ? Colors.greenAccent
+                              : Colors.tealAccent,
                   width: 1,
                 ),
               ),
@@ -1522,12 +1521,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       Icon(
                         (_isWhatsAppUnlocked && _isLocationUnlocked)
                             ? Icons.lock_open_rounded
-                            : (_myWhatsAppConsent || _myLocationConsent)
-                                ? Icons.hourglass_top_rounded
-                                : Icons.shield_outlined,
+                            : (_mutualMessageCount < 15)
+                                ? Icons.lock_clock
+                                : (_myBridgePaid || _myWhatsAppConsent)
+                                    ? Icons.hourglass_top_rounded
+                                    : Icons.shield_outlined,
                         color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                             ? Colors.greenAccent
-                            : (_myWhatsAppConsent || _myLocationConsent)
+                            : (_mutualMessageCount < 15)
                                 ? Colors.amber
                                 : Colors.tealAccent,
                         size: 24,
@@ -1544,9 +1545,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                       ? '🎉 Safe WhatsApp Unlocked!'
                                       : _isLocationUnlocked
                                           ? '🎉 Live Route on Maps Unlocked!'
-                                          : (_myWhatsAppConsent || _myLocationConsent)
-                                              ? 'Consent Shared 🤝'
-                                              : 'Safe Contact & Route Sharing',
+                                          : (_mutualMessageCount < 15)
+                                              ? '🔒 Safe Share unlocks at 15 messages ($_mutualMessageCount/15)'
+                                              : (_myBridgePaid && !_partnerBridgePaid)
+                                                  ? 'Paid ✅ — Waiting for ${_displayRecipient.name} ⏳'
+                                                  : 'Safe Meet & WhatsApp Bridge 🤝',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -1561,14 +1564,16 @@ class _ChatScreenState extends State<ChatScreen> {
                                       ? 'WhatsApp: ${_unlockedPhoneNumber ?? "Contact Available"}'
                                       : _isLocationUnlocked
                                           ? 'Google Maps navigation is ready.'
-                                          : (_myWhatsAppConsent || _myLocationConsent)
-                                              ? 'Waiting for ${_displayRecipient.name}\'s consent ⏳'
-                                              : 'Mutual consent is required to share number & route.',
+                                          : (_mutualMessageCount < 15)
+                                              ? 'Exchange ${15 - _mutualMessageCount} more messages to unlock mutual consent & ₹499 bridge.'
+                                              : (_myBridgePaid && !_partnerBridgePaid)
+                                                  ? 'Aapka ₹499 payment complete ho gaya hai.'
+                                                  : 'Mutual consent + ₹499 access fee is required.',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                                     ? Colors.greenAccent
-                                    : (_myWhatsAppConsent || _myLocationConsent)
+                                    : (_mutualMessageCount < 15)
                                         ? Colors.amber
                                         : Colors.tealAccent,
                               ),
@@ -1585,15 +1590,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       else if (!_isWhatsAppUnlocked && !_isLocationUnlocked)
                         ElevatedButton.icon(
                           onPressed: _openSafeShareDialog,
-                          icon: const Icon(Icons.lock_open, size: 14),
+                          icon: Icon(
+                            _mutualMessageCount < 15 ? Icons.lock_clock : Icons.lock_open,
+                            size: 14,
+                          ),
                           label: Text(
-                            (_myWhatsAppConsent || _myLocationConsent) ? 'Edit 🔒' : 'Share 🔒',
+                            _mutualMessageCount < 15
+                                ? '$_mutualMessageCount/15'
+                                : (_myBridgePaid ? 'Status 🔒' : 'Unlock 🔒'),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: (_myWhatsAppConsent || _myLocationConsent)
-                                ? Colors.amber.shade800
-                                : const Color(0xFF00BFA5),
+                            backgroundColor: _mutualMessageCount < 15
+                                ? Colors.amber.shade900
+                                : (_myBridgePaid ? Colors.teal.shade800 : const Color(0xFF00BFA5)),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

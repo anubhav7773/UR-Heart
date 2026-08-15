@@ -95,11 +95,15 @@ async def init_db() -> None:
         -- Spatial Index
         CREATE INDEX IF NOT EXISTS idx_users_location_geom_gist ON users USING GIST (location_geom);
 
-        -- New columns for matches table (Safe WhatsApp & Location double consent)
+        -- New columns for matches table (Safe WhatsApp & Location double consent & Dual ₹499 Paywall)
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_whatsapp_consent BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_whatsapp_consent BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_location_consent BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_location_consent BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_paid BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_bridge_paid BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_payment_id VARCHAR(128);
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_bridge_payment_id VARCHAR(128);
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_whatsapp_unlocked BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_location_unlocked BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS mutual_message_count INT DEFAULT 0;
@@ -171,6 +175,10 @@ async def init_db() -> None:
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_whatsapp_consent BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_location_consent BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_location_consent BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_paid BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_bridge_paid BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_payment_id VARCHAR(128);",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_bridge_payment_id VARCHAR(128);",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_whatsapp_unlocked BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_location_unlocked BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS mutual_message_count INT DEFAULT 0;",

@@ -265,6 +265,10 @@ class Match(Base):
     user2_whatsapp_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     user1_location_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     user2_location_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    user1_bridge_paid: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    user2_bridge_paid: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    user1_bridge_payment_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
+    user2_bridge_payment_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
     is_whatsapp_unlocked: Mapped[bool] = mapped_column(Boolean, default=False)
     is_location_unlocked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(

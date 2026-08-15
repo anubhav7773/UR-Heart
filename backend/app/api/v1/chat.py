@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_, update
+from sqlalchemy import select, or_, and_, update, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -18,6 +18,8 @@ from app.models.schemas import (
     SendMessageRequest,
     UploadMediaData,
     WhatsAppBridgeStatusData,
+    SafeBridgeStatusData,
+    SafeBridgePaymentRequest,
     ChatConsentRequest,
     ChatConsentStatusData,
     IcebreakerItem,
@@ -523,67 +525,100 @@ async def upload_chat_media(
     )
 
 
-@router.get("/whatsapp-bridge-status/{match_id}", response_model=APIResponse[WhatsAppBridgeStatusData])
-async def get_whatsapp_bridge_status(
+@router.get("/bridge-status/{match_id}", response_model=APIResponse[SafeBridgeStatusData])
+@router.get("/whatsapp-bridge-status/{match_id}", response_model=APIResponse[SafeBridgeStatusData])
+async def get_safe_bridge_status(
     match_id: str,
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Checks Safe WhatsApp Bridge double-consent status.
-    Unlocks contact number only when at least 15 mutual messages are exchanged
-    AND both participants have explicitly provided their consent.
+    Checks Safe Meet & WhatsApp Bridge state.
+    Unlocks contact phone and Google Maps route only when:
+    1. At least 15 total messages are exchanged (Milestone reached).
+    2. Both participants have explicitly given consent.
+    3. BOTH participants have completed the ₹499 unlock payment.
     """
-    count = 0
-    my_consent = False
-    partner_consent = False
-    unlocked = False
-    target_phone = None
-
     try:
         user_uuid = uuid.UUID(current_user_id)
         match_uuid = uuid.UUID(match_id)
-        match_res = await db.execute(select(Match).where(Match.id == match_uuid))
-        match_obj = match_res.scalars().first()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid match ID or user ID format."
+        )
 
-        if match_obj:
-            if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You are not a participant in this match."
-                )
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    match_obj = match_res.scalars().first()
 
-            count = match_obj.mutual_message_count or 0
-            is_user1 = (match_obj.user1_id == user_uuid)
+    if not match_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match conversation not found."
+        )
 
-            my_consent = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
-            partner_consent = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
+    if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a participant in this match."
+        )
 
-            # Unlocked only when both consented and count >= 15 (or previously marked unlocked)
-            unlocked = (my_consent and partner_consent and count >= 15) or match_obj.is_whatsapp_unlocked
+    # 1. Count actual total messages exchanged in this match
+    count_res = await db.execute(
+        select(func.count(ChatMessage.id)).where(ChatMessage.match_id == match_uuid)
+    )
+    total_messages = count_res.scalar() or 0
+    is_milestone_reached = total_messages >= 15
 
-            if unlocked:
-                target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
-                target_res = await db.execute(select(User).where(User.id == target_id))
-                target_user = target_res.scalars().first()
-                if target_user and target_user.phone_number:
-                    target_phone = target_user.phone_number
-    except HTTPException:
-        raise
-    except Exception as err:
-        logger.warning(f"[WhatsApp-Bridge] Error checking status for match {match_id}: {err}")
-        await db.rollback()
+    is_user1 = (match_obj.user1_id == user_uuid)
+
+    my_whatsapp = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
+    partner_whatsapp = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
+    my_location = match_obj.user1_location_consent if is_user1 else match_obj.user2_location_consent
+    partner_location = match_obj.user2_location_consent if is_user1 else match_obj.user1_location_consent
+
+    my_paid = match_obj.user1_bridge_paid if is_user1 else match_obj.user2_bridge_paid
+    partner_paid = match_obj.user2_bridge_paid if is_user1 else match_obj.user1_bridge_paid
+    is_both_paid = bool(match_obj.user1_bridge_paid and match_obj.user2_bridge_paid)
+
+    # Unlocked only when milestone >= 15 AND mutual consent given AND both paid
+    whatsapp_unlocked = bool(is_milestone_reached and my_whatsapp and partner_whatsapp and is_both_paid)
+    location_unlocked = bool(is_milestone_reached and my_location and partner_location and is_both_paid)
+    is_fully_unlocked = bool(whatsapp_unlocked or location_unlocked)
+
+    partner_phone = None
+    partner_maps_url = None
+
+    if is_fully_unlocked:
+        target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
+        target_res = await db.execute(select(User).where(User.id == target_id))
+        target_user = target_res.scalars().first()
+        if target_user:
+            if whatsapp_unlocked and target_user.phone_number:
+                partner_phone = target_user.phone_number
+            if location_unlocked and target_user.latitude is not None and target_user.longitude is not None:
+                partner_maps_url = f"https://www.google.com/maps/dir/?api=1&destination={target_user.latitude},{target_user.longitude}"
 
     return APIResponse(
         success=True,
-        data=WhatsAppBridgeStatusData(
+        data=SafeBridgeStatusData(
             match_id=match_id,
-            mutual_message_count=count,
-            required_threshold=15,
-            my_consent=my_consent,
-            partner_consent=partner_consent,
-            is_whatsapp_unlocked=unlocked,
-            phone_number=target_phone if unlocked and target_phone else None,
+            total_messages=total_messages,
+            is_milestone_reached=is_milestone_reached,
+            required_messages=15,
+            my_consent=bool(my_whatsapp or my_location),
+            my_whatsapp_consent=my_whatsapp,
+            my_location_consent=my_location,
+            partner_consent=bool(partner_whatsapp or partner_location),
+            partner_whatsapp_consent=partner_whatsapp,
+            partner_location_consent=partner_location,
+            my_payment_done=my_paid,
+            partner_payment_done=partner_paid,
+            is_fully_unlocked=is_fully_unlocked,
+            whatsapp_unlocked=whatsapp_unlocked,
+            location_unlocked=location_unlocked,
+            partner_phone=partner_phone,
+            partner_maps_url=partner_maps_url,
         )
     )
 
@@ -748,7 +783,8 @@ async def submit_chat_consent(
 ):
     """
     Submits current user's consent flags for sharing WhatsApp and/or Live Route on Google Maps.
-    Unlocks contact phone and/or turn-by-turn route once mutual consent is achieved.
+    Requires at least 15 messages in the match.
+    Unlocks contact phone and/or turn-by-turn route once mutual consent AND dual ₹499 payments are achieved.
     """
     try:
         user_uuid = uuid.UUID(current_user_id)
@@ -774,6 +810,17 @@ async def submit_chat_consent(
             detail="You are not an authorized participant in this conversation."
         )
 
+    # 1. 15-Message Milestone Validation
+    count_res = await db.execute(
+        select(func.count(ChatMessage.id)).where(ChatMessage.match_id == match_uuid)
+    )
+    total_messages = count_res.scalar() or 0
+    if total_messages < 15:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"15 messages complete hone ke baad Safe Share unlock hoga (Current: {total_messages}/15)"
+        )
+
     is_user1 = (match_obj.user1_id == user_uuid)
     if is_user1:
         match_obj.user1_whatsapp_consent = payload.share_whatsapp
@@ -782,9 +829,12 @@ async def submit_chat_consent(
         match_obj.user2_whatsapp_consent = payload.share_whatsapp
         match_obj.user2_location_consent = payload.share_location
 
-    # Determine mutual unlocked states
-    whatsapp_unlocked = bool(match_obj.user1_whatsapp_consent and match_obj.user2_whatsapp_consent)
-    location_unlocked = bool(match_obj.user1_location_consent and match_obj.user2_location_consent)
+    # Determine mutual unlocked states (Requires BOTH consent AND dual ₹499 payments)
+    is_both_paid = bool(match_obj.user1_bridge_paid and match_obj.user2_bridge_paid)
+    whatsapp_unlocked = bool(match_obj.user1_whatsapp_consent and match_obj.user2_whatsapp_consent and is_both_paid)
+    location_unlocked = bool(match_obj.user1_location_consent and match_obj.user2_location_consent and is_both_paid)
+    is_fully_unlocked = bool(whatsapp_unlocked or location_unlocked)
+
     match_obj.is_whatsapp_unlocked = whatsapp_unlocked
     match_obj.is_location_unlocked = location_unlocked
 
@@ -794,7 +844,7 @@ async def submit_chat_consent(
     partner_phone = None
     partner_maps_url = None
 
-    if whatsapp_unlocked or location_unlocked:
+    if is_fully_unlocked:
         target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
         target_res = await db.execute(select(User).where(User.id == target_id))
         target_user = target_res.scalars().first()
@@ -809,16 +859,24 @@ async def submit_chat_consent(
     partner_whatsapp = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
     partner_location = match_obj.user2_location_consent if is_user1 else match_obj.user1_location_consent
 
+    my_paid = match_obj.user1_bridge_paid if is_user1 else match_obj.user2_bridge_paid
+    partner_paid = match_obj.user2_bridge_paid if is_user1 else match_obj.user1_bridge_paid
+
     # Broadcast real-time consent update event to all active match sockets and partner
     consent_payload = {
         "type": "consent_update",
         "match_id": match_id,
+        "total_messages": total_messages,
+        "is_milestone_reached": True,
         "whatsapp_unlocked": whatsapp_unlocked,
         "location_unlocked": location_unlocked,
         "my_whatsapp_consent": my_whatsapp,
         "my_location_consent": my_location,
         "partner_whatsapp_consent": partner_whatsapp,
         "partner_location_consent": partner_location,
+        "my_payment_done": my_paid,
+        "partner_payment_done": partner_paid,
+        "is_fully_unlocked": is_fully_unlocked,
         "partner_phone": partner_phone,
         "partner_maps_url": partner_maps_url,
     }
@@ -839,6 +897,142 @@ async def submit_chat_consent(
             my_location_consent=my_location,
             partner_whatsapp_consent=partner_whatsapp,
             partner_location_consent=partner_location,
+            my_payment_done=my_paid,
+            partner_payment_done=partner_paid,
+            is_fully_unlocked=is_fully_unlocked,
+            total_messages=total_messages,
+            is_milestone_reached=True,
+            partner_phone=partner_phone,
+            partner_maps_url=partner_maps_url,
+        )
+    )
+
+
+@router.post("/bridge/unlock-payment", response_model=APIResponse[SafeBridgeStatusData])
+@router.post("/bridge-payment", response_model=APIResponse[SafeBridgeStatusData])
+async def submit_bridge_payment(
+    payload: SafeBridgePaymentRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submits and registers a ₹499 Safe Bridge payment.
+    Real contact number and Google Maps route unlock live when BOTH users complete their ₹499 payment and grant consent.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        match_uuid = uuid.UUID(payload.match_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid match ID or user ID format."
+        )
+
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    match_obj = match_res.scalars().first()
+
+    if not match_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match conversation not found."
+        )
+
+    if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a participant in this match."
+        )
+
+    count_res = await db.execute(
+        select(func.count(ChatMessage.id)).where(ChatMessage.match_id == match_uuid)
+    )
+    total_messages = count_res.scalar() or 0
+    is_milestone_reached = total_messages >= 15
+
+    is_user1 = (match_obj.user1_id == user_uuid)
+    if is_user1:
+        match_obj.user1_bridge_paid = True
+        match_obj.user1_bridge_payment_id = payload.payment_id
+    else:
+        match_obj.user2_bridge_paid = True
+        match_obj.user2_bridge_payment_id = payload.payment_id
+
+    is_both_paid = bool(match_obj.user1_bridge_paid and match_obj.user2_bridge_paid)
+    my_whatsapp = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
+    partner_whatsapp = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
+    my_location = match_obj.user1_location_consent if is_user1 else match_obj.user2_location_consent
+    partner_location = match_obj.user2_location_consent if is_user1 else match_obj.user1_location_consent
+
+    whatsapp_unlocked = bool(is_milestone_reached and my_whatsapp and partner_whatsapp and is_both_paid)
+    location_unlocked = bool(is_milestone_reached and my_location and partner_location and is_both_paid)
+    is_fully_unlocked = bool(whatsapp_unlocked or location_unlocked)
+
+    match_obj.is_whatsapp_unlocked = whatsapp_unlocked
+    match_obj.is_location_unlocked = location_unlocked
+
+    await db.commit()
+    await db.refresh(match_obj)
+
+    partner_phone = None
+    partner_maps_url = None
+
+    if is_fully_unlocked:
+        target_id = match_obj.user2_id if is_user1 else match_obj.user1_id
+        target_res = await db.execute(select(User).where(User.id == target_id))
+        target_user = target_res.scalars().first()
+        if target_user:
+            if whatsapp_unlocked and target_user.phone_number:
+                partner_phone = target_user.phone_number
+            if location_unlocked and target_user.latitude is not None and target_user.longitude is not None:
+                partner_maps_url = f"https://www.google.com/maps/dir/?api=1&destination={target_user.latitude},{target_user.longitude}"
+
+    my_paid = match_obj.user1_bridge_paid if is_user1 else match_obj.user2_bridge_paid
+    partner_paid = match_obj.user2_bridge_paid if is_user1 else match_obj.user1_bridge_paid
+
+    # Broadcast real-time payment update event over WebSocket
+    bridge_payload = {
+        "type": "bridge_payment_update",
+        "match_id": payload.match_id,
+        "total_messages": total_messages,
+        "is_milestone_reached": is_milestone_reached,
+        "my_whatsapp_consent": my_whatsapp,
+        "my_location_consent": my_location,
+        "partner_whatsapp_consent": partner_whatsapp,
+        "partner_location_consent": partner_location,
+        "my_payment_done": my_paid,
+        "partner_payment_done": partner_paid,
+        "is_fully_unlocked": is_fully_unlocked,
+        "whatsapp_unlocked": whatsapp_unlocked,
+        "location_unlocked": location_unlocked,
+        "partner_phone": partner_phone,
+        "partner_maps_url": partner_maps_url,
+    }
+    try:
+        await ws_manager.broadcast_to_match(payload.match_id, bridge_payload)
+        target_id_str = str(match_obj.user2_id if is_user1 else match_obj.user1_id)
+        await ws_manager.broadcast_to_user(target_id_str, bridge_payload)
+    except Exception:
+        pass
+
+    return APIResponse(
+        success=True,
+        message="Bridge payment verified and registered successfully.",
+        data=SafeBridgeStatusData(
+            match_id=payload.match_id,
+            total_messages=total_messages,
+            is_milestone_reached=is_milestone_reached,
+            required_messages=15,
+            my_consent=bool(my_whatsapp or my_location),
+            my_whatsapp_consent=my_whatsapp,
+            my_location_consent=my_location,
+            partner_consent=bool(partner_whatsapp or partner_location),
+            partner_whatsapp_consent=partner_whatsapp,
+            partner_location_consent=partner_location,
+            my_payment_done=my_paid,
+            partner_payment_done=partner_paid,
+            is_fully_unlocked=is_fully_unlocked,
+            whatsapp_unlocked=whatsapp_unlocked,
+            location_unlocked=location_unlocked,
             partner_phone=partner_phone,
             partner_maps_url=partner_maps_url,
         )

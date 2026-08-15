@@ -224,6 +224,24 @@ class ApiClient {
     return await dio.get('/chat/consent/$matchId');
   }
 
+  // 10e. Get Safe Bridge Status (15-message milestone, dual consent, dual ₹499 payment)
+  Future<Response> getBridgeStatus(String matchId) async {
+    return await dio.get('/chat/bridge-status/$matchId');
+  }
+
+  // 10f. Submit Safe Bridge ₹499 Unlock Payment
+  Future<Response> submitBridgePayment({
+    required String matchId,
+    required String paymentId,
+    double amount = 499.0,
+  }) async {
+    return await dio.post('/chat/bridge/unlock-payment', data: {
+      'match_id': matchId,
+      'payment_id': paymentId,
+      'amount': amount,
+    });
+  }
+
   // 11. Remote Ad Configuration
   Future<Response> getAdConfig() async {
     return await dio.get('/ads/config');
