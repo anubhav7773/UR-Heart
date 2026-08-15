@@ -12,6 +12,7 @@ import '../../screens/admin_verification_screen.dart';
 import '../../screens/activity_screen.dart';
 import '../../core/utils/feedback_helper.dart';
 import '../../core/services/app_update_service.dart';
+import '../../core/services/image_guard_service.dart';
 import 'edit_profile_screen.dart';
 import 'profile_service.dart';
 
@@ -309,6 +310,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (pickedFile != null) {
+        // On-Device OCR Text Guard Check
+        final isClean = await ImageGuardService.validateProfilePhoto(pickedFile.path);
+        if (!isClean) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Colors.redAccent,
+                content: Text(
+                  "⚠️ Photo me phone number, Insta ID, ya text likhna mana hai. Kripya apni real photo upload karein.",
+                ),
+              ),
+            );
+          }
+          return;
+        }
+
         setState(() => _isLoading = true);
         final File imageFile = File(pickedFile.path);
         final String? uploadedUrl = await _profileService.uploadProfilePhoto(imageFile);

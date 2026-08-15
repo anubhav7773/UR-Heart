@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/services/image_guard_service.dart';
 import '../home/home_screen.dart';
 import 'profile_service.dart';
 
@@ -91,6 +92,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
 
       if (pickedFile != null) {
+        // On-Device OCR Text Guard Check
+        final isClean = await ImageGuardService.validateProfilePhoto(pickedFile.path);
+        if (!isClean) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Colors.redAccent,
+                content: Text(
+                  "⚠️ Photo me phone number, Insta ID, ya text likhna mana hai. Kripya apni real photo upload karein.",
+                ),
+              ),
+            );
+          }
+          return;
+        }
+
         setState(() => _isSubmitting = true);
         final File imageFile = File(pickedFile.path);
         final String? uploadedUrl = await _profileService.uploadProfilePhoto(imageFile);

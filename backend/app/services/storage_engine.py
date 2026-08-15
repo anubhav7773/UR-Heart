@@ -52,8 +52,8 @@ class StorageEngineService:
             except Exception:
                 processed_bytes = file_bytes
 
-        supabase_url = settings.SUPABASE_URL.rstrip('/')
-        supabase_key = settings.SUPABASE_KEY
+        supabase_url = (settings.SUPABASE_URL or "https://mock.supabase.co").rstrip('/')
+        supabase_key = settings.SUPABASE_KEY or "mock_key"
 
         # Supabase Storage REST API URL for specified bucket
         upload_url = f"{supabase_url}/storage/v1/object/{bucket_name}/{target_filename}"

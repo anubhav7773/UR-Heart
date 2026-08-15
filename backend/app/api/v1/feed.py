@@ -2,7 +2,7 @@ import math
 import uuid
 from datetime import date, datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, status, Response
+from fastapi import APIRouter, Depends, Query, status, Response, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, func, case
 from sqlalchemy.orm import selectinload
@@ -16,6 +16,7 @@ from app.models.orm import (
     UserAdCounter,
     Swipe,
     Match,
+    ChatMessage,
     BlockedUser,
     UserReport,
     SwipeActionEnum as ORMSwipeActionEnum,
@@ -33,6 +34,8 @@ from app.models.schemas import (
     IntentEnum,
     SwipeActionEnum,
     VerificationStatusEnum,
+    DirectDMRequest,
+    DirectDMData,
     calculate_dynamic_age,
 )
 from app.services.geo_engine import GeoEngineService
@@ -529,3 +532,130 @@ async def swipe_action(
     )
 
     return APIResponse(success=True, data=swipe_data)
+
+
+@router.post("/direct-dm", response_model=APIResponse[DirectDMData])
+async def send_direct_dm(
+    payload: DirectDMRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Direct DM Route:
+    - Verifies user has active direct_dm_until pass.
+    - If expired or not present: raises 403 HTTP error ("Direct DM pass expired or inactive").
+    - Creates or retrieves Match between users.
+    - Inserts the initial message into chat_messages.
+    - Triggers FCM push notification to target_user_id.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        target_uuid = uuid.UUID(payload.target_user_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format."
+        )
+
+    if user_uuid == target_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot send Direct DM to yourself."
+        )
+
+    now_utc = datetime.now(timezone.utc)
+
+    # 1. Fetch current user and verify direct DM pass
+    is_pass_valid = False
+    current_user = None
+    try:
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        current_user = user_res.scalars().first()
+        if current_user and current_user.direct_dm_until and current_user.direct_dm_until > now_utc:
+            is_pass_valid = True
+    except Exception:
+        current_user = None
+
+    if not is_pass_valid:
+        from app.api.v1.payments import _mock_user_passes
+        mock_p = _mock_user_passes.get(current_user_id)
+        if mock_p and mock_p.get("direct_dm_until") and mock_p.get("direct_dm_until") > now_utc:
+            is_pass_valid = True
+
+    if not is_pass_valid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Direct DM pass expired or inactive. Please unlock the ₹49 Direct DM Pass."
+        )
+
+    match_id_str = str(uuid.uuid4())
+    msg_id = uuid.uuid4()
+    sender_name = current_user.full_name if current_user and current_user.full_name else "Someone"
+
+    try:
+        target_res = await db.execute(select(User).where(User.id == target_uuid))
+        target_user = target_res.scalars().first()
+
+        match_res = await db.execute(
+            select(Match).where(
+                or_(
+                    and_(Match.user1_id == user_uuid, Match.user2_id == target_uuid),
+                    and_(Match.user1_id == target_uuid, Match.user2_id == user_uuid)
+                )
+            )
+        )
+        match_obj = match_res.scalars().first()
+        if not match_obj:
+            match_obj = Match(
+                user1_id=user_uuid,
+                user2_id=target_uuid,
+                mutual_message_count=1
+            )
+            db.add(match_obj)
+            await db.flush()
+        else:
+            match_obj.mutual_message_count = (match_obj.mutual_message_count or 0) + 1
+
+        match_id_str = str(match_obj.id)
+        chat_msg = ChatMessage(
+            id=msg_id,
+            match_id=match_obj.id,
+            sender_id=user_uuid,
+            content=payload.message.strip(),
+            media_type="text",
+            status="sent",
+        )
+        db.add(chat_msg)
+        await db.commit()
+        await db.refresh(chat_msg)
+
+        if target_user:
+            target_fcm = getattr(target_user, 'fcm_token', None)
+            if target_fcm:
+                try:
+                    await send_push_notification(
+                        fcm_token=target_fcm,
+                        title=f"⚡ New Direct Message from {sender_name}",
+                        body=payload.message[:100],
+                        data={
+                            "type": "direct_dm",
+                            "match_id": match_id_str,
+                            "sender_id": str(user_uuid),
+                        }
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return APIResponse(
+        success=True,
+        data=DirectDMData(
+            match_id=match_id_str,
+            target_user_id=str(target_uuid),
+            message_id=str(msg_id),
+            content=payload.message.strip(),
+            created_at=now_utc.isoformat(),
+            message="Direct DM sent successfully!"
+        )
+    )

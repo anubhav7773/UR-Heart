@@ -59,10 +59,15 @@ class VerificationStatusEnum(str, enum.Enum):
 
 
 class SachetPlanTypeEnum(str, enum.Enum):
-    chai_invite = "chai_invite"  # ₹9
-    photo_pass = "photo_pass"    # ₹19
-    super_boost = "super_boost"  # ₹29
-    monthly = "monthly"          # ₹99
+    PLAN_BOOST_29 = "PLAN_BOOST_29"          # ₹29 - Profile Boost (1 Hour 10x Discovery)
+    PLAN_DIRECT_DM_49 = "PLAN_DIRECT_DM_49"  # ₹49 - Direct DM Pass (1 Hour Instant DM)
+    PLAN_AD_FREE_199 = "PLAN_AD_FREE_199"    # ₹199 - Ad-Free VIP (30 Days Zero Ads)
+    PLAN_SAFE_BRIDGE_499 = "PLAN_SAFE_BRIDGE_499"  # ₹499 - Safe Bridge Unlock
+    # Legacy alias support
+    chai_invite = "chai_invite"
+    photo_pass = "photo_pass"
+    super_boost = "super_boost"
+    monthly = "monthly"
 
 
 class User(Base):
@@ -107,6 +112,12 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
     boosted_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    direct_dm_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    ad_free_until: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
     photo_pass_until: Mapped[Optional[datetime]] = mapped_column(

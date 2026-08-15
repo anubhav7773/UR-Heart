@@ -69,6 +69,8 @@ async def init_db() -> None:
 
         -- New columns for users table
         ALTER TABLE users ADD COLUMN IF NOT EXISTS boosted_until TIMESTAMPTZ DEFAULT NULL;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS direct_dm_until TIMESTAMPTZ DEFAULT NULL;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS ad_free_until TIMESTAMPTZ DEFAULT NULL;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_pass_until TIMESTAMPTZ DEFAULT NULL;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_swipes INT DEFAULT 0;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_url VARCHAR(500) DEFAULT NULL;
@@ -154,6 +156,8 @@ async def init_db() -> None:
     # 3. Individual fallback column statements to guarantee completion even if non-Postgres dialect
     individual_queries = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS boosted_until TIMESTAMPTZ DEFAULT NULL;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS direct_dm_until TIMESTAMPTZ DEFAULT NULL;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ad_free_until TIMESTAMPTZ DEFAULT NULL;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_pass_until TIMESTAMPTZ DEFAULT NULL;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_swipes INT DEFAULT 0;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_url VARCHAR(500) DEFAULT NULL;",

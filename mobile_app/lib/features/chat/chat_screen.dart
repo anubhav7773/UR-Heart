@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -513,6 +514,34 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final String type = (data['type'] ?? 'message').toString();
 
+      if (type == 'error' || data['code'] == 'CONTENT_FILTER_BLOCKED') {
+        final errorMsg = data['message'] ??
+            '⚠️ Contact details, usernames, ya location share karna mana hai. 15 messages ke baad Safe Bridge unlock karein!';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      errorMsg.toString(),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.redAccent.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
+
       if (type == 'consent_update' || type == 'bridge_payment_update') {
         if (mounted) {
           setState(() {
@@ -861,49 +890,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _handleAttachmentTap() async {
-    if (!_isPremiumUser) {
-      final bool? upgraded = await showModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => const SubscriptionSheet(),
-      );
 
-      if (upgraded == true) {
-        setState(() {
-          _isPremiumUser = true;
-        });
-        _inChatAdTimer?.cancel();
-      }
-    } else {
-      _sendMessage(text: '📷 Shared photo attachment');
-    }
-  }
-
-  Future<void> _sendChaiInviteDirect() async {
-    try {
-      await ApiClient.instance.postSendChaiInvite(
-        receiverId: widget.recipientUser.id,
-        matchId: widget.matchId,
-        message: '⚡ I sent you a ₹9 Direct Invite Pass!',
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('⚡ ₹9 Direct Invite Pass sent to ${_displayRecipient.name}!'),
-          backgroundColor: AppTheme.primaryColor,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      _sendMessage(text: '⚡ I sent you a Direct Invite Pass!');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Chai Invite notice: ${e.toString()}')),
-      );
-    }
-  }
 
   void _showMatchProfileBottomSheet() {
     showModalBottomSheet(
@@ -1022,22 +1009,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-
-                    // Quick Action: Send Direct Invite Pass
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _sendChaiInviteDirect();
-                      },
-                      icon: const Icon(Icons.bolt, size: 20),
-                      label: const Text('Send ₹9 Direct Pass (24 Hours)'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                    ),
                     const SizedBox(height: 12),
 
                     // Report & Block Options
@@ -1132,7 +1103,56 @@ class _ChatScreenState extends State<ChatScreen> {
           _upsertServerMessage(Map<String, dynamic>.from(data));
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      String errorMsg =
+          '⚠️ Contact details, usernames, ya location share karna mana hai. 15 messages ke baad Safe Bridge unlock karein!';
+
+      if (e is DioException && e.response != null) {
+        final resData = e.response?.data;
+        if (resData is Map) {
+          if (resData['error'] is Map && resData['error']['message'] != null) {
+            errorMsg = resData['error']['message'].toString();
+          } else if (resData['detail'] != null) {
+            errorMsg = resData['detail'].toString();
+          } else if (resData['message'] != null) {
+            errorMsg = resData['message'].toString();
+          }
+        }
+      }
+
+      // Rollback optimistic message if rejected by filter or server
+      if (mounted) {
+        setState(() {
+          _messages.removeWhere((m) => m.id == clientMsgId || m.clientMsgId == clientMsgId);
+          _processedMessageIds.remove(clientMsgId);
+          if (_mutualMessageCount > 0) _mutualMessageCount--;
+          if (content.isNotEmpty && _messageController.text.isEmpty) {
+            _messageController.text = content;
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    errorMsg,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.redAccent.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -1357,12 +1377,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         actions: [
-          // Quick Action: Send ₹9 Direct Pass
-          IconButton(
-            tooltip: 'Send ₹9 Direct Pass',
-            icon: const Icon(Icons.bolt, color: AppTheme.secondaryColor, size: 22),
-            onPressed: _sendChaiInviteDirect,
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             color: AppTheme.cardColor,
@@ -1460,9 +1474,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   InkWell(
-                    onTap: _handleAttachmentTap,
+                    onTap: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const SubscriptionSheet(initialPlanType: 'PLAN_AD_FREE_199'),
+                    ),
                     child: const Text(
-                      'Upgrade ₹99',
+                      'Upgrade ₹199 VIP',
                       style: TextStyle(fontSize: 11, color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -1747,16 +1766,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: SafeArea(
               child: Row(
                 children: [
-                  // Attachment Button
-                  IconButton(
-                    icon: Icon(
-                      _isPremiumUser ? Icons.photo_camera : Icons.lock_outline,
-                      color: _isPremiumUser ? Colors.blueAccent : AppTheme.secondaryColor,
-                    ),
-                    onPressed: _handleAttachmentTap,
-                  ),
-
-                  // Floating Input Field
+                  // Floating Text Input Field
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),

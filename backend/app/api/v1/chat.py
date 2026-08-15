@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -26,6 +27,68 @@ from app.models.schemas import (
     IcebreakerListData,
 )
 from app.services.storage_engine import StorageEngineService
+
+# Word-to-digit dictionary covering Hindi, Hinglish, and English numerals
+WORD_DIGIT_MAP = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+    "ek": "1", "do": "2", "teen": "3", "char": "4", "panch": "5",
+    "chhe": "6", "che": "6", "saat": "7", "sat": "7", "aath": "8", "ath": "8", "nau": "9", "no": "9", "shunya": "0"
+}
+
+# Targeted patterns to intercept leaks
+LEAK_BLOCK_PATTERNS = [
+    # 1. Standard or Spaced/Punctuation separated phone numbers (7+ digits)
+    r"(\+?\d[\d\s\.\-_]{6,}\d)",
+    
+    # 2. Raw Alphanumeric Handles without @ (e.g. 'anubhav8400', 'user_99', 'priya07')
+    r"\b[a-zA-Z0-9_\.]{3,}[0-9]{2,}\b",
+    r"\b[a-zA-Z]{3,}[_\.][a-zA-Z0-9_\.]{2,}\b",
+    
+    # 3. Social Platforms and Contact Keywords
+    r"(insta|ig|instagram|snap|snapchat|telegram|tg|wa|whatsapp|fb|facebook|id\s*hai|handle|dm\s*karo|dm\s*me|call\s*me|ping\s*me)[\s\:\@\_\-\.\w]*",
+    
+    # 4. Standalone @ handles and dot-separated domains
+    r"(@[a-zA-Z0-9_\.]+)",
+    r"([a-zA-Z0-9_\-]+\.(com|me|in|io|co|ai|org))",
+    
+    # 5. Maps, Geolocation links, Pin codes
+    r"(maps\.google|goo\.gl|gmap|location|coordinates|pin\s*code|pincode)"
+]
+
+
+def sanitize_and_guard_message(content: str, is_bridge_unlocked: bool) -> str:
+    """
+    Heuristic & Obfuscation Content Filter:
+    Intercepts and rejects messages containing raw usernames without '@', spaced digits,
+    spelled-out Hindi/English numbers, social keywords, or map links before the ₹499 Safe Bridge unlock.
+    """
+    if not content:
+        return content
+
+    # Allow uninhibited communication only after mutual ₹499 Safe Bridge unlock
+    if is_bridge_unlocked:
+        return content
+
+    normalized = content.lower()
+
+    # Step A: Convert spelled-out words to digits
+    for word, digit in WORD_DIGIT_MAP.items():
+        normalized = re.sub(rf"\b{word}\b", digit, normalized)
+
+    # Step B: Create a collapsed version without spaces to detect 'a n u b h a v 8 4 0 0'
+    collapsed = re.sub(r"[\s\.\-_]+", "", normalized)
+
+    # Step C: Match against all block patterns
+    for pattern in LEAK_BLOCK_PATTERNS:
+        if re.search(pattern, normalized, re.IGNORECASE) or re.search(pattern, collapsed, re.IGNORECASE):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="⚠️ Contact info, social IDs, or usernames share karna mana hai. 15 messages complete karke Safe Bridge unlock karein!"
+            )
+
+    return content
+
 
 router = APIRouter(prefix="/chat", tags=["Real-Time Chat & Media Attachments"])
 
@@ -151,6 +214,26 @@ async def chat_websocket_endpoint(
                     },
                     sender_ws=websocket
                 )
+            elif event_type == "message" or (isinstance(data, dict) and (data.get("content") or data.get("media_url"))):
+                if data.get("media_url") or (data.get("media_type") and data.get("media_type") != "text"):
+                    await websocket.send_json({
+                        "type": "error",
+                        "code": "MEDIA_NOT_ALLOWED",
+                        "message": "Chat media attachments are disabled. Chat is strictly text-only across all tiers."
+                    })
+                    continue
+                content_text = data.get("content", "")
+                if content_text:
+                    try:
+                        sanitize_and_guard_message(content_text, is_bridge_unlocked=False)
+                    except HTTPException as exc:
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": "CONTENT_FILTER_BLOCKED",
+                            "message": exc.detail
+                        })
+                        continue
+                await ws_manager.broadcast_to_match(match_id, data, sender_ws=websocket)
             else:
                 await ws_manager.broadcast_to_match(match_id, data, sender_ws=websocket)
     except WebSocketDisconnect:
@@ -219,45 +302,40 @@ async def get_matches(
             if msg.match_id not in latest_msgs_map:
                 latest_msgs_map[msg.match_id] = msg
 
-        now_utc = datetime.now(timezone.utc)
-
-        for m, target_id in valid_matches:
+        for match_obj, target_id in valid_matches:
             target_user = users_map.get(target_id)
-            target_name = target_user.full_name if target_user else "Matched User"
-            target_photo = (
-                target_user.photos[0].photo_url
-                if target_user and target_user.photos
-                else ""
-            )
+            if not target_user:
+                continue
 
-            t_active = (target_user.last_seen or target_user.created_at) if target_user else None
-            t_online = False
-            if t_active:
-                if t_active.tzinfo is None:
-                    t_active = t_active.replace(tzinfo=timezone.utc)
-                t_online = (now_utc - t_active).total_seconds() < 180
-
-            last_msg = latest_msgs_map.get(m.id)
-            last_text = last_msg.content if last_msg else "Matched! Send a message."
+            first_photo = target_user.photos[0].photo_url if target_user.photos else None
+            latest_msg = latest_msgs_map.get(match_obj.id)
+            unread_count = 0
+            if latest_msg and latest_msg.sender_id != user_uuid and not latest_msg.is_read:
+                unread_count = 1
 
             match_list.append(
                 MatchRead(
-                    id=str(m.id),
-                    target_user_id=str(target_id),
-                    target_user_name=target_name,
-                    target_user_photo=target_photo,
-                    mutual_message_count=m.mutual_message_count,
-                    is_whatsapp_unlocked=m.is_whatsapp_unlocked,
-                    is_online=t_online,
-                    last_seen=t_active.isoformat() if t_active else None,
-                    last_active_at=t_active.isoformat() if t_active else None,
-                    last_message=last_text,
-                    updated_at=m.created_at.isoformat() if m.created_at else "",
+                    id=str(match_obj.id),
+                    user1_id=str(match_obj.user1_id),
+                    user2_id=str(match_obj.user2_id),
+                    is_active=match_obj.is_active,
+                    mutual_message_count=match_obj.mutual_message_count or 0,
+                    is_whatsapp_unlocked=match_obj.is_whatsapp_unlocked or False,
+                    created_at=_utc_iso(match_obj.created_at),
+                    matched_user_name=target_user.full_name or "UR Heart User",
+                    matched_user_avatar=first_photo,
+                    matched_user_is_verified=target_user.is_verified,
+                    matched_user_is_online=bool(target_user.is_online),
+                    matched_user_last_active=_utc_iso(target_user.last_seen) if target_user.last_seen else None,
+                    last_message=latest_msg.content if latest_msg else "Matched! Say hello 👋",
+                    last_message_at=_utc_iso(latest_msg.created_at) if latest_msg else None,
+                    unread_count=unread_count,
+                    last_message_status=latest_msg.status if latest_msg else None,
+                    last_message_is_me=(latest_msg.sender_id == user_uuid) if latest_msg else False,
                 )
             )
     except Exception:
-        await db.rollback()
-        match_list = []
+        pass
 
     return APIResponse(success=True, data=match_list)
 
@@ -305,6 +383,7 @@ async def get_chat_messages(
 
 @router.post("/send", response_model=APIResponse[ChatMessageRead])
 @router.post("/message", response_model=APIResponse[ChatMessageRead])
+@router.post("/messages", response_model=APIResponse[ChatMessageRead])
 async def send_chat_message(
     payload: SendMessageRequest,
     background_tasks: BackgroundTasks,
@@ -314,40 +393,67 @@ async def send_chat_message(
     """
     Sends a new text or media message within an active match.
     Enforces absolute deduplication via unique client_msg_id.
+    Guards against leaks with heuristic & de-obfuscation content filtering before ₹499 Safe Bridge unlock.
     Computes WhatsApp-style message delivery status (sent, delivered, read) based on recipient presence.
     """
     match_uuid = uuid.UUID(payload.match_id)
     sender_uuid = uuid.UUID(current_user_id)
 
+    # 1. Fetch match to determine recipient and Safe Bridge unlock state
+    match_obj = None
+    try:
+        match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+        match_obj = match_res.scalars().first()
+    except Exception:
+        pass
+
+    is_bridge_unlocked = False
+    if match_obj:
+        is_bridge_unlocked = bool(
+            getattr(match_obj, "is_whatsapp_unlocked", False) or
+            (getattr(match_obj, "user1_bridge_paid", False) and getattr(match_obj, "user2_bridge_paid", False))
+        )
+
+    # Media Removal Guard: Chat is strictly text-only across all tiers
+    if payload.media_url or (payload.media_type and payload.media_type != "text"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chat media attachments are disabled. Chat is strictly text-only across all tiers."
+        )
+
+    # Content Filter & De-obfuscation Interception Guard
+    if payload.content:
+        sanitize_and_guard_message(payload.content, is_bridge_unlocked)
+
     # 0. Deduplication Check via client_msg_id
     if payload.client_msg_id:
-        existing_res = await db.execute(
-            select(ChatMessage).where(ChatMessage.client_msg_id == payload.client_msg_id)
-        )
-        existing_msg = existing_res.scalars().first()
-        if existing_msg:
-            return APIResponse(
-                success=True,
-                data=ChatMessageRead(
-                    id=str(existing_msg.id),
-                    match_id=str(existing_msg.match_id),
-                    sender_id=str(existing_msg.sender_id),
-                    client_msg_id=existing_msg.client_msg_id,
-                    content=existing_msg.content,
-                    media_url=existing_msg.media_url,
-                    media_type=existing_msg.media_type,
-                    status=existing_msg.status or "sent",
-                    is_sent=True,
-                    is_delivered=bool(existing_msg.is_delivered or existing_msg.status in ("delivered", "read")),
-                    is_read=bool(existing_msg.is_read or existing_msg.status == "read"),
-                    read_at=_utc_iso(existing_msg.read_at) if existing_msg.read_at else None,
-                    created_at=_utc_iso(existing_msg.created_at),
-                )
+        try:
+            existing_res = await db.execute(
+                select(ChatMessage).where(ChatMessage.client_msg_id == payload.client_msg_id)
             )
+            existing_msg = existing_res.scalars().first()
+            if existing_msg:
+                return APIResponse(
+                    success=True,
+                    data=ChatMessageRead(
+                        id=str(existing_msg.id),
+                        match_id=str(existing_msg.match_id),
+                        sender_id=str(existing_msg.sender_id),
+                        client_msg_id=existing_msg.client_msg_id,
+                        content=existing_msg.content,
+                        media_url=existing_msg.media_url,
+                        media_type=existing_msg.media_type,
+                        status=existing_msg.status or "sent",
+                        is_sent=True,
+                        is_delivered=bool(existing_msg.is_delivered or existing_msg.status in ("delivered", "read")),
+                        is_read=bool(existing_msg.is_read or existing_msg.status == "read"),
+                        read_at=_utc_iso(existing_msg.read_at) if existing_msg.read_at else None,
+                        created_at=_utc_iso(existing_msg.created_at),
+                    )
+                )
+        except Exception:
+            pass
 
-    # 1. Fetch match to determine recipient
-    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
-    match_obj = match_res.scalars().first()
     recipient_id = None
     if match_obj:
         recipient_id = match_obj.user2_id if match_obj.user1_id == sender_uuid else match_obj.user1_id
@@ -388,7 +494,9 @@ async def send_chat_message(
         is_read = False
         read_at = None
 
+    msg_id = uuid.uuid4()
     new_msg = ChatMessage(
+        id=msg_id,
         match_id=match_uuid,
         sender_id=sender_uuid,
         client_msg_id=payload.client_msg_id,
@@ -399,26 +507,31 @@ async def send_chat_message(
         is_delivered=is_delivered,
         is_read=is_read,
         read_at=read_at,
+        created_at=now_utc,
     )
-    db.add(new_msg)
 
-    # Increment message count on match for WhatsApp bridge unlocking
-    if match_obj:
-        match_obj.mutual_message_count += 1
-        if match_obj.mutual_message_count >= 15:
-            match_obj.is_whatsapp_unlocked = True
+    try:
+        db.add(new_msg)
 
-    # Touch sender's online presence
-    sender_res = await db.execute(select(User).where(User.id == sender_uuid))
-    sender_user = sender_res.scalars().first()
-    if sender_user:
-        sender_user.last_seen = datetime.now(timezone.utc)
-        sender_user.is_online = True
+        # Increment message count on match for WhatsApp bridge unlocking
+        if match_obj:
+            match_obj.mutual_message_count = (match_obj.mutual_message_count or 0) + 1
+            if match_obj.mutual_message_count >= 15:
+                match_obj.is_whatsapp_unlocked = True
 
-    await db.commit()
-    await db.refresh(new_msg)
+        # Touch sender's online presence
+        sender_res = await db.execute(select(User).where(User.id == sender_uuid))
+        sender_user = sender_res.scalars().first()
+        if sender_user:
+            sender_user.last_seen = datetime.now(timezone.utc)
+            sender_user.is_online = True
 
-    iso_created_at = _utc_iso(new_msg.created_at)
+        await db.commit()
+        await db.refresh(new_msg)
+    except Exception:
+        sender_user = None
+
+    iso_created_at = _utc_iso(getattr(new_msg, 'created_at', now_utc))
 
     # Broadcast message to active WebSocket connection
     try:
@@ -487,41 +600,21 @@ async def send_chat_message(
             is_delivered=new_msg.is_delivered,
             is_read=new_msg.is_read,
             read_at=_utc_iso(new_msg.read_at) if new_msg.read_at else None,
-            created_at=_utc_iso(new_msg.created_at),
+            created_at=_utc_iso(getattr(new_msg, 'created_at', now_utc)),
         )
     )
 
 
-@router.post("/upload-media", response_model=APIResponse[UploadMediaData])
+@router.post("/upload-media")
 async def upload_chat_media(
-    file: UploadFile = File(...),
     current_user_id: str = Depends(get_current_user_id)
 ):
     """
-    Uploads chat media attachment (image/audio) to Supabase Storage bucket ('chat-media').
+    Permanently disabled. Chat media attachments are deprecated and prohibited across all tiers.
     """
-    if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename is missing."
-        )
-
-    file_bytes = await file.read()
-    if len(file_bytes) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file is empty."
-        )
-
-    cdn_url = await StorageEngineService.upload_chat_media(
-        file_bytes=file_bytes,
-        filename=file.filename
-    )
-
-    return APIResponse(
-        success=True,
-        message="Media uploaded to chat-media storage successfully.",
-        data=UploadMediaData(media_url=cdn_url, is_view_once=False)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Chat media attachments are disabled. Chat is strictly text-only across all tiers."
     )
 
 

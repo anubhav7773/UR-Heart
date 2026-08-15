@@ -303,23 +303,136 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Future<void> _handleSendChaiInvite(String targetUserId, String name) async {
+  Future<void> _handleDirectDmAction(String targetUserId, String name) async {
     try {
-      await ApiClient.instance.sendChaiInvite(receiverId: targetUserId);
+      final passRes = await ApiClient.instance.dio.get('/payments/active-pass');
+      final passData = passRes.data?['data'];
+      final bool isDirectDmActive = passData?['is_direct_dm_active'] == true;
+
+      if (!isDirectDmActive) {
+        if (!mounted) return;
+        final upgraded = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => const SubscriptionSheet(initialPlanType: 'PLAN_DIRECT_DM_49'),
+        );
+        if (upgraded != true) return;
+      }
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('☕ Sent ₹9 Chai Invite to $name!'),
-          backgroundColor: Colors.amber[800],
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      _showDirectDmComposer(targetUserId, name);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send Chai Invite: ${e.toString()}')),
-      );
+      _showDirectDmComposer(targetUserId, name);
     }
+  }
+
+  void _showDirectDmComposer(String targetUserId, String name) {
+    final textController = TextEditingController();
+    bool isSending = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: Colors.grey[950],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Colors.cyanAccent, width: 1.5),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.bolt, color: Colors.cyanAccent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '⚡ Direct DM to $name',
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Instant message delivery without waiting for a mutual match.',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: textController,
+                maxLines: 3,
+                maxLength: 250,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Type your message to $name...',
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.grey[900],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[800]!),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton.icon(
+              onPressed: isSending
+                  ? null
+                  : () async {
+                      final msg = textController.text.trim();
+                      if (msg.isEmpty) return;
+                      setDlgState(() => isSending = true);
+                      try {
+                        await ApiClient.instance.sendDirectDm(
+                          targetUserId: targetUserId,
+                          message: msg,
+                        );
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('⚡ Direct DM sent to $name!'),
+                            backgroundColor: Colors.cyan[700],
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      } catch (e) {
+                        setDlgState(() => isSending = false);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to send Direct DM: ${e.toString()}')),
+                        );
+                      }
+                    },
+              icon: isSending
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_rounded, color: Colors.black, size: 16),
+              label: const Text('Send DM', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.cyanAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showFilterBottomSheet() {
@@ -906,37 +1019,6 @@ class _FeedScreenState extends State<FeedScreen> {
                                 ),
                               ),
 
-                            // Top Left "☕ Free for Chai" Active Badge
-                            Positioned(
-                              top: 16,
-                              left: 16,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.95),
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: const [
-                                    BoxShadow(color: Colors.black45, blurRadius: 6, offset: Offset(0, 2)),
-                                  ],
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('☕', style: TextStyle(fontSize: 14)),
-                                    SizedBox(width: 6),
-                                    Text(
-                                      'Free for Chai',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
                             // Top Right Safety 3-Dots Safety Menu & Verified Badge
                             Positioned(
                               top: 16,
@@ -1275,13 +1357,13 @@ class _FeedScreenState extends State<FeedScreen> {
                     child: const Icon(Icons.favorite, color: Colors.white, size: 40),
                   ),
 
-                  // 3. Send ₹9 Direct Invite Button
+                  // 3. Send ⚡ Direct DM (₹49) Pass Button
                   FloatingActionButton(
-                    heroTag: 'btn_direct_invite_deck',
-                    onPressed: () => _handleSendChaiInvite(targetUserId, firstName),
-                    backgroundColor: Colors.amber[800],
+                    heroTag: 'btn_direct_dm_deck',
+                    onPressed: () => _handleDirectDmAction(targetUserId, firstName),
+                    backgroundColor: Colors.cyanAccent.shade700,
                     shape: const CircleBorder(),
-                    child: const Icon(Icons.bolt, color: Colors.white, size: 24),
+                    child: const Icon(Icons.bolt, color: Colors.white, size: 26),
                   ),
 
                   // 4. DM (Direct Message)

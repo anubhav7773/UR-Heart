@@ -501,4 +501,15 @@ class ApiClient {
   Future<Response> getAppVersion() async {
     return await dio.get('/system/app-version');
   }
+
+  // 30. Send Direct DM (POST /feed/direct-dm)
+  Future<Response> sendDirectDm({
+    required String targetUserId,
+    required String message,
+  }) async {
+    return await dio.post('/feed/direct-dm', data: {
+      'target_user_id': targetUserId,
+      'message': message,
+    });
+  }
 }

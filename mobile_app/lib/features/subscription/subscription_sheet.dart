@@ -7,7 +7,12 @@ import '../../core/theme/app_theme.dart';
 import 'payment_service.dart';
 
 class SubscriptionSheet extends StatefulWidget {
-  const SubscriptionSheet({super.key});
+  final String? initialPlanType;
+
+  const SubscriptionSheet({
+    super.key,
+    this.initialPlanType,
+  });
 
   @override
   State<SubscriptionSheet> createState() => _SubscriptionSheetState();
@@ -15,7 +20,7 @@ class SubscriptionSheet extends StatefulWidget {
 
 class _SubscriptionSheetState extends State<SubscriptionSheet> {
   bool _isProcessing = false;
-  String _selectedPlanType = 'monthly'; // 'fast_pass' (₹9), 'photo_pass' (₹19), 'monthly' (₹99)
+  late String _selectedPlanType;
 
   String? _activePassBadge;
   bool _hasActivePass = false;
@@ -23,6 +28,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
   @override
   void initState() {
     super.initState();
+    _selectedPlanType = widget.initialPlanType ?? 'PLAN_DIRECT_DM_49';
     _fetchActivePassStatus();
 
     PaymentService.instance.initialize(
@@ -74,7 +80,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     Navigator.pop(context, true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Payment Successful & Verified! ID: ${response.paymentId}'),
+        content: Text('Payment Successful & Verified! Plan: ${_getPlanDisplayName(_selectedPlanType)}'),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 4),
       ),
@@ -104,7 +110,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     Navigator.pop(context, true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Pass Activated! Order ID: $orderId'),
+        content: Text('Pass Activated! Plan: ${_getPlanDisplayName(_selectedPlanType)}'),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 4),
       ),
@@ -131,161 +137,293 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     }
   }
 
+  String _getPlanDisplayName(String planKey) {
+    switch (planKey) {
+      case 'PLAN_BOOST_29':
+        return '🚀 Profile Boost (₹29)';
+      case 'PLAN_DIRECT_DM_49':
+        return '⚡ Direct DM Pass (₹49)';
+      case 'PLAN_AD_FREE_199':
+        return '🚫 Ad-Free VIP (₹199)';
+      case 'PLAN_SAFE_BRIDGE_499':
+        return '🔒 Safe Bridge (₹499)';
+      default:
+        return 'UR Heart Pass';
+    }
+  }
+
+  String _getPlanPriceLabel() {
+    switch (_selectedPlanType) {
+      case 'PLAN_BOOST_29':
+        return '₹29';
+      case 'PLAN_DIRECT_DM_49':
+        return '₹49';
+      case 'PLAN_AD_FREE_199':
+        return '₹199';
+      case 'PLAN_SAFE_BRIDGE_499':
+        return '₹499';
+      default:
+        return '₹49';
+    }
+  }
+
+  String _getPlanValidityLabel() {
+    switch (_selectedPlanType) {
+      case 'PLAN_BOOST_29':
+        return '1 Hour 10x Discovery';
+      case 'PLAN_DIRECT_DM_49':
+        return '1 Hour Instant Direct DM';
+      case 'PLAN_AD_FREE_199':
+        return '30 Days Zero Ads';
+      case 'PLAN_SAFE_BRIDGE_499':
+        return 'Dual WhatsApp & Maps Unlock';
+      default:
+        return 'Valid 1 Hour';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
       decoration: const BoxDecoration(
         color: AppTheme.cardColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[700],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header Title
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.workspace_premium, size: 28, color: AppTheme.primaryColor),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'UR Heart Monetization Passes',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Active Countdown Expiry Badge
+            if (_hasActivePass && _activePassBadge != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.greenAccent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.greenAccent),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.timer_outlined, size: 14, color: Colors.greenAccent),
+                    const SizedBox(width: 6),
+                    Text(
+                      _activePassBadge!,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+                    ),
+                  ],
+                ),
+              ),
+
+            // 4 Distinct Standardized Plans Grid
+            Row(
+              children: [
+                _buildPlanTile(
+                  'PLAN_BOOST_29',
+                  '🚀 Boost',
+                  '₹29',
+                  '1 Hour',
+                  '10x Discovery',
+                ),
+                const SizedBox(width: 6),
+                _buildPlanTile(
+                  'PLAN_DIRECT_DM_49',
+                  '⚡ Direct DM',
+                  '₹49',
+                  '1 Hour',
+                  'Instant DM',
+                ),
+                const SizedBox(width: 6),
+                _buildPlanTile(
+                  'PLAN_AD_FREE_199',
+                  '🚫 Zero Ads',
+                  '₹199',
+                  '30 Days',
+                  'VIP Pro',
+                ),
+                const SizedBox(width: 6),
+                _buildPlanTile(
+                  'PLAN_SAFE_BRIDGE_499',
+                  '🔒 Safe Bridge',
+                  '₹499',
+                  'Chat Lock',
+                  'Maps & WA',
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Detailed Highlight Box for Selected Plan
+            _buildPlanDescriptionBanner(),
+            const SizedBox(height: 18),
+
+            // Pay Action Button
+            ElevatedButton.icon(
+              onPressed: _isProcessing ? null : _initiateSachetPayment,
+              icon: _isProcessing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.account_balance_wallet, color: Colors.white),
+              label: Text(
+                _isProcessing
+                    ? 'Connecting to Razorpay...'
+                    : 'Pay ${_getPlanPriceLabel()} via UPI (${_getPlanValidityLabel()})',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanDescriptionBanner() {
+    String title;
+    String hindiSubtitle;
+    String detail;
+    IconData icon;
+    Color accentColor;
+
+    switch (_selectedPlanType) {
+      case 'PLAN_BOOST_29':
+        title = '🚀 Profile Boost (₹29)';
+        hindiSubtitle = '1 Ghante ke liye 10x Jyada Discovery';
+        detail = 'Apni profile ko discovery feed me top priority par layein aur 10x jyada views paayein.';
+        icon = Icons.bolt;
+        accentColor = Colors.amber;
+        break;
+      case 'PLAN_DIRECT_DM_49':
+        title = '⚡ Direct DM Pass (₹49)';
+        hindiSubtitle = '1 Ghante tak bina match ke direct message bhejein';
+        detail = 'Kisi bhi profile ko bina mutual match ka intezar kiye turant instant direct message bhejein.';
+        icon = Icons.send_rounded;
+        accentColor = Colors.cyanAccent;
+        break;
+      case 'PLAN_AD_FREE_199':
+        title = '🚫 Ad-Free VIP (₹199)';
+        hindiSubtitle = '30 Din ke liye bilkul Zero Ads';
+        detail = '100% Ad-Free anubhav: Koi feed cards nahi, koi 20-skip video ads nahi, bilkul smooth UI.';
+        icon = Icons.block;
+        accentColor = Colors.greenAccent;
+        break;
+      case 'PLAN_SAFE_BRIDGE_499':
+        title = '🔒 Safe Bridge (₹499)';
+        hindiSubtitle = '15 Messages ke baad WhatsApp aur Live Maps Unlock';
+        detail = 'Dual payment safety flow: Dono users ke 15 messages aur consent ke baad secure contact unlock.';
+        icon = Icons.lock_open_rounded;
+        accentColor = const Color(0xFFE91E63);
+        break;
+      default:
+        title = 'UR Heart Pass';
+        hindiSubtitle = 'Instant upgrade';
+        detail = 'Unlock premium dating features on UR Heart.';
+        icon = Icons.star;
+        accentColor = Colors.amber;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accentColor.withValues(alpha: 0.5), width: 1.2),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 4,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.grey[700],
-              borderRadius: BorderRadius.circular(2),
+              color: accentColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
+            child: Icon(icon, color: accentColor, size: 22),
           ),
-          const SizedBox(height: 16),
-
-          // Header Title
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: accentColor),
                 ),
-                child: const Icon(Icons.workspace_premium, size: 32, color: AppTheme.primaryColor),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'UR Heart Passes & Pro',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Active Countdown Expiry Badge
-          if (_hasActivePass && _activePassBadge != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.greenAccent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.greenAccent),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.timer_outlined, size: 14, color: Colors.greenAccent),
-                  const SizedBox(width: 6),
-                  Text(
-                    _activePassBadge!,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.greenAccent),
-                  ),
-                ],
-              ),
-            ),
-
-          // 4-Option Pass Selector Cards with Explicit Validity Tags
-          Row(
-            children: [
-              _buildPlanTile('fast_pass', '⚡ Invite', '₹9', '24 Hours'),
-              const SizedBox(width: 6),
-              _buildPlanTile('photo_pass', '📷 Photo', '₹19', '24 Hours'),
-              const SizedBox(width: 6),
-              _buildPlanTile('super_boost', '🔥 Boost', '₹29', '1 Hour (10x)'),
-              const SizedBox(width: 6),
-              _buildPlanTile('monthly', '👑 Pro', '₹99', '30 Days'),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Features Matrix
-          const Column(
-            children: [
-              ListTile(
-                dense: true,
-                leading: Icon(Icons.bolt, color: Colors.amber),
-                title: Text('⚡ 10x Profile Boost & Priority Feed', style: TextStyle(color: Colors.white)),
-                subtitle: Text('Get featured at the top of candidate feeds for 1 hour', style: TextStyle(color: Colors.grey)),
-              ),
-              ListTile(
-                dense: true,
-                leading: Icon(Icons.offline_bolt_outlined, color: Colors.greenAccent),
-                title: Text('Instant Direct Message & Photo Access', style: TextStyle(color: Colors.white)),
-                subtitle: Text('Bypass swipe queues & message candidates immediately', style: TextStyle(color: Colors.grey)),
-              ),
-              ListTile(
-                dense: true,
-                leading: Icon(Icons.block, color: Colors.greenAccent),
-                title: Text('100% Zero Ad Experience', style: TextStyle(color: Colors.white)),
-                subtitle: Text('Bypass native cards, 20-skip interstitials, & chat video ads', style: TextStyle(color: Colors.grey)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Pay Action Button
-          ElevatedButton.icon(
-            onPressed: _isProcessing ? null : _initiateSachetPayment,
-            icon: _isProcessing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
-                : const Icon(Icons.account_balance_wallet, color: Colors.white),
-            label: Text(
-              _isProcessing
-                  ? 'Connecting to Razorpay...'
-                  : 'Pay ${_getPlanPriceLabel()} via UPI (${_getPlanValidityLabel()})',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                const SizedBox(height: 2),
+                Text(
+                  hindiSubtitle,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  detail,
+                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
         ],
       ),
     );
   }
 
-  String _getPlanPriceLabel() {
-    if (_selectedPlanType == 'fast_pass' || _selectedPlanType == 'chai_invite') return '₹9';
-    if (_selectedPlanType == 'photo_pass') return '₹19';
-    if (_selectedPlanType == 'super_boost') return '₹29';
-    return '₹99';
-  }
-
-  String _getPlanValidityLabel() {
-    if (_selectedPlanType == 'super_boost') return 'Valid 1 Hour (10x Views)';
-    if (_selectedPlanType == 'monthly') return 'Valid 30 Days';
-    return 'Valid 24 Hours';
-  }
-
-  Widget _buildPlanTile(String planKey, String title, String price, String validitySubtitle) {
-    final bool isSelected = _selectedPlanType == planKey || (_selectedPlanType == 'chai_invite' && planKey == 'fast_pass');
+  Widget _buildPlanTile(
+    String planKey,
+    String title,
+    String price,
+    String validity,
+    String subtitle,
+  ) {
+    final bool isSelected = _selectedPlanType == planKey;
 
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _selectedPlanType = planKey),
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
           decoration: BoxDecoration(
             color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.2) : AppTheme.surfaceColor,
             borderRadius: BorderRadius.circular(14),
@@ -295,26 +433,29 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
             ),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 4),
               Text(
                 price,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
               ),
               const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected ? AppTheme.primaryColor : Colors.black45,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  validitySubtitle,
+                  validity,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 8,
@@ -322,6 +463,14 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
                     color: isSelected ? Colors.white : Colors.white70,
                   ),
                 ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 7.5, color: Colors.grey),
               ),
             ],
           ),

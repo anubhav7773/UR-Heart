@@ -323,6 +323,8 @@ class UserRead(BaseModel):
     is_premium: bool = False
     is_boosted: bool = False
     boosted_until: Optional[datetime] = None
+    direct_dm_until: Optional[datetime] = None
+    ad_free_until: Optional[datetime] = None
     photo_pass_until: Optional[datetime] = None
     bonus_swipes: int = 0
     is_verified: bool = False
@@ -338,6 +340,9 @@ class UserRead(BaseModel):
     photos: List[PhotoRead] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+UserResponse = UserRead
 
 
 # 6. Feed & Swiping Schemas
@@ -529,7 +534,10 @@ class WhatsAppBridgeStatusData(BaseModel):
 
 # 11. Sachet Micro-Transaction Schemas
 class CreateSachetOrderRequest(BaseModel):
-    plan_type: str = Field(..., description="'chai_invite' (₹9), 'photo_pass' (₹19), 'super_boost' (₹29), or 'monthly' (₹99)")
+    plan_type: str = Field(
+        ...,
+        description="'PLAN_BOOST_29' (₹29), 'PLAN_DIRECT_DM_49' (₹49), 'PLAN_AD_FREE_199' (₹199), 'PLAN_SAFE_BRIDGE_499' (₹499)"
+    )
 
 
 class CreateSachetOrderData(BaseModel):
@@ -538,6 +546,20 @@ class CreateSachetOrderData(BaseModel):
     currency: str = "INR"
     plan_type: str
     razorpay_key_id: str
+
+
+class DirectDMRequest(BaseModel):
+    target_user_id: str = Field(..., description="Target user ID to send direct message without matching")
+    message: str = Field(..., min_length=1, max_length=2000, description="Direct message text content")
+
+
+class DirectDMData(BaseModel):
+    match_id: str
+    target_user_id: str
+    message_id: str
+    content: str
+    created_at: str
+    message: str = "Direct DM sent successfully!"
 
 
 # 12. Storage Photo Upload Schema
