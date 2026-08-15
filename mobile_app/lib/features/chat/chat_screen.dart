@@ -179,6 +179,8 @@ class ConversationsScreen extends StatefulWidget {
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
   bool _isLoading = true;
+  bool _hasError = false;
+  String? _errorMessage;
   List<dynamic> _conversations = [];
 
   @override
@@ -188,7 +190,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Future<void> _fetchConversations({bool forceRefresh = false}) async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _errorMessage = null;
+    });
     try {
       final response = await ApiClient.instance.getChatConversations();
       List<dynamic> parsedList = [];
@@ -209,6 +215,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       if (mounted) {
         setState(() {
           _conversations = parsedList;
+          _hasError = false;
         });
       }
     } catch (e) {
@@ -217,6 +224,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         if (e is DioException) {
           print('[ConversationsScreen] StatusCode: ${e.response?.statusCode}, Response: ${e.response?.data}');
         }
+      }
+      if (mounted) {
+        setState(() {
+          _hasError = _conversations.isEmpty;
+          _errorMessage = 'Unable to load matches. Please check your connection.';
+        });
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -243,9 +256,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         onRefresh: () => _fetchConversations(forceRefresh: true),
         color: AppTheme.primaryColor,
         backgroundColor: AppTheme.surfaceColor,
-        child: _isLoading
+        child: _isLoading && _conversations.isEmpty
             ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
-            : _conversations.isEmpty
+            : _hasError && _conversations.isEmpty
                 ? Center(
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -258,26 +271,69 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                             decoration: BoxDecoration(
                               color: AppTheme.cardColor,
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
                             ),
-                            child: const Icon(Icons.favorite_outline, size: 64, color: AppTheme.primaryColor),
+                            child: const Icon(Icons.cloud_off_rounded, size: 64, color: Colors.redAccent),
                           ),
                           const SizedBox(height: 24),
                           const Text(
-                            'No matches yet!',
+                            'Connection Issue',
                             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'Keep swiping on the feed or send a Direct DM to start chatting.',
+                          Text(
+                            _errorMessage ?? 'Unable to load conversations.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                            style: const TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: () => _fetchConversations(forceRefresh: true),
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Try Again'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
                           ),
                         ],
                       ),
                     ),
                   )
-                : ListView.builder(
+                : _conversations.isEmpty
+                    ? Center(
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.cardColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                                ),
+                                child: const Icon(Icons.favorite_outline, size: 64, color: AppTheme.primaryColor),
+                              ),
+                              const SizedBox(height: 24),
+                              const Text(
+                                'No matches yet!',
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Keep swiping on the feed or send a Direct DM to start chatting.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: _conversations.length,
@@ -416,7 +472,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _enableScreenshotProtection();
-    _loadUserStatus();
+    _initChat();
     // Refresh the local GPS fix before calculating the recipient distance.
     LocationService.instance.getCurrentLocation().then((position) {
       if (position == null && mounted && _recipientDistanceLabel == 'Location pending') {
@@ -425,8 +481,14 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _fetchConsentStatus();
     _fetchRecipientProfile();
-    _fetchMessages();
-    _startRealtimeStreamListener();
+  }
+
+  Future<void> _initChat() async {
+    await _loadUserStatus();
+    if (mounted) {
+      _startRealtimeStreamListener();
+      await _fetchMessages();
+    }
   }
 
   Future<void> _enableScreenshotProtection() async {

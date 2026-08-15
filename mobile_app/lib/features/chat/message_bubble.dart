@@ -174,32 +174,32 @@ class MessageBubbleWidget extends StatelessWidget {
 
   Widget _buildStatusIcon() {
     if (status == 'read' || isRead) {
-      // Double Blue Tick: Read
+      // 3. Double Blue Tick: Read
       return const Icon(
-        Icons.done_all_rounded,
-        size: 14,
-        color: Colors.lightBlueAccent,
+        Icons.done_all,
+        size: 15,
+        color: Colors.blue,
       );
     } else if (status == 'delivered' || isDelivered) {
-      // Double Grey Tick: Delivered to recipient device/socket
+      // 2. Double Grey Tick: Delivered to recipient device/socket
       return const Icon(
-        Icons.done_all_rounded,
-        size: 14,
-        color: Colors.white70,
+        Icons.done_all,
+        size: 15,
+        color: Colors.grey,
       );
     } else if (status == 'sent' || isSent) {
-      // Single Grey Tick: Sent to server
+      // 1. Single Grey Tick: Sent to server
       return const Icon(
-        Icons.done_rounded,
-        size: 14,
-        color: Colors.white70,
+        Icons.done,
+        size: 15,
+        color: Colors.grey,
       );
     } else {
-      // Sending: Clock
+      // Sending: Clock indicator
       return const Icon(
-        Icons.access_time_rounded,
+        Icons.access_time,
         size: 12,
-        color: Colors.white60,
+        color: Colors.grey,
       );
     }
   }

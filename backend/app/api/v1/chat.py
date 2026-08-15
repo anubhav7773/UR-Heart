@@ -1155,6 +1155,10 @@ async def submit_bridge_payment(
 
 @router.post("/{match_id}/read")
 @router.post("/read/{match_id}")
+@router.put("/{match_id}/read")
+@router.put("/read/{match_id}")
+@router.post("/messages/read")
+@router.put("/messages/read")
 async def mark_messages_as_read(
     match_id: str,
     current_user_id: str = Depends(get_current_user_id),
