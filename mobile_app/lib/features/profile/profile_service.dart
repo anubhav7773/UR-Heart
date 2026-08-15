@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/utils/image_compressor.dart';
 
 class ProfileService {
   final Dio _dio;
@@ -22,13 +24,19 @@ class ProfileService {
 
   /// Uploads profile photo to FastAPI backend (`POST /api/v1/profile/photos`)
   /// using Dio and FormData.fromMap with MultipartFile.fromFile.
+  /// Automatically compresses raw 5-15MB camera photos down to < 300KB via ImageCompressor.
   /// Automatically passes `Authorization: Bearer <firebase_id_token>` header,
   /// and immediately saves/persists the returned photo URL in the user profile state in DB.
   Future<String?> uploadProfilePhoto(File imageFile) async {
     final token = await _getAuthToken();
-    final fileName = imageFile.path.split('/').last.split('\\').last;
+    
+    // Automatic client-side compression (< 300KB, 1080x1350 max, quality 80)
+    final XFile compressedXFile = await ImageCompressor.compressImage(XFile(imageFile.path));
+    final String uploadPath = compressedXFile.path;
+    final fileName = uploadPath.split('/').last.split('\\').last;
+
     final formData = FormData.fromMap({
-      "file": await MultipartFile.fromFile(imageFile.path, filename: fileName),
+      "file": await MultipartFile.fromFile(uploadPath, filename: fileName),
     });
 
     final options = Options(

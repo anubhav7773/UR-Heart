@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import '../security/storage_manager.dart';
+import '../utils/image_compressor.dart';
 
 class ApiClient {
   static final ApiClient instance = ApiClient._internal();
@@ -358,9 +360,11 @@ class ApiClient {
 
   // 20b. Upload Profile Photo via Local File Path
   Future<Response> uploadProfilePhotoFile(String filePath) async {
-    final fileName = filePath.split('/').last.split('\\').last;
+    final XFile compressedXFile = await ImageCompressor.compressImage(XFile(filePath));
+    final String uploadPath = compressedXFile.path;
+    final fileName = uploadPath.split('/').last.split('\\').last;
     final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'file': await MultipartFile.fromFile(uploadPath, filename: fileName),
     });
     return await dio.post('/profile/photos', data: formData);
   }
