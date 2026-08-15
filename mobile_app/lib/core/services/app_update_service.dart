@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:ota_update/ota_update.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -124,112 +122,73 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
   bool _isDownloading = false;
   double _progress = 0.0;
   String _statusText = 'Direct In-App APK Install';
-  StreamSubscription<OtaEvent>? _otaSubscription;
 
-  @override
-  void dispose() {
-    _otaSubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _startDirectOtaDownload() async {
+  Future<void> _startDirectDownload() async {
     if (_isDownloading) return;
 
     setState(() {
       _isDownloading = true;
       _progress = 0.0;
-      _statusText = 'Starting download... ⏳';
+      _statusText = 'Connecting to server... ⏳';
     });
 
     if (!kIsWeb && Platform.isAndroid) {
       try {
-        _otaSubscription = OtaUpdate()
-            .execute(
-              widget.apkUrl,
-              destinationFilename: 'ur-heart-update.apk',
-            )
-            .listen(
-          (OtaEvent event) {
-            if (!mounted) return;
-            switch (event.status) {
-              case OtaStatus.DOWNLOADING:
-                final progressVal = double.tryParse(event.value ?? '0') ?? 0.0;
-                setState(() {
-                  _progress = (progressVal / 100.0).clamp(0.0, 1.0);
-                  _statusText = 'Downloading update: ${event.value}%';
-                });
-                break;
-              case OtaStatus.INSTALLING:
-                setState(() {
-                  _progress = 1.0;
-                  _statusText = 'Launching installer... 🚀';
-                });
-                break;
-              case OtaStatus.ALREADY_RUNNING_ERROR:
-                setState(() {
-                  _statusText = 'Download already in progress.';
-                });
-                break;
-              case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
-              case OtaStatus.INTERNAL_ERROR:
-              case OtaStatus.DOWNLOAD_ERROR:
-              default:
-                _fallbackDirectDioDownload();
-                break;
+        final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+        final filePath = '${dir.path}/ur-heart-update.apk';
+
+        await ApiClient.instance.dio.download(
+          widget.apkUrl,
+          filePath,
+          onReceiveProgress: (received, total) {
+            if (total > 0 && mounted) {
+              final double p = (received / total).clamp(0.0, 1.0);
+              setState(() {
+                _progress = p;
+                _statusText = 'Downloading: ${(p * 100).toInt()}%';
+              });
             }
           },
-          onError: (dynamic error) {
-            if (kDebugMode) print('[OtaUpdate Error] $error');
-            _fallbackDirectDioDownload();
-          },
         );
-      } catch (e) {
-        _fallbackDirectDioDownload();
-      }
-    } else {
-      _openInBrowser();
-    }
-  }
 
-  /// Fallback direct Dio download + OpenFilex if OTA plugin fails
-  Future<void> _fallbackDirectDioDownload() async {
-    try {
-      setState(() {
-        _statusText = 'Downloading package directly...';
-      });
+        if (mounted) {
+          setState(() {
+            _progress = 1.0;
+            _statusText = 'Opening package installer... 🚀';
+          });
+        }
 
-      final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-      final filePath = '${dir.path}/ur-heart-update.apk';
-
-      await ApiClient.instance.dio.download(
-        widget.apkUrl,
-        filePath,
-        onReceiveProgress: (received, total) {
-          if (total > 0 && mounted) {
+        final result = await OpenFilex.open(filePath);
+        if (result.type != ResultType.done) {
+          if (mounted) {
             setState(() {
-              _progress = (received / total).clamp(0.0, 1.0);
-              _statusText = 'Downloading: ${(_progress * 100).toInt()}%';
+              _statusText = 'Opening in browser...';
             });
           }
-        },
-      );
-
-      if (mounted) {
-        setState(() {
-          _progress = 1.0;
-          _statusText = 'Opening package installer...';
-        });
+          await _openInBrowser();
+        }
+      } catch (e) {
+        if (kDebugMode) print('[Download Error] $e');
+        if (mounted) {
+          setState(() {
+            _statusText = 'Download failed. Opening in browser...';
+          });
+        }
+        await _openInBrowser();
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isDownloading = false;
+          });
+        }
       }
-
-      await OpenFilex.open(filePath);
-    } catch (e) {
+    } else {
+      await _openInBrowser();
       if (mounted) {
         setState(() {
           _isDownloading = false;
-          _statusText = 'Download failed. Opening in browser...';
         });
       }
-      _openInBrowser();
     }
   }
 
@@ -368,7 +327,7 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton.icon(
-                    onPressed: _startDirectOtaDownload,
+                    onPressed: _startDirectDownload,
                     icon: const Icon(Icons.download_rounded, size: 20),
                     label: const Text(
                       'Update Now (Direct APK)',

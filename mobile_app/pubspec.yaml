@@ -46,7 +46,6 @@ dependencies:
   # Window & System Security / URL Launcher / App Update
   url_launcher: ^6.2.5
   package_info_plus: ^8.0.0
-  ota_update: ^6.0.0
   open_filex: ^4.5.0
 
   # Audio Recording & Playback (Voice Bio)
