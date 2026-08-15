@@ -42,7 +42,11 @@ class AppUpdateService {
             latestBuild: latestBuild,
           );
 
-          if (hasUpdate && apkUrl.isNotEmpty && context.mounted) {
+          final bool isValidApkUrl = apkUrl.isNotEmpty &&
+              apkUrl.toLowerCase() != 'null' &&
+              (apkUrl.startsWith('http://') || apkUrl.startsWith('https://'));
+
+          if (hasUpdate && isValidApkUrl && context.mounted) {
             _dialogShown = true;
             await showDialog(
               context: context,
@@ -75,7 +79,7 @@ class AppUpdateService {
     }
   }
 
-  /// Version comparison helper (e.g. 1.0.1 vs 1.0.0 or build numbers)
+  /// Semantic version comparison helper ([major, minor, patch] + build number)
   bool _isNewerVersion({
     required String installedVersion,
     required String latestVersion,
@@ -83,18 +87,20 @@ class AppUpdateService {
     required int latestBuild,
   }) {
     try {
-      final v1Parts = installedVersion.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      final v2Parts = latestVersion.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final v1Parts = installedVersion.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
+      final v2Parts = latestVersion.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
 
-      final maxLen = v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
-      for (int i = 0; i < maxLen; i++) {
+      for (int i = 0; i < 3; i++) {
         final p1 = i < v1Parts.length ? v1Parts[i] : 0;
         final p2 = i < v2Parts.length ? v2Parts[i] : 0;
         if (p2 > p1) return true;
         if (p2 < p1) return false;
       }
 
-      return latestBuild > installedBuild;
+      if (latestBuild > 0 && installedBuild > 0) {
+        return latestBuild > installedBuild;
+      }
+      return false;
     } catch (_) {
       return false;
     }

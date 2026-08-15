@@ -98,6 +98,7 @@ async def get_user_profile(
     profile_data = {
         "user_id": str(user.id),
         "full_name": user.full_name or "UR Heart User",
+        "phone_number": user.phone_number,
         "dob": user.dob.isoformat() if user.dob else None,
         "date_of_birth": user.dob.isoformat() if user.dob else None,
         "age": age,
@@ -244,6 +245,7 @@ async def complete_profile(
         user = User(
             id=user_uuid,
             full_name=full_name,
+            phone_number=payload.phone_number,
             dob=dob_val,
             gender=gender_val,
             interested_in=interested_val,
@@ -263,6 +265,8 @@ async def complete_profile(
         db.add(user)
     else:
         user.full_name = full_name
+        if payload.phone_number is not None:
+            user.phone_number = payload.phone_number
         if dob_val is not None:
             user.dob = dob_val
         user.gender = gender_val

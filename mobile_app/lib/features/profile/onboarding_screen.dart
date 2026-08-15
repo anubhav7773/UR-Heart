@@ -20,6 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final ProfileService _profileService = ProfileService();
 
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
   final TextEditingController _pinController = TextEditingController();
@@ -152,6 +153,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final dobStr = _selectedDob.toIso8601String().split('T').first;
       final payload = {
         'full_name': _nameController.text.trim(),
+        'phone_number': _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
         'dob': dobStr,
         'date_of_birth': dobStr,
         'gender': _gender,
@@ -330,6 +332,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'WhatsApp / Mobile Number',
+                    hintText: 'e.g. 9876543210 (for 🔒 Safe Share)',
+                    labelStyle: const TextStyle(color: Colors.grey),
+                    hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
+                    prefixIcon: const Icon(Icons.chat, color: Colors.greenAccent, size: 20),
+                    filled: true,
+                    fillColor: Colors.grey[900],
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 InkWell(

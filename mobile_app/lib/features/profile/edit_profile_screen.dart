@@ -21,6 +21,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
@@ -72,6 +73,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _audioRecorder.dispose();
     _audioPlayer.dispose();
     _nameController.dispose();
+    _phoneController.dispose();
     _dobController.dispose();
     _bioController.dispose();
     _areaController.dispose();
@@ -85,6 +87,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'];
         _nameController.text = data['full_name'] ?? '';
+        _phoneController.text = (data['phone_number'] ?? '').toString();
         _bioController.text = data['bio'] ?? '';
         _areaController.text = data['area_name'] ?? '';
         _isVerified = data['is_verified'] == true;
@@ -305,6 +308,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final dobStr = _selectedDob != null ? DateFormat('yyyy-MM-dd').format(_selectedDob!) : null;
       await ApiClient.instance.putProfile({
         'full_name': _nameController.text.trim(),
+        'phone_number': _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
         'dob': dobStr,
         'date_of_birth': dobStr,
         'bio': _bioController.text.trim(),
@@ -598,6 +602,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                       validator: (val) => val == null || val.trim().isEmpty ? 'Name cannot be empty' : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // WhatsApp / Phone Number Field
+                    Row(
+                      children: [
+                        const Text('WhatsApp / Mobile Number', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('🔒 Safe Share', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('Only revealed when both matched users grant mutual consent in chat.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 9876543210',
+                        hintStyle: const TextStyle(color: Colors.grey),
+                        prefixIcon: const Icon(Icons.chat, color: Colors.greenAccent, size: 20),
+                        filled: true,
+                        fillColor: AppTheme.surfaceColor,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
                     ),
                     const SizedBox(height: 20),
 

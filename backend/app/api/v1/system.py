@@ -7,12 +7,12 @@ router = APIRouter(prefix="/system", tags=["System & In-App Auto Update"])
 
 
 class AppVersionData(BaseModel):
-    latest_version: str = "1.0.1"
-    latest_build_number: int = 2
+    latest_version: str = "1.0.0"
+    latest_build_number: int = 1
     min_supported_version: str = "1.0.0"
     min_supported_build_number: int = 1
-    apk_url: str = "https://github.com/anubhav7773/UR-Heart/releases/latest/download/app-release.apk"
-    release_notes: str = "🚀 Naya Update Aaya Hai!\n• Real Online Presence & Relative Last Seen\n• Safe WhatsApp & Location Contact Bridge\n• 60 FPS Fast Discovery Swipes & Media Caching\n• Direct In-App APK Auto-Updater"
+    apk_url: Optional[str] = None
+    release_notes: str = "✨ Bug fixes and performance improvements."
     is_force_update: bool = False
 
 

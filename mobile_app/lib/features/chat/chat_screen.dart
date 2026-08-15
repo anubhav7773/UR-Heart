@@ -681,15 +681,18 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       return;
     }
-    final cleanPhone = _unlockedPhoneNumber!.replaceAll('+', '').replaceAll(' ', '').replaceAll('-', '');
-    final uri = Uri.parse('whatsapp://send?phone=$cleanPhone');
-    final webUri = Uri.parse('https://wa.me/$cleanPhone');
+    String digitsOnly = _unlockedPhoneNumber!.replaceAll(RegExp(r'[^\d]'), '');
+    if (digitsOnly.length == 10) {
+      digitsOnly = '91$digitsOnly';
+    }
+    final uri = Uri.parse('https://wa.me/$digitsOnly?text=${Uri.encodeComponent('Hi!')}');
+    final nativeUri = Uri.parse('whatsapp://send?phone=$digitsOnly&text=${Uri.encodeComponent('Hi!')}');
 
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(nativeUri)) {
+        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
       } else {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
@@ -1251,24 +1254,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         actions: [
-          // 🔒 Safe Share Action
-          TextButton.icon(
-            key: const Key('safe_share_action_button'),
-            onPressed: _openSafeShareDialog,
-            icon: const Icon(Icons.shield_outlined, color: Colors.tealAccent, size: 18),
-            label: const Text(
-              '🔒 Safe Share',
-              style: TextStyle(
-                color: Colors.tealAccent,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
           // Quick Action: Send ₹9 Direct Pass
           IconButton(
             tooltip: 'Send ₹9 Direct Pass',
@@ -1279,7 +1264,9 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.more_vert, color: Colors.white),
             color: AppTheme.cardColor,
             onSelected: (val) {
-              if (val == 'profile') {
+              if (val == 'safe_share') {
+                _openSafeShareDialog();
+              } else if (val == 'profile') {
                 _showMatchProfileBottomSheet();
               } else if (val == 'report') {
                 _showReportDialog();
@@ -1288,32 +1275,42 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              const PopupMenuItem<String>(
+                value: 'safe_share',
+                child: Row(
+                  children: [
+                    Icon(Icons.security, color: Colors.greenAccent, size: 18),
+                    SizedBox(width: 10),
+                    Text('Safe Share (WhatsApp/Location)', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
                 value: 'profile',
                 child: Row(
                   children: [
                     Icon(Icons.account_circle, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
+                    SizedBox(width: 10),
                     Text('View Profile', style: TextStyle(color: Colors.white)),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              const PopupMenuItem<String>(
                 value: 'report',
                 child: Row(
                   children: [
                     Icon(Icons.report, color: AppTheme.secondaryColor, size: 18),
-                    SizedBox(width: 8),
+                    SizedBox(width: 10),
                     Text('Report User', style: TextStyle(color: Colors.white)),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              const PopupMenuItem<String>(
                 value: 'block',
                 child: Row(
                   children: [
                     Icon(Icons.block, color: Colors.redAccent, size: 18),
-                    SizedBox(width: 8),
+                    SizedBox(width: 10),
                     Text('Block User', style: TextStyle(color: Colors.redAccent)),
                   ],
                 ),

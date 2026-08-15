@@ -184,6 +184,7 @@ def calculate_dynamic_age(born: Optional[date]) -> Optional[int]:
 
 class CompleteProfileRequest(BaseModel):
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
     dob: Optional[date] = None
     date_of_birth: Optional[date] = None
     gender: Optional[GenderEnum] = None
@@ -304,6 +305,7 @@ class PhotoRead(BaseModel):
 class UserRead(BaseModel):
     id: str
     full_name: str
+    phone_number: Optional[str] = None
     dob: Optional[date] = None
     date_of_birth: Optional[date] = None
     age: Optional[int] = None
@@ -337,6 +339,7 @@ class ProfileCardData(BaseModel):
     user_id: str
     first_name: str
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
     age: Optional[int] = None
     date_of_birth: Optional[date] = None
     distance_km: Optional[float] = None
