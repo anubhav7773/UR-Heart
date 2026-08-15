@@ -94,6 +94,7 @@ from app.api.v1.payments import router as payments_router
 from app.api.v1.safety import router as safety_router
 from app.api.v1.verification import router as verification_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.system import router as system_router
 
 api_v1_prefix = settings.API_V1_STR
 all_routers = [
@@ -109,6 +110,7 @@ all_routers = [
     safety_router,
     verification_router,
     admin_router,
+    system_router,
 ]
 
 for r in all_routers:

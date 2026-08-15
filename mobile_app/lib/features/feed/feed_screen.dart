@@ -12,6 +12,7 @@ import '../profile/profile_view_dialog.dart';
 import '../subscription/subscription_sheet.dart';
 import 'native_ad_card_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/services/app_update_service.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -46,6 +47,11 @@ class _FeedScreenState extends State<FeedScreen> {
     _enableScreenshotProtection();
     AdManager.instance.loadRewardedAd();
     _loadFeed();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppUpdateService.instance.checkForUpdate(context);
+      }
+    });
   }
 
   @override

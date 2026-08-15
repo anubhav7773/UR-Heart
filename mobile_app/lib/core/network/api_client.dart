@@ -467,4 +467,9 @@ class ApiClient {
   Future<Response> getProfile({String? userId}) async {
     return await dio.get('/profile', queryParameters: userId != null ? {'user_id': userId} : null);
   }
+
+  // 29. Get App Version & OTA Auto-Update Config
+  Future<Response> getAppVersion() async {
+    return await dio.get('/system/app-version');
+  }
 }

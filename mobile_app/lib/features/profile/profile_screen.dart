@@ -11,6 +11,7 @@ import '../subscription/subscription_sheet.dart';
 import '../../screens/admin_verification_screen.dart';
 import '../../screens/activity_screen.dart';
 import '../../core/utils/feedback_helper.dart';
+import '../../core/services/app_update_service.dart';
 import 'edit_profile_screen.dart';
 import 'profile_service.dart';
 
@@ -978,6 +979,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {
                       final userId = _profileData?['id'] ?? _profileData?['user_id'] ?? FirebaseAuth.instance.currentUser?.uid;
                       sendFeedbackEmail(userId: userId?.toString(), appVersion: 'v1.0.0-release');
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  ListTile(
+                    tileColor: Colors.grey[900],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    leading: const Icon(Icons.system_update_rounded, color: Colors.greenAccent),
+                    title: const Text('Check for App Updates 🚀', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Download latest direct APK updates instantly', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    onTap: () {
+                      AppUpdateService.instance.checkForUpdate(context, showNoUpdateToast: true);
                     },
                   ),
                 ],
