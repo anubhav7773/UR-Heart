@@ -359,3 +359,23 @@ def test_heuristic_content_filter():
         assert res.status_code == 200, f"Expected 200 for allowed message: '{msg}', got {res.status_code}"
         assert res.json()["success"] is True
 
+
+def test_get_conversations_and_matches():
+    token = get_social_login_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Test /api/v1/chat/conversations
+    res1 = client.get("/api/v1/chat/conversations", headers=headers)
+    assert res1.status_code == 200
+    json_data1 = res1.json()
+    assert json_data1["success"] is True
+    assert isinstance(json_data1["data"], list)
+
+    # Test /api/v1/chat/matches
+    res2 = client.get("/api/v1/chat/matches", headers=headers)
+    assert res2.status_code == 200
+    json_data2 = res2.json()
+    assert json_data2["success"] is True
+    assert isinstance(json_data2["data"], list)
+
+

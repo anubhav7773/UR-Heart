@@ -68,27 +68,41 @@ class ChatRecipient {
 
   factory ChatRecipient.fromConversation(Map<String, dynamic> conversation) {
     DateTime? lastActive;
-    final lastSeenStr = conversation['last_active_at'] ?? conversation['last_seen'];
+    final lastSeenStr = conversation['last_active_at'] ??
+        conversation['last_seen'] ??
+        conversation['matched_user_last_active'];
     if (lastSeenStr != null) {
       try {
         lastActive = DateTime.parse(lastSeenStr.toString()).toLocal();
       } catch (_) {}
     }
-    final bool isOnline = conversation['is_online'] == true;
+    final bool isOnline = conversation['is_online'] == true ||
+        conversation['matched_user_is_online'] == true;
 
     return ChatRecipient(
-      id: (conversation['target_user_id'] ?? conversation['target_id'] ?? '').toString(),
-      name: (conversation['target_user_name'] ??
+      id: (conversation['partner_id'] ??
+              conversation['target_user_id'] ??
+              conversation['target_id'] ??
+              conversation['user_id'] ??
+              '')
+          .toString(),
+      name: (conversation['partner_name'] ??
+              conversation['matched_user_name'] ??
+              conversation['target_user_name'] ??
               conversation['full_name'] ??
               conversation['match_name'] ??
               '')
           .toString(),
-      avatarUrl: (conversation['target_user_photo'] ??
+      avatarUrl: (conversation['partner_avatar'] ??
+              conversation['matched_user_avatar'] ??
+              conversation['target_user_photo'] ??
               conversation['avatar_url'] ??
               conversation['photo_url'] ??
               '')
           .toString(),
-      isVerified: conversation['is_verified'] ?? conversation['is_verified_local'] ?? false,
+      isVerified: conversation['is_verified'] == true ||
+          conversation['matched_user_is_verified'] == true ||
+          conversation['is_verified_local'] == true,
       isOnline: isOnline,
       lastActiveAt: lastActive,
     );
@@ -173,18 +187,37 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     _fetchConversations();
   }
 
-  Future<void> _fetchConversations() async {
+  Future<void> _fetchConversations({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     try {
       final response = await ApiClient.instance.getChatConversations();
-      if (response.data != null && response.data['data'] != null) {
-        final List<dynamic> list = response.data['data'];
+      List<dynamic> parsedList = [];
+      if (response.data != null) {
+        final rawData = response.data;
+        if (rawData is List) {
+          parsedList = rawData;
+        } else if (rawData is Map) {
+          if (rawData['data'] is List) {
+            parsedList = rawData['data'] as List<dynamic>;
+          } else if (rawData['conversations'] is List) {
+            parsedList = rawData['conversations'] as List<dynamic>;
+          } else if (rawData['matches'] is List) {
+            parsedList = rawData['matches'] as List<dynamic>;
+          }
+        }
+      }
+      if (mounted) {
         setState(() {
-          _conversations = list;
+          _conversations = parsedList;
         });
       }
     } catch (e) {
-      // Empty list fallback on network errors
+      if (kDebugMode) {
+        print('[ConversationsScreen] Error loading conversations: $e');
+        if (e is DioException) {
+          print('[ConversationsScreen] StatusCode: ${e.response?.statusCode}, Response: ${e.response?.data}');
+        }
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -201,47 +234,54 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _fetchConversations,
+            tooltip: 'Refresh Conversations',
+            onPressed: () => _fetchConversations(forceRefresh: true),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
-          : _conversations.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: AppTheme.cardColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+      body: RefreshIndicator(
+        onRefresh: () => _fetchConversations(forceRefresh: true),
+        color: AppTheme.primaryColor,
+        backgroundColor: AppTheme.surfaceColor,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
+            : _conversations.isEmpty
+                ? Center(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: AppTheme.cardColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                            ),
+                            child: const Icon(Icons.favorite_outline, size: 64, color: AppTheme.primaryColor),
                           ),
-                          child: const Icon(Icons.favorite_outline, size: 64, color: AppTheme.primaryColor),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'No matches yet!',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Keep swiping on the feed to find your match and start chatting over Chai.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                      ],
+                          const SizedBox(height: 24),
+                          const Text(
+                            'No matches yet!',
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Keep swiping on the feed or send a Direct DM to start chatting.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _conversations.length,
-                  itemBuilder: (context, index) {
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _conversations.length,
+                    itemBuilder: (context, index) {
                     final item = _conversations[index];
                     final String matchId = item['id'] ?? item['match_id'] ?? '';
                     final recipientUser = ChatRecipient.fromConversation(
@@ -315,6 +355,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     );
                   },
                 ),
+      ),
     );
   }
 }

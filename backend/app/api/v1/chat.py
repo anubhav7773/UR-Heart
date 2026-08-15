@@ -307,28 +307,49 @@ async def get_matches(
             if not target_user:
                 continue
 
-            first_photo = target_user.photos[0].photo_url if target_user.photos else None
+            first_photo = target_user.photos[0].photo_url if (target_user.photos and len(target_user.photos) > 0) else None
             latest_msg = latest_msgs_map.get(match_obj.id)
             unread_count = 0
             if latest_msg and latest_msg.sender_id != user_uuid and not latest_msg.is_read:
                 unread_count = 1
 
+            partner_name = target_user.full_name or "UR Heart User"
+            last_text = latest_msg.content if latest_msg else "Matched! Say hello 👋"
+            last_msg_time = _utc_iso(latest_msg.created_at) if latest_msg else None
+            match_id_str = str(match_obj.id)
+            target_id_str = str(target_id)
+            last_seen_str = _utc_iso(target_user.last_seen) if target_user.last_seen else None
+            created_at_str = _utc_iso(match_obj.created_at)
+
             match_list.append(
                 MatchRead(
-                    id=str(match_obj.id),
+                    id=match_id_str,
+                    match_id=match_id_str,
+                    partner_id=target_id_str,
+                    partner_name=partner_name,
+                    partner_avatar=first_photo,
+                    target_user_id=target_id_str,
+                    target_user_name=partner_name,
+                    target_user_photo=first_photo,
+                    matched_user_name=partner_name,
+                    matched_user_avatar=first_photo,
                     user1_id=str(match_obj.user1_id),
                     user2_id=str(match_obj.user2_id),
                     is_active=match_obj.is_active,
                     mutual_message_count=match_obj.mutual_message_count or 0,
                     is_whatsapp_unlocked=match_obj.is_whatsapp_unlocked or False,
-                    created_at=_utc_iso(match_obj.created_at),
-                    matched_user_name=target_user.full_name or "UR Heart User",
-                    matched_user_avatar=first_photo,
-                    matched_user_is_verified=target_user.is_verified,
+                    created_at=created_at_str,
+                    updated_at=created_at_str,
+                    matched_user_is_verified=bool(target_user.is_verified),
                     matched_user_is_online=bool(target_user.is_online),
-                    matched_user_last_active=_utc_iso(target_user.last_seen) if target_user.last_seen else None,
-                    last_message=latest_msg.content if latest_msg else "Matched! Say hello 👋",
-                    last_message_at=_utc_iso(latest_msg.created_at) if latest_msg else None,
+                    matched_user_last_active=last_seen_str,
+                    is_online=bool(target_user.is_online),
+                    is_verified=bool(target_user.is_verified),
+                    last_seen=last_seen_str,
+                    last_active_at=last_seen_str,
+                    last_message=last_text,
+                    last_message_time=last_msg_time,
+                    last_message_at=last_msg_time,
                     unread_count=unread_count,
                     last_message_status=latest_msg.status if latest_msg else None,
                     last_message_is_me=(latest_msg.sender_id == user_uuid) if latest_msg else False,

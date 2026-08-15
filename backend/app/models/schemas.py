@@ -570,16 +570,35 @@ class UploadPhotoData(BaseModel):
 # 13. Chat & Matches Schemas
 class MatchRead(BaseModel):
     id: str
-    target_user_id: str
-    target_user_name: str
-    target_user_photo: str
+    match_id: Optional[str] = None
+    partner_id: Optional[str] = None
+    partner_name: Optional[str] = None
+    partner_avatar: Optional[str] = None
+    target_user_id: Optional[str] = None
+    target_user_name: Optional[str] = None
+    target_user_photo: Optional[str] = None
+    matched_user_name: Optional[str] = None
+    matched_user_avatar: Optional[str] = None
+    user1_id: Optional[str] = None
+    user2_id: Optional[str] = None
+    is_active: bool = True
     mutual_message_count: int = 0
     is_whatsapp_unlocked: bool = False
     is_online: bool = False
+    is_verified: bool = False
+    matched_user_is_verified: bool = False
+    matched_user_is_online: bool = False
+    matched_user_last_active: Optional[str] = None
     last_seen: Optional[str] = None
     last_active_at: Optional[str] = None
     last_message: Optional[str] = None
-    updated_at: str
+    last_message_time: Optional[str] = None
+    last_message_at: Optional[str] = None
+    last_message_status: Optional[str] = None
+    last_message_is_me: bool = False
+    unread_count: int = 0
+    updated_at: Optional[str] = None
+    created_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

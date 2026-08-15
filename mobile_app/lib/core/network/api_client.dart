@@ -444,6 +444,10 @@ class ApiClient {
     return await dio.get('/chat/conversations');
   }
 
+  Future<Response> getConversations() async {
+    return await dio.get('/chat/conversations');
+  }
+
   // 24. Block User (POST /safety/block)
   Future<Response> blockUser({required String blockedUserId}) async {
     return await dio.post('/safety/block', data: {
