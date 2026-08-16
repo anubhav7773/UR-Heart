@@ -114,25 +114,10 @@ class ChatProvider extends ChangeNotifier {
         final List<ChatMessage> parsedList = [];
 
         for (var item in rawMsgs) {
-          final String msgId = item['id'] ?? '';
-          if (msgId.isNotEmpty) {
-            final String rawTime = item['created_at'] ?? '';
-            DateTime parsedDt;
+          if (item is Map) {
             try {
-              parsedDt = DateTime.parse(rawTime).toLocal();
-            } on FormatException {
-              parsedDt = DateTime.now();
-            }
-            parsedList.add(
-              ChatMessage(
-                id: msgId,
-                clientMsgId: item['client_msg_id']?.toString(),
-                senderId: item['sender_id'] ?? '',
-                text: item['content'] ?? '',
-                mediaUrl: item['media_url'],
-                timestamp: parsedDt,
-              ),
-            );
+              parsedList.add(ChatMessage.fromJson(Map<String, dynamic>.from(item)));
+            } catch (_) {}
           }
         }
 

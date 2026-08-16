@@ -172,33 +172,29 @@ class MessageBubbleWidget extends StatelessWidget {
     );
   }
 
+  /// 3-State WhatsApp Tick Logic for Outbound Messages:
+  /// - Read (Double Blue Tick): `isRead == true` OR `status == 'read'`
+  /// - Delivered (Double Grey Tick): `status == 'delivered'` OR `isDelivered == true`
+  /// - Sent (Single Grey Tick): Default / `status == 'sent'` OR `isSent == true`
   Widget _buildStatusIcon() {
-    if (status == 'read' || isRead) {
-      // 3. Double Blue Tick: Read
+    if (!isMe) return const SizedBox.shrink();
+
+    if (isRead == true || status == 'read') {
       return const Icon(
         Icons.done_all,
         size: 15,
-        color: Colors.blue,
+        color: Colors.blueAccent,
       );
-    } else if (status == 'delivered' || isDelivered) {
-      // 2. Double Grey Tick: Delivered to recipient device/socket
+    } else if (status == 'delivered' || isDelivered == true) {
       return const Icon(
         Icons.done_all,
-        size: 15,
-        color: Colors.grey,
-      );
-    } else if (status == 'sent' || isSent) {
-      // 1. Single Grey Tick: Sent to server
-      return const Icon(
-        Icons.done,
         size: 15,
         color: Colors.grey,
       );
     } else {
-      // Sending: Clock indicator
       return const Icon(
-        Icons.access_time,
-        size: 12,
+        Icons.done,
+        size: 15,
         color: Colors.grey,
       );
     }

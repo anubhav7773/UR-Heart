@@ -43,12 +43,210 @@ class ChatMessage {
     this.isDelivered = false,
     this.isRead = false,
   });
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final String rawStatus = (json['status'] ?? 'sent').toString().toLowerCase();
+    final bool isRead = json['is_read'] == true || rawStatus == 'read';
+    final bool isDelivered = json['is_delivered'] == true || rawStatus == 'delivered' || isRead;
+
+    DateTime parsedTime;
+    try {
+      final rawTime = json['created_at'] ?? json['timestamp'];
+      parsedTime = rawTime != null ? DateTime.parse(rawTime.toString()).toLocal() : DateTime.now();
+    } catch (_) {
+      parsedTime = DateTime.now();
+    }
+
+    return ChatMessage(
+      id: (json['id'] ?? json['message_id'] ?? '').toString(),
+      clientMsgId: json['client_msg_id']?.toString(),
+      senderId: (json['sender_id'] ?? '').toString(),
+      text: (json['content'] ?? json['text'] ?? json['message'] ?? '').toString(),
+      mediaUrl: json['media_url']?.toString(),
+      isViewOnce: json['is_view_once'] == true,
+      timestamp: parsedTime,
+      status: isRead ? 'read' : (isDelivered ? 'delivered' : (rawStatus.isNotEmpty ? rawStatus : 'sent')),
+      isSent: true,
+      isDelivered: isDelivered,
+      isRead: isRead,
+    );
+  }
+
+  ChatMessage copyWith({
+    String? id,
+    String? clientMsgId,
+    String? senderId,
+    String? text,
+    String? mediaUrl,
+    bool? isViewOnce,
+    DateTime? timestamp,
+    String? status,
+    bool? isSent,
+    bool? isDelivered,
+    bool? isRead,
+  }) {
+    return ChatMessage(
+      id: id ?? this.id,
+      clientMsgId: clientMsgId ?? this.clientMsgId,
+      senderId: senderId ?? this.senderId,
+      text: text ?? this.text,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
+      isViewOnce: isViewOnce ?? this.isViewOnce,
+      timestamp: timestamp ?? this.timestamp,
+      status: status ?? this.status,
+      isSent: isSent ?? this.isSent,
+      isDelivered: isDelivered ?? this.isDelivered,
+      isRead: isRead ?? this.isRead,
+    );
+  }
+}
+
+/// A parsed conversation item representing a match thread.
+class Conversation {
+  final String id;
+  final String matchId;
+  final String partnerId;
+  final String partnerName;
+  final String partnerAvatar;
+  final String lastMessage;
+  final String? lastMessageTime;
+  final String? lastMessageStatus;
+  final bool lastMessageIsMe;
+  final int unreadCount;
+  final bool isOnline;
+  final bool isVerified;
+  final DateTime? lastActiveAt;
+
+  const Conversation({
+    required this.id,
+    required this.matchId,
+    required this.partnerId,
+    required this.partnerName,
+    required this.partnerAvatar,
+    required this.lastMessage,
+    this.lastMessageTime,
+    this.lastMessageStatus,
+    this.lastMessageIsMe = false,
+    this.unreadCount = 0,
+    this.isOnline = false,
+    this.isVerified = false,
+    this.lastActiveAt,
+  });
+
+  factory Conversation.fromJson(Map<String, dynamic> json) {
+    // 1. Resolve ID / Match ID
+    final String convId = (json['id'] ?? json['conversation_id'] ?? json['match_id'] ?? '').toString();
+    final String mId = (json['match_id'] ?? json['id'] ?? json['conversation_id'] ?? '').toString();
+
+    // 2. Resolve Partner ID
+    final String pId = (json['partner']?['id'] ??
+            json['partner']?['user_id'] ??
+            json['partner_id'] ??
+            json['target_user_id'] ??
+            json['target_id'] ??
+            json['user_id'] ??
+            '')
+        .toString();
+
+    // 3. Resolve Partner Name
+    final String pName = (json['partner']?['name'] ??
+            json['partner']?['full_name'] ??
+            json['user']?['name'] ??
+            json['user']?['full_name'] ??
+            json['partner_name'] ??
+            json['matched_user_name'] ??
+            json['target_user_name'] ??
+            json['full_name'] ??
+            json['match_name'] ??
+            'User')
+        .toString();
+
+    // 4. Resolve Partner Avatar
+    dynamic rawPhotos = json['partner']?['photos'] ?? json['photos'];
+    String firstPhoto = '';
+    if (rawPhotos is List && rawPhotos.isNotEmpty) {
+      firstPhoto = (rawPhotos[0] is Map ? (rawPhotos[0]['photo_url'] ?? rawPhotos[0]['url']) : rawPhotos[0]).toString();
+    }
+    final String pAvatar = (json['partner']?['avatar_url'] ??
+            json['partner']?['photo_url'] ??
+            json['partner_avatar'] ??
+            json['matched_user_avatar'] ??
+            json['target_user_photo'] ??
+            json['avatar_url'] ??
+            json['avatar'] ??
+            json['photo_url'] ??
+            firstPhoto)
+        .toString();
+
+    // 5. Resolve Last Message
+    final String lastMsg = (json['last_message'] is Map
+            ? (json['last_message']['message'] ?? json['last_message']['content'] ?? json['last_message']['text'] ?? '')
+            : (json['last_message'] ?? 'Matched! Say hello 👋'))
+        .toString();
+
+    // 6. Resolve Unread Count
+    int unread = 0;
+    if (json['unread_count'] is int) {
+      unread = json['unread_count'];
+    } else if (json['unread_count'] != null) {
+      unread = int.tryParse(json['unread_count'].toString()) ?? 0;
+    }
+
+    // 7. Presence & Timestamps
+    DateTime? lastActive;
+    final lastSeenStr = json['last_active_at'] ??
+        json['last_seen'] ??
+        json['matched_user_last_active'] ??
+        json['partner']?['last_seen'];
+    if (lastSeenStr != null) {
+      try {
+        lastActive = DateTime.parse(lastSeenStr.toString()).toLocal();
+      } catch (_) {}
+    }
+
+    final bool online = json['is_online'] == true ||
+        json['matched_user_is_online'] == true ||
+        json['partner']?['is_online'] == true;
+
+    final bool verified = json['is_verified'] == true ||
+        json['matched_user_is_verified'] == true ||
+        json['is_verified_local'] == true ||
+        json['partner']?['is_verified'] == true;
+
+    final String? lastMsgTime = (json['last_message_time'] ?? json['last_message_at'] ?? json['updated_at'])?.toString();
+    final String? lastMsgStatus = (json['last_message_status'] ?? (json['last_message'] is Map ? json['last_message']['status'] : null))?.toString();
+    final bool lastMsgIsMe = json['last_message_is_me'] == true || (json['last_message'] is Map && json['last_message']['is_me'] == true);
+
+    return Conversation(
+      id: convId,
+      matchId: mId,
+      partnerId: pId,
+      partnerName: pName.isNotEmpty ? pName : 'User',
+      partnerAvatar: pAvatar,
+      lastMessage: lastMsg.isNotEmpty ? lastMsg : 'Matched! Say hello 👋',
+      lastMessageTime: lastMsgTime,
+      lastMessageStatus: lastMsgStatus,
+      lastMessageIsMe: lastMsgIsMe,
+      unreadCount: unread,
+      isOnline: online,
+      isVerified: verified,
+      lastActiveAt: lastActive,
+    );
+  }
+
+  ChatRecipient toRecipient() {
+    return ChatRecipient(
+      id: partnerId.isNotEmpty ? partnerId : matchId,
+      name: partnerName,
+      avatarUrl: partnerAvatar,
+      isVerified: isVerified,
+      isOnline: isOnline,
+      lastActiveAt: lastActiveAt,
+    );
+  }
 }
 
 /// The person on the other side of a chat.
-///
-/// This is deliberately separate from the signed-in user: chat UI must never
-/// infer its recipient from authentication or profile state.
 class ChatRecipient {
   final String id;
   final String name;
@@ -67,45 +265,7 @@ class ChatRecipient {
   });
 
   factory ChatRecipient.fromConversation(Map<String, dynamic> conversation) {
-    DateTime? lastActive;
-    final lastSeenStr = conversation['last_active_at'] ??
-        conversation['last_seen'] ??
-        conversation['matched_user_last_active'];
-    if (lastSeenStr != null) {
-      try {
-        lastActive = DateTime.parse(lastSeenStr.toString()).toLocal();
-      } catch (_) {}
-    }
-    final bool isOnline = conversation['is_online'] == true ||
-        conversation['matched_user_is_online'] == true;
-
-    return ChatRecipient(
-      id: (conversation['partner_id'] ??
-              conversation['target_user_id'] ??
-              conversation['target_id'] ??
-              conversation['user_id'] ??
-              '')
-          .toString(),
-      name: (conversation['partner_name'] ??
-              conversation['matched_user_name'] ??
-              conversation['target_user_name'] ??
-              conversation['full_name'] ??
-              conversation['match_name'] ??
-              '')
-          .toString(),
-      avatarUrl: (conversation['partner_avatar'] ??
-              conversation['matched_user_avatar'] ??
-              conversation['target_user_photo'] ??
-              conversation['avatar_url'] ??
-              conversation['photo_url'] ??
-              '')
-          .toString(),
-      isVerified: conversation['is_verified'] == true ||
-          conversation['matched_user_is_verified'] == true ||
-          conversation['is_verified_local'] == true,
-      isOnline: isOnline,
-      lastActiveAt: lastActive,
-    );
+    return Conversation.fromJson(conversation).toRecipient();
   }
 
   ChatRecipient copyWith({
@@ -181,7 +341,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   String? _errorMessage;
-  List<dynamic> _conversations = [];
+  List<Conversation> _conversations = [];
 
   @override
   void initState() {
@@ -197,42 +357,56 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     });
     try {
       final response = await ApiClient.instance.getChatConversations();
-      List<dynamic> parsedList = [];
+      debugPrint('Conversations JSON: ${response.data}');
+
+      List<Conversation> parsedList = [];
       if (response.data != null) {
         final rawData = response.data;
+        List<dynamic> rawList = [];
         if (rawData is List) {
-          parsedList = rawData;
+          rawList = rawData;
         } else if (rawData is Map) {
           if (rawData['data'] is List) {
-            parsedList = rawData['data'] as List<dynamic>;
+            rawList = rawData['data'] as List<dynamic>;
           } else if (rawData['conversations'] is List) {
-            parsedList = rawData['conversations'] as List<dynamic>;
+            rawList = rawData['conversations'] as List<dynamic>;
           } else if (rawData['matches'] is List) {
-            parsedList = rawData['matches'] as List<dynamic>;
+            rawList = rawData['matches'] as List<dynamic>;
+          }
+        }
+
+        for (final item in rawList) {
+          if (item is Map) {
+            try {
+              parsedList.add(Conversation.fromJson(Map<String, dynamic>.from(item)));
+            } catch (err) {
+              debugPrint('Error parsing conversation item: $err');
+            }
           }
         }
       }
+
       if (mounted) {
         setState(() {
           _conversations = parsedList;
           _hasError = false;
+          _isLoading = false;
         });
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('[ConversationsScreen] Error loading conversations: $e');
-        if (e is DioException) {
-          print('[ConversationsScreen] StatusCode: ${e.response?.statusCode}, Response: ${e.response?.data}');
-        }
+      debugPrint('[ConversationsScreen] Error loading conversations: $e');
+      if (e is DioException) {
+        debugPrint('[ConversationsScreen] StatusCode: ${e.response?.statusCode}, Response: ${e.response?.data}');
       }
       if (mounted) {
         setState(() {
           _hasError = _conversations.isEmpty;
           _errorMessage = 'Unable to load matches. Please check your connection.';
+          _isLoading = false;
         });
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && _isLoading) setState(() => _isLoading = false);
     }
   }
 
@@ -338,30 +512,22 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: _conversations.length,
                     itemBuilder: (context, index) {
-                    final item = _conversations[index];
-                    final String matchId = (item['id'] ?? item['match_id'] ?? '').toString();
-                    ChatRecipient recipientUser;
-                    try {
-                      recipientUser = ChatRecipient.fromConversation(
-                        Map<String, dynamic>.from(item as Map),
-                      );
-                    } catch (_) {
-                      recipientUser = const ChatRecipient(id: '', name: 'User');
-                    }
-                    final String matchName = recipientUser.name.isNotEmpty ? recipientUser.name : 'User';
-                    final String avatarUrl = recipientUser.avatarUrl;
-                    final String lastMsg = (item['last_message'] ?? 'Matched! Say hello 👋').toString();
-                    final int unreadCount = (item['unread_count'] is int) ? item['unread_count'] : (int.tryParse(item['unread_count']?.toString() ?? '') ?? 0);
-                    final bool isOnline = item['is_online'] == true || item['matched_user_is_online'] == true;
-                    final bool lastMsgIsMe = item['last_message_is_me'] == true;
-                    final String? lastMsgStatus = item['last_message_status']?.toString();
+                    final conv = _conversations[index];
+                    final String matchId = conv.matchId.isNotEmpty ? conv.matchId : conv.id;
+                    final recipientUser = conv.toRecipient();
+                    final String matchName = conv.partnerName;
+                    final String avatarUrl = conv.partnerAvatar;
+                    final String lastMsg = conv.lastMessage;
+                    final int unreadCount = conv.unreadCount;
+                    final bool isOnline = conv.isOnline;
+                    final bool lastMsgIsMe = conv.lastMessageIsMe;
+                    final String? lastMsgStatus = conv.lastMessageStatus;
 
                     // Parse last_message_time for relative display
                     String timeLabel = '';
-                    final rawTime = item['last_message_time'] ?? item['last_message_at'];
-                    if (rawTime != null) {
+                    if (conv.lastMessageTime != null) {
                       try {
-                        final dt = DateTime.parse(rawTime.toString()).toLocal();
+                        final dt = DateTime.parse(conv.lastMessageTime!).toLocal();
                         final now = DateTime.now();
                         final diff = now.difference(dt);
                         if (diff.inMinutes < 1) {
@@ -383,7 +549,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       onTap: () async {
-                        if (recipientUser.id.isEmpty) {
+                        if (recipientUser.id.isEmpty && matchId.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('This conversation has no recipient. Please refresh and try again.')),
                           );
@@ -744,21 +910,14 @@ class _ChatScreenState extends State<ChatScreen> {
             if (data['partner_maps_url'] != null) _partnerMapsUrl = data['partner_maps_url'];
           });
         }
-      } else if (type == 'messages_read') {
+      } else if (type == 'messages_read' || type == 'read_receipt') {
         if (mounted) {
           setState(() {
             for (int i = 0; i < _messages.length; i++) {
               final msg = _messages[i];
               final isMe = (_currentUserId.isNotEmpty && msg.senderId == _currentUserId) || msg.senderId == 'current_user_id';
               if (isMe) {
-                _messages[i] = ChatMessage(
-                  id: msg.id,
-                  clientMsgId: msg.clientMsgId,
-                  senderId: msg.senderId,
-                  text: msg.text,
-                  mediaUrl: msg.mediaUrl,
-                  isViewOnce: msg.isViewOnce,
-                  timestamp: msg.timestamp,
+                _messages[i] = msg.copyWith(
                   status: 'read',
                   isSent: true,
                   isDelivered: true,
@@ -795,7 +954,11 @@ class _ChatScreenState extends State<ChatScreen> {
         'match_id': widget.matchId,
         'reader_id': _currentUserId,
       }));
-      ApiClient.instance.markMessagesAsRead(widget.matchId);
+      ApiClient.instance.markMessagesAsRead(widget.matchId).then((res) {
+        if (mounted) {
+          // Success
+        }
+      }).catchError((_) {});
     } catch (_) {}
   }
 
@@ -808,7 +971,9 @@ class _ChatScreenState extends State<ChatScreen> {
         bool changed = false;
         setState(() {
           for (final item in rawMsgs) {
-            changed = _upsertServerMessage(Map<String, dynamic>.from(item as Map)) || changed;
+            if (item is Map) {
+              changed = _upsertServerMessage(Map<String, dynamic>.from(item)) || changed;
+            }
           }
         });
         if (changed || (!silent && _messages.isNotEmpty)) _scrollToBottom();
@@ -829,28 +994,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Adds a server message once, or swaps an optimistic client message in place.
   bool _upsertServerMessage(Map<String, dynamic> data) {
-    final dbId = (data['id'] ?? '').toString();
-    final clientMsgId = (data['client_msg_id'] ?? '').toString();
-    if (dbId.isEmpty) return false;
+    final serverMessage = ChatMessage.fromJson(data);
+    final dbId = serverMessage.id;
+    final clientMsgId = serverMessage.clientMsgId ?? '';
+    if (dbId.isEmpty && clientMsgId.isEmpty) return false;
 
-    final String rawStatus = (data['status'] ?? 'sent').toString();
-    final bool isDelivered = data['is_delivered'] == true || rawStatus == 'delivered' || rawStatus == 'read';
-    final bool isRead = data['is_read'] == true || rawStatus == 'read';
+    final lookupId = dbId.isNotEmpty ? dbId : clientMsgId;
 
-    final serverMessage = ChatMessage(
-      id: dbId,
-      clientMsgId: clientMsgId.isEmpty ? null : clientMsgId,
-      senderId: (data['sender_id'] ?? '').toString(),
-      text: (data['content'] ?? '').toString(),
-      mediaUrl: data['media_url']?.toString(),
-      timestamp: _parseLocalTimestamp((data['created_at'] ?? '').toString()),
-      status: isRead ? 'read' : (isDelivered ? 'delivered' : rawStatus),
-      isSent: true,
-      isDelivered: isDelivered,
-      isRead: isRead,
-    );
-    if (_processedMessageIds.contains(dbId)) {
-      final existingIdx = _messages.indexWhere((m) => m.id == dbId);
+    if (_processedMessageIds.contains(lookupId)) {
+      final existingIdx = _messages.indexWhere((m) =>
+          m.id == lookupId || (clientMsgId.isNotEmpty && (m.id == clientMsgId || m.clientMsgId == clientMsgId)));
       if (existingIdx != -1) {
         if (_messages[existingIdx].status != serverMessage.status ||
             _messages[existingIdx].isRead != serverMessage.isRead ||
@@ -869,10 +1022,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (optimisticIndex != -1) {
       _messages[optimisticIndex] = serverMessage;
-      _processedMessageIds..add(clientMsgId)..add(dbId);
+      if (clientMsgId.isNotEmpty) _processedMessageIds.add(clientMsgId);
+      if (serverMessage.id.isNotEmpty) _processedMessageIds.add(serverMessage.id);
       return true;
     }
-    _processedMessageIds.add(dbId);
+    if (serverMessage.id.isNotEmpty) _processedMessageIds.add(serverMessage.id);
     if (clientMsgId.isNotEmpty) _processedMessageIds.add(clientMsgId);
     _messages.add(serverMessage);
     return true;
