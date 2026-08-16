@@ -339,15 +339,49 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     itemCount: _conversations.length,
                     itemBuilder: (context, index) {
                     final item = _conversations[index];
-                    final String matchId = item['id'] ?? item['match_id'] ?? '';
-                    final recipientUser = ChatRecipient.fromConversation(
-                      Map<String, dynamic>.from(item as Map),
-                    );
+                    final String matchId = (item['id'] ?? item['match_id'] ?? '').toString();
+                    ChatRecipient recipientUser;
+                    try {
+                      recipientUser = ChatRecipient.fromConversation(
+                        Map<String, dynamic>.from(item as Map),
+                      );
+                    } catch (_) {
+                      recipientUser = const ChatRecipient(id: '', name: 'User');
+                    }
                     final String matchName = recipientUser.name.isNotEmpty ? recipientUser.name : 'User';
                     final String avatarUrl = recipientUser.avatarUrl;
-                    final String lastMsg = item['last_message'] ?? 'Matched! Say hello 👋';
+                    final String lastMsg = (item['last_message'] ?? 'Matched! Say hello 👋').toString();
+                    final int unreadCount = (item['unread_count'] is int) ? item['unread_count'] : (int.tryParse(item['unread_count']?.toString() ?? '') ?? 0);
+                    final bool isOnline = item['is_online'] == true || item['matched_user_is_online'] == true;
+                    final bool lastMsgIsMe = item['last_message_is_me'] == true;
+                    final String? lastMsgStatus = item['last_message_status']?.toString();
+
+                    // Parse last_message_time for relative display
+                    String timeLabel = '';
+                    final rawTime = item['last_message_time'] ?? item['last_message_at'];
+                    if (rawTime != null) {
+                      try {
+                        final dt = DateTime.parse(rawTime.toString()).toLocal();
+                        final now = DateTime.now();
+                        final diff = now.difference(dt);
+                        if (diff.inMinutes < 1) {
+                          timeLabel = 'now';
+                        } else if (diff.inMinutes < 60) {
+                          timeLabel = '${diff.inMinutes}m';
+                        } else if (diff.inHours < 24) {
+                          timeLabel = '${diff.inHours}h';
+                        } else if (diff.inDays == 1) {
+                          timeLabel = 'Yesterday';
+                        } else if (diff.inDays < 7) {
+                          timeLabel = '${diff.inDays}d';
+                        } else {
+                          timeLabel = '${dt.day}/${dt.month}';
+                        }
+                      } catch (_) {}
+                    }
 
                     return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       onTap: () async {
                         if (recipientUser.id.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -364,7 +398,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                             ),
                           ),
                         );
-                        if (res == true) {
+                        if (res == true || res == null) {
                           _fetchConversations();
                         }
                       },
@@ -389,7 +423,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                               width: 12,
                               height: 12,
                               decoration: BoxDecoration(
-                                color: Colors.greenAccent,
+                                color: isOnline ? Colors.greenAccent : Colors.grey,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: AppTheme.backgroundColor, width: 2),
                               ),
@@ -401,13 +435,60 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         matchName,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
-                      subtitle: Text(
-                        lastMsg,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      subtitle: Row(
+                        children: [
+                          if (lastMsgIsMe && lastMsgStatus != null) ...[
+                            Icon(
+                              (lastMsgStatus == 'read') ? Icons.done_all
+                                  : (lastMsgStatus == 'delivered') ? Icons.done_all
+                                  : Icons.done,
+                              size: 14,
+                              color: (lastMsgStatus == 'read') ? Colors.blueAccent : Colors.grey,
+                            ),
+                            const SizedBox(width: 3),
+                          ],
+                          Expanded(
+                            child: Text(
+                              lastMsg,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: unreadCount > 0 ? Colors.white : Colors.white70,
+                                fontSize: 13,
+                                fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (timeLabel.isNotEmpty)
+                            Text(
+                              timeLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: unreadCount > 0 ? AppTheme.primaryColor : Colors.grey,
+                              ),
+                            ),
+                          if (unreadCount > 0) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                unreadCount > 99 ? '99+' : '$unreadCount',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -488,6 +569,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) {
       _startRealtimeStreamListener();
       await _fetchMessages();
+      // Immediately mark incoming messages as read when opening chat
+      _emitReadReceipt();
     }
   }
 

@@ -302,6 +302,19 @@ async def get_matches(
             if msg.match_id not in latest_msgs_map:
                 latest_msgs_map[msg.match_id] = msg
 
+        # 3. Batch count unread messages per match in 1 query
+        unread_res = await db.execute(
+            select(
+                ChatMessage.match_id,
+                func.count(ChatMessage.id).label("cnt")
+            ).where(
+                ChatMessage.match_id.in_(match_ids),
+                ChatMessage.sender_id != user_uuid,
+                ChatMessage.is_read == False,
+            ).group_by(ChatMessage.match_id)
+        )
+        unread_map: dict[uuid.UUID, int] = {row[0]: row[1] for row in unread_res.all()}
+
         for match_obj, target_id in valid_matches:
             target_user = users_map.get(target_id)
             if not target_user:
@@ -309,9 +322,7 @@ async def get_matches(
 
             first_photo = target_user.photos[0].photo_url if (target_user.photos and len(target_user.photos) > 0) else None
             latest_msg = latest_msgs_map.get(match_obj.id)
-            unread_count = 0
-            if latest_msg and latest_msg.sender_id != user_uuid and not latest_msg.is_read:
-                unread_count = 1
+            unread_count = unread_map.get(match_obj.id, 0)
 
             partner_name = target_user.full_name or "UR Heart User"
             last_text = latest_msg.content if latest_msg else "Matched! Say hello 👋"
