@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:ota_update/ota_update.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 
@@ -42,7 +45,7 @@ class UpdateService {
       final String rawTag = release['tag_name'] ?? '';
       final String latestVersion = _cleanVersion(rawTag);
       final String releaseNotes = release['body'] ?? 'Performance improvements and bug fixes.';
-      
+
       // Find direct APK download url
       final List<dynamic> assets = release['assets'] ?? [];
       String? apkUrl;
@@ -172,9 +175,16 @@ class _UpdateDialogContentState extends State<_UpdateDialogContent> {
   bool _isDownloading = false;
   int _downloadProgress = 0;
   String _statusText = '';
+  CancelToken? _cancelToken;
+
+  @override
+  void dispose() {
+    _cancelToken?.cancel();
+    super.dispose();
+  }
 
   Future<void> _startOtaUpdate() async {
-    if (kIsWeb) {
+    if (kIsWeb || !Platform.isAndroid) {
       _fallbackToBrowser();
       return;
     }
@@ -186,54 +196,56 @@ class _UpdateDialogContentState extends State<_UpdateDialogContent> {
     });
 
     try {
-      OtaUpdate()
-          .execute(
-            widget.apkUrl,
-            destinationFilename: 'ur-heart-update.apk',
-          )
-          .listen(
-        (OtaEvent event) {
-          if (!mounted) return;
-          switch (event.status) {
-            case OtaStatus.DOWNLOADING:
-              final int progress = int.tryParse(event.value ?? '0') ?? 0;
-              setState(() {
-                _downloadProgress = progress;
-                _statusText = 'Downloading update... $progress%';
-              });
-              break;
-            case OtaStatus.INSTALLING:
-              setState(() {
-                _statusText = 'Installing update...';
-              });
-              break;
-            case OtaStatus.ALREADY_RUNNING_ERROR:
-              setState(() {
-                _statusText = 'Update already in progress.';
-              });
-              break;
-            case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
-            case OtaStatus.INTERNAL_ERROR:
-            case OtaStatus.DOWNLOAD_ERROR:
-            case OtaStatus.CHECKSUM_ERROR:
-              setState(() {
-                _statusText = 'Direct install failed. Opening browser...';
-              });
-              _fallbackToBrowser();
-              break;
-          }
-        },
-        onError: (err) {
-          if (mounted) {
+      final tempDir = await getTemporaryDirectory();
+      final savePath = '${tempDir.path}/ur-heart-update.apk';
+
+      // Delete previous download if exists
+      final file = File(savePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      _cancelToken = CancelToken();
+      final dio = Dio();
+
+      await dio.download(
+        widget.apkUrl,
+        savePath,
+        cancelToken: _cancelToken,
+        onReceiveProgress: (received, total) {
+          if (total > 0 && mounted) {
+            final progress = ((received / total) * 100).toInt();
             setState(() {
-              _statusText = 'Update error. Opening browser...';
+              _downloadProgress = progress;
+              _statusText = 'Downloading update... $progress%';
             });
-            _fallbackToBrowser();
           }
         },
       );
+
+      if (!mounted) return;
+
+      setState(() {
+        _statusText = 'Opening package installer...';
+      });
+
+      final result = await OpenFilex.open(savePath, type: 'application/vnd.android.package-archive');
+      if (result.type != ResultType.done) {
+        if (mounted) {
+          setState(() {
+            _statusText = 'Opening in external browser...';
+          });
+          _fallbackToBrowser();
+        }
+      }
     } catch (e) {
+      if (kDebugMode) {
+        print('Download / install failed: $e');
+      }
       if (mounted) {
+        setState(() {
+          _statusText = 'Direct download failed. Opening browser...';
+        });
         _fallbackToBrowser();
       }
     }
