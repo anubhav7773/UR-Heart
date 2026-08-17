@@ -239,3 +239,17 @@ def _block_reason() -> str:
         "⚠️ Contact details, social IDs, ya phone numbers share karna mana hai. "
         "15 messages complete karke Safe Bridge unlock karein!"
     )
+
+
+# Backwards-compatible API wrapper expected by other modules
+def sanitize_and_guard_message(content: str) -> bool:
+    """
+    Compatibility wrapper that returns True when a leak is detected.
+    Older callers import sanitize_and_guard_message(content) — keep that API stable.
+    """
+    try:
+        blocked, _ = sanitize_and_guard(content, is_bridge_unlocked=False)
+        return bool(blocked)
+    except Exception:
+        # Fail-safe: treat unknown errors as detection
+        return True
