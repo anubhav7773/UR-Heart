@@ -1,19 +1,27 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import 'chat_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
 
 class ChatProvider extends ChangeNotifier {
   List<ChatMessage> _messages = [];
   final Set<String> _uniqueMessageIds = {};
   bool _isLoading = false;
   String _currentUserId = '';
+  String? _lastErrorCode;
+  String? _lastErrorMessage;
 
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get isLoading => _isLoading;
   String get currentUserId => _currentUserId;
+  String? get lastErrorCode => _lastErrorCode;
+  String? get lastErrorMessage => _lastErrorMessage;
+  void clearLastError() { _lastErrorCode = null; _lastErrorMessage = null; notifyListeners(); }
 
   static double calculateHaversineDistance({
     required double lat1,
@@ -109,30 +117,24 @@ class ChatProvider extends ChangeNotifier {
       }
 
       final response = await ApiClient.instance.getMessages(matchId);
-      if (response.data != null && response.data['data'] != null) {
-        final List<dynamic> rawMsgs = response.data['data'];
+      // Handle response.data being a raw JSON string
+      dynamic responseData = response.data;
+      if (responseData is String) {
+        try {
+          responseData = jsonDecode(responseData);
+        } catch (_) {}
+      }
+      if (responseData != null && responseData is Map && responseData['data'] != null) {
+        final List<dynamic> rawMsgs = responseData['data'] is List
+            ? responseData['data']
+            : [];
         final List<ChatMessage> parsedList = [];
 
         for (var item in rawMsgs) {
-          final String msgId = item['id'] ?? '';
-          if (msgId.isNotEmpty) {
-            final String rawTime = item['created_at'] ?? '';
-            DateTime parsedDt;
+          if (item is Map) {
             try {
-              parsedDt = DateTime.parse(rawTime).toLocal();
-            } on FormatException {
-              parsedDt = DateTime.now();
-            }
-            parsedList.add(
-              ChatMessage(
-                id: msgId,
-                clientMsgId: item['client_msg_id']?.toString(),
-                senderId: item['sender_id'] ?? '',
-                text: item['content'] ?? '',
-                mediaUrl: item['media_url'],
-                timestamp: parsedDt,
-              ),
-            );
+              parsedList.add(ChatMessage.fromJson(Map<String, dynamic>.from(item)));
+            } catch (_) {}
           }
         }
 
@@ -207,6 +209,40 @@ class ChatProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('[ChatProvider] Error sending message: $e');
       }
+
+      // Rollback optimistic message if still present
+      final index = _messages.indexWhere((m) => m.id == clientMsgId || m.clientMsgId == clientMsgId);
+      if (index != -1) {
+        _messages.removeAt(index);
+      }
+      _uniqueMessageIds.remove(clientMsgId);
+
+      String? code;
+      String? detail;
+
+      if (e is DioException && e.response != null) {
+        final resData = e.response?.data;
+        if (resData is Map) {
+          code = resData['error_code'] ?? (resData['error'] is Map ? resData['error']['error_code'] : null);
+          detail = resData['detail'] ?? (resData['error'] is Map ? resData['error']['detail'] : null) ?? resData['message'];
+        }
+      }
+
+      // If Safe Bridge enforcement triggered, provide haptic feedback and surface the error to UI
+      if (code != null && code == 'SAFE_BRIDGE_LOCKED') {
+        try {
+          HapticFeedback.vibrate();
+        } catch (_) {}
+        _lastErrorCode = code;
+        _lastErrorMessage = detail ?? 'Safe Bridge locked. Unlock to share contact details.';
+        notifyListeners();
+        return false;
+      }
+
+      // Generic failure
+      _lastErrorCode = null;
+      _lastErrorMessage = e.toString();
+      notifyListeners();
       return false;
     }
   }

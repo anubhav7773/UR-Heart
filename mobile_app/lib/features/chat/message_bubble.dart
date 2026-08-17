@@ -172,35 +172,45 @@ class MessageBubbleWidget extends StatelessWidget {
     );
   }
 
+  /// 3-State WhatsApp Tick Logic for Outbound Messages:
+  /// - Read (Double Blue Tick): `isRead == true` OR `status == 'read'`
+  /// - Delivered (Double Grey Tick): `status == 'delivered'` OR `isDelivered == true`
+  /// - Sent (Single Grey Tick): Default / `status == 'sent'` OR `isSent == true`
   Widget _buildStatusIcon() {
-    if (status == 'read' || isRead) {
-      // 3. Double Blue Tick: Read
+    if (!isMe) return const SizedBox.shrink();
+
+    // 1. Read: Double Blue Tick
+    if (isRead == true || status == 'read') {
       return const Icon(
         Icons.done_all,
-        size: 15,
-        color: Colors.blue,
-      );
-    } else if (status == 'delivered' || isDelivered) {
-      // 2. Double Grey Tick: Delivered to recipient device/socket
-      return const Icon(
-        Icons.done_all,
-        size: 15,
-        color: Colors.grey,
-      );
-    } else if (status == 'sent' || isSent) {
-      // 1. Single Grey Tick: Sent to server
-      return const Icon(
-        Icons.done,
-        size: 15,
-        color: Colors.grey,
-      );
-    } else {
-      // Sending: Clock indicator
-      return const Icon(
-        Icons.access_time,
-        size: 12,
-        color: Colors.grey,
+        size: 16,
+        color: Color(0xFF34B7F1),
       );
     }
+
+    // 2. Delivered: Double Grey Tick
+    if (status == 'delivered' || isDelivered == true) {
+      return Icon(
+        Icons.done_all,
+        size: 16,
+        color: Colors.grey.shade600,
+      );
+    }
+
+    // 3. Sent: Single Grey Tick
+    if (status == 'sent' || isSent == true) {
+      return Icon(
+        Icons.done,
+        size: 16,
+        color: Colors.grey.shade600,
+      );
+    }
+
+    // 4. Sending / Pending: Clock Icon
+    return Icon(
+      Icons.access_time,
+      size: 14,
+      color: Colors.grey.shade400,
+    );
   }
 }

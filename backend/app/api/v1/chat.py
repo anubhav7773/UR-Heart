@@ -1,5 +1,6 @@
 import re
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, HTTPException, status, WebSocket, WebSocketDisconnect
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, update, func
 from sqlalchemy.orm import selectinload
 
-from app.core.database import get_db
+from app.core.database import get_db, AsyncSessionLocal
 from app.core.security import get_current_user_id
 from app.models.orm import Match, ChatMessage, User, UserPhoto, BlockedUser
 from app.services.notification_engine import NotificationEngineService
@@ -57,37 +58,39 @@ LEAK_BLOCK_PATTERNS = [
 ]
 
 
-def sanitize_and_guard_message(content: str, is_bridge_unlocked: bool) -> str:
+from app.services.content_guard import sanitize_and_guard_message
+
+
+def guard_or_raise(content: str, is_bridge_unlocked: bool):
     """
-    Heuristic & Obfuscation Content Filter:
-    Intercepts and rejects messages containing raw usernames without '@', spaced digits,
-    spelled-out Hindi/English numbers, social keywords, or map links before the ₹499 Safe Bridge unlock.
+    Wrapper to call the centralized content guard. If bridge is unlocked allow content.
+    If bridge is locked and the guard detects a leak, raise an HTTPException with a structured body
+    that clients can parse for the SAFE_BRIDGE_LOCKED error code.
     """
     if not content:
-        return content
+        return
 
-    # Allow uninhibited communication only after mutual ₹499 Safe Bridge unlock
     if is_bridge_unlocked:
-        return content
+        return
 
-    normalized = content.lower()
+    try:
+        leak = sanitize_and_guard_message(content)
+    except Exception:
+        # Be conservative: Treat any unexpected error as detection
+        leak = True
 
-    # Step A: Convert spelled-out words to digits
-    for word, digit in WORD_DIGIT_MAP.items():
-        normalized = re.sub(rf"\b{word}\b", digit, normalized)
+    if leak:
+        # Log the violation server-side for audits
+        logging.getLogger(__name__).warning("Safe Bridge leak detected for content: %s", content)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": "SAFE_BRIDGE_LOCKED",
+                "detail": "Contact sharing is locked. Both participants must unlock Safe Bridge to share phone numbers, social handles, or UPI IDs."
+            }
+        )
 
-    # Step B: Create a collapsed version without spaces to detect 'a n u b h a v 8 4 0 0'
-    collapsed = re.sub(r"[\s\.\-_]+", "", normalized)
-
-    # Step C: Match against all block patterns
-    for pattern in LEAK_BLOCK_PATTERNS:
-        if re.search(pattern, normalized, re.IGNORECASE) or re.search(pattern, collapsed, re.IGNORECASE):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="⚠️ Contact info, social IDs, or usernames share karna mana hai. 15 messages complete karke Safe Bridge unlock karein!"
-            )
-
-    return content
+    return
 
 
 router = APIRouter(prefix="/chat", tags=["Real-Time Chat & Media Attachments"])
@@ -224,15 +227,47 @@ async def chat_websocket_endpoint(
                     continue
                 content_text = data.get("content", "")
                 if content_text:
+                    # Determine Safe Bridge state from DB for this match so weaponized obfuscation cannot bypass WS path
+                    is_bridge_unlocked = False
                     try:
-                        sanitize_and_guard_message(content_text, is_bridge_unlocked=False)
-                    except HTTPException as exc:
-                        await websocket.send_json({
-                            "type": "error",
-                            "code": "CONTENT_FILTER_BLOCKED",
-                            "message": exc.detail
-                        })
-                        continue
+                        import uuid as _uuid
+                        try:
+                            match_uuid = _uuid.UUID(match_id)
+                        except Exception:
+                            match_uuid = None
+
+                        if match_uuid:
+                            async with AsyncSessionLocal() as _db:
+                                mres = await _db.execute(select(Match).where(Match.id == match_uuid))
+                                match_obj = mres.scalars().first()
+                                if match_obj:
+                                    is_bridge_unlocked = bool(
+                                        getattr(match_obj, "is_whatsapp_unlocked", False)
+                                        or (getattr(match_obj, "user1_bridge_paid", False) and getattr(match_obj, "user2_bridge_paid", False))
+                                    )
+                    except Exception:
+                        # Fail-safe: if DB check fails, treat as locked
+                        is_bridge_unlocked = False
+
+                    if not is_bridge_unlocked:
+                        try:
+                            leak = sanitize_and_guard_message(content_text)
+                        except Exception:
+                            leak = True
+
+                        if leak:
+                            # Emit websocket error frame and do not broadcast or persist
+                            await websocket.send_json({
+                                "type": "error",
+                                "code": "LEAK_DETECTED",
+                                "message": "Message blocked: Unlock Safe Bridge to share contact info."
+                            })
+                            logging.getLogger(__name__).warning(
+                                "WS leak blocked for match=%s user=%s content=%s",
+                                match_id, user_id, (content_text[:200] + '...') if len(content_text) > 200 else content_text
+                            )
+                            continue
+
                 await ws_manager.broadcast_to_match(match_id, data, sender_ws=websocket)
             else:
                 await ws_manager.broadcast_to_match(match_id, data, sender_ws=websocket)
@@ -455,7 +490,8 @@ async def send_chat_message(
 
     # Content Filter & De-obfuscation Interception Guard
     if payload.content:
-        sanitize_and_guard_message(payload.content, is_bridge_unlocked)
+        # Use unified guard wrapper which raises a structured HTTPException when a leak is detected
+        guard_or_raise(payload.content, is_bridge_unlocked)
 
     # 0. Deduplication Check via client_msg_id
     if payload.client_msg_id:
