@@ -85,8 +85,8 @@ def guard_or_raise(content: str, is_bridge_unlocked: bool):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "error_code": "SAFE_BRIDGE_LOCKED",
-                "detail": "Contact sharing is locked. Both participants must unlock Safe Bridge to share phone numbers, social handles, or UPI IDs."
+                "error_code": "MUTUAL_PAYMENT_REQUIRED",
+                "detail": "Both users must pay ₹499 to unlock Safe Bridge before sharing phone numbers, social handles, or UPI IDs."
             }
         )
 
@@ -241,9 +241,10 @@ async def chat_websocket_endpoint(
                                 mres = await _db.execute(select(Match).where(Match.id == match_uuid))
                                 match_obj = mres.scalars().first()
                                 if match_obj:
+                                    # STRICT: BOTH users must pay
                                     is_bridge_unlocked = bool(
-                                        getattr(match_obj, "is_whatsapp_unlocked", False)
-                                        or (getattr(match_obj, "user1_bridge_paid", False) and getattr(match_obj, "user2_bridge_paid", False))
+                                        getattr(match_obj, "user1_bridge_paid", False) and
+                                        getattr(match_obj, "user2_bridge_paid", False)
                                     )
                     except Exception:
                         # Fail-safe: if DB check fails, treat as locked
@@ -259,8 +260,8 @@ async def chat_websocket_endpoint(
                             # Emit websocket error frame and do not broadcast or persist
                             await websocket.send_json({
                                 "type": "error",
-                                "code": "LEAK_DETECTED",
-                                "message": "Message blocked: Unlock Safe Bridge to share contact info."
+                                "code": "MUTUAL_PAYMENT_REQUIRED",
+                                "message": "Message blocked: Both users must pay ₹499 to unlock Safe Bridge before sharing contacts."
                             })
                             logging.getLogger(__name__).warning(
                                 "WS leak blocked for match=%s user=%s content=%s",
@@ -474,11 +475,12 @@ async def send_chat_message(
     except Exception:
         pass
 
+    # STRICT MUTUAL SAFE BRIDGE ENFORCEMENT: BOTH users must pay ₹499
     is_bridge_unlocked = False
     if match_obj:
         is_bridge_unlocked = bool(
-            getattr(match_obj, "is_whatsapp_unlocked", False) or
-            (getattr(match_obj, "user1_bridge_paid", False) and getattr(match_obj, "user2_bridge_paid", False))
+            getattr(match_obj, "user1_bridge_paid", False) and
+            getattr(match_obj, "user2_bridge_paid", False)
         )
 
     # Media Removal Guard: Chat is strictly text-only across all tiers
@@ -546,12 +548,9 @@ async def send_chat_message(
                         is_recip_online = True
 
     now_utc = datetime.now(timezone.utc)
-    if is_recip_in_match:
-        msg_status = "read"
-        is_delivered = True
-        is_read = True
-        read_at = now_utc
-    elif is_recip_online:
+    # FIX: NEVER automatically mark as 'read' - requires explicit read_receipt event
+    # Only detect delivery status based on recipient presence
+    if is_recip_online:
         msg_status = "delivered"
         is_delivered = True
         is_read = False

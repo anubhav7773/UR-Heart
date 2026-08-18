@@ -1655,9 +1655,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
           // Detect Safe Bridge lock by error code OR by 400 + leak keywords
           if (code == 'SAFE_BRIDGE_LOCKED' ||
+              code == 'MUTUAL_PAYMENT_REQUIRED' ||
               (e.response?.statusCode == 400 &&
                (errorMsg.toLowerCase().contains('safe bridge') ||
                 errorMsg.toLowerCase().contains('contact') ||
+                errorMsg.toLowerCase().contains('payment') ||
                 errorMsg.toLowerCase().contains('locked')))) {
             isSafeBridgeLocked = true;
           }
