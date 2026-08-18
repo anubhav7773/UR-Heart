@@ -1704,7 +1704,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '⚠️ Contact Details Locked — Unlock Safe Bridge to share phone numbers, social handles or UPI. ',
+                      '⚠️ Contact Details Locked — Both users must pay ₹499 to share phone numbers, social handles or UPI.',
                       style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1719,7 +1719,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   borderRadius: BorderRadius.circular(12)),
               duration: const Duration(seconds: 6),
               action: SnackBarAction(
-                label: 'Unlock (₹29)',
+                label: 'Unlock (₹499)',
                 textColor: Colors.white,
                 onPressed: () {
                   SafeBridgePaywallSheet.show(
@@ -1935,6 +1935,142 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // ============================================================================
+  // 4-STATE MUTUAL PAYMENT BANNER HELPER METHODS (₹499 × 2)
+  // ============================================================================
+
+  Color _getBannerBackgroundColor() {
+    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
+      return Colors.green.withValues(alpha: 0.15);
+    } else if (_mutualMessageCount < 15) {
+      return Colors.amber.withValues(alpha: 0.12);
+    } else if (_myBridgePaid && _partnerBridgePaid) {
+      return Colors.green.withValues(alpha: 0.15);
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return Colors.teal.withValues(alpha: 0.15);
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return Colors.orange.withValues(alpha: 0.15);
+    } else {
+      return Colors.purple.withValues(alpha: 0.12);
+    }
+  }
+
+  Color _getBannerBorderColor() {
+    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
+      return Colors.greenAccent;
+    } else if (_mutualMessageCount < 15) {
+      return Colors.amber.shade700;
+    } else if (_myBridgePaid && _partnerBridgePaid) {
+      return Colors.greenAccent;
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return Colors.tealAccent;
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return Colors.deepOrange;
+    } else {
+      return Colors.purpleAccent;
+    }
+  }
+
+  IconData _getBannerIcon() {
+    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
+      return Icons.lock_open_rounded;
+    } else if (_mutualMessageCount < 15) {
+      return Icons.lock_clock;
+    } else if (_myBridgePaid && _partnerBridgePaid) {
+      return Icons.lock_open_rounded;
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return Icons.hourglass_top_rounded;
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return Icons.flash_on;
+    } else {
+      return Icons.shield_outlined;
+    }
+  }
+
+  Color _getBannerIconColor() {
+    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
+      return Colors.greenAccent;
+    } else if (_mutualMessageCount < 15) {
+      return Colors.amber;
+    } else if (_myBridgePaid && _partnerBridgePaid) {
+      return Colors.greenAccent;
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return Colors.tealAccent;
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return Colors.deepOrange;
+    } else {
+      return Colors.purpleAccent;
+    }
+  }
+
+  String _getBannerTitle() {
+    if (_isWhatsAppUnlocked && _isLocationUnlocked) {
+      return '🎉 Safe Contact & Live Route Unlocked!';
+    } else if (_isWhatsAppUnlocked) {
+      return '🎉 Safe WhatsApp Unlocked!';
+    } else if (_isLocationUnlocked) {
+      return '🎉 Live Route Unlocked!';
+    } else if (_mutualMessageCount < 15) {
+      return '🔒 Safe Meet & WhatsApp Bridge — Milestone Required';
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return '⏳ You\'ve unlocked! Waiting for ${_displayRecipient.name}. (1/2 Unlocked)';
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return '🔥 ${_displayRecipient.name} unlocked Safe Bridge!';
+    } else {
+      return '🔒 Safe Meet & WhatsApp Bridge — Both users must unlock (₹499 each)';
+    }
+  }
+
+  String _getBannerSubtitle() {
+    if (_isWhatsAppUnlocked && _isLocationUnlocked) {
+      return 'WhatsApp & Turn-by-Turn Route are ready.';
+    } else if (_isWhatsAppUnlocked) {
+      return 'WhatsApp: ${_unlockedPhoneNumber ?? "Contact Available"}';
+    } else if (_isLocationUnlocked) {
+      return 'Google Maps navigation is ready.';
+    } else if (_mutualMessageCount < 15) {
+      return 'Exchange ${15 - _mutualMessageCount} more messages to unlock mutual consent & ₹499 bridge.';
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return 'Your ₹499 payment is complete. Waiting for match to pay ₹499 to reveal contacts.';
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return 'Your match has paid ₹499! Pay ₹499 now to view WhatsApp & Route.';
+    } else {
+      return 'Both users must pay ₹499 each to unlock Safe Bridge.';
+    }
+  }
+
+  String _getBannerButtonText() {
+    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
+      return 'View';
+    } else if (_mutualMessageCount < 15) {
+      return '$_mutualMessageCount/15';
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return 'Waiting...';
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return '₹499';
+    } else {
+      return '₹499';
+    }
+  }
+
+  Color _getBannerButtonColor() {
+    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
+      return Colors.green.shade700;
+    } else if (_mutualMessageCount < 15) {
+      return Colors.amber.shade900;
+    } else if (_myBridgePaid && !_partnerBridgePaid) {
+      return Colors.teal.shade800;
+    } else if (!_myBridgePaid && _partnerBridgePaid) {
+      return Colors.deepOrange.shade700;
+    } else {
+      return const Color(0xFF00BFA5);
+    }
+  }
+
+  bool _getBannerButtonEnabled() {
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2146,29 +2282,17 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-          // Safe Two-Way Consent Bridge & Dual ₹499 Paywall Header Widget
+          // STRICT 4-STATE MUTUAL PAYMENT BANNER (₹499 × 2)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             color: AppTheme.surfaceColor,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: (_isWhatsAppUnlocked || _isLocationUnlocked)
-                    ? Colors.green.withValues(alpha: 0.15)
-                    : (_mutualMessageCount < 15)
-                        ? Colors.amber.withValues(alpha: 0.12)
-                        : (_myBridgePaid && _partnerBridgePaid)
-                            ? Colors.green.withValues(alpha: 0.15)
-                            : Colors.teal.withValues(alpha: 0.15),
+                color: _getBannerBackgroundColor(),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: (_isWhatsAppUnlocked || _isLocationUnlocked)
-                      ? Colors.greenAccent
-                      : (_mutualMessageCount < 15)
-                          ? Colors.amber.shade700
-                          : (_myBridgePaid && _partnerBridgePaid)
-                              ? Colors.greenAccent
-                              : Colors.tealAccent,
+                  color: _getBannerBorderColor(),
                   width: 1,
                 ),
               ),
@@ -2177,18 +2301,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   Row(
                     children: [
                       Icon(
-                        (_isWhatsAppUnlocked && _isLocationUnlocked)
-                            ? Icons.lock_open_rounded
-                            : (_mutualMessageCount < 15)
-                                ? Icons.lock_clock
-                                : (_myBridgePaid || _myWhatsAppConsent)
-                                    ? Icons.hourglass_top_rounded
-                                    : Icons.shield_outlined,
-                        color: (_isWhatsAppUnlocked || _isLocationUnlocked)
-                            ? Colors.greenAccent
-                            : (_mutualMessageCount < 15)
-                                ? Colors.amber
-                                : Colors.tealAccent,
+                        _getBannerIcon(),
+                        color: _getBannerIconColor(),
                         size: 24,
                       ),
                       const SizedBox(width: 10),
@@ -2197,18 +2311,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              (_isWhatsAppUnlocked && _isLocationUnlocked)
-                                  ? '🎉 Safe Contact & Live Route Unlocked!'
-                                  : _isWhatsAppUnlocked
-                                      ? '🎉 Safe WhatsApp Unlocked!'
-                                      : _isLocationUnlocked
-                                          ? '🎉 Live Route on Maps Unlocked!'
-                                          : (_mutualMessageCount < 15)
-                                              ? '🔒 Safe Share unlocks at 15 messages ($_mutualMessageCount/15)'
-                                              : (_myBridgePaid &&
-                                                      !_partnerBridgePaid)
-                                                  ? 'Paid ✅ — Waiting for ${_displayRecipient.name} ⏳'
-                                                  : 'Safe Meet & WhatsApp Bridge 🤝',
+                              _getBannerTitle(),
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -2217,26 +2320,10 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              (_isWhatsAppUnlocked && _isLocationUnlocked)
-                                  ? 'WhatsApp & Turn-by-Turn Route are ready.'
-                                  : _isWhatsAppUnlocked
-                                      ? 'WhatsApp: ${_unlockedPhoneNumber ?? "Contact Available"}'
-                                      : _isLocationUnlocked
-                                          ? 'Google Maps navigation is ready.'
-                                          : (_mutualMessageCount < 15)
-                                              ? 'Exchange ${15 - _mutualMessageCount} more messages to unlock mutual consent & ₹499 bridge.'
-                                              : (_myBridgePaid &&
-                                                      !_partnerBridgePaid)
-                                                  ? 'Aapka ₹499 payment complete ho gaya hai.'
-                                                  : 'Mutual consent + ₹499 access fee is required.',
+                              _getBannerSubtitle(),
                               style: TextStyle(
                                 fontSize: 11,
-                                color:
-                                    (_isWhatsAppUnlocked || _isLocationUnlocked)
-                                        ? Colors.greenAccent
-                                        : (_mutualMessageCount < 15)
-                                            ? Colors.amber
-                                            : Colors.tealAccent,
+                                color: _getBannerIconColor(),
                               ),
                             ),
                           ],
@@ -2249,33 +2336,23 @@ class _ChatScreenState extends State<ChatScreen> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2.5, color: Colors.tealAccent),
                         )
-                      else if (!_isWhatsAppUnlocked && !_isLocationUnlocked)
-                        ElevatedButton.icon(
-                          onPressed: _openSafeShareDialog,
-                          icon: Icon(
-                            _mutualMessageCount < 15
-                                ? Icons.lock_clock
-                                : Icons.lock_open,
-                            size: 14,
-                          ),
-                          label: Text(
-                            _mutualMessageCount < 15
-                                ? '$_mutualMessageCount/15'
-                                : (_myBridgePaid ? 'Status 🔒' : 'Unlock 🔒'),
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
+                      else
+                        ElevatedButton(
+                          onPressed: _getBannerButtonEnabled() ? _openSafeShareDialog : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _mutualMessageCount < 15
-                                ? Colors.amber.shade900
-                                : (_myBridgePaid
-                                    ? Colors.teal.shade800
-                                    : const Color(0xFF00BFA5)),
+                            backgroundColor: _getBannerButtonColor(),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
+                                horizontal: 12, vertical: 8),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: Text(
+                            _getBannerButtonText(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                     ],
