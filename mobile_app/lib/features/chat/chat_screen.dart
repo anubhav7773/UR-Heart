@@ -46,14 +46,18 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
-    final String rawStatus = (json['status'] ?? 'sent').toString().toLowerCase();
+    final String rawStatus =
+        (json['status'] ?? 'sent').toString().toLowerCase();
     final bool isRead = json['is_read'] == true || rawStatus == 'read';
-    final bool isDelivered = json['is_delivered'] == true || rawStatus == 'delivered' || isRead;
+    final bool isDelivered =
+        json['is_delivered'] == true || rawStatus == 'delivered' || isRead;
 
     DateTime parsedTime;
     try {
       final rawTime = json['created_at'] ?? json['timestamp'];
-      parsedTime = rawTime != null ? DateTime.parse(rawTime.toString()).toLocal() : DateTime.now();
+      parsedTime = rawTime != null
+          ? DateTime.parse(rawTime.toString()).toLocal()
+          : DateTime.now();
     } catch (_) {
       parsedTime = DateTime.now();
     }
@@ -62,11 +66,16 @@ class ChatMessage {
       id: (json['id'] ?? json['message_id'] ?? '').toString(),
       clientMsgId: json['client_msg_id']?.toString(),
       senderId: (json['sender_id'] ?? '').toString(),
-      text: (json['content'] ?? json['text'] ?? json['message'] ?? '').toString(),
+      text:
+          (json['content'] ?? json['text'] ?? json['message'] ?? '').toString(),
       mediaUrl: json['media_url']?.toString(),
       isViewOnce: json['is_view_once'] == true,
       timestamp: parsedTime,
-      status: isRead ? 'read' : (isDelivered ? 'delivered' : (rawStatus.isNotEmpty ? rawStatus : 'sent')),
+      status: isRead
+          ? 'read'
+          : (isDelivered
+              ? 'delivered'
+              : (rawStatus.isNotEmpty ? rawStatus : 'sent')),
       isSent: true,
       isDelivered: isDelivered,
       isRead: isRead,
@@ -136,8 +145,12 @@ class Conversation {
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
     // 1. Resolve ID / Match ID
-    final String convId = (json['id'] ?? json['conversation_id'] ?? json['match_id'] ?? '').toString();
-    final String mId = (json['match_id'] ?? json['id'] ?? json['conversation_id'] ?? '').toString();
+    final String convId =
+        (json['id'] ?? json['conversation_id'] ?? json['match_id'] ?? '')
+            .toString();
+    final String mId =
+        (json['match_id'] ?? json['id'] ?? json['conversation_id'] ?? '')
+            .toString();
 
     // 2. Resolve Partner ID
     final String pId = (json['partner']?['id'] ??
@@ -166,7 +179,10 @@ class Conversation {
     dynamic rawPhotos = json['partner']?['photos'] ?? json['photos'];
     String firstPhoto = '';
     if (rawPhotos is List && rawPhotos.isNotEmpty) {
-      firstPhoto = (rawPhotos[0] is Map ? (rawPhotos[0]['photo_url'] ?? rawPhotos[0]['url']) : rawPhotos[0]).toString();
+      firstPhoto = (rawPhotos[0] is Map
+              ? (rawPhotos[0]['photo_url'] ?? rawPhotos[0]['url'])
+              : rawPhotos[0])
+          .toString();
     }
     final String pAvatar = (json['partner']?['avatar_url'] ??
             json['partner']?['photo_url'] ??
@@ -181,7 +197,10 @@ class Conversation {
 
     // 5. Resolve Last Message
     final String lastMsg = (json['last_message'] is Map
-            ? (json['last_message']['message'] ?? json['last_message']['content'] ?? json['last_message']['text'] ?? '')
+            ? (json['last_message']['message'] ??
+                json['last_message']['content'] ??
+                json['last_message']['text'] ??
+                '')
             : (json['last_message'] ?? 'Matched! Say hello 👋'))
         .toString();
 
@@ -214,9 +233,17 @@ class Conversation {
         json['is_verified_local'] == true ||
         json['partner']?['is_verified'] == true;
 
-    final String? lastMsgTime = (json['last_message_time'] ?? json['last_message_at'] ?? json['updated_at'])?.toString();
-    final String? lastMsgStatus = (json['last_message_status'] ?? (json['last_message'] is Map ? json['last_message']['status'] : null))?.toString();
-    final bool lastMsgIsMe = json['last_message_is_me'] == true || (json['last_message'] is Map && json['last_message']['is_me'] == true);
+    final String? lastMsgTime = (json['last_message_time'] ??
+            json['last_message_at'] ??
+            json['updated_at'])
+        ?.toString();
+    final String? lastMsgStatus = (json['last_message_status'] ??
+            (json['last_message'] is Map
+                ? json['last_message']['status']
+                : null))
+        ?.toString();
+    final bool lastMsgIsMe = json['last_message_is_me'] == true ||
+        (json['last_message'] is Map && json['last_message']['is_me'] == true);
 
     return Conversation(
       id: convId,
@@ -388,12 +415,14 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           }
         }
 
-        debugPrint('[ConversationsScreen] Parsed ${rawList.length} conversation items from response');
+        debugPrint(
+            '[ConversationsScreen] Parsed ${rawList.length} conversation items from response');
 
         for (final item in rawList) {
           if (item is Map) {
             try {
-              parsedList.add(Conversation.fromJson(Map<String, dynamic>.from(item)));
+              parsedList
+                  .add(Conversation.fromJson(Map<String, dynamic>.from(item)));
             } catch (err) {
               debugPrint('Error parsing conversation item: $err — raw: $item');
             }
@@ -401,7 +430,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         }
       }
 
-      debugPrint('[ConversationsScreen] Final parsed conversations count: ${parsedList.length}');
+      debugPrint(
+          '[ConversationsScreen] Final parsed conversations count: ${parsedList.length}');
 
       if (mounted) {
         setState(() {
@@ -413,12 +443,14 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     } catch (e) {
       debugPrint('[ConversationsScreen] Error loading conversations: $e');
       if (e is DioException) {
-        debugPrint('[ConversationsScreen] StatusCode: ${e.response?.statusCode}, Response: ${e.response?.data}');
+        debugPrint(
+            '[ConversationsScreen] StatusCode: ${e.response?.statusCode}, Response: ${e.response?.data}');
       }
       if (mounted) {
         setState(() {
           _hasError = _conversations.isEmpty;
-          _errorMessage = 'Unable to load matches. Please check your connection.';
+          _errorMessage =
+              'Unable to load matches. Please check your connection.';
           _isLoading = false;
         });
       }
@@ -434,7 +466,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       appBar: AppBar(
         backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
-        title: const Text('Matches & Conversations', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Matches & Conversations',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
@@ -448,7 +481,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         color: AppTheme.primaryColor,
         backgroundColor: AppTheme.surfaceColor,
         child: _isLoading && _conversations.isEmpty
-            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
+            ? const Center(
+                child: CircularProgressIndicator(color: AppTheme.primaryColor))
             : _hasError && _conversations.isEmpty
                 ? Center(
                     child: SingleChildScrollView(
@@ -462,30 +496,39 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                             decoration: BoxDecoration(
                               color: AppTheme.cardColor,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color:
+                                      Colors.redAccent.withValues(alpha: 0.3)),
                             ),
-                            child: const Icon(Icons.cloud_off_rounded, size: 64, color: Colors.redAccent),
+                            child: const Icon(Icons.cloud_off_rounded,
+                                size: 64, color: Colors.redAccent),
                           ),
                           const SizedBox(height: 24),
                           const Text(
                             'Connection Issue',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             _errorMessage ?? 'Unable to load conversations.',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 14, color: Colors.grey),
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.grey),
                           ),
                           const SizedBox(height: 20),
                           ElevatedButton.icon(
-                            onPressed: () => _fetchConversations(forceRefresh: true),
+                            onPressed: () =>
+                                _fetchConversations(forceRefresh: true),
                             icon: const Icon(Icons.refresh, size: 18),
                             label: const Text('Try Again'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.primaryColor,
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
                         ],
@@ -505,176 +548,212 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                 decoration: BoxDecoration(
                                   color: AppTheme.cardColor,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                                  border: Border.all(
+                                      color: AppTheme.primaryColor
+                                          .withValues(alpha: 0.3)),
                                 ),
-                                child: const Icon(Icons.favorite_outline, size: 64, color: AppTheme.primaryColor),
+                                child: const Icon(Icons.favorite_outline,
+                                    size: 64, color: AppTheme.primaryColor),
                               ),
                               const SizedBox(height: 24),
                               const Text(
                                 'No matches yet!',
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white),
                               ),
                               const SizedBox(height: 8),
                               const Text(
                                 'Keep swiping on the feed or send a Direct DM to start chatting.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 14, color: Colors.grey),
+                                style:
+                                    TextStyle(fontSize: 14, color: Colors.grey),
                               ),
                             ],
                           ),
                         ),
                       )
                     : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _conversations.length,
-                    itemBuilder: (context, index) {
-                    final conv = _conversations[index];
-                    final String matchId = conv.matchId.isNotEmpty ? conv.matchId : conv.id;
-                    final recipientUser = conv.toRecipient();
-                    final String matchName = conv.partnerName;
-                    final String avatarUrl = conv.partnerAvatar;
-                    final String lastMsg = conv.lastMessage;
-                    final int unreadCount = conv.unreadCount;
-                    final bool isOnline = conv.isOnline;
-                    final bool lastMsgIsMe = conv.lastMessageIsMe;
-                    final String? lastMsgStatus = conv.lastMessageStatus;
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _conversations.length,
+                        itemBuilder: (context, index) {
+                          final conv = _conversations[index];
+                          final String matchId =
+                              conv.matchId.isNotEmpty ? conv.matchId : conv.id;
+                          final recipientUser = conv.toRecipient();
+                          final String matchName = conv.partnerName;
+                          final String avatarUrl = conv.partnerAvatar;
+                          final String lastMsg = conv.lastMessage;
+                          final int unreadCount = conv.unreadCount;
+                          final bool isOnline = conv.isOnline;
+                          final bool lastMsgIsMe = conv.lastMessageIsMe;
+                          final String? lastMsgStatus = conv.lastMessageStatus;
 
-                    // Parse last_message_time for relative display
-                    String timeLabel = '';
-                    if (conv.lastMessageTime != null) {
-                      try {
-                        final dt = DateTime.parse(conv.lastMessageTime!).toLocal();
-                        final now = DateTime.now();
-                        final diff = now.difference(dt);
-                        if (diff.inMinutes < 1) {
-                          timeLabel = 'now';
-                        } else if (diff.inMinutes < 60) {
-                          timeLabel = '${diff.inMinutes}m';
-                        } else if (diff.inHours < 24) {
-                          timeLabel = '${diff.inHours}h';
-                        } else if (diff.inDays == 1) {
-                          timeLabel = 'Yesterday';
-                        } else if (diff.inDays < 7) {
-                          timeLabel = '${diff.inDays}d';
-                        } else {
-                          timeLabel = '${dt.day}/${dt.month}';
-                        }
-                      } catch (_) {}
-                    }
+                          // Parse last_message_time for relative display
+                          String timeLabel = '';
+                          if (conv.lastMessageTime != null) {
+                            try {
+                              final dt = DateTime.parse(conv.lastMessageTime!)
+                                  .toLocal();
+                              final now = DateTime.now();
+                              final diff = now.difference(dt);
+                              if (diff.inMinutes < 1) {
+                                timeLabel = 'now';
+                              } else if (diff.inMinutes < 60) {
+                                timeLabel = '${diff.inMinutes}m';
+                              } else if (diff.inHours < 24) {
+                                timeLabel = '${diff.inHours}h';
+                              } else if (diff.inDays == 1) {
+                                timeLabel = 'Yesterday';
+                              } else if (diff.inDays < 7) {
+                                timeLabel = '${diff.inDays}d';
+                              } else {
+                                timeLabel = '${dt.day}/${dt.month}';
+                              }
+                            } catch (_) {}
+                          }
 
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      onTap: () async {
-                        if (recipientUser.id.isEmpty && matchId.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('This conversation has no recipient. Please refresh and try again.')),
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            onTap: () async {
+                              if (recipientUser.id.isEmpty && matchId.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text(
+                                          'This conversation has no recipient. Please refresh and try again.')),
+                                );
+                                return;
+                              }
+                              final res = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ChatScreen(
+                                    matchId: matchId,
+                                    recipientUser: recipientUser,
+                                  ),
+                                ),
+                              );
+                              if (res == true || res == null) {
+                                _fetchConversations();
+                              }
+                            },
+                            leading: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 26,
+                                  backgroundColor: AppTheme.primaryColor,
+                                  backgroundImage: avatarUrl.isNotEmpty
+                                      ? CachedNetworkImageProvider(
+                                          avatarUrl,
+                                          maxHeight: 120,
+                                          maxWidth: 120,
+                                        )
+                                      : null,
+                                  child: avatarUrl.isEmpty
+                                      ? const Icon(Icons.person,
+                                          color: Colors.white)
+                                      : null,
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: isOnline
+                                          ? Colors.greenAccent
+                                          : Colors.grey,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: AppTheme.backgroundColor,
+                                          width: 2),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            title: Text(
+                              matchName,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            ),
+                            subtitle: Row(
+                              children: [
+                                if (lastMsgIsMe && lastMsgStatus != null) ...[
+                                  Icon(
+                                    (lastMsgStatus == 'read')
+                                        ? Icons.done_all
+                                        : (lastMsgStatus == 'delivered')
+                                            ? Icons.done_all
+                                            : Icons.done,
+                                    size: 14,
+                                    color: (lastMsgStatus == 'read')
+                                        ? Colors.blueAccent
+                                        : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 3),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    lastMsg,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: unreadCount > 0
+                                          ? Colors.white
+                                          : Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: unreadCount > 0
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (timeLabel.isNotEmpty)
+                                  Text(
+                                    timeLabel,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: unreadCount > 0
+                                          ? AppTheme.primaryColor
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                if (unreadCount > 0) ...[
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      unreadCount > 99 ? '99+' : '$unreadCount',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           );
-                          return;
-                        }
-                        final res = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatScreen(
-                              matchId: matchId,
-                              recipientUser: recipientUser,
-                            ),
-                          ),
-                        );
-                        if (res == true || res == null) {
-                          _fetchConversations();
-                        }
-                      },
-                      leading: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 26,
-                            backgroundColor: AppTheme.primaryColor,
-                            backgroundImage: avatarUrl.isNotEmpty
-                                ? CachedNetworkImageProvider(
-                                    avatarUrl,
-                                    maxHeight: 120,
-                                    maxWidth: 120,
-                                  )
-                                : null,
-                            child: avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
-                          ),
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: isOnline ? Colors.greenAccent : Colors.grey,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppTheme.backgroundColor, width: 2),
-                              ),
-                            ),
-                          ),
-                        ],
+                        },
                       ),
-                      title: Text(
-                        matchName,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      subtitle: Row(
-                        children: [
-                          if (lastMsgIsMe && lastMsgStatus != null) ...[
-                            Icon(
-                              (lastMsgStatus == 'read') ? Icons.done_all
-                                  : (lastMsgStatus == 'delivered') ? Icons.done_all
-                                  : Icons.done,
-                              size: 14,
-                              color: (lastMsgStatus == 'read') ? Colors.blueAccent : Colors.grey,
-                            ),
-                            const SizedBox(width: 3),
-                          ],
-                          Expanded(
-                            child: Text(
-                              lastMsg,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: unreadCount > 0 ? Colors.white : Colors.white70,
-                                fontSize: 13,
-                                fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (timeLabel.isNotEmpty)
-                            Text(
-                              timeLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: unreadCount > 0 ? AppTheme.primaryColor : Colors.grey,
-                              ),
-                            ),
-                          if (unreadCount > 0) ...[
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                unreadCount > 99 ? '99+' : '$unreadCount',
-                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  },
-                ),
       ),
     );
   }
@@ -730,7 +809,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isRecipientProfileLoading = true;
   String _recipientDistanceLabel = 'Location pending';
 
-  ChatRecipient get _displayRecipient => _recipientProfile ?? widget.recipientUser;
+  ChatRecipient get _displayRecipient =>
+      _recipientProfile ?? widget.recipientUser;
 
   @override
   void initState() {
@@ -739,7 +819,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _initChat();
     // Refresh the local GPS fix before calculating the recipient distance.
     LocationService.instance.getCurrentLocation().then((position) {
-      if (position == null && mounted && _recipientDistanceLabel == 'Location pending') {
+      if (position == null &&
+          mounted &&
+          _recipientDistanceLabel == 'Location pending') {
         setState(() => _recipientDistanceLabel = 'Location unavailable');
       }
     });
@@ -770,8 +852,10 @@ class _ChatScreenState extends State<ChatScreen> {
           queryParameters: {'user_id': recipientId},
         );
         if (response.data != null && response.data['data'] != null) {
-          final Map<String, dynamic> data = Map<String, dynamic>.from(response.data['data'] as Map);
-          final returnedUserId = (data['user_id'] ?? data['id'] ?? '').toString();
+          final Map<String, dynamic> data =
+              Map<String, dynamic>.from(response.data['data'] as Map);
+          final returnedUserId =
+              (data['user_id'] ?? data['id'] ?? '').toString();
 
           // A profile endpoint response for another account must identify that
           // account. Never let a response for the signed-in user overwrite the
@@ -798,7 +882,8 @@ class _ChatScreenState extends State<ChatScreen> {
               _recipientProfile = widget.recipientUser.copyWith(
                 name: name.isNotEmpty ? name : widget.recipientUser.name,
                 avatarUrl: avatarUrl,
-                isVerified: data['is_verified'] ?? data['is_verified_local'] ?? false,
+                isVerified:
+                    data['is_verified'] ?? data['is_verified_local'] ?? false,
                 isOnline: isOnline,
                 lastActiveAt: lastActive,
               );
@@ -814,7 +899,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   lat2: rLat,
                   lon2: rLng,
                 );
-                _recipientDistanceLabel = ChatProvider.getFormattedDistanceLabel(distKm);
+                _recipientDistanceLabel =
+                    ChatProvider.getFormattedDistanceLabel(distKm);
               } else if (data['area_name'] != null) {
                 _recipientDistanceLabel = data['area_name'].toString();
               }
@@ -851,7 +937,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final wsScheme = isHttps ? 'wss' : 'ws';
       final wsHost = baseUri.host;
       final wsPort = baseUri.hasPort ? ':${baseUri.port}' : '';
-      final wsUrl = '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?user_id=$_currentUserId';
+      final wsUrl =
+          '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?user_id=$_currentUserId';
 
       _wsChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
       _wsSubscription = _wsChannel?.stream.listen(
@@ -891,19 +978,24 @@ class _ChatScreenState extends State<ChatScreen> {
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 22),
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.white, size: 22),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       errorMsg.toString(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
                     ),
                   ),
                 ],
               ),
               backgroundColor: Colors.redAccent.shade700,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               duration: const Duration(seconds: 5),
             ),
           );
@@ -914,17 +1006,28 @@ class _ChatScreenState extends State<ChatScreen> {
       if (type == 'consent_update' || type == 'bridge_payment_update') {
         if (mounted) {
           setState(() {
-            if (data['total_messages'] != null) _mutualMessageCount = data['total_messages'];
-            _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? (data['is_fully_unlocked'] ?? _isWhatsAppUnlocked);
-            _isLocationUnlocked = data['location_unlocked'] ?? (data['is_fully_unlocked'] ?? _isLocationUnlocked);
-            if (data['my_whatsapp_consent'] != null) _myWhatsAppConsent = data['my_whatsapp_consent'];
-            if (data['my_location_consent'] != null) _myLocationConsent = data['my_location_consent'];
-            if (data['partner_whatsapp_consent'] != null) _partnerWhatsAppConsent = data['partner_whatsapp_consent'];
-            if (data['partner_location_consent'] != null) _partnerLocationConsent = data['partner_location_consent'];
-            if (data['my_payment_done'] != null) _myBridgePaid = data['my_payment_done'];
-            if (data['partner_payment_done'] != null) _partnerBridgePaid = data['partner_payment_done'];
-            if (data['partner_phone'] != null) _unlockedPhoneNumber = data['partner_phone'];
-            if (data['partner_maps_url'] != null) _partnerMapsUrl = data['partner_maps_url'];
+            if (data['total_messages'] != null)
+              _mutualMessageCount = data['total_messages'];
+            _isWhatsAppUnlocked = data['whatsapp_unlocked'] ??
+                (data['is_fully_unlocked'] ?? _isWhatsAppUnlocked);
+            _isLocationUnlocked = data['location_unlocked'] ??
+                (data['is_fully_unlocked'] ?? _isLocationUnlocked);
+            if (data['my_whatsapp_consent'] != null)
+              _myWhatsAppConsent = data['my_whatsapp_consent'];
+            if (data['my_location_consent'] != null)
+              _myLocationConsent = data['my_location_consent'];
+            if (data['partner_whatsapp_consent'] != null)
+              _partnerWhatsAppConsent = data['partner_whatsapp_consent'];
+            if (data['partner_location_consent'] != null)
+              _partnerLocationConsent = data['partner_location_consent'];
+            if (data['my_payment_done'] != null)
+              _myBridgePaid = data['my_payment_done'];
+            if (data['partner_payment_done'] != null)
+              _partnerBridgePaid = data['partner_payment_done'];
+            if (data['partner_phone'] != null)
+              _unlockedPhoneNumber = data['partner_phone'];
+            if (data['partner_maps_url'] != null)
+              _partnerMapsUrl = data['partner_maps_url'];
           });
         }
       } else if (type == 'messages_read' || type == 'read_receipt') {
@@ -932,7 +1035,9 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             for (int i = 0; i < _messages.length; i++) {
               final msg = _messages[i];
-              final isMe = (_currentUserId.isNotEmpty && msg.senderId == _currentUserId) || msg.senderId == 'current_user_id';
+              final isMe = (_currentUserId.isNotEmpty &&
+                      msg.senderId == _currentUserId) ||
+                  msg.senderId == 'current_user_id';
               if (isMe) {
                 _messages[i] = msg.copyWith(
                   status: 'read',
@@ -944,7 +1049,9 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           });
         }
-      } else if (type == 'message' || data.containsKey('content') || data.containsKey('id')) {
+      } else if (type == 'message' ||
+          data.containsKey('content') ||
+          data.containsKey('id')) {
         bool changed = false;
         if (mounted) {
           setState(() {
@@ -953,7 +1060,9 @@ class _ChatScreenState extends State<ChatScreen> {
           if (changed) {
             _scrollToBottom();
             final senderId = (data['sender_id'] ?? '').toString();
-            if (senderId.isNotEmpty && senderId != _currentUserId && senderId != 'current_user_id') {
+            if (senderId.isNotEmpty &&
+                senderId != _currentUserId &&
+                senderId != 'current_user_id') {
               _emitReadReceipt();
             }
           }
@@ -989,18 +1098,22 @@ class _ChatScreenState extends State<ChatScreen> {
       // Handle response.data being a raw JSON string
       dynamic responseData = response.data;
       if (responseData is String) {
-        try { responseData = jsonDecode(responseData); } catch (_) {}
+        try {
+          responseData = jsonDecode(responseData);
+        } catch (_) {}
       }
-      if (responseData != null && responseData is Map && responseData['data'] != null) {
-        final List<dynamic> rawMsgs = responseData['data'] is List
-            ? responseData['data']
-            : [];
+      if (responseData != null &&
+          responseData is Map &&
+          responseData['data'] != null) {
+        final List<dynamic> rawMsgs =
+            responseData['data'] is List ? responseData['data'] : [];
 
         bool changed = false;
         setState(() {
           for (final item in rawMsgs) {
             if (item is Map) {
-              changed = _upsertServerMessage(Map<String, dynamic>.from(item)) || changed;
+              changed = _upsertServerMessage(Map<String, dynamic>.from(item)) ||
+                  changed;
             }
           }
         });
@@ -1031,7 +1144,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (_processedMessageIds.contains(lookupId)) {
       final existingIdx = _messages.indexWhere((m) =>
-          m.id == lookupId || (clientMsgId.isNotEmpty && (m.id == clientMsgId || m.clientMsgId == clientMsgId)));
+          m.id == lookupId ||
+          (clientMsgId.isNotEmpty &&
+              (m.id == clientMsgId || m.clientMsgId == clientMsgId)));
       if (existingIdx != -1) {
         if (_messages[existingIdx].status != serverMessage.status ||
             _messages[existingIdx].isRead != serverMessage.isRead ||
@@ -1051,7 +1166,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (optimisticIndex != -1) {
       _messages[optimisticIndex] = serverMessage;
       if (clientMsgId.isNotEmpty) _processedMessageIds.add(clientMsgId);
-      if (serverMessage.id.isNotEmpty) _processedMessageIds.add(serverMessage.id);
+      if (serverMessage.id.isNotEmpty)
+        _processedMessageIds.add(serverMessage.id);
       return true;
     }
     if (serverMessage.id.isNotEmpty) _processedMessageIds.add(serverMessage.id);
@@ -1127,16 +1243,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _fetchWhatsAppBridgeStatus() async {
     try {
-      final response = await ApiClient.instance.getWhatsAppBridgeStatus(matchId: widget.matchId);
+      final response = await ApiClient.instance
+          .getWhatsAppBridgeStatus(matchId: widget.matchId);
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'];
         setState(() {
-          _mutualMessageCount = data['total_messages'] ?? (data['mutual_message_count'] ?? 0);
+          _mutualMessageCount =
+              data['total_messages'] ?? (data['mutual_message_count'] ?? 0);
           _myWhatsAppConsent = data['my_consent'] ?? false;
           _partnerWhatsAppConsent = data['partner_consent'] ?? false;
           _myBridgePaid = data['my_payment_done'] ?? false;
           _partnerBridgePaid = data['partner_payment_done'] ?? false;
-          _isWhatsAppUnlocked = data['is_whatsapp_unlocked'] ?? (data['is_fully_unlocked'] ?? false);
+          _isWhatsAppUnlocked = data['is_whatsapp_unlocked'] ??
+              (data['is_fully_unlocked'] ?? false);
           _unlockedPhoneNumber = data['phone_number'] ?? data['partner_phone'];
         });
       }
@@ -1167,7 +1286,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _launchWhatsAppChat() async {
     if (_unlockedPhoneNumber == null || _unlockedPhoneNumber!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('WhatsApp phone number not available yet.')),
+        const SnackBar(
+            content: Text('WhatsApp phone number not available yet.')),
       );
       return;
     }
@@ -1175,8 +1295,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (digitsOnly.length == 10) {
       digitsOnly = '91$digitsOnly';
     }
-    final uri = Uri.parse('https://wa.me/$digitsOnly?text=${Uri.encodeComponent('Hi!')}');
-    final nativeUri = Uri.parse('whatsapp://send?phone=$digitsOnly&text=${Uri.encodeComponent('Hi!')}');
+    final uri = Uri.parse(
+        'https://wa.me/$digitsOnly?text=${Uri.encodeComponent('Hi!')}');
+    final nativeUri = Uri.parse(
+        'whatsapp://send?phone=$digitsOnly&text=${Uri.encodeComponent('Hi!')}');
 
     try {
       if (await canLaunchUrl(uri)) {
@@ -1239,9 +1361,11 @@ class _ChatScreenState extends State<ChatScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.ondemand_video, color: AppTheme.secondaryColor, size: 26),
+            Icon(Icons.ondemand_video,
+                color: AppTheme.secondaryColor, size: 26),
             SizedBox(width: 10),
-            Text('In-Chat Video Ad (10s)', style: TextStyle(color: Colors.white, fontSize: 16)),
+            Text('In-Chat Video Ad (10s)',
+                style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
         content: const Text(
@@ -1251,14 +1375,13 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Dismiss', style: TextStyle(color: AppTheme.secondaryColor)),
+            child: const Text('Dismiss',
+                style: TextStyle(color: AppTheme.secondaryColor)),
           ),
         ],
       ),
     );
   }
-
-
 
   void _showMatchProfileBottomSheet() {
     showModalBottomSheet(
@@ -1298,18 +1421,25 @@ class _ChatScreenState extends State<ChatScreen> {
                               maxWidth: 240,
                             )
                           : null,
-                      child: _displayRecipient.avatarUrl.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                      child: _displayRecipient.avatarUrl.isEmpty
+                          ? const Icon(Icons.person,
+                              size: 60, color: Colors.white)
+                          : null,
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
                           _displayRecipient.name,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
                         ),
                         if (_displayRecipient.isVerified) ...[
                           const SizedBox(width: 6),
-                          const Icon(Icons.verified, color: Colors.blueAccent, size: 20),
+                          const Icon(Icons.verified,
+                              color: Colors.blueAccent, size: 20),
                         ],
                       ],
                     ),
@@ -1322,22 +1452,28 @@ class _ChatScreenState extends State<ChatScreen> {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: _displayRecipient.isOnline ? Colors.greenAccent : Colors.grey,
+                            color: _displayRecipient.isOnline
+                                ? Colors.greenAccent
+                                : Colors.grey,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          formatRelativePresence(_displayRecipient.isOnline, _displayRecipient.lastActiveAt),
+                          formatRelativePresence(_displayRecipient.isOnline,
+                              _displayRecipient.lastActiveAt),
                           style: TextStyle(
-                            color: _displayRecipient.isOnline ? Colors.greenAccent : Colors.white70,
+                            color: _displayRecipient.isOnline
+                                ? Colors.greenAccent
+                                : Colors.white70,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 3),
                           decoration: BoxDecoration(
                             color: Colors.black45,
                             borderRadius: BorderRadius.circular(12),
@@ -1346,9 +1482,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.location_on, size: 13, color: AppTheme.secondaryColor),
+                              const Icon(Icons.location_on,
+                                  size: 13, color: AppTheme.secondaryColor),
                               const SizedBox(width: 4),
-                              Text(_recipientDistanceLabel, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                              Text(_recipientDistanceLabel,
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 11)),
                             ],
                           ),
                         ),
@@ -1368,11 +1507,18 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('About Me', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                          Text('About Me',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryColor)),
                           SizedBox(height: 6),
                           Text(
                             'Love authentic conversations over evening Chai ☕. Looking for genuine connections on UR-Heart.',
-                            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                            style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                height: 1.4),
                           ),
                         ],
                       ),
@@ -1388,10 +1534,14 @@ class _ChatScreenState extends State<ChatScreen> {
                               Navigator.pop(context);
                               _showReportDialog();
                             },
-                            icon: const Icon(Icons.report_problem, color: AppTheme.secondaryColor, size: 18),
-                            label: const Text('Report', style: TextStyle(color: AppTheme.secondaryColor)),
+                            icon: const Icon(Icons.report_problem,
+                                color: AppTheme.secondaryColor, size: 18),
+                            label: const Text('Report',
+                                style:
+                                    TextStyle(color: AppTheme.secondaryColor)),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppTheme.secondaryColor),
+                              side: const BorderSide(
+                                  color: AppTheme.secondaryColor),
                             ),
                           ),
                         ),
@@ -1402,8 +1552,10 @@ class _ChatScreenState extends State<ChatScreen> {
                               Navigator.pop(context);
                               _showBlockConfirmDialog();
                             },
-                            icon: const Icon(Icons.block, color: Colors.redAccent, size: 18),
-                            label: const Text('Block', style: TextStyle(color: Colors.redAccent)),
+                            icon: const Icon(Icons.block,
+                                color: Colors.redAccent, size: 18),
+                            label: const Text('Block',
+                                style: TextStyle(color: Colors.redAccent)),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: Colors.redAccent),
                             ),
@@ -1425,7 +1577,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final String content = text ?? _messageController.text.trim();
     if (content.isEmpty && mediaUrl == null) return;
 
-    final String actualSenderId = _currentUserId.isNotEmpty ? _currentUserId : 'current_user_id';
+    final String actualSenderId =
+        _currentUserId.isNotEmpty ? _currentUserId : 'current_user_id';
     final clientMsgId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
     final newMessage = ChatMessage(
       id: clientMsgId,
@@ -1450,7 +1603,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_mutualMessageCount == 15) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 15 Messages Complete! Safe WhatsApp & Location Bridge is now available.'),
+            content: Text(
+                '🎉 15 Messages Complete! Safe WhatsApp & Location Bridge is now available.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 4),
           ),
@@ -1473,17 +1627,38 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       String errorMsg =
-          '⚠️ Contact details, usernames, ya location share karna mana hai. 15 messages ke baad Safe Bridge unlock karein!';
+          '⚠️ Safe Bridge unlock hone se pehle number ya social handle share karna mana hai.';
       bool isSafeBridgeLocked = false;
 
       if (e is DioException && e.response != null) {
         final resData = e.response?.data;
         if (resData is Map) {
-          // Backend structured SAFE_BRIDGE_LOCKED payload: { error_code: "SAFE_BRIDGE_LOCKED", detail: "..." }
-          final code = resData['error_code'] ?? (resData['error'] is Map ? resData['error']['error_code'] : null);
-          final detail = resData['detail'] ?? (resData['error'] is Map ? resData['error']['detail'] : null) ?? resData['message'];
-          if (detail != null) errorMsg = detail.toString();
-          if (code != null && code.toString() == 'SAFE_BRIDGE_LOCKED') {
+          // Backend structured SAFE_BRIDGE_LOCKED payload:
+          // { "detail": { "error_code": "SAFE_BRIDGE_LOCKED", "detail": "..." } }
+          String? code;
+          String? message;
+
+          // Check if detail is a nested Map containing error_code
+          final detailObj = resData['detail'];
+          if (detailObj is Map) {
+            code = detailObj['error_code']?.toString();
+            message = detailObj['detail']?.toString();
+          } else {
+            // Fallback: check root level for backward compatibility
+            code = resData['error_code']?.toString();
+            message = detailObj?.toString() ?? resData['message']?.toString();
+          }
+
+          if (message != null && message.isNotEmpty) {
+            errorMsg = message;
+          }
+
+          // Detect Safe Bridge lock by error code OR by 400 + leak keywords
+          if (code == 'SAFE_BRIDGE_LOCKED' ||
+              (e.response?.statusCode == 400 &&
+               (errorMsg.toLowerCase().contains('safe bridge') ||
+                errorMsg.toLowerCase().contains('contact') ||
+                errorMsg.toLowerCase().contains('locked')))) {
             isSafeBridgeLocked = true;
           }
         }
@@ -1492,7 +1667,8 @@ class _ChatScreenState extends State<ChatScreen> {
       // Rollback optimistic message
       if (mounted) {
         setState(() {
-          _messages.removeWhere((m) => m.id == clientMsgId || m.clientMsgId == clientMsgId);
+          _messages.removeWhere(
+              (m) => m.id == clientMsgId || m.clientMsgId == clientMsgId);
           _processedMessageIds.remove(clientMsgId);
           if (_mutualMessageCount > 0) _mutualMessageCount--;
           if (content.isNotEmpty && _messageController.text.isEmpty) {
@@ -1520,21 +1696,25 @@ class _ChatScreenState extends State<ChatScreen> {
           // Also show a small SnackBar for immediate feedback
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Row(
+              content: const Row(
                 children: [
-                  const Icon(Icons.lock, color: Colors.white, size: 20),
-                  const SizedBox(width: 10),
+                  Icon(Icons.lock, color: Colors.white, size: 20),
+                  SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       '⚠️ Contact Details Locked — Unlock Safe Bridge to share phone numbers, social handles or UPI. ',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
                     ),
                   ),
                 ],
               ),
               backgroundColor: Colors.deepOrange.shade700,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               duration: const Duration(seconds: 6),
               action: SnackBarAction(
                 label: 'Unlock (₹29)',
@@ -1558,19 +1738,24 @@ class _ChatScreenState extends State<ChatScreen> {
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 22),
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.white, size: 22),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       errorMsg,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
                     ),
                   ),
                 ],
               ),
               backgroundColor: Colors.redAccent.shade700,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               duration: const Duration(seconds: 5),
             ),
           );
@@ -1598,19 +1783,22 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           backgroundColor: AppTheme.cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               const Icon(Icons.report_problem, color: AppTheme.secondaryColor),
               const SizedBox(width: 10),
-              Text('Report ${_displayRecipient.name}', style: const TextStyle(color: Colors.white, fontSize: 18)),
+              Text('Report ${_displayRecipient.name}',
+                  style: const TextStyle(color: Colors.white, fontSize: 18)),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Select reason for reporting:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const Text('Select reason for reporting:',
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
               const SizedBox(height: 10),
               DropdownButton<String>(
                 value: selectedReason,
@@ -1618,11 +1806,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 isExpanded: true,
                 style: const TextStyle(color: Colors.white),
                 items: const [
-                  DropdownMenuItem(value: 'Inappropriate Content', child: Text('Inappropriate Content')),
-                  DropdownMenuItem(value: 'Harassment or Bullying', child: Text('Harassment or Bullying')),
-                  DropdownMenuItem(value: 'Fake Profile or Impersonation', child: Text('Fake Profile or Impersonation')),
-                  DropdownMenuItem(value: 'Spam or Scam', child: Text('Spam or Scam')),
-                  DropdownMenuItem(value: 'Other Reason', child: Text('Other Reason')),
+                  DropdownMenuItem(
+                      value: 'Inappropriate Content',
+                      child: Text('Inappropriate Content')),
+                  DropdownMenuItem(
+                      value: 'Harassment or Bullying',
+                      child: Text('Harassment or Bullying')),
+                  DropdownMenuItem(
+                      value: 'Fake Profile or Impersonation',
+                      child: Text('Fake Profile or Impersonation')),
+                  DropdownMenuItem(
+                      value: 'Spam or Scam', child: Text('Spam or Scam')),
+                  DropdownMenuItem(
+                      value: 'Other Reason', child: Text('Other Reason')),
                 ],
                 onChanged: (val) {
                   if (val != null) setDlgState(() => selectedReason = val);
@@ -1638,7 +1834,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   hintStyle: const TextStyle(color: Colors.grey),
                   filled: true,
                   fillColor: AppTheme.backgroundColor,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
@@ -1660,7 +1857,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                   messenger.showSnackBar(
                     const SnackBar(
-                      content: Text('Report submitted. Thank you for keeping UR-Heart safe.'),
+                      content: Text(
+                          'Report submitted. Thank you for keeping UR-Heart safe.'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -1670,7 +1868,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.secondaryColor,
+                  foregroundColor: Colors.black),
               child: const Text('Submit Report'),
             ),
           ],
@@ -1689,7 +1889,8 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             const Icon(Icons.block, color: Colors.redAccent),
             const SizedBox(width: 10),
-            Text('Block ${_displayRecipient.name}?', style: const TextStyle(color: Colors.white, fontSize: 18)),
+            Text('Block ${_displayRecipient.name}?',
+                style: const TextStyle(color: Colors.white, fontSize: 18)),
           ],
         ),
         content: const Text(
@@ -1707,10 +1908,12 @@ class _ChatScreenState extends State<ChatScreen> {
               final nav = Navigator.of(context);
               nav.pop();
               try {
-                await ApiClient.instance.blockUser(blockedUserId: widget.recipientUser.id);
+                await ApiClient.instance
+                    .blockUser(blockedUserId: widget.recipientUser.id);
                 messenger.showSnackBar(
                   SnackBar(
-                    content: Text('Blocked ${_displayRecipient.name} successfully.'),
+                    content:
+                        Text('Blocked ${_displayRecipient.name} successfully.'),
                     backgroundColor: Colors.redAccent,
                   ),
                 );
@@ -1722,7 +1925,8 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Block User', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Block User', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1737,68 +1941,83 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: AppTheme.surfaceColor,
         titleSpacing: 0,
         title: InkWell(
-          onTap: _isRecipientProfileLoading ? null : _showMatchProfileBottomSheet,
+          onTap:
+              _isRecipientProfileLoading ? null : _showMatchProfileBottomSheet,
           child: _isRecipientProfileLoading
               ? const _RecipientHeaderLoadingPlaceholder()
               : Row(
-            children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppTheme.primaryColor,
-                    backgroundImage: _displayRecipient.avatarUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(
-                            _displayRecipient.avatarUrl,
-                            maxHeight: 120,
-                            maxWidth: 120,
-                          )
-                        : null,
-                    child: _displayRecipient.avatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 18) : null,
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: _displayRecipient.isOnline ? Colors.greenAccent : Colors.grey,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppTheme.surfaceColor, width: 1.5),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(_displayRecipient.name, style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
-                      if (_displayRecipient.isVerified) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.verified, color: Colors.blueAccent, size: 16),
+                  children: [
+                    Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: AppTheme.primaryColor,
+                          backgroundImage:
+                              _displayRecipient.avatarUrl.isNotEmpty
+                                  ? CachedNetworkImageProvider(
+                                      _displayRecipient.avatarUrl,
+                                      maxHeight: 120,
+                                      maxWidth: 120,
+                                    )
+                                  : null,
+                          child: _displayRecipient.avatarUrl.isEmpty
+                              ? const Icon(Icons.person,
+                                  color: Colors.white, size: 18)
+                              : null,
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: _displayRecipient.isOnline
+                                  ? Colors.greenAccent
+                                  : Colors.grey,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppTheme.surfaceColor, width: 1.5),
+                            ),
+                          ),
+                        ),
                       ],
-                    ],
-                  ),
-                  Text(
-                    _isTyping
-                        ? 'typing...'
-                        : '${formatRelativePresence(_displayRecipient.isOnline, _displayRecipient.lastActiveAt)} • $_recipientDistanceLabel',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _isTyping
-                          ? AppTheme.primaryColor
-                          : (_displayRecipient.isOnline ? Colors.greenAccent : Colors.white70),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(_displayRecipient.name,
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                            if (_displayRecipient.isVerified) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.verified,
+                                  color: Colors.blueAccent, size: 16),
+                            ],
+                          ],
+                        ),
+                        Text(
+                          _isTyping
+                              ? 'typing...'
+                              : '${formatRelativePresence(_displayRecipient.isOnline, _displayRecipient.lastActiveAt)} • $_recipientDistanceLabel',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _isTyping
+                                ? AppTheme.primaryColor
+                                : (_displayRecipient.isOnline
+                                    ? Colors.greenAccent
+                                    : Colors.white70),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
         ),
         actions: [
           PopupMenuButton<String>(
@@ -1823,10 +2042,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     Icon(
                       (_isWhatsAppUnlocked || _isLocationUnlocked)
                           ? Icons.lock_open_rounded
-                          : (_mutualMessageCount < 15 ? Icons.lock_clock : Icons.shield_outlined),
+                          : (_mutualMessageCount < 15
+                              ? Icons.lock_clock
+                              : Icons.shield_outlined),
                       color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                           ? Colors.greenAccent
-                          : (_mutualMessageCount < 15 ? Colors.amber : Colors.tealAccent),
+                          : (_mutualMessageCount < 15
+                              ? Colors.amber
+                              : Colors.tealAccent),
                       size: 18,
                     ),
                     const SizedBox(width: 10),
@@ -1860,7 +2083,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 value: 'report',
                 child: Row(
                   children: [
-                    Icon(Icons.report, color: AppTheme.secondaryColor, size: 18),
+                    Icon(Icons.report,
+                        color: AppTheme.secondaryColor, size: 18),
                     SizedBox(width: 10),
                     Text('Report User', style: TextStyle(color: Colors.white)),
                   ],
@@ -1872,7 +2096,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     Icon(Icons.block, color: Colors.redAccent, size: 18),
                     SizedBox(width: 10),
-                    Text('Block User', style: TextStyle(color: Colors.redAccent)),
+                    Text('Block User',
+                        style: TextStyle(color: Colors.redAccent)),
                   ],
                 ),
               ),
@@ -1889,12 +2114,14 @@ class _ChatScreenState extends State<ChatScreen> {
               color: AppTheme.secondaryColor.withValues(alpha: 0.15),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: AppTheme.secondaryColor),
+                  const Icon(Icons.info_outline,
+                      size: 16, color: AppTheme.secondaryColor),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Free Tier: Next 10s video ad in ${300 - _secondsActive}s',
-                      style: const TextStyle(fontSize: 11, color: AppTheme.secondaryColor),
+                      style: const TextStyle(
+                          fontSize: 11, color: AppTheme.secondaryColor),
                     ),
                   ),
                   InkWell(
@@ -1902,11 +2129,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       context: context,
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
-                      builder: (_) => const SubscriptionSheet(initialPlanType: 'PLAN_AD_FREE_199'),
+                      builder: (_) => const SubscriptionSheet(
+                          initialPlanType: 'PLAN_AD_FREE_199'),
                     ),
                     child: const Text(
                       'Upgrade ₹199 VIP',
-                      style: TextStyle(fontSize: 11, color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -1972,7 +2203,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                           ? '🎉 Live Route on Maps Unlocked!'
                                           : (_mutualMessageCount < 15)
                                               ? '🔒 Safe Share unlocks at 15 messages ($_mutualMessageCount/15)'
-                                              : (_myBridgePaid && !_partnerBridgePaid)
+                                              : (_myBridgePaid &&
+                                                      !_partnerBridgePaid)
                                                   ? 'Paid ✅ — Waiting for ${_displayRecipient.name} ⏳'
                                                   : 'Safe Meet & WhatsApp Bridge 🤝',
                               style: const TextStyle(
@@ -1991,16 +2223,18 @@ class _ChatScreenState extends State<ChatScreen> {
                                           ? 'Google Maps navigation is ready.'
                                           : (_mutualMessageCount < 15)
                                               ? 'Exchange ${15 - _mutualMessageCount} more messages to unlock mutual consent & ₹499 bridge.'
-                                              : (_myBridgePaid && !_partnerBridgePaid)
+                                              : (_myBridgePaid &&
+                                                      !_partnerBridgePaid)
                                                   ? 'Aapka ₹499 payment complete ho gaya hai.'
                                                   : 'Mutual consent + ₹499 access fee is required.',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: (_isWhatsAppUnlocked || _isLocationUnlocked)
-                                    ? Colors.greenAccent
-                                    : (_mutualMessageCount < 15)
-                                        ? Colors.amber
-                                        : Colors.tealAccent,
+                                color:
+                                    (_isWhatsAppUnlocked || _isLocationUnlocked)
+                                        ? Colors.greenAccent
+                                        : (_mutualMessageCount < 15)
+                                            ? Colors.amber
+                                            : Colors.tealAccent,
                               ),
                             ),
                           ],
@@ -2010,28 +2244,36 @@ class _ChatScreenState extends State<ChatScreen> {
                         const SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.tealAccent),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.5, color: Colors.tealAccent),
                         )
                       else if (!_isWhatsAppUnlocked && !_isLocationUnlocked)
                         ElevatedButton.icon(
                           onPressed: _openSafeShareDialog,
                           icon: Icon(
-                            _mutualMessageCount < 15 ? Icons.lock_clock : Icons.lock_open,
+                            _mutualMessageCount < 15
+                                ? Icons.lock_clock
+                                : Icons.lock_open,
                             size: 14,
                           ),
                           label: Text(
                             _mutualMessageCount < 15
                                 ? '$_mutualMessageCount/15'
                                 : (_myBridgePaid ? 'Status 🔒' : 'Unlock 🔒'),
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _mutualMessageCount < 15
                                 ? Colors.amber.shade900
-                                : (_myBridgePaid ? Colors.teal.shade800 : const Color(0xFF00BFA5)),
+                                : (_myBridgePaid
+                                    ? Colors.teal.shade800
+                                    : const Color(0xFF00BFA5)),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
                     ],
@@ -2047,13 +2289,16 @@ class _ChatScreenState extends State<ChatScreen> {
                               icon: const Icon(Icons.chat, size: 14),
                               label: const Text(
                                 '💬 Chat on WhatsApp',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 11, fontWeight: FontWeight.bold),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.greenAccent.shade700,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
                               ),
                             ),
                           ),
@@ -2066,22 +2311,28 @@ class _ChatScreenState extends State<ChatScreen> {
                               icon: const Icon(Icons.navigation, size: 14),
                               label: const Text(
                                 '📍 Open Route in Google Maps',
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blueAccent.shade700,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
                               ),
                             ),
                           ),
                         const SizedBox(width: 6),
                         IconButton(
                           tooltip: 'Manage Sharing',
-                          icon: const Icon(Icons.tune, color: Colors.white70, size: 18),
+                          icon: const Icon(Icons.tune,
+                              color: Colors.white70, size: 18),
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          constraints:
+                              const BoxConstraints(minWidth: 32, minHeight: 32),
                           onPressed: _openSafeShareDialog,
                         ),
                       ],
@@ -2097,13 +2348,16 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _messages.isEmpty
                 ? Center(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
                       child: Container(
                         padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(
                           color: AppTheme.cardColor,
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color:
+                                  AppTheme.primaryColor.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -2111,21 +2365,27 @@ class _ChatScreenState extends State<ChatScreen> {
                             Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                                color: AppTheme.primaryColor
+                                    .withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.favorite_rounded, color: AppTheme.primaryColor, size: 36),
+                              child: const Icon(Icons.favorite_rounded,
+                                  color: AppTheme.primaryColor, size: 36),
                             ),
                             const SizedBox(height: 12),
                             Text(
                               'Say Hi to ${_displayRecipient.name}! ✨',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
                             ),
                             const SizedBox(height: 6),
                             const Text(
                               'Break the ice with a ready-to-tap conversation starter:',
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12, color: Colors.white70),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.white70),
                             ),
                             const SizedBox(height: 16),
 
@@ -2134,23 +2394,33 @@ class _ChatScreenState extends State<ChatScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                _buildIcebreakerChip('☕ Chai date ke liye kab chalein?'),
-                                _buildIcebreakerChip('🎶 Aajkal kaun sa gaana loop pe chal raha hai?'),
-                                _buildIcebreakerChip('🌴 Shaam ko ghoomne ki best jagah kaun si hai?'),
-                                _buildIcebreakerChip('🎬 Koi achhi movie recommend karo!'),
-                                _buildIcebreakerChip('✨ Weekend ka kya plan hai?'),
+                                _buildIcebreakerChip(
+                                    '☕ Chai date ke liye kab chalein?'),
+                                _buildIcebreakerChip(
+                                    '🎶 Aajkal kaun sa gaana loop pe chal raha hai?'),
+                                _buildIcebreakerChip(
+                                    '🌴 Shaam ko ghoomne ki best jagah kaun si hai?'),
+                                _buildIcebreakerChip(
+                                    '🎬 Koi achhi movie recommend karo!'),
+                                _buildIcebreakerChip(
+                                    '✨ Weekend ka kya plan hai?'),
                               ],
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
-                              onPressed: () => _sendMessage(text: 'Hi 👋 Great to match with you!'),
+                              onPressed: () => _sendMessage(
+                                  text: 'Hi 👋 Great to match with you!'),
                               icon: const Icon(Icons.waving_hand, size: 16),
-                              label: const Text('Send Quick Hi 👋', style: TextStyle(fontWeight: FontWeight.bold)),
+                              label: const Text('Send Quick Hi 👋',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.primaryColor,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                             ),
                           ],
@@ -2165,8 +2435,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
-                      final isMe = (_currentUserId.isNotEmpty && msg.senderId == _currentUserId) || msg.senderId == 'current_user_id';
-                      final String timeStr = '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}';
+                      final isMe = (_currentUserId.isNotEmpty &&
+                              msg.senderId == _currentUserId) ||
+                          msg.senderId == 'current_user_id';
+                      final String timeStr =
+                          '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}';
 
                       return MessageBubbleWidget(
                         message: msg.text,
@@ -2185,7 +2458,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
           // Modern Floating Input Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
             color: AppTheme.surfaceColor,
             child: SafeArea(
               child: Row(
@@ -2210,12 +2484,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                 hintStyle: TextStyle(color: Colors.grey),
                                 border: InputBorder.none,
                                 focusedBorder: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                                contentPadding:
+                                    EdgeInsets.symmetric(vertical: 10),
                               ),
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.sentiment_satisfied_alt, color: Colors.white54, size: 22),
+                            icon: const Icon(Icons.sentiment_satisfied_alt,
+                                color: Colors.white54, size: 22),
                             onPressed: () {
                               _messageController.text += ' 😊';
                             },
@@ -2233,7 +2509,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       gradient: AppTheme.sentBubbleGradient,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.send_rounded,
+                          color: Colors.white, size: 20),
                       onPressed: () => _sendMessage(),
                     ),
                   ),
@@ -2254,7 +2531,8 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       label: Text(
         text,
-        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+        style: const TextStyle(
+            color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
       ),
       onPressed: () => _sendMessage(text: text),
     );

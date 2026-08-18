@@ -172,24 +172,30 @@ class MessageBubbleWidget extends StatelessWidget {
     );
   }
 
-  /// 3-State WhatsApp Tick Logic for Outbound Messages:
-  /// - Read (Double Blue Tick): `isRead == true` OR `status == 'read'`
-  /// - Delivered (Double Grey Tick): `status == 'delivered'` OR `isDelivered == true`
-  /// - Sent (Single Grey Tick): Default / `status == 'sent'` OR `isSent == true`
+  /// ABSOLUTE 3-State WhatsApp Tick Logic for Outbound Messages:
+  /// - INCOMING MESSAGES: NO TICKS (enforced at line 180)
+  /// - OUTGOING MESSAGES ONLY:
+  ///   1. Read (Double Blue Tick): `isRead == true` OR `status == 'read'`
+  ///   2. Delivered (Double Grey Tick): `status == 'delivered'` OR `isDelivered == true`
+  ///   3. Sent (Single Grey Tick): `status == 'sent'` OR `isSent == true`
+  ///   4. Sending (Clock): Default pending state
   Widget _buildStatusIcon() {
+    // CRITICAL ENFORCEMENT: Incoming messages NEVER show ticks
     if (!isMe) return const SizedBox.shrink();
 
-    // 1. Read: Double Blue Tick
-    if (isRead == true || status == 'read') {
+    // OUTGOING MESSAGES ONLY - Strict 3-state evaluation
+
+    // State 1: READ - Double Blue Tick (WhatsApp Blue)
+    if (isRead == true || status.toLowerCase() == 'read') {
       return const Icon(
         Icons.done_all,
         size: 16,
-        color: Color(0xFF34B7F1),
+        color: Color(0xFF34B7F1), // WhatsApp Blue
       );
     }
 
-    // 2. Delivered: Double Grey Tick
-    if (status == 'delivered' || isDelivered == true) {
+    // State 2: DELIVERED - Double Grey Tick
+    if (status.toLowerCase() == 'delivered' || (isDelivered == true && !isRead)) {
       return Icon(
         Icons.done_all,
         size: 16,
@@ -197,8 +203,8 @@ class MessageBubbleWidget extends StatelessWidget {
       );
     }
 
-    // 3. Sent: Single Grey Tick
-    if (status == 'sent' || isSent == true) {
+    // State 3: SENT - Single Grey Tick
+    if (status.toLowerCase() == 'sent' || (isSent == true && !isDelivered)) {
       return Icon(
         Icons.done,
         size: 16,
@@ -206,7 +212,7 @@ class MessageBubbleWidget extends StatelessWidget {
       );
     }
 
-    // 4. Sending / Pending: Clock Icon
+    // State 4: SENDING - Clock Icon (Optimistic/Pending)
     return Icon(
       Icons.access_time,
       size: 14,
