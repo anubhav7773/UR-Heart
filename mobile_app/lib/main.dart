@@ -1,6 +1,7 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -10,6 +11,7 @@ import 'core/network/api_client.dart';
 import 'core/security/storage_manager.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/location_service.dart';
+import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
@@ -185,10 +187,21 @@ class _RootSplashHandlerState extends State<RootSplashHandler> {
 
     if (currentUser != null || (token != null && token.isNotEmpty)) {
       if (isComplete) {
+        final initialMsg = NotificationRouter.pendingNotification ??
+            await FirebaseMessaging.instance.getInitialMessage();
+
+        if (!mounted) return;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MainHomeScreen()),
         );
+
+        if (initialMsg != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            NotificationRouter.handleNotificationClick(initialMsg);
+          });
+        }
       } else {
         Navigator.pushReplacement(
           context,

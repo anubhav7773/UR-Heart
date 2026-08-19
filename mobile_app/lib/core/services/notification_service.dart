@@ -6,31 +6,38 @@ import '../navigation/nav_keys.dart';
 import '../../features/chat/chat_screen.dart';
 
 class NotificationRouter {
+  static RemoteMessage? pendingNotification;
+  static bool isNavigatingToDeepLink = false;
+
   /// Centralized handler for routing push notification clicks (Cold Start, Background, & Foreground)
   static void handleNotificationClick(RemoteMessage message) {
-    final Map<String, dynamic> data = message.data;
-    final String? type = data['type']?.toString();
-    final String? matchId = (data['match_id'] ?? data['conversation_id'])?.toString();
-    final String? partnerId = (data['sender_id'] ?? data['partner_id'] ?? data['target_user_id'])?.toString();
-    final String? partnerName = (data['sender_name'] ?? data['partner_name'] ?? data['title'])?.toString();
-    final String partnerAvatar = data['partner_avatar']?.toString() ?? '';
+    pendingNotification = message;
 
-    if (kDebugMode) {
-      print('--> [NotificationRouter] Click: type=$type, matchId=$matchId, partnerId=$partnerId, partnerName=$partnerName');
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final Map<String, dynamic> data = message.data;
+      final String? type = data['type']?.toString();
+      final String? matchId = (data['match_id'] ?? data['conversation_id'])?.toString();
+      final String? partnerId = (data['sender_id'] ?? data['partner_id'] ?? data['target_user_id'])?.toString();
+      final String? partnerName = (data['sender_name'] ?? data['partner_name'] ?? data['title'])?.toString();
+      final String partnerAvatar = data['partner_avatar']?.toString() ?? '';
 
-    final navState = rootNavigatorKey.currentState;
-    if (navState == null) {
       if (kDebugMode) {
-        print('--> [NotificationRouter] rootNavigatorKey is not mounted yet. Retrying after delay...');
+        print('--> [NotificationRouter] Click: type=$type, matchId=$matchId, partnerId=$partnerId, partnerName=$partnerName');
       }
-      Future.delayed(const Duration(milliseconds: 600), () {
-        _routeToDestination(type, matchId, partnerId, partnerName, partnerAvatar);
-      });
-      return;
-    }
 
-    _routeToDestination(type, matchId, partnerId, partnerName, partnerAvatar);
+      final navState = rootNavigatorKey.currentState;
+      if (navState == null) {
+        if (kDebugMode) {
+          print('--> [NotificationRouter] rootNavigatorKey is not mounted yet. Retrying after delay...');
+        }
+        Future.delayed(const Duration(milliseconds: 600), () {
+          _routeToDestination(type, matchId, partnerId, partnerName, partnerAvatar);
+        });
+        return;
+      }
+
+      _routeToDestination(type, matchId, partnerId, partnerName, partnerAvatar);
+    });
   }
 
   /// Parses payload string (e.g. from local notifications plugin tap)
@@ -68,6 +75,9 @@ class NotificationRouter {
       avatarUrl: partnerAvatar,
     );
 
+    isNavigatingToDeepLink = true;
+    pendingNotification = null;
+
     // Push ChatScreen on TOP of the navigation stack to preserve Explore / Feed state
     navState.push(
       MaterialPageRoute(
@@ -77,7 +87,9 @@ class NotificationRouter {
           isDirectDM: type == 'direct_dm',
         ),
       ),
-    );
+    ).then((_) {
+      isNavigatingToDeepLink = false;
+    });
   }
 
   static Future<void> setupNotificationListeners() async {
@@ -86,14 +98,11 @@ class NotificationRouter {
       handleNotificationClick(message);
     });
 
-    // 2. App Terminated & Opened via Notification Click
+    // 2. App Terminated & Opened via Notification Click (cached for splash transition)
     final RemoteMessage? initialMessage =
         await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
-      // Delay slightly to ensure widget tree & rootNavigatorKey are mounted
-      Future.delayed(const Duration(milliseconds: 700), () {
-        handleNotificationClick(initialMessage);
-      });
+      pendingNotification = initialMessage;
     }
   }
 }

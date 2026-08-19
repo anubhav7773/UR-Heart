@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../../core/security/storage_manager.dart';
+import '../../core/services/notification_service.dart';
 import '../../core/services/security_service.dart';
 import '../../core/services/update_service.dart';
 import '../../core/theme/app_theme.dart';
@@ -74,18 +76,29 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
 
       if (!mounted || _hasNavigated) return;
 
-      Widget targetScreen;
       if (currentUser != null || (token != null && token.isNotEmpty)) {
         if (isComplete) {
-          targetScreen = const MainHomeScreen();
+          // 1. Check for pending notification deep links from cold start
+          final initialMsg = NotificationRouter.pendingNotification ??
+              await FirebaseMessaging.instance.getInitialMessage();
+
+          // 2. Navigate to MainHomeScreen first (so Home/Feed sits underneath in the stack)
+          _navigateTo(const MainHomeScreen());
+
+          // 3. If launched from notification, push ChatScreen on top once Home is mounted
+          if (initialMsg != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              NotificationRouter.handleNotificationClick(initialMsg);
+            });
+          }
+          return;
         } else {
-          targetScreen = const OnboardingScreen();
+          _navigateTo(const OnboardingScreen());
+          return;
         }
       } else {
-        targetScreen = const AuthScreen();
+        _navigateTo(const AuthScreen());
       }
-
-      _navigateTo(targetScreen);
     } catch (_) {
       if (mounted && !_hasNavigated) {
         _navigateTo(const AuthScreen());
