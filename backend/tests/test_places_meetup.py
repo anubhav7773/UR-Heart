@@ -1,9 +1,10 @@
 from unittest.mock import MagicMock, AsyncMock, patch
 import pytest
 import httpx
+import time
 from fastapi.testclient import TestClient
 from app.main import app
-from app.services.places_service import PlacesService, BLACKLIST_REGEX
+from app.services.places_service import PlacesService, BLACKLIST_REGEX, _CACHE
 from app.services.geo_engine import GeoEngineService
 try:
     from tests.test_auth import get_social_login_token
@@ -38,6 +39,12 @@ SAMPLE_OSM_RESPONSE = {
             "lon": 77.2150,
             "tags": {"name": "The Imperial Hotel", "tourism": "hotel", "addr:city": "Janpath"}
         },
+        {
+            "id": 105,
+            "lat": 29.5000,
+            "lon": 78.5000,  # ~160km away (Must be discarded by 50km ceiling)
+            "tags": {"name": "Far Distant Highway Dhaba", "amenity": "restaurant"}
+        },
     ]
 }
 
@@ -50,17 +57,22 @@ def make_mock_response():
 
 
 @pytest.mark.asyncio
-async def test_places_service_aggregation():
+async def test_places_service_aggregation_and_50km_ceiling():
+    _CACHE.clear()
     lat, lon = 28.6139, 77.2090
     with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = make_mock_response()
 
-        response = await PlacesService.fetch_nearby_spots(lat, lon, radius_meters=70000)
+        response = await PlacesService.fetch_nearby_spots(lat, lon, radius_meters=50000)
 
         assert response.total > 0
         assert len(response.spots) > 0
         assert response.center_lat == lat
         assert response.center_lon == lon
+
+        # Verify strict 50km ceiling: no spot > 50.0 km
+        for spot in response.spots:
+            assert spot.distance_km <= 50.0
 
         # Test that results are sorted ascending by distance
         for i in range(len(response.spots) - 1):
@@ -79,7 +91,29 @@ async def test_places_service_aggregation():
 
 
 @pytest.mark.asyncio
+async def test_places_service_ttl_cache_speedup():
+    _CACHE.clear()
+    lat, lon = 28.6139, 77.2090
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = make_mock_response()
+
+        # 1. Initial hit (populates cache)
+        t0 = time.time()
+        resp1 = await PlacesService.fetch_nearby_spots(lat, lon)
+        duration1 = time.time() - t0
+
+        # 2. Cached hit (should return instantaneously in < 50ms)
+        t1 = time.time()
+        resp2 = await PlacesService.fetch_nearby_spots(lat, lon)
+        duration2 = time.time() - t1
+
+        assert duration2 < 0.05
+        assert resp1.total == resp2.total
+
+
+@pytest.mark.asyncio
 async def test_places_service_category_filtering():
+    _CACHE.clear()
     lat, lon = 28.6139, 77.2090
     with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = make_mock_response()
@@ -114,8 +148,8 @@ def test_midpoint_computation_and_dynamic_corridor():
     assert abs(mid_lat - ((lat1 + lat2) / 2.0)) < 0.0001
     assert abs(mid_lon - ((lon1 + lon2) / 2.0)) < 0.0001
     assert 20.0 <= dist_km <= 30.0
-    # Dynamic radius should be bounded up to 70km
-    assert 5000 <= radius_m <= 70000
+    # Dynamic radius should be bounded up to 50km
+    assert 5000 <= radius_m <= 50000
 
 
 def test_strict_zero_garbage_blacklist_regex():
@@ -131,6 +165,8 @@ def test_strict_zero_garbage_blacklist_regex():
         "Pond water body",
         "Unnamed node",
         "Point 23",
+        "Ram Shop",
+        "Gita Dukan",
     ]
     for name in garbage_names:
         assert BLACKLIST_REGEX.search(name) is not None, f"Expected '{name}' to match blacklist regex"
@@ -148,6 +184,7 @@ def test_strict_zero_garbage_blacklist_regex():
 
 
 def test_api_places_midpoint_endpoint():
+    _CACHE.clear()
     token = get_social_login_token()
     headers = {"Authorization": f"Bearer {token}"}
 
