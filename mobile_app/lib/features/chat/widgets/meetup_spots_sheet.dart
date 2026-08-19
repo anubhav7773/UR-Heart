@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/map_launcher.dart';
 
 class MeetupSpot {
   final String id;
@@ -175,27 +176,13 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
     _fetchSpots();
   }
 
-  /// Precise Google Maps Navigation with Zero Geographic Drift
+  /// Precise Coordinate-Locked Map Navigation with Zero Geographic Drift
   Future<void> _launchMaps(MeetupSpot spot) async {
-    final String geoUrl =
-        'geo:${spot.latitude},${spot.longitude}?q=${spot.latitude},${spot.longitude}(${Uri.encodeComponent(spot.name)})';
-    final String webFallback =
-        'https://www.google.com/maps/search/?api=1&query=${spot.latitude},${spot.longitude}';
-
-    try {
-      final geoUri = Uri.parse(geoUrl);
-      if (await canLaunchUrl(geoUri)) {
-        await launchUrl(geoUri, mode: LaunchMode.externalApplication);
-        return;
-      }
-    } catch (_) {}
-
-    try {
-      final webUri = Uri.parse(webFallback);
-      if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {}
+    await MapLauncher.openExactLocation(
+      latitude: spot.latitude,
+      longitude: spot.longitude,
+      placeName: spot.name,
+    );
   }
 
   Future<void> _openDirectGoogleMapsSearch() async {
