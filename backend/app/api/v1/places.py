@@ -15,20 +15,20 @@ async def get_meetup_spots(
     lon1: Optional[float] = Query(None, description="User A longitude (-180 to 180) for midpoint calculation"),
     lat2: Optional[float] = Query(None, description="User B latitude (-90 to 90) for midpoint calculation"),
     lon2: Optional[float] = Query(None, description="User B longitude (-180 to 180) for midpoint calculation"),
-    radius_meters: Optional[int] = Query(None, ge=500, le=50000, description="Optional search radius in meters"),
+    radius_meters: Optional[int] = Query(None, ge=500, le=70000, description="Optional search radius in meters (max 70km)"),
     category: Optional[str] = Query(None, description="Optional category filter: chai, cafe, restaurant, hotel"),
     current_user_id: str = Depends(get_current_user_id),
 ):
     """
     Precision Geo-Filtering & Midpoint Meetup Spots Aggregator:
     - If (lat1, lon1) and (lat2, lon2) are supplied: Computes geodesic midpoint and dynamic corridor radius.
-    - If (lat, lon) is supplied: Uses the provided center point.
-    - Applies strict zero-garbage commercial filtering (OSM whitelist, regex blacklists).
-    - Produces high-reliability Google Maps direct business search URLs.
+    - If (lat, lon) is supplied: Uses the provided center point (strict 0-70km radius).
+    - Queries real OpenStreetMap Overpass POIs with zero mock data.
+    - Produces high-reliability Google Maps direct business coordinates.
     """
     is_midpoint = False
     user_dist_km: Optional[float] = None
-    target_radius = radius_meters or 15000
+    target_radius = radius_meters or 70000
 
     if lat1 is not None and lon1 is not None and lat2 is not None and lon2 is not None:
         # Validate coordinates

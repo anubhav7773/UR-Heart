@@ -175,27 +175,39 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
     _fetchSpots();
   }
 
-  /// High-Reliability Google Maps Direct Search Navigation
+  /// Precise Google Maps Navigation with Zero Geographic Drift
   Future<void> _launchMaps(MeetupSpot spot) async {
-    final query = Uri.encodeComponent('${spot.name}, ${spot.address}');
-    final String googleMapsUrl = (spot.placeId != null && spot.placeId!.isNotEmpty)
-        ? 'https://www.google.com/maps/search/?api=1&query=$query&query_place_id=${spot.placeId}'
-        : 'https://www.google.com/maps/search/?api=1&query=$query';
-    final String fallbackUrl =
+    final String geoUrl =
+        'geo:${spot.latitude},${spot.longitude}?q=${spot.latitude},${spot.longitude}(${Uri.encodeComponent(spot.name)})';
+    final String webFallback =
         'https://www.google.com/maps/search/?api=1&query=${spot.latitude},${spot.longitude}';
 
     try {
-      final uri = Uri.parse(googleMapsUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final geoUri = Uri.parse(geoUrl);
+      if (await canLaunchUrl(geoUri)) {
+        await launchUrl(geoUri, mode: LaunchMode.externalApplication);
         return;
       }
     } catch (_) {}
 
     try {
-      final fallbackUri = Uri.parse(fallbackUrl);
-      if (await canLaunchUrl(fallbackUri)) {
-        await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+      final webUri = Uri.parse(webFallback);
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openDirectGoogleMapsSearch() async {
+    try {
+      final pos = await LocationService.instance.getCurrentLocation();
+      final double myLat = pos?.latitude ?? 28.6139;
+      final double myLon = pos?.longitude ?? 77.2090;
+      final String searchUrl =
+          'https://www.google.com/maps/search/cafes+and+restaurants/@$myLat,$myLon,12z';
+      final uri = Uri.parse(searchUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (_) {}
   }
@@ -305,7 +317,7 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                           Text(
                             _isMidpoint && _userDistanceKm != null
                                 ? 'Fair midway zone (${_userDistanceKm!.toStringAsFixed(1)} km between you & ${widget.partnerName ?? "partner"})'
-                                : 'Tea stalls, cafes, restaurants & hotels nearest to you',
+                                : 'Tea stalls, cafes, restaurants & hotels nearest to you (0-70 km)',
                             style: const TextStyle(
                                 fontSize: 12, color: AppTheme.mutedTextColor),
                           ),
@@ -403,7 +415,7 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
               const SizedBox(height: 4),
               const Divider(color: AppTheme.cardBorderColor, height: 1),
 
-              // Spots List View
+              // Spots List View / Strict 70km Empty State
               Expanded(
                 child: _isLoading
                     ? const Center(
@@ -443,33 +455,95 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                         : _spots.isEmpty
                             ? Center(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(24.0),
+                                  padding: const EdgeInsets.all(28.0),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.storefront_outlined,
-                                          size: 48,
-                                          color: AppTheme.mutedTextColor),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        _isMidpoint
-                                            ? 'No commercial meetup spots found directly midway.\nShowing top verified spots in nearest town center.'
-                                            : 'No verified date spots found in this category.',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 13),
+                                      Container(
+                                        padding: const EdgeInsets.all(18),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.backgroundColor,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                              color: AppTheme.cardBorderColor),
+                                        ),
+                                        child: const Icon(
+                                            Icons.location_off_outlined,
+                                            size: 44,
+                                            color: AppTheme.mutedTextColor),
                                       ),
                                       const SizedBox(height: 16),
-                                      OutlinedButton(
-                                        onPressed: () =>
-                                            _onCategorySelected('all'),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppTheme.primaryColor,
-                                          side: const BorderSide(
-                                              color: AppTheme.primaryColor),
+                                      const Text(
+                                        'No registered meetup spots nearby',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        child: const Text('View All Categories'),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Aapke 0-70 km ke radius me koi registered cafe ya hotel verified nahi mila. Aap directly Google Maps par search kar sakte hain.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: AppTheme.mutedTextColor,
+                                          fontSize: 13,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          OutlinedButton.icon(
+                                            onPressed:
+                                                _openDirectGoogleMapsSearch,
+                                            icon: const Icon(
+                                                Icons.travel_explore_rounded,
+                                                size: 16),
+                                            label: const Text(
+                                                'Search on Google Maps',
+                                                style: TextStyle(fontSize: 12)),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor:
+                                                  AppTheme.primaryColor,
+                                              side: const BorderSide(
+                                                  color: AppTheme.primaryColor),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 10),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          ElevatedButton.icon(
+                                            onPressed: _fetchSpots,
+                                            icon: const Icon(
+                                                Icons.refresh_rounded,
+                                                size: 16),
+                                            label: const Text('Retry',
+                                                style: TextStyle(fontSize: 12)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppTheme.surfaceColor,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 10),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),

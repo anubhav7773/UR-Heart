@@ -1,4 +1,6 @@
+from unittest.mock import MagicMock, AsyncMock, patch
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.places_service import PlacesService, BLACKLIST_REGEX
@@ -10,50 +12,89 @@ except ImportError:
 
 client = TestClient(app)
 
+SAMPLE_OSM_RESPONSE = {
+    "elements": [
+        {
+            "id": 101,
+            "lat": 28.6145,
+            "lon": 77.2095,
+            "tags": {"name": "Blue Tokai Coffee Roasters", "amenity": "cafe", "addr:city": "New Delhi"}
+        },
+        {
+            "id": 102,
+            "lat": 28.6180,
+            "lon": 77.2120,
+            "tags": {"name": "Saravana Bhavan", "amenity": "restaurant", "addr:city": "Connaught Place"}
+        },
+        {
+            "id": 103,
+            "lat": 28.6120,
+            "lon": 77.2080,
+            "tags": {"name": "Chai Point Express", "amenity": "fast_food", "cuisine": "tea", "addr:city": "New Delhi"}
+        },
+        {
+            "id": 104,
+            "lat": 28.6200,
+            "lon": 77.2150,
+            "tags": {"name": "The Imperial Hotel", "tourism": "hotel", "addr:city": "Janpath"}
+        },
+    ]
+}
+
+
+def make_mock_response():
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = SAMPLE_OSM_RESPONSE
+    return mock_resp
+
 
 @pytest.mark.asyncio
 async def test_places_service_aggregation():
-    # Test nearby spots around Delhi (28.6139, 77.2090)
     lat, lon = 28.6139, 77.2090
-    response = await PlacesService.fetch_nearby_spots(lat, lon, radius_meters=15000)
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = make_mock_response()
 
-    assert response.total > 0
-    assert len(response.spots) > 0
-    assert response.center_lat == lat
-    assert response.center_lon == lon
+        response = await PlacesService.fetch_nearby_spots(lat, lon, radius_meters=70000)
 
-    # Test that results are sorted ascending by distance
-    for i in range(len(response.spots) - 1):
-        assert response.spots[i].distance_meters <= response.spots[i + 1].distance_meters
+        assert response.total > 0
+        assert len(response.spots) > 0
+        assert response.center_lat == lat
+        assert response.center_lon == lon
 
-    # Check spot fields
-    first_spot = response.spots[0]
-    assert first_spot.id
-    assert first_spot.name
-    assert first_spot.category in ("chai", "cafe", "restaurant", "hotel")
-    assert first_spot.category_label
-    assert first_spot.distance_meters >= 0
-    assert first_spot.distance_km >= 0
-    assert "away" in first_spot.distance_label
-    assert first_spot.maps_url.startswith("https://www.google.com/maps")
-    assert first_spot.is_verified is True
+        # Test that results are sorted ascending by distance
+        for i in range(len(response.spots) - 1):
+            assert response.spots[i].distance_km <= response.spots[i + 1].distance_km
+
+        # Check spot fields
+        first_spot = response.spots[0]
+        assert first_spot.id.startswith("osm_")
+        assert first_spot.name
+        assert first_spot.category in ("chai", "cafe", "restaurant", "hotel")
+        assert first_spot.category_label
+        assert first_spot.distance_km >= 0
+        assert "away" in first_spot.distance_label
+        assert first_spot.maps_url.startswith("https://www.google.com/maps")
+        assert first_spot.is_verified is True
 
 
 @pytest.mark.asyncio
 async def test_places_service_category_filtering():
     lat, lon = 28.6139, 77.2090
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = make_mock_response()
 
-    chai_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="chai")
-    assert all(s.category == "chai" for s in chai_response.spots)
+        chai_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="chai")
+        assert all(s.category == "chai" for s in chai_response.spots)
 
-    cafe_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="cafe")
-    assert all(s.category == "cafe" for s in cafe_response.spots)
+        cafe_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="cafe")
+        assert all(s.category == "cafe" for s in cafe_response.spots)
 
-    restaurant_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="restaurant")
-    assert all(s.category == "restaurant" for s in restaurant_response.spots)
+        restaurant_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="restaurant")
+        assert all(s.category == "restaurant" for s in restaurant_response.spots)
 
-    hotel_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="hotel")
-    assert all(s.category == "hotel" for s in hotel_response.spots)
+        hotel_response = await PlacesService.fetch_nearby_spots(lat, lon, category_filter="hotel")
+        assert all(s.category == "hotel" for s in hotel_response.spots)
 
 
 def test_geo_engine_haversine():
@@ -73,8 +114,8 @@ def test_midpoint_computation_and_dynamic_corridor():
     assert abs(mid_lat - ((lat1 + lat2) / 2.0)) < 0.0001
     assert abs(mid_lon - ((lon1 + lon2) / 2.0)) < 0.0001
     assert 20.0 <= dist_km <= 30.0
-    # Dynamic radius should be capped appropriately (between 5km and 20km)
-    assert 5000 <= radius_m <= 20000
+    # Dynamic radius should be bounded up to 70km
+    assert 5000 <= radius_m <= 70000
 
 
 def test_strict_zero_garbage_blacklist_regex():
@@ -113,16 +154,19 @@ def test_api_places_midpoint_endpoint():
     lat1, lon1 = 28.6139, 77.2090
     lat2, lon2 = 28.4595, 77.0266
 
-    res = client.get(
-        f"/api/v1/places/meetup-spots?lat1={lat1}&lon1={lon1}&lat2={lat2}&lon2={lon2}",
-        headers=headers,
-    )
-    assert res.status_code == 200
-    json_data = res.json()
-    assert json_data["success"] is True
-    data = json_data["data"]
-    assert data["is_midpoint"] is True
-    assert data["user_distance_km"] is not None
-    assert len(data["spots"]) > 0
-    assert all(s["is_verified"] is True for s in data["spots"])
-    assert all("mid-way" in s["distance_label"] for s in data["spots"])
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = make_mock_response()
+
+        res = client.get(
+            f"/api/v1/places/meetup-spots?lat1={lat1}&lon1={lon1}&lat2={lat2}&lon2={lon2}",
+            headers=headers,
+        )
+        assert res.status_code == 200
+        json_data = res.json()
+        assert json_data["success"] is True
+        data = json_data["data"]
+        assert data["is_midpoint"] is True
+        assert data["user_distance_km"] is not None
+        assert len(data["spots"]) > 0
+        assert all(s["is_verified"] is True for s in data["spots"])
+        assert all("mid-way" in s["distance_label"] for s in data["spots"])
