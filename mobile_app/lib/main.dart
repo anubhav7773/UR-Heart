@@ -12,6 +12,7 @@ import 'core/security/storage_manager.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/location_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/privacy_protection_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
@@ -29,6 +30,7 @@ const webFirebaseOptions = FirebaseOptions(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await PrivacyProtectionService.enableSecureScreen();
 
   // 1. Explicit Safe Firebase Initialization before runApp
   try {
