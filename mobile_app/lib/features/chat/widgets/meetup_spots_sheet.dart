@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_client.dart';
@@ -101,8 +102,9 @@ class MeetupSpotsSheet extends StatefulWidget {
 
 class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
   bool _isLoading = true;
-  String? _errorMessage;
-  List<MeetupSpot> _spots = [];
+  bool _hasError = false;
+  List<MeetupSpot> _allSpots = [];
+  List<MeetupSpot> _filteredSpots = [];
   String _selectedCategory = 'all'; // all, chai, cafe, restaurant, hotel
   bool _isMidpoint = false;
   double? _userDistanceKm;
@@ -122,10 +124,10 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
     _fetchSpots();
   }
 
-  Future<void> _fetchSpots() async {
+  Future<void> _fetchSpots({bool isRefresh = false}) async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
+      _hasError = false;
     });
 
     try {
@@ -136,44 +138,69 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
       final bool hasPartnerCoords =
           widget.partnerLat != null && widget.partnerLon != null;
 
-      final res = await ApiClient.instance.getMeetupSpots(
-        lat: hasPartnerCoords ? null : myLat,
-        lon: hasPartnerCoords ? null : myLon,
-        lat1: hasPartnerCoords ? myLat : null,
-        lon1: hasPartnerCoords ? myLon : null,
-        lat2: hasPartnerCoords ? widget.partnerLat : null,
-        lon2: hasPartnerCoords ? widget.partnerLon : null,
-        category: _selectedCategory == 'all' ? null : _selectedCategory,
-      );
+      // 5-Second Timeout Guard (Kills infinite spinner)
+      final res = await ApiClient.instance
+          .getMeetupSpots(
+            lat: hasPartnerCoords ? null : myLat,
+            lon: hasPartnerCoords ? null : myLon,
+            lat1: hasPartnerCoords ? myLat : null,
+            lon1: hasPartnerCoords ? myLon : null,
+            lat2: hasPartnerCoords ? widget.partnerLat : null,
+            lon2: hasPartnerCoords ? widget.partnerLon : null,
+          )
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw TimeoutException('Radar query timed out'),
+          );
 
       if (res.data != null && res.data['data'] != null) {
         final data = res.data['data'];
         final rawSpots = data['spots'] as List<dynamic>? ?? [];
+        final parsed = rawSpots
+            .map((e) => MeetupSpot.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+
         setState(() {
-          _spots = rawSpots
-              .map((e) => MeetupSpot.fromJson(Map<String, dynamic>.from(e as Map)))
-              .toList();
+          _allSpots = parsed;
+          _filteredSpots = _applyCategoryFilter(parsed, _selectedCategory);
           _isMidpoint = data['is_midpoint'] == true;
           _userDistanceKm = (data['user_distance_km'] as num?)?.toDouble();
           _notice = data['notice']?.toString();
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _allSpots = [];
+          _filteredSpots = [];
+          _isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage =
-            'Could not load commercial date spots. Please check network or location permissions.';
-      });
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _allSpots = [];
+          _filteredSpots = [];
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     }
   }
 
+  List<MeetupSpot> _applyCategoryFilter(List<MeetupSpot> source, String categoryKey) {
+    if (categoryKey == 'all') return source;
+    return source
+        .where((spot) => spot.category.toLowerCase() == categoryKey.toLowerCase())
+        .toList();
+  }
+
+  /// Instant Local Category Filtering (Zero Network Reloads)
   void _onCategorySelected(String categoryKey) {
     if (_selectedCategory == categoryKey) return;
     setState(() {
       _selectedCategory = categoryKey;
+      _filteredSpots = _applyCategoryFilter(_allSpots, categoryKey);
     });
-    _fetchSpots();
   }
 
   /// Precise Coordinate-Locked Map Navigation with Zero Geographic Drift
@@ -185,16 +212,17 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
     );
   }
 
-  Future<void> _openDirectGoogleMapsSearch() async {
+  /// Direct Google Maps Search when no spots are found
+  Future<void> _openGeneralGoogleMapsSearch() async {
     try {
       final pos = await LocationService.instance.getCurrentLocation();
       final double myLat = pos?.latitude ?? 28.6139;
       final double myLon = pos?.longitude ?? 77.2090;
-      final String searchUrl =
-          'https://www.google.com/maps/search/cafes+and+restaurants/@$myLat,$myLon,12z';
-      final uri = Uri.parse(searchUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final Uri searchUri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=restaurants+cafes+near+me&center=$myLat,$myLon',
+      );
+      if (await canLaunchUrl(searchUri)) {
+        await launchUrl(searchUri, mode: LaunchMode.externalApplication);
       }
     } catch (_) {}
   }
@@ -304,7 +332,7 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                           Text(
                             _isMidpoint && _userDistanceKm != null
                                 ? 'Fair midway zone (${_userDistanceKm!.toStringAsFixed(1)} km between you & ${widget.partnerName ?? "partner"})'
-                                : 'Tea stalls, cafes, restaurants & hotels nearest to you (0-70 km)',
+                                : 'Tea stalls, cafes, restaurants & hotels nearest to you (0-50 km)',
                             style: const TextStyle(
                                 fontSize: 12, color: AppTheme.mutedTextColor),
                           ),
@@ -352,7 +380,7 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                   ),
                 ),
 
-              // Filter Chips Bar
+              // Filter Chips Bar (Instant In-Memory Filtering)
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -402,155 +430,116 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
               const SizedBox(height: 4),
               const Divider(color: AppTheme.cardBorderColor, height: 1),
 
-              // Spots List View / Strict 70km Empty State
+              // Spots List View / Honest Obsidian Empty State View
               Expanded(
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
                             color: AppTheme.primaryColor),
                       )
-                    : _errorMessage != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24.0),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.location_off_outlined,
-                                      size: 48,
-                                      color: AppTheme.mutedTextColor),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _errorMessage!,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                        color: AppTheme.mutedTextColor,
-                                        fontSize: 13),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: _fetchSpots,
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.primaryColor),
-                                    child: const Text('Retry',
-                                        style: TextStyle(color: Colors.white)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : _spots.isEmpty
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(28.0),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(18),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.backgroundColor,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                              color: AppTheme.cardBorderColor),
-                                        ),
-                                        child: const Icon(
-                                            Icons.location_off_outlined,
-                                            size: 44,
-                                            color: AppTheme.mutedTextColor),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      const Text(
-                                        'No registered meetup spots nearby',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const Text(
-                                        'Aapke 0-70 km ke radius me koi registered cafe ya hotel verified nahi mila. Aap directly Google Maps par search kar sakte hain.',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: AppTheme.mutedTextColor,
-                                          fontSize: 13,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 20),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          OutlinedButton.icon(
-                                            onPressed:
-                                                _openDirectGoogleMapsSearch,
-                                            icon: const Icon(
-                                                Icons.travel_explore_rounded,
-                                                size: 16),
-                                            label: const Text(
-                                                'Search on Google Maps',
-                                                style: TextStyle(fontSize: 12)),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor:
-                                                  AppTheme.primaryColor,
-                                              side: const BorderSide(
-                                                  color: AppTheme.primaryColor),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 14,
-                                                      vertical: 10),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          ElevatedButton.icon(
-                                            onPressed: _fetchSpots,
-                                            icon: const Icon(
-                                                Icons.refresh_rounded,
-                                                size: 16),
-                                            label: const Text('Retry',
-                                                style: TextStyle(fontSize: 12)),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  AppTheme.surfaceColor,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 14,
-                                                      vertical: 10),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            : ListView.builder(
-                                controller: scrollController,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                itemCount: _spots.length,
-                                itemBuilder: (context, index) {
-                                  final spot = _spots[index];
-                                  return _buildSpotCard(spot);
-                                },
-                              ),
+                    : _filteredSpots.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.builder(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            itemCount: _filteredSpots.length,
+                            itemBuilder: (context, index) {
+                              final spot = _filteredSpots[index];
+                              return _buildSpotCard(spot);
+                            },
+                          ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  /// Honest Obsidian Empty State View with working Retry & Google Maps buttons
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E202E),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.location_off_outlined,
+                size: 40,
+                color: Color(0xFF8E8EA0),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _hasError
+                  ? 'Could not connect to Date Radar'
+                  : 'No verified spots within 50 km',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _hasError
+                  ? 'Network slow ya location timeout ho gaya. Aap Retry kar sakte hain ya direct Google Maps khol sakte hain.'
+                  : 'Aapke aas-paas koi verified commercial cafe ya restaurant listed nahi mila. Aap direct Google Maps par search kar sakte hain.',
+              style: const TextStyle(
+                color: Color(0xFF8E8EA0),
+                fontSize: 13,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _openGeneralGoogleMapsSearch,
+                    icon: const Icon(Icons.travel_explore, size: 16),
+                    label: const Text('Google Maps'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFF3366),
+                      side: const BorderSide(color: Color(0xFFFF3366)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _fetchSpots(isRefresh: true),
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2B2D42),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
