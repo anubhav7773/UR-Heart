@@ -102,6 +102,9 @@ async def init_db() -> None:
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_whatsapp_consent BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_location_consent BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_location_consent BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_meetup_agreed BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_meetup_agreed BOOLEAN DEFAULT FALSE;
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_meetup_unlocked BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_paid BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_bridge_paid BOOLEAN DEFAULT FALSE;
         ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_payment_id VARCHAR(128);
@@ -179,6 +182,9 @@ async def init_db() -> None:
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_whatsapp_consent BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_location_consent BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_location_consent BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_meetup_agreed BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_meetup_agreed BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_meetup_unlocked BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_paid BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user2_bridge_paid BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE matches ADD COLUMN IF NOT EXISTS user1_bridge_payment_id VARCHAR(128);",

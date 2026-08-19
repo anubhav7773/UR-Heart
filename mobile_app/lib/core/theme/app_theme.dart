@@ -1,25 +1,48 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Brand Color Palette
-  static const Color primaryColor = Color(0xFFE91E63); // Vibrant Rose Crimson
-  static const Color primaryDarkColor = Color(0xFFC2185B);
-  static const Color secondaryColor = Color(0xFFFFB300); // Warm Gold / Chai Accent
-  static const Color backgroundColor = Color(0xFF121212); // Deep Charcoal Slate
-  static const Color surfaceColor = Color(0xFF1E1E1E);
-  static const Color cardColor = Color(0xFF262626);
-  static const Color accentColor = Color(0xFFFF4081);
+  // 1. Standardized Modern Color Palette
+  static const Color backgroundColor = Color(0xFF0D0E15); // Deep Obsidian
+  static const Color surfaceColor = Color(0xFF171822);    // Dark Surface
+  static const Color cardColor = Color(0xFF171822);       // Card Background
+  static const Color cardBorderColor = Color(0xFF252736); // Subtle 1px Border
+  static const Color borderColor = Color(0xFF252736);
 
-  // Chat Bubble Aesthetics
+  static const Color primaryColor = Color(0xFFFF3366);     // Coral Pink
+  static const Color primaryDarkColor = Color(0xFFE02856);
+  static const Color accentColor = Color(0xFFFF3366);
+
+  static const Color verifiedBlue = Color(0xFF34B7F1);     // Electric Blue (Verified & Read Ticks)
+  static const Color secondaryColor = Color(0xFFFFB300);   // Warm Gold (Super Boost & VIP)
+
+  static const Color textPrimaryColor = Color(0xFFFFFFFF);
+  static const Color textSecondaryColor = Color(0xFF8E92A4);
+  static const Color mutedTextColor = Color(0xFF8E92A4);
+
+  // 2. Chat Bubble Aesthetics
   static const LinearGradient sentBubbleGradient = LinearGradient(
-    colors: [Color(0xFFE91E63), Color(0xFFD81B60)],
+    colors: [Color(0xFFFF3366), Color(0xFFE02856)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  static const Color receivedBubbleColor = Color(0xFF2C2C2E);
+  static const Color receivedBubbleColor = Color(0xFF1F212D);
+  static const Color receivedBubbleBorderColor = Color(0xFF252736);
 
-  // Material 3 Dark Theme Definition
+  // 3. Common Card & Container Decorations
+  static BoxDecoration get cardBoxDecoration => BoxDecoration(
+    color: cardColor,
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: cardBorderColor, width: 1),
+  );
+
+  static BoxDecoration cardBoxDecorationWithRadius(double radius) => BoxDecoration(
+    color: cardColor,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: cardBorderColor, width: 1),
+  );
+
+  // 4. Material 3 Dark Theme Definition
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
@@ -44,22 +67,35 @@ class AppTheme {
         titleTextStyle: TextStyle(
           color: Colors.white,
           fontSize: 20,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
         ),
       ),
       cardTheme: CardThemeData(
         color: cardColor,
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorderColor, width: 1),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-          elevation: 2,
+          elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: const BorderSide(color: cardBorderColor, width: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -67,14 +103,18 @@ class AppTheme {
         fillColor: cardColor,
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: cardBorderColor, width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: cardBorderColor, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: primaryColor, width: 1.5),
         ),
-        hintStyle: TextStyle(color: Colors.grey[500]),
+        hintStyle: const TextStyle(color: mutedTextColor, fontSize: 14),
       ),
     );
   }

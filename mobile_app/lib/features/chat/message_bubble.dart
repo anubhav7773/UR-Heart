@@ -64,6 +64,7 @@ class MessageBubbleWidget extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: isMe ? AppTheme.sentBubbleGradient : null,
                 color: isMe ? null : AppTheme.receivedBubbleColor,
+                border: isMe ? null : Border.all(color: AppTheme.receivedBubbleBorderColor, width: 1),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
@@ -151,7 +152,7 @@ class MessageBubbleWidget extends StatelessWidget {
                       Text(
                         time,
                         style: TextStyle(
-                          color: isMe ? Colors.white70 : Colors.grey[400],
+                          color: isMe ? Colors.white70 : AppTheme.mutedTextColor,
                           fontSize: 10,
                         ),
                       ),
@@ -185,12 +186,12 @@ class MessageBubbleWidget extends StatelessWidget {
 
     // OUTGOING MESSAGES ONLY - Strict 3-state evaluation
 
-    // State 1: READ - Double Blue Tick (WhatsApp Blue)
+    // State 1: READ - Double Blue Tick
     if (isRead == true || status.toLowerCase() == 'read') {
       return const Icon(
         Icons.done_all,
         size: 16,
-        color: Color(0xFF34B7F1), // WhatsApp Blue
+        color: AppTheme.verifiedBlue,
       );
     }
 

@@ -5,6 +5,7 @@ import '../../core/ads/ad_manager.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/services/location_service.dart';
+import '../../core/theme/app_theme.dart';
 import '../chat/chat_screen.dart';
 import '../profile/profile_view_dialog.dart';
 import '../subscription/subscription_sheet.dart';
@@ -194,7 +195,7 @@ class _FeedScreenState extends State<FeedScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.grey[950],
+      backgroundColor: AppTheme.surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -208,7 +209,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[700],
+                  color: AppTheme.borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -216,35 +217,42 @@ class _FeedScreenState extends State<FeedScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE91E63).withValues(alpha: 0.15),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.bolt, color: Color(0xFFE91E63), size: 36),
+                child: const Icon(Icons.bolt_outlined, color: AppTheme.primaryColor, size: 36),
               ),
               const SizedBox(height: 12),
               const Text(
-                'Need More Swipes? 🚀',
+                'Need More Swipes?',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 6),
               const Text(
                 'Watch a short sponsored video to get 5 free swipes instantly, or boost your profile for 10x visibility.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+                style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 13),
               ),
               const SizedBox(height: 20),
 
               // Option 1: Watch Rewarded Ad (Free +5 Swipes)
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[900],
+                  color: AppTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.5)),
+                  border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.35)),
                 ),
                 child: ListTile(
-                  leading: const Icon(Icons.ondemand_video, color: Colors.greenAccent, size: 30),
-                  title: const Text('Watch Short Ad (+5 Free Swipes)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Takes 15-30 seconds • Max 3/day', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.greenAccent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 24),
+                  ),
+                  title: const Text('Watch Short Video (+5 Free Swipes)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Takes 15-30 seconds • Max 3/day', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
                   trailing: ElevatedButton(
                     onPressed: _isClaimingReward
                         ? null
@@ -258,7 +266,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Watch 🎬', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text('Watch', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),
@@ -267,14 +275,21 @@ class _FeedScreenState extends State<FeedScreen> {
               // Option 2: Super Boost (₹29) or VIP Pro (₹99)
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[900],
+                  color: AppTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.5)),
+                  border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.35)),
                 ),
                 child: ListTile(
-                  leading: const Icon(Icons.workspace_premium, color: Color(0xFFE91E63), size: 30),
-                  title: const Text('⚡ Super Boost (₹29) & VIP Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  subtitle: const Text('10x feed priority & unlimited swipes', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.secondaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 24),
+                  ),
+                  title: const Text('Super Boost (₹29) & VIP Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('10x feed priority & unlimited swipes', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
                   trailing: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
@@ -286,12 +301,12 @@ class _FeedScreenState extends State<FeedScreen> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE91E63),
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppTheme.secondaryColor,
+                      foregroundColor: Colors.black87,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Explore 👑', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text('Explore', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),
@@ -799,10 +814,10 @@ class _FeedScreenState extends State<FeedScreen> {
                       );
                     }
                   },
-                  icon: const Icon(Icons.chat_bubble, size: 18),
-                  label: const Text('Send Message 💬', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('Send Message', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE91E63),
+                    backgroundColor: AppTheme.primaryColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -812,7 +827,7 @@ class _FeedScreenState extends State<FeedScreen> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Keep Swiping', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                child: const Text('Keep Swiping', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 14)),
               ),
             ],
           ),
@@ -896,8 +911,8 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator(color: Color(0xFFE91E63))),
+        backgroundColor: AppTheme.backgroundColor,
+        body: Center(child: CircularProgressIndicator(color: AppTheme.primaryColor)),
       );
     }
 
@@ -913,23 +928,25 @@ class _FeedScreenState extends State<FeedScreen> {
     final String distanceLabel = profile?['distance_label'] ?? (profile?['distance_km'] != null ? '${profile!['distance_km']} km away' : 'Nearby');
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('UR Heart', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.tune, color: Color(0xFFE91E63)),
+            icon: const Icon(Icons.tune_rounded, color: AppTheme.primaryColor),
+            tooltip: 'Filter Preferences',
             onPressed: _showFilterBottomSheet,
           ),
           IconButton(
-            icon: const Icon(Icons.bolt, color: Colors.amber),
+            icon: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor),
             tooltip: 'Earn Free Swipes / Super Boost',
             onPressed: _showEarnSwipesRewardSheet,
           ),
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+            tooltip: 'Chats',
             onPressed: () {
               Navigator.push(
                 context,
@@ -941,15 +958,15 @@ class _FeedScreenState extends State<FeedScreen> {
             child: Padding(
               padding: const EdgeInsets.only(right: 12.0),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey[800]!),
+                  color: AppTheme.surfaceColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.cardBorderColor),
                 ),
                 child: Text(
                   'Skips: $_persistentSkipCount/20',
-                  style: const TextStyle(fontSize: 11, color: Colors.amber),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.secondaryColor, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -972,8 +989,9 @@ class _FeedScreenState extends State<FeedScreen> {
                                 child: Container(
                                   clipBehavior: Clip.antiAlias,
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(24),
-                                    color: Colors.grey[900],
+                                    borderRadius: BorderRadius.circular(20),
+                                    color: AppTheme.surfaceColor,
+                                    border: Border.all(color: AppTheme.cardBorderColor),
                                   ),
                                   child: Stack(
                                     fit: StackFit.expand,
@@ -990,22 +1008,22 @@ class _FeedScreenState extends State<FeedScreen> {
                                             maxHeightDiskCache: 1200,
                                             fit: BoxFit.cover,
                                             placeholder: (context, url) => Container(
-                                              color: Colors.grey[900],
+                                              color: AppTheme.surfaceColor,
                                               child: const Center(
-                                                child: CircularProgressIndicator(color: Color(0xFFE91E63)),
+                                                child: CircularProgressIndicator(color: AppTheme.primaryColor),
                                               ),
                                             ),
                                             errorWidget: (context, url, error) {
                                               return Container(
-                                                decoration: BoxDecoration(
+                                                decoration: const BoxDecoration(
                                                   gradient: LinearGradient(
                                                     begin: Alignment.topCenter,
                                                     end: Alignment.bottomCenter,
-                                                    colors: [Colors.grey[850]!, Colors.grey[900]!],
+                                                    colors: [AppTheme.surfaceColor, AppTheme.backgroundColor],
                                                   ),
                                                 ),
                                                 child: const Center(
-                                                  child: Icon(Icons.person, size: 100, color: Colors.white24),
+                                                  child: Icon(Icons.person, size: 100, color: AppTheme.mutedTextColor),
                                                 ),
                                               );
                                             },
@@ -1013,9 +1031,9 @@ class _FeedScreenState extends State<FeedScreen> {
                                         )
                             else
                               Container(
-                                color: Colors.grey[900],
+                                color: AppTheme.surfaceColor,
                                 child: const Center(
-                                  child: Icon(Icons.person, size: 100, color: Colors.white24),
+                                  child: Icon(Icons.person, size: 100, color: AppTheme.mutedTextColor),
                                 ),
                               ),
 
@@ -1029,14 +1047,14 @@ class _FeedScreenState extends State<FeedScreen> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: Colors.green[800]!.withValues(alpha: 0.90),
+                                        color: AppTheme.surfaceColor.withValues(alpha: 0.90),
                                         borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: Colors.greenAccent, width: 1),
+                                        border: Border.all(color: AppTheme.verifiedBlue, width: 1),
                                       ),
                                       child: const Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.shield_outlined, color: Colors.greenAccent, size: 16),
+                                          Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 16),
                                           SizedBox(width: 4),
                                           Text('Verified', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
                                         ],
@@ -1046,13 +1064,18 @@ class _FeedScreenState extends State<FeedScreen> {
                                   PopupMenuButton<String>(
                                     icon: Container(
                                       padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.black54,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.backgroundColor.withValues(alpha: 0.7),
                                         shape: BoxShape.circle,
+                                        border: Border.all(color: AppTheme.cardBorderColor),
                                       ),
                                       child: const Icon(Icons.more_vert, color: Colors.white, size: 18),
                                     ),
-                                    color: Colors.grey[900],
+                                    color: AppTheme.surfaceColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: const BorderSide(color: AppTheme.cardBorderColor),
+                                    ),
                                     onSelected: (val) {
                                       if (val == 'report') {
                                         _showReportDialog(targetUserId, firstName);
@@ -1065,7 +1088,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                         value: 'report',
                                         child: Row(
                                           children: [
-                                            Icon(Icons.report, color: Colors.amber, size: 18),
+                                            Icon(Icons.report_outlined, color: AppTheme.secondaryColor, size: 18),
                                             SizedBox(width: 8),
                                             Text('Report Profile', style: TextStyle(color: Colors.white)),
                                           ],
@@ -1075,7 +1098,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                         value: 'block',
                                         child: Row(
                                           children: [
-                                            Icon(Icons.block, color: Colors.redAccent, size: 18),
+                                            Icon(Icons.block_outlined, color: Colors.redAccent, size: 18),
                                             SizedBox(width: 8),
                                             Text('Block User', style: TextStyle(color: Colors.redAccent)),
                                           ],
@@ -1095,11 +1118,15 @@ class _FeedScreenState extends State<FeedScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(20.0),
                                 decoration: const BoxDecoration(
-                                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+                                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
                                   gradient: LinearGradient(
                                     begin: Alignment.bottomCenter,
                                     end: Alignment.topCenter,
-                                    colors: [Color(0xF0000000), Colors.transparent],
+                                    colors: [
+                                      Color(0xEE0D0E15),
+                                      Color(0x990D0E15),
+                                      Colors.transparent,
+                                    ],
                                   ),
                                 ),
                                 child: Column(
@@ -1112,14 +1139,14 @@ class _FeedScreenState extends State<FeedScreen> {
                                               ? '${(profile['full_name'] as String?)?.isNotEmpty == true ? profile['full_name'] : (profile['first_name'] ?? 'User')}, ${profile['age']}'
                                               : '${(profile['full_name'] as String?)?.isNotEmpty == true ? profile['full_name'] : (profile['first_name'] ?? 'User')}',
                                           style: const TextStyle(
-                                            fontSize: 28,
+                                            fontSize: 26,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
                                           ),
                                         ),
                                         if (isVerified) ...[
                                           const SizedBox(width: 8),
-                                          const Icon(Icons.verified, color: Colors.blue, size: 22),
+                                          const Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 22),
                                         ],
                                         if (profile['is_boosted'] == true) ...[
                                           const SizedBox(width: 8),
@@ -1157,14 +1184,14 @@ class _FeedScreenState extends State<FeedScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: Colors.black54,
+                                            color: AppTheme.surfaceColor.withValues(alpha: 0.85),
                                             borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.grey[700]!),
+                                            border: Border.all(color: AppTheme.cardBorderColor),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              const Icon(Icons.location_on_outlined, size: 14, color: Colors.amber),
+                                              const Icon(Icons.location_on_outlined, size: 14, color: AppTheme.secondaryColor),
                                               const SizedBox(width: 4),
                                               Text(
                                                 distanceLabel,
@@ -1174,7 +1201,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                           ),
                                         ),
 
-                                        // 🎙️ Voice Bio Audio Pill Chip
+                                        // Voice Bio Audio Pill Chip
                                         if (profile['voice_bio_url'] != null && (profile['voice_bio_url'] as String).isNotEmpty)
                                           GestureDetector(
                                             onTap: () async {
@@ -1190,35 +1217,32 @@ class _FeedScreenState extends State<FeedScreen> {
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                                               decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: _playingVoiceBioUrl == profile['voice_bio_url']
-                                                      ? [Colors.purpleAccent.shade700, Colors.deepPurple]
-                                                      : [Colors.purple.shade900.withValues(alpha: 0.8), Colors.black87],
-                                                ),
+                                                color: _playingVoiceBioUrl == profile['voice_bio_url']
+                                                    ? AppTheme.primaryColor.withValues(alpha: 0.25)
+                                                    : AppTheme.surfaceColor.withValues(alpha: 0.85),
                                                 borderRadius: BorderRadius.circular(14),
-                                                border: Border.all(color: Colors.purpleAccent, width: 1.5),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.purpleAccent.withValues(alpha: 0.3),
-                                                    blurRadius: 6,
-                                                  ),
-                                                ],
+                                                border: Border.all(
+                                                  color: _playingVoiceBioUrl == profile['voice_bio_url']
+                                                      ? AppTheme.primaryColor
+                                                      : AppTheme.cardBorderColor,
+                                                  width: 1,
+                                                ),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Icon(
                                                     _playingVoiceBioUrl == profile['voice_bio_url']
-                                                        ? Icons.pause_circle_filled
-                                                        : Icons.play_circle_filled,
+                                                        ? Icons.pause_circle_outline
+                                                        : Icons.play_circle_outline,
                                                     color: Colors.white,
                                                     size: 16,
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Text(
                                                     _playingVoiceBioUrl == profile['voice_bio_url']
-                                                        ? 'Playing Voice 🎵'
-                                                        : '▶ Play Voice Intro (0:${(profile['voice_bio_duration_seconds'] ?? 15).toString().padLeft(2, '0')})',
+                                                        ? 'Playing Voice'
+                                                        : 'Voice Intro (0:${(profile['voice_bio_duration_seconds'] ?? 15).toString().padLeft(2, '0')})',
                                                     style: const TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 12,
@@ -1251,12 +1275,9 @@ class _FeedScreenState extends State<FeedScreen> {
                             margin: const EdgeInsets.all(20),
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: Colors.grey[900],
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.3)),
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 4)),
-                              ],
+                              color: AppTheme.surfaceColor,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppTheme.cardBorderColor),
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -1264,14 +1285,14 @@ class _FeedScreenState extends State<FeedScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(18),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFE91E63).withValues(alpha: 0.15),
+                                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.favorite_border_rounded, size: 48, color: Color(0xFFE91E63)),
+                                  child: const Icon(Icons.favorite_border_rounded, size: 44, color: AppTheme.primaryColor),
                                 ),
                                 const SizedBox(height: 16),
                                 const Text(
-                                  'No members nearby right now! ✨',
+                                  'No members nearby right now',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
@@ -1279,42 +1300,67 @@ class _FeedScreenState extends State<FeedScreen> {
                                 const Text(
                                   "You've seen all active profiles in your current radius. Earn more swipes or boost your visibility!",
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 13, color: Colors.white70),
+                                  style: TextStyle(fontSize: 13, color: AppTheme.mutedTextColor),
                                 ),
                                 const SizedBox(height: 20),
 
-                                // Action 1: Watch Rewarded Ad for Free Swipes
-                                ElevatedButton.icon(
-                                  onPressed: _isClaimingReward ? null : _claimRewardedSwipes,
-                                  icon: const Icon(Icons.ondemand_video, color: Colors.white, size: 18),
-                                  label: Text(
-                                    _isClaimingReward ? 'Loading Ad...' : 'Watch Video (+5 Free Swipes) 🎬',
-                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                // Action 1: Watch Rewarded Video for Free Swipes
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.backgroundColor,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.35)),
                                   ),
-                                  style: ElevatedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(46),
-                                    backgroundColor: Colors.greenAccent.shade700,
+                                  child: ListTile(
+                                    onTap: _isClaimingReward ? null : _claimRewardedSwipes,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.greenAccent.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 22),
+                                    ),
+                                    title: Text(
+                                      _isClaimingReward ? 'Loading Video...' : 'Watch video (+5 free swipes)',
+                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                    trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
 
                                 // Action 2: Super Boost (₹29) / VIP Pro
-                                OutlinedButton.icon(
-                                  onPressed: () {
-                                    showModalBottomSheet(
-                                      context: context,
-                                      isScrollControlled: true,
-                                      backgroundColor: Colors.transparent,
-                                      builder: (_) => const SubscriptionSheet(),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.bolt, color: Colors.amber, size: 18),
-                                  label: const Text('⚡ Super Boost Profile (₹29)', style: TextStyle(color: Colors.amber, fontSize: 13, fontWeight: FontWeight.bold)),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(46),
-                                    side: const BorderSide(color: Colors.amber),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.backgroundColor,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.35)),
+                                  ),
+                                  child: ListTile(
+                                    onTap: () {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (_) => const SubscriptionSheet(),
+                                      );
+                                    },
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.secondaryColor.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 22),
+                                    ),
+                                    title: const Text(
+                                      'Super Boost Profile (₹29)',
+                                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                    trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
@@ -1322,8 +1368,8 @@ class _FeedScreenState extends State<FeedScreen> {
                                 // Action 3: Refresh Feed
                                 TextButton.icon(
                                   onPressed: _loadFeed,
-                                  icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 18),
-                                  label: const Text('Refresh Discovery Feed', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                                  icon: const Icon(Icons.refresh_rounded, color: AppTheme.mutedTextColor, size: 18),
+                                  label: const Text('Refresh Discovery Feed', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 13)),
                                 ),
                               ],
                             ),
@@ -1333,46 +1379,86 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
 
-            // 4-Button Action Deck (Reject / Like / Chai Invite / DM)
+            // 4-Button Action Deck (Reject / Like / Super DM / Regular DM)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   // 1. Reject (Cross)
-                  FloatingActionButton(
-                    heroTag: 'btn_reject_deck',
-                    onPressed: () => _handleSwipeAction('reject'),
-                    backgroundColor: Colors.grey[900],
-                    shape: const CircleBorder(),
-                    child: const Icon(Icons.close, color: Colors.redAccent, size: 28),
+                  Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: FloatingActionButton(
+                      heroTag: 'btn_reject_deck',
+                      onPressed: () => _handleSwipeAction('reject'),
+                      backgroundColor: AppTheme.surfaceColor,
+                      shape: const CircleBorder(),
+                      child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 26),
+                    ),
                   ),
 
                   // 2. Like (Heart)
-                  FloatingActionButton.large(
-                    heroTag: 'btn_like_deck',
-                    onPressed: () => _handleSwipeAction('like'),
-                    backgroundColor: const Color(0xFFE91E63),
-                    shape: const CircleBorder(),
-                    child: const Icon(Icons.favorite, color: Colors.white, size: 40),
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: FloatingActionButton.large(
+                      heroTag: 'btn_like_deck',
+                      onPressed: () => _handleSwipeAction('like'),
+                      backgroundColor: AppTheme.primaryColor,
+                      shape: const CircleBorder(),
+                      child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 38),
+                    ),
                   ),
 
-                  // 3. Send ⚡ Direct DM (₹49) Pass Button
-                  FloatingActionButton(
-                    heroTag: 'btn_direct_dm_deck',
-                    onPressed: () => _handleDirectDmAction(targetUserId, firstName),
-                    backgroundColor: Colors.cyanAccent.shade700,
-                    shape: const CircleBorder(),
-                    child: const Icon(Icons.bolt, color: Colors.white, size: 26),
+                  // 3. Send Direct DM (₹49) Pass Button
+                  Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: FloatingActionButton(
+                      heroTag: 'btn_direct_dm_deck',
+                      onPressed: () => _handleDirectDmAction(targetUserId, firstName),
+                      backgroundColor: AppTheme.surfaceColor,
+                      shape: const CircleBorder(
+                        side: BorderSide(color: AppTheme.secondaryColor, width: 1.5),
+                      ),
+                      child: const Icon(Icons.bolt_rounded, color: AppTheme.secondaryColor, size: 26),
+                    ),
                   ),
 
                   // 4. DM (Direct Message)
-                  FloatingActionButton(
-                    heroTag: 'btn_dm_deck',
-                    onPressed: () => _handleSwipeAction('dm'),
-                    backgroundColor: Colors.grey[900],
-                    shape: const CircleBorder(),
-                    child: const Icon(Icons.send_rounded, color: Colors.amber, size: 24),
+                  Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: FloatingActionButton(
+                      heroTag: 'btn_dm_deck',
+                      onPressed: () => _handleSwipeAction('dm'),
+                      backgroundColor: AppTheme.surfaceColor,
+                      shape: const CircleBorder(
+                        side: BorderSide(color: AppTheme.cardBorderColor, width: 1),
+                      ),
+                      child: const Icon(Icons.send_rounded, color: AppTheme.mutedTextColor, size: 22),
+                    ),
                   ),
                 ],
               ),

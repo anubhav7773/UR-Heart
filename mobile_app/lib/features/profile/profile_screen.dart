@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
+import '../../core/theme/app_theme.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_screen.dart';
 import '../settings/blocked_users_screen.dart';
@@ -71,27 +72,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.surfaceColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.cardBorderColor),
+        ),
         title: const Row(
           children: [
-            Icon(Icons.logout, color: Color(0xFFE91E63)),
+            Icon(Icons.logout_rounded, color: AppTheme.primaryColor),
             SizedBox(width: 10),
-            Text('Logout', style: TextStyle(color: Colors.white)),
+            Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
         content: const Text(
-          'Are you sure you want to logout from RuralHeart?',
+          'Are you sure you want to logout from UR Heart?',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.mutedTextColor)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE91E63)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
             child: const Text('Logout', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -131,7 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.grey[950],
+      backgroundColor: AppTheme.surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -158,7 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: Colors.grey),
+                          icon: const Icon(Icons.close, color: AppTheme.mutedTextColor),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -169,9 +173,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Full Name',
-                        labelStyle: const TextStyle(color: Colors.grey),
+                        labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
                         filled: true,
-                        fillColor: Colors.grey[900],
+                        fillColor: AppTheme.backgroundColor,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -182,9 +186,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Bio',
-                        labelStyle: const TextStyle(color: Colors.grey),
+                        labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
                         filled: true,
-                        fillColor: Colors.grey[900],
+                        fillColor: AppTheme.backgroundColor,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -197,9 +201,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
                               labelText: 'Area / Landmark',
-                              labelStyle: const TextStyle(color: Colors.grey),
+                              labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
                               filled: true,
-                              fillColor: Colors.grey[900],
+                              fillColor: AppTheme.backgroundColor,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
@@ -212,9 +216,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
                               labelText: 'PIN Code',
-                              labelStyle: const TextStyle(color: Colors.grey),
+                              labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
                               filled: true,
-                              fillColor: Colors.grey[900],
+                              fillColor: AppTheme.backgroundColor,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
@@ -231,21 +235,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       spacing: 8,
                       children: [
                         ChoiceChip(
-                          label: const Text('☕ Casual Chai'),
+                          label: const Text('Casual Conversations'),
                           selected: currentIntent == 'casual',
-                          selectedColor: const Color(0xFFE91E63),
+                          selectedColor: AppTheme.primaryColor,
                           onSelected: (sel) => setModalState(() => currentIntent = 'casual'),
                         ),
                         ChoiceChip(
-                          label: const Text('💍 Serious Marriage'),
+                          label: const Text('Serious Marriage'),
                           selected: currentIntent == 'serious',
-                          selectedColor: const Color(0xFFE91E63),
+                          selectedColor: AppTheme.primaryColor,
                           onSelected: (sel) => setModalState(() => currentIntent = 'serious'),
                         ),
                         ChoiceChip(
-                          label: const Text('🤝 Friendship'),
+                          label: const Text('Friendship'),
                           selected: currentIntent == 'friendship',
-                          selectedColor: const Color(0xFFE91E63),
+                          selectedColor: AppTheme.primaryColor,
                           onSelected: (sel) => setModalState(() => currentIntent = 'friendship'),
                         ),
                       ],
@@ -272,7 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE91E63),
+                        backgroundColor: AppTheme.primaryColor,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -400,13 +404,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.blue.withValues(alpha: 0.12),
+          color: AppTheme.verifiedBlue.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blue.withValues(alpha: 0.4)),
+          border: Border.all(color: AppTheme.verifiedBlue.withValues(alpha: 0.35)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.verified_user, color: Colors.blue, size: 28),
+            Icon(Icons.verified_user_outlined, color: AppTheme.verifiedBlue, size: 28),
             SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -414,7 +418,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     'Profile Verified',
-                    style: TextStyle(fontSize: 14, color: Colors.blue, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 14, color: AppTheme.verifiedBlue, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 2),
                   Text(
@@ -432,13 +436,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.12),
+          color: AppTheme.secondaryColor.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+          border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.35)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.hourglass_top, color: Colors.amber, size: 28),
+            Icon(Icons.hourglass_top_outlined, color: AppTheme.secondaryColor, size: 28),
             SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -446,7 +450,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     'Verification Under Review',
-                    style: TextStyle(fontSize: 14, color: Colors.amber, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 14, color: AppTheme.secondaryColor, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 2),
                   Text(
@@ -464,15 +468,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.redAccent.withValues(alpha: 0.12),
+          color: Colors.redAccent.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
         ),
         child: Column(
           children: [
             const Row(
               children: [
-                Icon(Icons.error_outline, color: Colors.redAccent, size: 28),
+                Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 28),
                 SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -497,10 +501,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: _startVideoVerification,
-                icon: const Icon(Icons.videocam, size: 18),
+                icon: const Icon(Icons.videocam_outlined, size: 18),
                 label: const Text('Record Selfie Video Again'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE91E63),
+                  backgroundColor: AppTheme.primaryColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -515,23 +519,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFFE91E63).withValues(alpha: 0.2),
-              Colors.deepPurple.withValues(alpha: 0.2),
-            ],
-          ),
+          color: AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.4)),
+          border: Border.all(color: AppTheme.cardBorderColor),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.verified, color: Color(0xFFE91E63), size: 26),
-                SizedBox(width: 10),
-                Expanded(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.verifiedBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.verified_outlined, color: AppTheme.verifiedBlue, size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
                   child: Text(
                     'Get Verified & Stand Out',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
@@ -539,20 +545,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             const Text(
-              'Record a quick 5-second selfie video to earn the blue checkmark badge & get 3x more matches!',
-              style: TextStyle(fontSize: 12, color: Colors.white70),
+              'Record a quick 5-second selfie video to earn the blue checkmark badge & get 3x more matches.',
+              style: TextStyle(fontSize: 12, color: AppTheme.mutedTextColor),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: _startVideoVerification,
-                icon: const Icon(Icons.videocam, size: 18),
+                icon: const Icon(Icons.videocam_outlined, size: 18),
                 label: const Text('Verify Now (5-Sec Selfie)'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE91E63),
+                  backgroundColor: AppTheme.primaryColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -564,12 +570,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Widget _buildActionTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Widget? trailing,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.cardBorderColor, width: 1),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: iconColor, size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppTheme.mutedTextColor,
+            fontSize: 12,
+          ),
+        ),
+        trailing: trailing ??
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.mutedTextColor,
+              size: 22,
+            ),
+        onTap: onTap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator(color: Color(0xFFE91E63))),
+        backgroundColor: AppTheme.backgroundColor,
+        body: Center(child: CircularProgressIndicator(color: AppTheme.primaryColor)),
       );
     }
 
@@ -585,18 +642,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String verificationStatus = (_profileData?['verification_status'] ?? 'UNVERIFIED').toString().toUpperCase();
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit, color: Colors.white),
+            icon: const Icon(Icons.edit_outlined, color: Colors.white),
+            tooltip: 'Edit Profile',
             onPressed: _showEditProfileSheet,
           ),
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            tooltip: 'Logout',
             onPressed: _handleLogout,
           ),
         ],
@@ -614,8 +673,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     height: 130,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE91E63), width: 3),
-                      color: Colors.grey[900],
+                      border: Border.all(color: AppTheme.primaryColor, width: 3),
+                      color: AppTheme.surfaceColor,
                     ),
                     child: ClipOval(
                       child: mainPhoto.isNotEmpty
@@ -630,15 +689,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               maxWidthDiskCache: 600,
                               maxHeightDiskCache: 600,
                               placeholder: (context, url) => Container(
-                                color: Colors.grey[900],
+                                color: AppTheme.surfaceColor,
                                 child: const Center(
-                                  child: CircularProgressIndicator(color: Color(0xFFE91E63), strokeWidth: 2),
+                                  child: CircularProgressIndicator(color: AppTheme.primaryColor, strokeWidth: 2),
                                 ),
                               ),
                               errorWidget: (context, error, stackTrace) =>
-                                   const Icon(Icons.person, size: 70, color: Colors.grey),
+                                   const Icon(Icons.person, size: 70, color: AppTheme.mutedTextColor),
                             )
-                          : const Icon(Icons.person, size: 70, color: Colors.grey),
+                          : const Icon(Icons.person, size: 70, color: AppTheme.mutedTextColor),
                     ),
                   ),
                   Positioned(
@@ -649,10 +708,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: const BoxDecoration(
-                          color: Color(0xFFE91E63),
+                          color: AppTheme.primaryColor,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 20),
                       ),
                     ),
                   ),
@@ -667,11 +726,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   age != null && age > 0 ? '$fullName, $age' : fullName,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 if (isVerified) ...[
                   const SizedBox(width: 6),
-                  const Icon(Icons.verified, color: Colors.blue, size: 22),
+                  const Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 20),
                 ],
               ],
             ),
@@ -703,12 +762,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   '•  $areaName',
                   style: const TextStyle(
                     fontSize: 13,
-                    color: Colors.white70,
+                    color: AppTheme.mutedTextColor,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // Active Super Boost Countdown Badge
             if (_isBoosted && _boostBadgeText != null)
@@ -739,15 +798,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             // Location Chip
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: AppTheme.surfaceColor,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.cardBorderColor),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.location_on, size: 14, color: Colors.amber),
+                  const Icon(Icons.location_on_outlined, size: 14, color: AppTheme.secondaryColor),
                   const SizedBox(width: 4),
                   Text(areaName, style: const TextStyle(color: Colors.white70, fontSize: 13)),
                 ],
@@ -760,24 +820,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFE91E63).withValues(alpha: 0.15),
-                    Colors.amber.withValues(alpha: 0.15),
-                  ],
-                ),
+                color: AppTheme.surfaceColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.4)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      color: Colors.amber,
+                    decoration: BoxDecoration(
+                      color: AppTheme.secondaryColor.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.bolt, color: Colors.black87, size: 24),
+                    child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -785,13 +840,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '⚡ 10x Visibility Super Boost',
+                          '10x Visibility Super Boost',
                           style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _isBoosted ? 'Active on your profile now! 🔥' : 'Be #1 in candidate feeds for 1 hour (₹29)',
-                          style: const TextStyle(fontSize: 12, color: Colors.white70),
+                          _isBoosted ? 'Active on your profile now' : 'Be #1 in candidate feeds for 1 hour (₹29)',
+                          style: const TextStyle(fontSize: 12, color: AppTheme.mutedTextColor),
                         ),
                       ],
                     ),
@@ -806,34 +861,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ).then((_) => _fetchProfile());
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
+                      backgroundColor: AppTheme.secondaryColor,
                       foregroundColor: Colors.black87,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text(_isBoosted ? 'Extend 🔥' : 'Boost ₹29', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(_isBoosted ? 'Extend' : 'Boost ₹29', style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Video Verification Status Card
             _buildVerificationCard(isVerified, verificationStatus),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Intent Goal Badge Card
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.12),
+                color: AppTheme.surfaceColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                border: Border.all(color: AppTheme.cardBorderColor),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.favorite, color: Colors.amber, size: 26),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.favorite_outline, color: AppTheme.primaryColor, size: 22),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -841,14 +903,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         const Text(
                           'Relationship Goal',
-                          style: TextStyle(fontSize: 12, color: Colors.amber, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 12, color: AppTheme.mutedTextColor, fontWeight: FontWeight.w600),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           intent == 'casual'
-                              ? '☕ Casual Chai & Conversations'
+                              ? 'Casual Conversations & Chai'
                               : intent == 'serious'
-                                  ? '💍 Serious Marriage Intent'
-                                  : '🤝 Friendship & Networking',
+                                  ? 'Serious Marriage Intent'
+                                  : 'Friendship & Networking',
                           style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -857,15 +920,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // Profile Details Section
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(20),
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.cardBorderColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,24 +943,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     bio,
                     style: const TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
                   ),
-                  const Divider(color: Colors.white12, height: 28),
+                  const Divider(color: AppTheme.cardBorderColor, height: 28),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Gender', style: TextStyle(color: Colors.grey)),
+                      const Text('Gender', style: TextStyle(color: AppTheme.mutedTextColor)),
                       Text(gender, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Verification Status', style: TextStyle(color: Colors.grey)),
+                      const Text('Verification Status', style: TextStyle(color: AppTheme.mutedTextColor)),
                       Row(
                         children: [
-                          Icon(Icons.shield, color: Colors.greenAccent, size: 16),
-                          SizedBox(width: 4),
-                          Text('Verified Member', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+                          Icon(
+                            isVerified ? Icons.verified : Icons.shield_outlined,
+                            color: isVerified ? AppTheme.verifiedBlue : Colors.greenAccent,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isVerified ? 'Verified Member' : 'Standard Member',
+                            style: TextStyle(
+                              color: isVerified ? AppTheme.verifiedBlue : Colors.greenAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -912,39 +986,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   if ((_profileData?['email'] ?? FirebaseAuth.instance.currentUser?.email ?? '').toString().toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com' || _profileData?['is_admin'] == true) ...[
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.deepPurple.shade900.withValues(alpha: 0.7),
-                            const Color(0xFFE91E63).withValues(alpha: 0.7),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE91E63), width: 1.5),
-                      ),
-                      child: ListTile(
-                        leading: const Icon(Icons.admin_panel_settings, color: Colors.amber, size: 28),
-                        title: const Text('🛡️ Admin Verification Panel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Review and approve pending selfie videos', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                        trailing: const Icon(Icons.chevron_right, color: Colors.white),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const AdminVerificationScreen()),
-                          );
-                        },
-                      ),
+                    _buildActionTile(
+                      icon: Icons.admin_panel_settings_outlined,
+                      iconColor: AppTheme.secondaryColor,
+                      title: 'Admin Verification Panel',
+                      subtitle: 'Review and approve pending selfie videos',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AdminVerificationScreen()),
+                        );
+                      },
                     ),
                   ],
-                  ListTile(
-                    tileColor: Colors.grey[900],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    leading: const Icon(Icons.history_toggle_off, color: Color(0xFFE91E63)),
-                    title: const Text('Activity (Matches / Liked / Passed)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('View your matches, likes, and passes history', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  _buildActionTile(
+                    icon: Icons.history_outlined,
+                    iconColor: AppTheme.primaryColor,
+                    title: 'Activity',
+                    subtitle: 'View your matches, likes, and passes history',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -952,14 +1011,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 10),
-                  ListTile(
-                    tileColor: Colors.grey[900],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    leading: const Icon(Icons.verified_user, color: Colors.blueAccent),
-                    title: const Text('Edit Profile & Video Verification', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Get official Verified Blue Tick badge ✓', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  _buildActionTile(
+                    icon: Icons.badge_outlined,
+                    iconColor: AppTheme.verifiedBlue,
+                    title: 'Edit Profile & Verification',
+                    subtitle: 'Manage bio, photos, and video verification',
                     onTap: () async {
                       final updated = await Navigator.push<bool>(
                         context,
@@ -970,14 +1026,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       }
                     },
                   ),
-                  const SizedBox(height: 10),
-                  ListTile(
-                    tileColor: Colors.grey[900],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    leading: const Icon(Icons.block, color: Colors.redAccent),
-                    title: const Text('Blocked Users', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('View and unblock restricted profiles', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  _buildActionTile(
+                    icon: Icons.block_outlined,
+                    iconColor: Colors.redAccent,
+                    title: 'Blocked Users',
+                    subtitle: 'View and unblock restricted profiles',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -985,27 +1038,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 10),
-                  ListTile(
-                    tileColor: Colors.grey[900],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    leading: const Icon(Icons.lightbulb_outline, color: Colors.amber),
-                    title: const Text('Suggest an Enhancement / Feedback', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Got ideas to improve the app? Email the creator directly', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  _buildActionTile(
+                    icon: Icons.mail_outline_rounded,
+                    iconColor: AppTheme.secondaryColor,
+                    title: 'Enhancement & Feedback',
+                    subtitle: 'Send feedback and suggestions directly',
                     onTap: () {
                       final userId = _profileData?['id'] ?? _profileData?['user_id'] ?? FirebaseAuth.instance.currentUser?.uid;
                       sendFeedbackEmail(userId: userId?.toString(), appVersion: 'v1.0.0-release');
                     },
                   ),
-                  const SizedBox(height: 10),
-                  ListTile(
-                    tileColor: Colors.grey[900],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    leading: const Icon(Icons.system_update_rounded, color: Colors.greenAccent),
-                    title: const Text('Check for App Updates 🚀', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Download latest direct APK updates instantly', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  _buildActionTile(
+                    icon: Icons.system_update_alt_rounded,
+                    iconColor: Colors.greenAccent,
+                    title: 'Check for App Updates',
+                    subtitle: 'Download latest direct APK updates instantly',
                     onTap: () {
                       AppUpdateService.instance.checkForUpdate(context, showNoUpdateToast: true);
                     },
@@ -1023,7 +1070,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Photos (${photos.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                    IconButton(icon: const Icon(Icons.add_a_photo, color: Color(0xFFE91E63), size: 22), onPressed: _uploadNewPhoto),
+                    IconButton(
+                      icon: const Icon(Icons.add_a_photo_outlined, color: AppTheme.primaryColor, size: 22),
+                      onPressed: _uploadNewPhoto,
+                    ),
                   ],
                 ),
               ),
@@ -1040,11 +1090,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 100,
                       margin: const EdgeInsets.only(right: 12),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(16),
+                        color: AppTheme.surfaceColor,
+                        border: Border.all(color: AppTheme.cardBorderColor),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
                         child: CachedNetworkImage(
                           imageUrl: _getCacheBusterUrl(pUrl),
                           key: UniqueKey(),
@@ -1054,14 +1105,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           maxWidthDiskCache: 400,
                           maxHeightDiskCache: 400,
                           placeholder: (context, url) => Container(
-                            color: Colors.grey[900],
+                            color: AppTheme.surfaceColor,
                             child: const Center(
-                              child: CircularProgressIndicator(color: Color(0xFFE91E63), strokeWidth: 2),
+                              child: CircularProgressIndicator(color: AppTheme.primaryColor, strokeWidth: 2),
                             ),
                           ),
                           errorWidget: (context, error, stackTrace) => Container(
-                            color: Colors.grey[900],
-                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                            color: AppTheme.surfaceColor,
+                            child: const Icon(Icons.broken_image_outlined, color: AppTheme.mutedTextColor),
                           ),
                         ),
                       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/network/api_client.dart';
+import '../core/theme/app_theme.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/profile/profile_view_dialog.dart';
 
@@ -98,16 +99,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
-          backgroundColor: Colors.grey[950],
+          backgroundColor: AppTheme.backgroundColor,
           elevation: 0,
           title: const Text('Activity & Swipes', style: TextStyle(fontWeight: FontWeight.bold)),
           bottom: TabBar(
-            indicatorColor: const Color(0xFFE91E63),
+            indicatorColor: AppTheme.primaryColor,
             indicatorWeight: 3,
-            labelColor: const Color(0xFFE91E63),
-            unselectedLabelColor: Colors.grey,
+            labelColor: AppTheme.primaryColor,
+            unselectedLabelColor: AppTheme.mutedTextColor,
             labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             tabs: [
               Tab(
@@ -145,9 +146,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ),
         body: RefreshIndicator(
           onRefresh: _fetchActivityData,
-          color: const Color(0xFFE91E63),
+          color: AppTheme.primaryColor,
           child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFFE91E63)))
+              ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
               : _errorMessage != null
                   ? Center(
                       child: Column(
@@ -159,7 +160,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: _fetchActivityData,
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE91E63)),
+                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
                             child: const Text('Retry', style: TextStyle(color: Colors.white)),
                           ),
                         ],
@@ -207,9 +208,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         return Container(
           decoration: BoxDecoration(
-            color: Colors.grey[900],
+            color: AppTheme.surfaceColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[800]!),
+            border: Border.all(color: AppTheme.cardBorderColor),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -224,14 +225,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           ? Image.network(
                               photoUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.person, size: 50, color: Colors.grey)),
+                              errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.person, size: 50, color: AppTheme.mutedTextColor)),
                             )
-                          : const Center(child: Icon(Icons.person, size: 50, color: Colors.grey)),
+                          : const Center(child: Icon(Icons.person, size: 50, color: AppTheme.mutedTextColor)),
                       if (isVerified)
                         const Positioned(
                           top: 8,
                           right: 8,
-                          child: Icon(Icons.verified, color: Colors.blue, size: 20),
+                          child: Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 20),
                         ),
                     ],
                   ),
@@ -256,7 +257,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         icon: const Icon(Icons.chat_bubble_outline, size: 14),
                         label: const Text('Message', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE91E63),
+                          backgroundColor: AppTheme.primaryColor,
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -301,9 +302,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey[900],
+            color: AppTheme.surfaceColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[800]!),
+            border: Border.all(color: AppTheme.cardBorderColor),
           ),
           child: Row(
             children: [
@@ -311,9 +312,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 onTap: () => _openProfileDialog(user),
                 child: CircleAvatar(
                   radius: 28,
-                  backgroundColor: Colors.grey[800],
+                  backgroundColor: AppTheme.backgroundColor,
                   backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                  child: photoUrl.isEmpty ? const Icon(Icons.person, color: Colors.grey) : null,
+                  child: photoUrl.isEmpty ? const Icon(Icons.person, color: AppTheme.mutedTextColor) : null,
                 ),
               ),
               const SizedBox(width: 14),
@@ -329,13 +330,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         ),
                         if (isVerified) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: Colors.blue, size: 16),
+                          const Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 16),
                         ],
                       ],
                     ),
                     if (area.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text(area, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                      Text(area, style: const TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
                     ],
                   ],
                 ),
@@ -343,12 +344,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
               OutlinedButton(
                 onPressed: () => _openProfileDialog(user),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isLiked ? const Color(0xFFE91E63) : Colors.grey,
-                  side: BorderSide(color: isLiked ? const Color(0xFFE91E63) : Colors.grey[700]!),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  foregroundColor: isLiked ? AppTheme.primaryColor : AppTheme.mutedTextColor,
+                  side: BorderSide(color: isLiked ? AppTheme.primaryColor : AppTheme.cardBorderColor),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 ),
-                child: const Text('View', style: TextStyle(fontSize: 12)),
+                child: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -364,7 +365,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 56, color: Colors.grey[700]),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.cardBorderColor),
+              ),
+              child: Icon(icon, size: 44, color: AppTheme.mutedTextColor),
+            ),
             const SizedBox(height: 16),
             Text(
               title,
@@ -373,7 +382,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              style: const TextStyle(color: AppTheme.mutedTextColor, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],

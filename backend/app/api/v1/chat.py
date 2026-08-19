@@ -24,6 +24,8 @@ from app.models.schemas import (
     SafeBridgePaymentRequest,
     ChatConsentRequest,
     ChatConsentStatusData,
+    MeetupConsentRequest,
+    MeetupConsentStatusData,
     IcebreakerItem,
     IcebreakerListData,
 )
@@ -84,10 +86,7 @@ def guard_or_raise(content: str, is_bridge_unlocked: bool):
         logging.getLogger(__name__).warning("Safe Bridge leak detected for content: %s", content)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error_code": "MUTUAL_PAYMENT_REQUIRED",
-                "detail": "Both users must pay ₹499 to unlock Safe Bridge before sharing phone numbers, social handles, or UPI IDs."
-            }
+            detail="Both users must pay ₹499 to unlock Safe Bridge before sharing phone numbers, social handles, or UPI IDs."
         )
 
     return
@@ -278,6 +277,9 @@ async def chat_websocket_endpoint(
         ws_manager.disconnect(websocket)
 
 
+logger = logging.getLogger(__name__)
+
+
 @router.get("/matches", response_model=APIResponse[List[MatchRead]])
 @router.get("/conversations", response_model=APIResponse[List[MatchRead]])
 async def get_matches(
@@ -361,7 +363,7 @@ async def get_matches(
             unread_count = unread_map.get(match_obj.id, 0)
 
             partner_name = target_user.full_name or "UR Heart User"
-            last_text = latest_msg.content if latest_msg else "Matched! Say hello 👋"
+            last_text = latest_msg.content if latest_msg else None
             last_msg_time = _utc_iso(latest_msg.created_at) if latest_msg else None
             match_id_str = str(match_obj.id)
             target_id_str = str(target_id)
@@ -382,9 +384,9 @@ async def get_matches(
                     matched_user_avatar=first_photo,
                     user1_id=str(match_obj.user1_id),
                     user2_id=str(match_obj.user2_id),
-                    is_active=match_obj.is_active,
-                    mutual_message_count=match_obj.mutual_message_count or 0,
-                    is_whatsapp_unlocked=match_obj.is_whatsapp_unlocked or False,
+                    is_active=getattr(match_obj, 'is_active', True),
+                    mutual_message_count=getattr(match_obj, 'mutual_message_count', 0) or 0,
+                    is_whatsapp_unlocked=getattr(match_obj, 'is_whatsapp_unlocked', False) or False,
                     created_at=created_at_str,
                     updated_at=created_at_str,
                     matched_user_is_verified=bool(target_user.is_verified),
@@ -402,8 +404,8 @@ async def get_matches(
                     last_message_is_me=(latest_msg.sender_id == user_uuid) if latest_msg else False,
                 )
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.exception(f"Error in get_matches: {exc}")
 
     return APIResponse(success=True, data=match_list)
 
@@ -732,10 +734,14 @@ async def get_safe_bridge_status(
 
     is_user1 = (match_obj.user1_id == user_uuid)
 
-    my_whatsapp = match_obj.user1_whatsapp_consent if is_user1 else match_obj.user2_whatsapp_consent
-    partner_whatsapp = match_obj.user2_whatsapp_consent if is_user1 else match_obj.user1_whatsapp_consent
-    my_location = match_obj.user1_location_consent if is_user1 else match_obj.user2_location_consent
-    partner_location = match_obj.user2_location_consent if is_user1 else match_obj.user1_location_consent
+    my_whatsapp = getattr(match_obj, "user1_whatsapp_consent", False) if is_user1 else getattr(match_obj, "user2_whatsapp_consent", False)
+    partner_whatsapp = getattr(match_obj, "user2_whatsapp_consent", False) if is_user1 else getattr(match_obj, "user1_whatsapp_consent", False)
+    my_location = getattr(match_obj, "user1_location_consent", False) if is_user1 else getattr(match_obj, "user2_location_consent", False)
+    partner_location = getattr(match_obj, "user2_location_consent", False) if is_user1 else getattr(match_obj, "user1_location_consent", False)
+
+    my_meetup = bool(getattr(match_obj, "user1_meetup_agreed", False) if is_user1 else getattr(match_obj, "user2_meetup_agreed", False))
+    partner_meetup = bool(getattr(match_obj, "user2_meetup_agreed", False) if is_user1 else getattr(match_obj, "user1_meetup_agreed", False))
+    is_meetup_unlocked = bool(getattr(match_obj, "is_meetup_unlocked", False) or (my_meetup and partner_meetup))
 
     my_paid = match_obj.user1_bridge_paid if is_user1 else match_obj.user2_bridge_paid
     partner_paid = match_obj.user2_bridge_paid if is_user1 else match_obj.user1_bridge_paid
@@ -772,6 +778,9 @@ async def get_safe_bridge_status(
             partner_consent=bool(partner_whatsapp or partner_location),
             partner_whatsapp_consent=partner_whatsapp,
             partner_location_consent=partner_location,
+            my_meetup_consent=my_meetup,
+            partner_meetup_consent=partner_meetup,
+            is_meetup_unlocked=is_meetup_unlocked,
             my_payment_done=my_paid,
             partner_payment_done=partner_paid,
             is_fully_unlocked=is_fully_unlocked,
@@ -779,6 +788,89 @@ async def get_safe_bridge_status(
             location_unlocked=location_unlocked,
             partner_phone=partner_phone,
             partner_maps_url=partner_maps_url,
+        )
+    )
+
+
+@router.post("/{match_id}/meetup-consent", response_model=APIResponse[MeetupConsentStatusData])
+async def update_meetup_consent(
+    match_id: str,
+    payload: MeetupConsentRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submits or toggles current user's consent for in-person meetup date planning.
+    When both match partners agree (2/2), mutual meetup is unlocked and local date radar opens.
+    Broadcasts MEETUP_CONSENT_UPDATED event to active WebSocket connections.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        match_uuid = uuid.UUID(match_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid match ID or user ID format."
+        )
+
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    match_obj = match_res.scalars().first()
+
+    if not match_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match conversation not found."
+        )
+
+    if match_obj.user1_id != user_uuid and match_obj.user2_id != user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an authorized participant in this conversation."
+        )
+
+    is_user1 = (match_obj.user1_id == user_uuid)
+    if is_user1:
+        match_obj.user1_meetup_agreed = payload.agree
+    else:
+        match_obj.user2_meetup_agreed = payload.agree
+
+    is_unlocked = bool(match_obj.user1_meetup_agreed and match_obj.user2_meetup_agreed)
+    match_obj.is_meetup_unlocked = is_unlocked
+
+    await db.commit()
+    await db.refresh(match_obj)
+
+    my_consent = match_obj.user1_meetup_agreed if is_user1 else match_obj.user2_meetup_agreed
+    partner_consent = match_obj.user2_meetup_agreed if is_user1 else match_obj.user1_meetup_agreed
+
+    # Broadcast real-time WebSocket event to both participants
+    await ws_manager.broadcast_to_match(
+        match_id,
+        {
+            "type": "MEETUP_CONSENT_UPDATED",
+            "match_id": match_id,
+            "sender_id": current_user_id,
+            "user1_meetup_agreed": match_obj.user1_meetup_agreed,
+            "user2_meetup_agreed": match_obj.user2_meetup_agreed,
+            "is_meetup_unlocked": is_unlocked,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+    msg = (
+        "Mutual Meetup Unlocked! Explore nearby local date spots."
+        if is_unlocked
+        else ("Meetup agreement recorded. Waiting for match partner..." if payload.agree else "Meetup consent declined.")
+    )
+
+    return APIResponse(
+        success=True,
+        data=MeetupConsentStatusData(
+            match_id=match_id,
+            my_meetup_consent=my_consent,
+            partner_meetup_consent=partner_consent,
+            is_meetup_unlocked=is_unlocked,
+            message=msg,
         )
     )
 

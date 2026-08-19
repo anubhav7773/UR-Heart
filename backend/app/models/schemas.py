@@ -509,6 +509,9 @@ class SafeBridgeStatusData(BaseModel):
     is_fully_unlocked: bool = False
     whatsapp_unlocked: bool = False
     location_unlocked: bool = False
+    my_meetup_consent: bool = False
+    partner_meetup_consent: bool = False
+    is_meetup_unlocked: bool = False
     partner_phone: Optional[str] = None
     partner_maps_url: Optional[str] = None
 
@@ -517,6 +520,41 @@ class SafeBridgePaymentRequest(BaseModel):
     match_id: str
     payment_id: str
     amount: float = 499.0
+
+
+class MeetupConsentRequest(BaseModel):
+    agree: bool
+
+
+class MeetupConsentStatusData(BaseModel):
+    match_id: str
+    my_meetup_consent: bool
+    partner_meetup_consent: bool
+    is_meetup_unlocked: bool
+    message: str
+
+
+class MeetupSpotData(BaseModel):
+    id: str
+    name: str
+    category: str  # chai, cafe, restaurant, hotel
+    category_label: str  # Chai & Snacks, Cafes, Restaurants, Hotels
+    distance_meters: int
+    distance_km: float
+    distance_label: str  # e.g., "350m away", "1.2 km away"
+    address: str
+    latitude: float
+    longitude: float
+    maps_url: str
+    phone: Optional[str] = None
+    rating: Optional[float] = None
+
+
+class MeetupSpotsResponse(BaseModel):
+    total: int
+    spots: List[MeetupSpotData]
+    center_lat: float
+    center_lon: float
 
 
 class WhatsAppBridgeStatusData(BaseModel):

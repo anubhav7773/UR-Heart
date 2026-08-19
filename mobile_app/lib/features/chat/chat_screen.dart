@@ -17,6 +17,7 @@ import '../subscription/subscription_sheet.dart';
 import 'chat_provider.dart';
 import 'message_bubble.dart';
 import 'widgets/safe_bridge_paywall_sheet.dart';
+import 'widgets/meetup_spots_sheet.dart';
 
 class ChatMessage {
   final String id;
@@ -118,7 +119,7 @@ class Conversation {
   final String partnerId;
   final String partnerName;
   final String partnerAvatar;
-  final String lastMessage;
+  final String? lastMessage;
   final String? lastMessageTime;
   final String? lastMessageStatus;
   final bool lastMessageIsMe;
@@ -133,7 +134,7 @@ class Conversation {
     required this.partnerId,
     required this.partnerName,
     required this.partnerAvatar,
-    required this.lastMessage,
+    this.lastMessage,
     this.lastMessageTime,
     this.lastMessageStatus,
     this.lastMessageIsMe = false,
@@ -142,6 +143,14 @@ class Conversation {
     this.isVerified = false,
     this.lastActiveAt,
   });
+
+  /// A match is considered an active conversation if messages have been exchanged.
+  bool get hasMessages =>
+      lastMessage != null &&
+      lastMessage!.trim().isNotEmpty &&
+      lastMessageTime != null &&
+      lastMessageTime!.trim().isNotEmpty &&
+      lastMessage != 'Matched! Say hello 👋';
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
     // 1. Resolve ID / Match ID
@@ -196,18 +205,25 @@ class Conversation {
         .toString();
 
     // 5. Resolve Last Message
-    final String lastMsg = (json['last_message'] is Map
-            ? (json['last_message']['message'] ??
+    String? lastMsg;
+    if (json['last_message'] != null) {
+      if (json['last_message'] is Map) {
+        lastMsg = (json['last_message']['message'] ??
                 json['last_message']['content'] ??
-                json['last_message']['text'] ??
-                '')
-            : (json['last_message'] ?? 'Matched! Say hello 👋'))
-        .toString();
+                json['last_message']['text'])
+            ?.toString();
+      } else {
+        final str = json['last_message'].toString().trim();
+        if (str.isNotEmpty) {
+          lastMsg = str;
+        }
+      }
+    }
 
     // 6. Resolve Unread Count
     int unread = 0;
     if (json['unread_count'] is int) {
-      unread = json['unread_count'];
+      unread = json['unread_count'] as int;
     } else if (json['unread_count'] != null) {
       unread = int.tryParse(json['unread_count'].toString()) ?? 0;
     }
@@ -251,7 +267,7 @@ class Conversation {
       partnerId: pId,
       partnerName: pName.isNotEmpty ? pName : 'User',
       partnerAvatar: pAvatar,
-      lastMessage: lastMsg.isNotEmpty ? lastMsg : 'Matched! Say hello 👋',
+      lastMessage: lastMsg,
       lastMessageTime: lastMsgTime,
       lastMessageStatus: lastMsgStatus,
       lastMessageIsMe: lastMsgIsMe,
@@ -358,6 +374,8 @@ class _RecipientHeaderLoadingPlaceholder extends StatelessWidget {
   }
 }
 
+typedef ChatsScreen = ConversationsScreen;
+
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
 
@@ -370,6 +388,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   bool _hasError = false;
   String? _errorMessage;
   List<Conversation> _conversations = [];
+
+  List<Conversation> get _newMatches =>
+      _conversations.where((c) => !c.hasMessages).toList();
+
+  List<Conversation> get _activeConversations =>
+      _conversations.where((c) => c.hasMessages).toList();
 
   @override
   void initState() {
@@ -459,8 +483,37 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     }
   }
 
+  void _openChat(Conversation conv) async {
+    final recipientUser = conv.toRecipient();
+    final String matchId = conv.matchId.isNotEmpty ? conv.matchId : conv.id;
+    if (recipientUser.id.isEmpty && matchId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'This conversation has no recipient. Please refresh and try again.')),
+      );
+      return;
+    }
+    final res = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          matchId: matchId,
+          recipientUser: recipientUser,
+        ),
+      ),
+    );
+    if (res == true || res == null) {
+      _fetchConversations();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final newMatches = _newMatches;
+    final activeConvs = _activeConversations;
+    final bool isEmpty = newMatches.isEmpty && activeConvs.isEmpty;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -535,7 +588,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       ),
                     ),
                   )
-                : _conversations.isEmpty
+                : isEmpty
                     ? Center(
                         child: SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
@@ -574,185 +627,406 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           ),
                         ),
                       )
-                    : ListView.builder(
+                    : ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: _conversations.length,
-                        itemBuilder: (context, index) {
-                          final conv = _conversations[index];
-                          final String matchId =
-                              conv.matchId.isNotEmpty ? conv.matchId : conv.id;
-                          final recipientUser = conv.toRecipient();
-                          final String matchName = conv.partnerName;
-                          final String avatarUrl = conv.partnerAvatar;
-                          final String lastMsg = conv.lastMessage;
-                          final int unreadCount = conv.unreadCount;
-                          final bool isOnline = conv.isOnline;
-                          final bool lastMsgIsMe = conv.lastMessageIsMe;
-                          final String? lastMsgStatus = conv.lastMessageStatus;
-
-                          // Parse last_message_time for relative display
-                          String timeLabel = '';
-                          if (conv.lastMessageTime != null) {
-                            try {
-                              final dt = DateTime.parse(conv.lastMessageTime!)
-                                  .toLocal();
-                              final now = DateTime.now();
-                              final diff = now.difference(dt);
-                              if (diff.inMinutes < 1) {
-                                timeLabel = 'now';
-                              } else if (diff.inMinutes < 60) {
-                                timeLabel = '${diff.inMinutes}m';
-                              } else if (diff.inHours < 24) {
-                                timeLabel = '${diff.inHours}h';
-                              } else if (diff.inDays == 1) {
-                                timeLabel = 'Yesterday';
-                              } else if (diff.inDays < 7) {
-                                timeLabel = '${diff.inDays}d';
-                              } else {
-                                timeLabel = '${dt.day}/${dt.month}';
-                              }
-                            } catch (_) {}
-                          }
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            onTap: () async {
-                              if (recipientUser.id.isEmpty && matchId.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'This conversation has no recipient. Please refresh and try again.')),
-                                );
-                                return;
-                              }
-                              final res = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatScreen(
-                                    matchId: matchId,
-                                    recipientUser: recipientUser,
-                                  ),
-                                ),
-                              );
-                              if (res == true || res == null) {
-                                _fetchConversations();
-                              }
-                            },
-                            leading: Stack(
-                              children: [
-                                CircleAvatar(
-                                  radius: 26,
-                                  backgroundColor: AppTheme.primaryColor,
-                                  backgroundImage: avatarUrl.isNotEmpty
-                                      ? CachedNetworkImageProvider(
-                                          avatarUrl,
-                                          maxHeight: 120,
-                                          maxWidth: 120,
-                                        )
-                                      : null,
-                                  child: avatarUrl.isEmpty
-                                      ? const Icon(Icons.person,
-                                          color: Colors.white)
-                                      : null,
-                                ),
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: isOnline
-                                          ? Colors.greenAccent
-                                          : Colors.grey,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: AppTheme.backgroundColor,
-                                          width: 2),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            title: Text(
-                              matchName,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16),
-                            ),
-                            subtitle: Row(
-                              children: [
-                                if (lastMsgIsMe && lastMsgStatus != null) ...[
-                                  Icon(
-                                    (lastMsgStatus == 'read')
-                                        ? Icons.done_all
-                                        : (lastMsgStatus == 'delivered')
-                                            ? Icons.done_all
-                                            : Icons.done,
-                                    size: 14,
-                                    color: (lastMsgStatus == 'read')
-                                        ? Colors.blueAccent
-                                        : Colors.grey,
-                                  ),
-                                  const SizedBox(width: 3),
-                                ],
-                                Expanded(
-                                  child: Text(
-                                    lastMsg,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                        children: [
+                          // 1. New Matches Horizontal Section
+                          if (newMatches.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                              child: Row(
+                                children: [
+                                  const Text(
+                                    'New Matches',
                                     style: TextStyle(
-                                      color: unreadCount > 0
-                                          ? Colors.white
-                                          : Colors.white70,
-                                      fontSize: 13,
-                                      fontWeight: unreadCount > 0
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.2,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                if (timeLabel.isNotEmpty)
-                                  Text(
-                                    timeLabel,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: unreadCount > 0
-                                          ? AppTheme.primaryColor
-                                          : Colors.grey,
-                                    ),
-                                  ),
-                                if (unreadCount > 0) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 7, vertical: 3),
+                                        horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryColor,
-                                      borderRadius: BorderRadius.circular(12),
+                                      color: AppTheme.primaryColor
+                                          .withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppTheme.primaryColor
+                                            .withValues(alpha: 0.4),
+                                      ),
                                     ),
                                     child: Text(
-                                      unreadCount > 99 ? '99+' : '$unreadCount',
+                                      '${newMatches.length}',
                                       style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold),
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
-                              ],
+                              ),
                             ),
-                          );
-                        },
+                            SizedBox(
+                              height: 104,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                                itemCount: newMatches.length,
+                                itemBuilder: (context, index) {
+                                  final match = newMatches[index];
+                                  final firstName =
+                                      match.partnerName.split(' ').first;
+                                  return GestureDetector(
+                                    onTap: () => _openChat(match),
+                                    child: Container(
+                                      width: 76,
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 4),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Stack(
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.all(2.5),
+                                                decoration: const BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      Color(0xFFE91E63),
+                                                      Color(0xFFFF5252),
+                                                      Color(0xFFFF9800),
+                                                    ],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                ),
+                                                child: CircleAvatar(
+                                                  radius: 28,
+                                                  backgroundColor:
+                                                      Colors.grey[900],
+                                                  backgroundImage: match
+                                                          .partnerAvatar
+                                                          .isNotEmpty
+                                                      ? CachedNetworkImageProvider(
+                                                          match.partnerAvatar)
+                                                      : null,
+                                                  child: match.partnerAvatar
+                                                          .isEmpty
+                                                      ? const Icon(Icons.person,
+                                                          color: Colors.white70,
+                                                          size: 28)
+                                                      : null,
+                                                ),
+                                              ),
+                                              if (match.isOnline)
+                                                Positioned(
+                                                  right: 2,
+                                                  bottom: 2,
+                                                  child: Container(
+                                                    width: 12,
+                                                    height: 12,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.greenAccent,
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(
+                                                        color: AppTheme
+                                                            .backgroundColor,
+                                                        width: 2,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              if (match.unreadCount > 0)
+                                                Positioned(
+                                                  top: 0,
+                                                  right: 0,
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(4),
+                                                    decoration:
+                                                        const BoxDecoration(
+                                                      color:
+                                                          AppTheme.primaryColor,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Text(
+                                                      '${match.unreadCount}',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  firstName,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (match.isVerified) ...[
+                                                const SizedBox(width: 2),
+                                                const Icon(Icons.verified,
+                                                    size: 12,
+                                                    color: AppTheme.verifiedBlue),
+                                              ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const Divider(
+                                color: AppTheme.cardBorderColor,
+                                height: 16,
+                                indent: 16,
+                                endIndent: 16),
+                          ],
+
+                          // 2. Active Conversations Header
+                          if (newMatches.isNotEmpty || activeConvs.isNotEmpty)
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 6, 16, 4),
+                              child: Text(
+                                'Conversations',
+                                style: TextStyle(
+                                  color: AppTheme.mutedTextColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+
+                          // 3. Prompt if no active conversations yet
+                          if (activeConvs.isEmpty && newMatches.isNotEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 36),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.chat_bubble_outline,
+                                        size: 36, color: AppTheme.mutedTextColor),
+                                    SizedBox(height: 12),
+                                    Text(
+                                      'Tap a match above to send your first message',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: AppTheme.mutedTextColor,
+                                        fontSize: 14,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                          // 4. Vertical Active Conversations List
+                          ...activeConvs.map((conv) {
+                            final String matchName = conv.partnerName;
+                            final String avatarUrl = conv.partnerAvatar;
+                            final String lastMsg = (conv.lastMessage != null &&
+                                    conv.lastMessage!.isNotEmpty)
+                                ? conv.lastMessage!
+                                : 'Matched! Say hello';
+                            final int unreadCount = conv.unreadCount;
+                            final bool isOnline = conv.isOnline;
+                            final bool lastMsgIsMe = conv.lastMessageIsMe;
+                            final String? lastMsgStatus =
+                                conv.lastMessageStatus;
+
+                            // Parse last_message_time for relative display
+                            String timeLabel = '';
+                            if (conv.lastMessageTime != null &&
+                                conv.lastMessageTime!.isNotEmpty) {
+                              try {
+                                final dt =
+                                    DateTime.parse(conv.lastMessageTime!)
+                                        .toLocal();
+                                final now = DateTime.now();
+                                final diff = now.difference(dt);
+                                if (diff.inMinutes < 1) {
+                                  timeLabel = 'now';
+                                } else if (diff.inMinutes < 60) {
+                                  timeLabel = '${diff.inMinutes}m';
+                                } else if (diff.inHours < 24) {
+                                  timeLabel = '${diff.inHours}h';
+                                } else if (diff.inDays == 1) {
+                                  timeLabel = 'Yesterday';
+                                } else if (diff.inDays < 7) {
+                                  timeLabel = '${diff.inDays}d';
+                                } else {
+                                  timeLabel = '${dt.day}/${dt.month}';
+                                }
+                              } catch (_) {}
+                            }
+
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
+                              onTap: () => _openChat(conv),
+                              leading: Stack(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 26,
+                                    backgroundColor: AppTheme.surfaceColor,
+                                    backgroundImage: avatarUrl.isNotEmpty
+                                        ? CachedNetworkImageProvider(
+                                            avatarUrl,
+                                            maxHeight: 120,
+                                            maxWidth: 120,
+                                          )
+                                        : null,
+                                    child: avatarUrl.isEmpty
+                                        ? const Icon(Icons.person,
+                                            color: AppTheme.mutedTextColor)
+                                        : null,
+                                  ),
+                                  Positioned(
+                                    right: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: isOnline
+                                            ? Colors.greenAccent
+                                            : Colors.grey,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                            color: AppTheme.backgroundColor,
+                                            width: 2),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              title: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      matchName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16),
+                                    ),
+                                  ),
+                                  if (conv.isVerified) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.verified,
+                                        size: 14, color: AppTheme.verifiedBlue),
+                                  ],
+                                ],
+                              ),
+                              subtitle: Row(
+                                children: [
+                                  if (lastMsgIsMe &&
+                                      lastMsgStatus != null) ...[
+                                    Icon(
+                                      (lastMsgStatus == 'read')
+                                          ? Icons.done_all
+                                          : (lastMsgStatus == 'delivered')
+                                              ? Icons.done_all
+                                              : Icons.done,
+                                      size: 14,
+                                      color: (lastMsgStatus == 'read')
+                                          ? AppTheme.verifiedBlue
+                                          : Colors.grey,
+                                    ),
+                                    const SizedBox(width: 3),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      lastMsg,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: unreadCount > 0
+                                            ? Colors.white
+                                            : Colors.white70,
+                                        fontSize: 13,
+                                        fontWeight: unreadCount > 0
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  if (timeLabel.isNotEmpty)
+                                    Text(
+                                      timeLabel,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: unreadCount > 0
+                                            ? AppTheme.primaryColor
+                                            : AppTheme.mutedTextColor,
+                                      ),
+                                    ),
+                                  if (unreadCount > 0) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 7, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryColor,
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        unreadCount > 99
+                                            ? '99+'
+                                            : '$unreadCount',
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
                       ),
       ),
     );
@@ -796,6 +1070,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool _myBridgePaid = false;
   bool _partnerBridgePaid = false;
+
+  // Mutual Meetup Consent & Local Date Spot Radar State
+  bool _myMeetupConsent = false;
+  bool _partnerMeetupConsent = false;
+  bool _isMeetupUnlocked = false;
+  bool _isMeetupVotingLoading = false;
 
   bool _isConsentLoading = false;
 
@@ -1003,31 +1283,73 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
+      if (type == 'MEETUP_CONSENT_UPDATED') {
+        if (mounted) {
+          setState(() {
+            final senderId = (data['sender_id'] ?? '').toString();
+            final bool isSenderMe = (_currentUserId.isNotEmpty && senderId == _currentUserId);
+            final user1Agreed = data['user1_meetup_agreed'] == true;
+            final user2Agreed = data['user2_meetup_agreed'] == true;
+            _isMeetupUnlocked = data['is_meetup_unlocked'] == true;
+
+            if (data['my_meetup_consent'] != null) {
+              _myMeetupConsent = data['my_meetup_consent'] == true;
+            } else if (isSenderMe) {
+              _myMeetupConsent = user1Agreed || user2Agreed;
+            }
+            if (data['partner_meetup_consent'] != null) {
+              _partnerMeetupConsent = data['partner_meetup_consent'] == true;
+            } else if (!isSenderMe) {
+              _partnerMeetupConsent = user1Agreed || user2Agreed;
+            }
+          });
+        }
+        return;
+      }
+
       if (type == 'consent_update' || type == 'bridge_payment_update') {
         if (mounted) {
           setState(() {
-            if (data['total_messages'] != null)
+            if (data['total_messages'] != null) {
               _mutualMessageCount = data['total_messages'];
+            }
             _isWhatsAppUnlocked = data['whatsapp_unlocked'] ??
                 (data['is_fully_unlocked'] ?? _isWhatsAppUnlocked);
             _isLocationUnlocked = data['location_unlocked'] ??
                 (data['is_fully_unlocked'] ?? _isLocationUnlocked);
-            if (data['my_whatsapp_consent'] != null)
+            if (data['my_whatsapp_consent'] != null) {
               _myWhatsAppConsent = data['my_whatsapp_consent'];
-            if (data['my_location_consent'] != null)
+            }
+            if (data['my_location_consent'] != null) {
               _myLocationConsent = data['my_location_consent'];
-            if (data['partner_whatsapp_consent'] != null)
+            }
+            if (data['partner_whatsapp_consent'] != null) {
               _partnerWhatsAppConsent = data['partner_whatsapp_consent'];
-            if (data['partner_location_consent'] != null)
+            }
+            if (data['partner_location_consent'] != null) {
               _partnerLocationConsent = data['partner_location_consent'];
-            if (data['my_payment_done'] != null)
+            }
+            if (data['my_meetup_consent'] != null) {
+              _myMeetupConsent = data['my_meetup_consent'];
+            }
+            if (data['partner_meetup_consent'] != null) {
+              _partnerMeetupConsent = data['partner_meetup_consent'];
+            }
+            if (data['is_meetup_unlocked'] != null) {
+              _isMeetupUnlocked = data['is_meetup_unlocked'];
+            }
+            if (data['my_payment_done'] != null) {
               _myBridgePaid = data['my_payment_done'];
-            if (data['partner_payment_done'] != null)
+            }
+            if (data['partner_payment_done'] != null) {
               _partnerBridgePaid = data['partner_payment_done'];
-            if (data['partner_phone'] != null)
+            }
+            if (data['partner_phone'] != null) {
               _unlockedPhoneNumber = data['partner_phone'];
-            if (data['partner_maps_url'] != null)
+            }
+            if (data['partner_maps_url'] != null) {
               _partnerMapsUrl = data['partner_maps_url'];
+            }
           });
         }
       } else if (type == 'messages_read' || type == 'read_receipt') {
@@ -1117,20 +1439,13 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           }
         });
-        if (changed || (!silent && _messages.isNotEmpty)) _scrollToBottom();
+        if (changed || (!silent && _messages.isNotEmpty)) {
+          _scrollToBottom();
+        }
 
-        // Mark incoming messages as read
         _emitReadReceipt();
       }
     } catch (_) {}
-  }
-
-  DateTime _parseLocalTimestamp(String isoTimestamp) {
-    try {
-      return DateTime.parse(isoTimestamp).toLocal();
-    } on FormatException {
-      return DateTime.now();
-    }
   }
 
   /// Adds a server message once, or swaps an optimistic client message in place.
@@ -1138,7 +1453,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final serverMessage = ChatMessage.fromJson(data);
     final dbId = serverMessage.id;
     final clientMsgId = serverMessage.clientMsgId ?? '';
-    if (dbId.isEmpty && clientMsgId.isEmpty) return false;
+    if (dbId.isEmpty && clientMsgId.isEmpty) {
+      return false;
+    }
 
     final lookupId = dbId.isNotEmpty ? dbId : clientMsgId;
 
@@ -1165,13 +1482,20 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (optimisticIndex != -1) {
       _messages[optimisticIndex] = serverMessage;
-      if (clientMsgId.isNotEmpty) _processedMessageIds.add(clientMsgId);
-      if (serverMessage.id.isNotEmpty)
+      if (clientMsgId.isNotEmpty) {
+        _processedMessageIds.add(clientMsgId);
+      }
+      if (serverMessage.id.isNotEmpty) {
         _processedMessageIds.add(serverMessage.id);
+      }
       return true;
     }
-    if (serverMessage.id.isNotEmpty) _processedMessageIds.add(serverMessage.id);
-    if (clientMsgId.isNotEmpty) _processedMessageIds.add(clientMsgId);
+    if (serverMessage.id.isNotEmpty) {
+      _processedMessageIds.add(serverMessage.id);
+    }
+    if (clientMsgId.isNotEmpty) {
+      _processedMessageIds.add(clientMsgId);
+    }
     _messages.add(serverMessage);
     return true;
   }
@@ -1226,6 +1550,9 @@ class _ChatScreenState extends State<ChatScreen> {
           _partnerWhatsAppConsent = data['partner_whatsapp_consent'] ?? false;
           _myLocationConsent = data['my_location_consent'] ?? false;
           _partnerLocationConsent = data['partner_location_consent'] ?? false;
+          _myMeetupConsent = data['my_meetup_consent'] ?? false;
+          _partnerMeetupConsent = data['partner_meetup_consent'] ?? false;
+          _isMeetupUnlocked = data['is_meetup_unlocked'] ?? false;
           _myBridgePaid = data['my_payment_done'] ?? false;
           _partnerBridgePaid = data['partner_payment_done'] ?? false;
           _isWhatsAppUnlocked = data['whatsapp_unlocked'] ?? false;
@@ -1239,6 +1566,50 @@ class _ChatScreenState extends State<ChatScreen> {
     } finally {
       if (mounted) setState(() => _isConsentLoading = false);
     }
+  }
+
+  Future<void> _submitMeetupConsent(bool agree) async {
+    setState(() => _isMeetupVotingLoading = true);
+    try {
+      final res = await ApiClient.instance.updateMeetupConsent(
+        matchId: widget.matchId,
+        agree: agree,
+      );
+      if (res.data != null && res.data['data'] != null) {
+        final data = res.data['data'];
+        setState(() {
+          _myMeetupConsent = data['my_meetup_consent'] ?? agree;
+          _partnerMeetupConsent =
+              data['partner_meetup_consent'] ?? _partnerMeetupConsent;
+          _isMeetupUnlocked = data['is_meetup_unlocked'] ?? false;
+        });
+      } else {
+        setState(() => _myMeetupConsent = agree);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Meetup consent notice: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isMeetupVotingLoading = false);
+    }
+  }
+
+  void _openMeetupSpotsExplorer() {
+    MeetupSpotsSheet.show(
+      context: context,
+      onSuggestSpot: (spot) => _suggestSpotInChat(spot),
+    );
+  }
+
+  void _suggestSpotInChat(MeetupSpot spot) {
+    final String text =
+        '📍 Meetup Spot Suggestion: ${spot.name} (${spot.categoryLabel}, ${spot.distanceLabel})\n'
+        'Address: ${spot.address}\n'
+        'Google Maps: ${spot.mapsUrl}';
+    _sendMessage(text: text);
   }
 
   Future<void> _fetchWhatsAppBridgeStatus() async {
@@ -2071,6 +2442,194 @@ class _ChatScreenState extends State<ChatScreen> {
     return true;
   }
 
+  Widget _buildMutualMeetupConsentCard() {
+    final bool isBridgeUnlocked = _isWhatsAppUnlocked ||
+        _isLocationUnlocked ||
+        (_myBridgePaid && _partnerBridgePaid);
+    if (!isBridgeUnlocked) return const SizedBox.shrink();
+
+    final bool bothAgreed =
+        _isMeetupUnlocked || (_myMeetupConsent && _partnerMeetupConsent);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bothAgreed
+            ? AppTheme.primaryColor.withValues(alpha: 0.12)
+            : AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: bothAgreed ? AppTheme.primaryColor : AppTheme.cardBorderColor,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: bothAgreed
+                      ? AppTheme.primaryColor.withValues(alpha: 0.2)
+                      : AppTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  bothAgreed ? Icons.celebration_outlined : Icons.handshake_outlined,
+                  color: bothAgreed ? AppTheme.primaryColor : AppTheme.secondaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      bothAgreed
+                          ? 'Mutual Meetup Consent Confirmed!'
+                          : (_myMeetupConsent && !_partnerMeetupConsent
+                              ? 'Meetup Request Sent'
+                              : 'Plan a Safe Meetup?'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      bothAgreed
+                          ? 'Tap to explore all nearby meetup spots (Chai, Cafe, Hotel).'
+                          : (_myMeetupConsent && !_partnerMeetupConsent
+                              ? 'Aapne haan bola hai. Match ke response ka wait kar rahe hain... (1/2)'
+                              : 'Kya aap apne partner ke sath kahin milna chahte hain?'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: bothAgreed ? Colors.white70 : AppTheme.mutedTextColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_isMeetupVotingLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(4.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppTheme.primaryColor),
+                ),
+              ),
+            )
+          else if (bothAgreed)
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton.icon(
+                onPressed: _openMeetupSpotsExplorer,
+                icon: const Icon(Icons.place_rounded, size: 16),
+                label: const Text(
+                  'Explore Nearby Meetup Spots',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            )
+          else if (_myMeetupConsent && !_partnerMeetupConsent)
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.cardBorderColor),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.hourglass_top_rounded,
+                            size: 14, color: AppTheme.secondaryColor),
+                        SizedBox(width: 6),
+                        Text(
+                          'Waiting for partner (1/2)',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.secondaryColor,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => _submitMeetupConsent(false),
+                  child: const Text('Change (No)',
+                      style: TextStyle(
+                          fontSize: 11, color: AppTheme.mutedTextColor)),
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _submitMeetupConsent(true),
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('Haan, bilkul',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _submitMeetupConsent(false),
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    label: const Text('Abhi nahi',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.mutedTextColor,
+                      side: const BorderSide(color: AppTheme.cardBorderColor),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2421,6 +2980,9 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
+
+          // MUTUAL MEETUP CONSENT CARD (2/2 Unlocked -> Nearby Date Spot Radar)
+          _buildMutualMeetupConsentCard(),
 
           // Messages List View
           Expanded(

@@ -222,9 +222,9 @@ def sanitize_and_guard(content: str, is_bridge_unlocked: bool = False) -> Tuple[
         if pattern.search(collapsed) or pattern.search(leet_decoded):
             return True, _block_reason()
 
-    # Check handle patterns on normalized text
+    # Check handle patterns on normalized and collapsed text
     for pattern in HANDLE_PATTERNS:
-        if pattern.search(normalized_lower):
+        if pattern.search(normalized_lower) or pattern.search(collapsed):
             return True, _block_reason()
 
     # Check if word-digit replacement produced a long digit sequence

@@ -244,6 +244,34 @@ class ApiClient {
     });
   }
 
+  // 10g. Submit / Update Mutual Meetup Consent
+  Future<Response> updateMeetupConsent({
+    required String matchId,
+    required bool agree,
+  }) async {
+    return await dio.post('/chat/$matchId/meetup-consent', data: {
+      'agree': agree,
+    });
+  }
+
+  // 10h. Get Nearby Date Spots (Chai, Cafes, Restaurants, Hotels)
+  Future<Response> getMeetupSpots({
+    required double lat,
+    required double lon,
+    int radiusMeters = 15000,
+    String? category,
+  }) async {
+    final Map<String, dynamic> query = {
+      'lat': lat,
+      'lon': lon,
+      'radius_meters': radiusMeters,
+    };
+    if (category != null && category.isNotEmpty) {
+      query['category'] = category;
+    }
+    return await dio.get('/places/meetup-spots', queryParameters: query);
+  }
+
   // 11. Remote Ad Configuration
   Future<Response> getAdConfig() async {
     return await dio.get('/ads/config');

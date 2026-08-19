@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 import '../feed/feed_screen.dart';
 import '../chat/chat_screen.dart';
 import '../../screens/activity_screen.dart';
@@ -31,14 +32,17 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
       ),
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[950],
-          border: const Border(top: BorderSide(color: Colors.white12, width: 0.5)),
+        decoration: const BoxDecoration(
+          color: AppTheme.surfaceColor,
+          border: Border(
+            top: BorderSide(color: AppTheme.borderColor, width: 1),
+          ),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
@@ -47,31 +51,34 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               _currentIndex = index;
             });
           },
-          backgroundColor: Colors.black,
-          selectedItemColor: const Color(0xFFE91E63),
-          unselectedItemColor: Colors.grey,
+          backgroundColor: AppTheme.surfaceColor,
+          selectedItemColor: AppTheme.primaryColor,
+          unselectedItemColor: AppTheme.mutedTextColor,
           type: BottomNavigationBarType.fixed,
           selectedFontSize: 12,
           unselectedFontSize: 12,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
+          elevation: 0,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.style_outlined),
-              activeIcon: Icon(Icons.style, color: Color(0xFFE91E63)),
+              activeIcon: Icon(Icons.style, color: AppTheme.primaryColor),
               label: 'Explore',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble, color: Color(0xFFE91E63)),
+              activeIcon: Icon(Icons.chat_bubble, color: AppTheme.primaryColor),
               label: 'Chats',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.favorite_border),
-              activeIcon: Icon(Icons.favorite, color: Color(0xFFE91E63)),
+              activeIcon: Icon(Icons.favorite, color: AppTheme.primaryColor),
               label: 'Activity',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person, color: Color(0xFFE91E63)),
+              activeIcon: Icon(Icons.person, color: AppTheme.primaryColor),
               label: 'Profile',
             ),
           ],
