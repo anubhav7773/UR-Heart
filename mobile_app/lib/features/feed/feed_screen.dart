@@ -12,6 +12,7 @@ import '../subscription/subscription_sheet.dart';
 import 'native_ad_card_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/services/app_update_service.dart';
+import 'visitors_sheet.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -25,6 +26,7 @@ class _FeedScreenState extends State<FeedScreen> {
   List<dynamic> _cards = [];
   int _currentIndex = 0;
   int _persistentSkipCount = 0;
+  int _visitorCount = 0;
   bool _isClaimingReward = false;
 
   // Voice Bio Playback State
@@ -46,11 +48,22 @@ class _FeedScreenState extends State<FeedScreen> {
     _enableScreenshotProtection();
     AdManager.instance.loadRewardedAd();
     _loadFeed();
+    _fetchVisitorCount();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         AppUpdateService.instance.checkForUpdate(context);
       }
     });
+  }
+
+  Future<void> _fetchVisitorCount() async {
+    try {
+      final res = await ApiClient.instance.getVisitors(limit: 1);
+      if (res.data != null && res.data['data'] != null) {
+        final total = (res.data['data']['total_count'] as num?)?.toInt() ?? 0;
+        if (mounted) setState(() => _visitorCount = total);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -944,19 +957,59 @@ class _FeedScreenState extends State<FeedScreen> {
             tooltip: 'Earn Free Swipes / Super Boost',
             onPressed: _showEarnSwipesRewardSheet,
           ),
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-            tooltip: 'Chats',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ConversationsScreen()),
-              );
-            },
+          // Profile Visitors / Ghost Passer Action Button
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: InkWell(
+                onTap: () => VisitorsSheet.show(
+                  context: context,
+                  onVisitorsUpdated: _fetchVisitorCount,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _visitorCount > 0
+                        ? AppTheme.primaryColor.withValues(alpha: 0.15)
+                        : AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _visitorCount > 0
+                          ? AppTheme.primaryColor.withValues(alpha: 0.5)
+                          : AppTheme.cardBorderColor,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.visibility_outlined,
+                        size: 16,
+                        color: _visitorCount > 0
+                            ? AppTheme.primaryColor
+                            : AppTheme.mutedTextColor,
+                      ),
+                      if (_visitorCount > 0) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '$_visitorCount',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
           Center(
             child: Padding(
-              padding: const EdgeInsets.only(right: 12.0),
+              padding: const EdgeInsets.only(right: 12.0, left: 4.0),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(

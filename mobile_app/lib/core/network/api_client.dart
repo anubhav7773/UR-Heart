@@ -295,6 +295,32 @@ class ApiClient {
     return await dio.delete('/chat/messages/$messageId');
   }
 
+  // 10j. Profile Visitors & Ghost Passers (Who Passed You)
+  Future<Response> getVisitors({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    return await dio.get('/profile/visitors', queryParameters: {
+      'limit': limit,
+      'offset': offset,
+    });
+  }
+
+  Future<Response> dismissVisitor({
+    required String visitorId,
+  }) async {
+    return await dio.delete('/profile/visitors/$visitorId');
+  }
+
+  // 10k. Direct DM Sachet Unlock (₹49)
+  Future<Response> unlockDirectDMSachet({
+    required String targetUserId,
+  }) async {
+    return await dio.post('/payments/sachet/direct-dm', data: {
+      'target_user_id': targetUserId,
+    });
+  }
+
   // 11. Remote Ad Configuration
   Future<Response> getAdConfig() async {
     return await dio.get('/ads/config');

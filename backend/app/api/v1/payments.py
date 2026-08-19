@@ -5,7 +5,7 @@ import hashlib
 from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, or_, and_
 
 from app.core.database import get_db
 from app.core.security import get_current_user_id
@@ -17,6 +17,8 @@ from app.models.schemas import (
     CreateSachetOrderData,
     VerifyPaymentRequest,
     VerifyPaymentData,
+    DirectDMSachetRequest,
+    DirectDMSachetResponse,
 )
 from app.core.config import settings
 
@@ -371,3 +373,95 @@ async def razorpay_webhook(
         }
 
     return {"status": "ignored"}
+
+
+@router.post("/sachet/direct-dm", response_model=APIResponse[DirectDMSachetResponse])
+@router.post("/direct-dm-sachet", response_model=APIResponse[DirectDMSachetResponse])
+async def unlock_direct_dm_sachet(
+    payload: DirectDMSachetRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Direct DM Sachet Unlock (₹49):
+    - Activates 1-hour Direct DM pass for current user.
+    - Creates or retrieves Match/Conversation row between current_user and target_user.
+    - Allows sending direct message without requiring mutual swipe.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        target_uuid = uuid.UUID(payload.target_user_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID format.")
+
+    if user_uuid == target_uuid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot unlock direct DM with yourself.")
+
+    now_utc = datetime.now(timezone.utc)
+    valid_until = now_utc + timedelta(hours=1)
+
+    # 1. Update user's direct_dm_until in DB
+    try:
+        u_res = await db.execute(select(User).where(User.id == user_uuid))
+        u_obj = u_res.scalars().first()
+        if u_obj:
+            u_obj.direct_dm_until = valid_until
+            db.add(u_obj)
+    except Exception:
+        pass
+
+    # 2. Ensure Match / Conversation exists with target user
+    match_id_str = str(uuid.uuid4())
+    try:
+        match_res = await db.execute(
+            select(Match).where(
+                or_(
+                    and_(Match.user1_id == user_uuid, Match.user2_id == target_uuid),
+                    and_(Match.user1_id == target_uuid, Match.user2_id == user_uuid),
+                )
+            )
+        )
+        match_obj = match_res.scalars().first()
+        if not match_obj:
+            match_obj = Match(
+                user1_id=user_uuid,
+                user2_id=target_uuid,
+                mutual_message_count=0,
+            )
+            db.add(match_obj)
+            await db.flush()
+        match_id_str = str(match_obj.id)
+
+        # 3. Record Sachet Transaction
+        txn = SachetTransaction(
+            id=uuid.uuid4(),
+            user_id=user_uuid,
+            plan_type="PLAN_DIRECT_DM_49",
+            amount_inr=49.0,
+            order_id=f"direct_dm_{uuid.uuid4().hex[:8]}",
+            status="paid",
+            valid_until=valid_until,
+        )
+        db.add(txn)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    _mock_user_passes[current_user_id] = {
+        "plan_type": "PLAN_DIRECT_DM_49",
+        "valid_until": valid_until,
+        "direct_dm_until": valid_until,
+    }
+
+    return APIResponse(
+        success=True,
+        message="Direct DM Unlocked via ₹49 Sachet!",
+        data=DirectDMSachetResponse(
+            conversation_id=match_id_str,
+            match_id=match_id_str,
+            target_user_id=str(target_uuid),
+            success=True,
+            message="Direct DM Unlocked via ₹49 Sachet",
+        )
+    )
+

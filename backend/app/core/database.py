@@ -131,6 +131,19 @@ async def init_db() -> None:
         -- Sachet transactions table
         ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ DEFAULT NULL;
 
+        -- Profile impressions (Visitors / Ghost Passers)
+        CREATE TABLE IF NOT EXISTS profile_impressions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            visitor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            target_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            action_type VARCHAR(20) NOT NULL DEFAULT 'pass',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            CONSTRAINT uq_visitor_target UNIQUE (visitor_id, target_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_profile_impressions_target ON profile_impressions (target_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_profile_impressions_visitor ON profile_impressions (visitor_id);
+
         -- User ad counters table and columns
         CREATE TABLE IF NOT EXISTS user_ad_counters (
             user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

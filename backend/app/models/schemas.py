@@ -743,6 +743,40 @@ class IcebreakerItem(BaseModel):
     category: str = "general"
 
 
+# 18. Profile Visitors & Ghost Passers Schemas
+class VisitorItem(BaseModel):
+    user_id: str
+    name: str
+    age: Optional[int] = None
+    city: Optional[str] = None
+    photo_url: Optional[str] = None
+    photos: List[str] = Field(default_factory=list)
+    distance_km: Optional[float] = None
+    distance_label: str = "Nearby"
+    action_type: str = "pass"
+    is_verified: bool = False
+    visited_at: str
+    time_ago: str = "Recently"
+
+
+class VisitorsListResponse(BaseModel):
+    total_count: int
+    unread_count: int = 0
+    visitors: List[VisitorItem]
+
+
+class DirectDMSachetRequest(BaseModel):
+    target_user_id: str = Field(..., description="Target user ID to unlock direct DM for")
+
+
+class DirectDMSachetResponse(BaseModel):
+    conversation_id: str
+    match_id: str
+    target_user_id: str
+    success: bool = True
+    message: str = "Direct DM Unlocked via ₹49 Sachet"
+
+
 class IcebreakerListData(BaseModel):
     icebreakers: List[IcebreakerItem]
 

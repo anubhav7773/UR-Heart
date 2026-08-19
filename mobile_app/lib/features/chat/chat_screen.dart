@@ -1071,11 +1071,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 class ChatScreen extends StatefulWidget {
   final String matchId;
   final ChatRecipient recipientUser;
+  final bool isDirectDM;
 
   const ChatScreen({
     super.key,
     required this.matchId,
     required this.recipientUser,
+    this.isDirectDM = false,
   });
 
   @override
@@ -2765,6 +2767,36 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          // Direct DM Sachet Notice Banner
+          if (widget.isDirectDM)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFB800).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFFFB800).withValues(alpha: 0.4),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.bolt_rounded, size: 18, color: Color(0xFFFFB800)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚡ Direct DM Unlocked via ₹49 Sachet • Send your message directly!',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFFFB800),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // 5-Min Ad Banner Notice for Free Tier Users
           if (!_isPremiumUser)
             Container(

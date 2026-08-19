@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +15,9 @@ from app.models.orm import (
     UserAdCounter,
     Swipe,
     Match,
+    ProfileImpression,
     SwipeActionEnum as ORMSwipeActionEnum,
-    GenderEnum as ORMGenderEnum
+    GenderEnum as ORMGenderEnum,
 )
 from app.models.schemas import (
     APIResponse,
@@ -35,6 +36,7 @@ from app.services.ad_engine import AdEngineService
 router = APIRouter(prefix="/matches", tags=["Matches & Discovery Feed Engine"])
 
 _user_skip_counts = {}
+
 
 def calculate_age(born: date) -> int:
     today = date.today()
@@ -137,6 +139,7 @@ async def post_matches_swipe(
     """
     Records user swipe action (reject/like/dm) in Supabase PostgreSQL `swipes` table,
     checks for mutual like, and creates a record in `matches` table on match.
+    Also logs ProfileImpression if user passes (rejects) a profile.
     """
     user_uuid = uuid.UUID(current_user_id)
     target_uuid = uuid.UUID(payload.target_user_id)
@@ -151,6 +154,33 @@ async def post_matches_swipe(
         )
         db.add(new_swipe)
         await db.commit()
+
+        # Log Profile Impression (Ghost Passer / Visitor) if swiping left (pass)
+        if payload.action == SwipeActionEnum.REJECT and user_uuid != target_uuid:
+            try:
+                imp_res = await db.execute(
+                    select(ProfileImpression).where(
+                        and_(
+                            ProfileImpression.visitor_id == user_uuid,
+                            ProfileImpression.target_id == target_uuid,
+                        )
+                    )
+                )
+                imp_obj = imp_res.scalars().first()
+                if imp_obj:
+                    imp_obj.action_type = "pass"
+                    imp_obj.created_at = datetime.now(timezone.utc)
+                else:
+                    db.add(
+                        ProfileImpression(
+                            visitor_id=user_uuid,
+                            target_id=target_uuid,
+                            action_type="pass",
+                        )
+                    )
+                await db.commit()
+            except Exception:
+                await db.rollback()
     except Exception:
         pass
 

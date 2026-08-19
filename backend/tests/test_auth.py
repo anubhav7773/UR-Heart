@@ -402,4 +402,37 @@ def test_unsend_chat_message():
     assert unsend_data["data"]["message_id"] == msg_id
 
 
+def test_visitors_and_ghost_passers_flow():
+    token = get_social_login_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Fetch visitors tray (GET /api/v1/profile/visitors)
+    res = client.get("/api/v1/profile/visitors?limit=20", headers=headers)
+    assert res.status_code == 200
+    json_data = res.json()
+    assert json_data["success"] is True
+    assert "total_count" in json_data["data"]
+    assert "visitors" in json_data["data"]
+    assert isinstance(json_data["data"]["visitors"], list)
+
+
+def test_direct_dm_sachet_unlock():
+    token = get_social_login_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    target_user_id = "00000000-0000-0000-0000-000000000002"
+    payload = {"target_user_id": target_user_id}
+
+    # Unlock direct DM via sachet (POST /api/v1/payments/sachet/direct-dm)
+    res = client.post("/api/v1/payments/sachet/direct-dm", json=payload, headers=headers)
+    assert res.status_code == 200
+    json_data = res.json()
+    assert json_data["success"] is True
+    data = json_data["data"]
+    assert data["success"] is True
+    assert data["conversation_id"] is not None
+    assert data["target_user_id"] == target_user_id
+
+
+
 

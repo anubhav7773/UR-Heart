@@ -19,6 +19,7 @@ from app.models.orm import (
     ChatMessage,
     BlockedUser,
     UserReport,
+    ProfileImpression,
     SwipeActionEnum as ORMSwipeActionEnum,
     GenderEnum as ORMGenderEnum,
     VerificationStatusEnum as ORMVerificationStatusEnum,
@@ -439,6 +440,33 @@ async def swipe_action(
         )
         db.add(new_swipe)
         await db.commit()
+
+        # Log Profile Impression (Ghost Passer / Visitor) if swiping left (pass)
+        if payload.action == SwipeActionEnum.REJECT and user_uuid != target_uuid:
+            try:
+                imp_res = await db.execute(
+                    select(ProfileImpression).where(
+                        and_(
+                            ProfileImpression.visitor_id == user_uuid,
+                            ProfileImpression.target_id == target_uuid,
+                        )
+                    )
+                )
+                imp_obj = imp_res.scalars().first()
+                if imp_obj:
+                    imp_obj.action_type = "pass"
+                    imp_obj.created_at = datetime.now(timezone.utc)
+                else:
+                    db.add(
+                        ProfileImpression(
+                            visitor_id=user_uuid,
+                            target_id=target_uuid,
+                            action_type="pass",
+                        )
+                    )
+                await db.commit()
+            except Exception:
+                await db.rollback()
     except Exception as e:
         await db.rollback()
         print(f"[SWIPE INSERT ERROR] Failed to record swipe: {e}")

@@ -23,9 +23,21 @@ from app.models.schemas import (
     CompleteProfileRequest,
     CompleteProfileData,
     VoiceBioUploadData,
+    VisitorItem,
+    VisitorsListResponse,
 )
-from app.models.orm import User, UserPhoto, BlockedUser, UserReport, GenderEnum as ORMGenderEnum, IntentEnum as ORMIntentEnum
+from app.models.orm import (
+    User,
+    UserPhoto,
+    BlockedUser,
+    UserReport,
+    Match,
+    ProfileImpression,
+    GenderEnum as ORMGenderEnum,
+    IntentEnum as ORMIntentEnum,
+)
 from app.services.storage_engine import StorageEngineService
+from app.services.geo_engine import GeoEngineService
 from app.core.security import get_current_user_id
 
 router = APIRouter(prefix="/profile", tags=["Profile Management & Media Uploads"])
@@ -808,3 +820,190 @@ async def delete_voice_bio(
         message="Voice Bio removed successfully.",
         data={"voice_bio_url": None}
     )
+
+
+def _format_time_ago(dt: Optional[datetime]) -> str:
+    if not dt:
+        return "Recently"
+    now = datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    diff = now - dt
+    secs = int(diff.total_seconds())
+    if secs < 60:
+        return "Just now"
+    mins = secs // 60
+    if mins < 60:
+        return f"Passed you {mins}m ago"
+    hours = mins // 60
+    if hours < 24:
+        return f"Passed you {hours}h ago"
+    days = hours // 24
+    if days == 1:
+        return "Passed you yesterday"
+    return f"Passed you {days}d ago"
+
+
+@router.get("/visitors", response_model=APIResponse[VisitorsListResponse])
+@router.get("/visitors/", response_model=APIResponse[VisitorsListResponse])
+async def get_profile_visitors(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetches the list of users who visited or passed the current user (Who Passed You tray).
+    Excludes users who are blocked or already matched.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID session.")
+
+    # 1. Fetch current user coordinates
+    current_user = None
+    try:
+        u_res = await db.execute(select(User).where(User.id == user_uuid))
+        current_user = u_res.scalars().first()
+    except Exception:
+        pass
+
+    # 2. Exclude blocked users and matched users
+    excluded_ids = set()
+    try:
+        blocked_res = await db.execute(
+            select(BlockedUser.blocked_id).where(BlockedUser.blocker_id == user_uuid)
+        )
+        for b_id in blocked_res.scalars().all():
+            excluded_ids.add(b_id)
+
+        blocker_res = await db.execute(
+            select(BlockedUser.blocker_id).where(BlockedUser.blocked_id == user_uuid)
+        )
+        for b_id in blocker_res.scalars().all():
+            excluded_ids.add(b_id)
+
+        matches_res = await db.execute(
+            select(Match).where(
+                (Match.user1_id == user_uuid) | (Match.user2_id == user_uuid)
+            )
+        )
+        for m in matches_res.scalars().all():
+            excluded_ids.add(m.user2_id if m.user1_id == user_uuid else m.user1_id)
+    except Exception:
+        pass
+
+    # 3. Query impressions where target_id == user_uuid
+    visitors_list: List[VisitorItem] = []
+    total_count = 0
+
+    try:
+        imp_query = (
+            select(ProfileImpression)
+            .where(ProfileImpression.target_id == user_uuid)
+            .order_by(ProfileImpression.created_at.desc())
+        )
+        if excluded_ids:
+            imp_query = imp_query.where(~ProfileImpression.visitor_id.in_(excluded_ids))
+
+        imp_res = await db.execute(imp_query)
+        all_impressions = imp_res.scalars().all()
+        total_count = len(all_impressions)
+
+        paged_impressions = all_impressions[offset: offset + limit]
+        visitor_ids = [imp.visitor_id for imp in paged_impressions]
+
+        if visitor_ids:
+            users_res = await db.execute(
+                select(User)
+                .options(selectinload(User.photos))
+                .where(User.id.in_(visitor_ids))
+            )
+            users_map = {u.id: u for u in users_res.scalars().all()}
+
+            today = date.today()
+            for imp in paged_impressions:
+                v_user = users_map.get(imp.visitor_id)
+                if not v_user:
+                    continue
+
+                age = (
+                    today.year - v_user.dob.year - ((today.month, today.day) < (v_user.dob.month, v_user.dob.day))
+                    if v_user.dob else 22
+                )
+                photos = [p.photo_url for p in v_user.photos] if v_user.photos else []
+                photo_url = photos[0] if photos else (v_user.avatar_url if hasattr(v_user, 'avatar_url') else None)
+
+                dist_km = None
+                dist_label = "Nearby"
+                if current_user and current_user.latitude and current_user.longitude and v_user.latitude and v_user.longitude:
+                    dist_km = GeoEngineService.calculate_haversine_distance(
+                        float(current_user.latitude),
+                        float(current_user.longitude),
+                        float(v_user.latitude),
+                        float(v_user.longitude)
+                    )
+                    dist_km = round(dist_km, 1)
+                    dist_label = GeoEngineService.obfuscate_distance(dist_km)
+
+                visitors_list.append(
+                    VisitorItem(
+                        user_id=str(v_user.id),
+                        name=v_user.full_name or "UR Heart User",
+                        age=age,
+                        city=v_user.area_name or "Ayodhya Region",
+                        photo_url=photo_url,
+                        photos=photos,
+                        distance_km=dist_km,
+                        distance_label=dist_label,
+                        action_type=imp.action_type,
+                        is_verified=bool(v_user.is_verified),
+                        visited_at=imp.created_at.isoformat() if imp.created_at else datetime.now(timezone.utc).isoformat(),
+                        time_ago=_format_time_ago(imp.created_at),
+                    )
+                )
+    except Exception as e:
+        print(f"[VISITORS QUERY ERROR] {e}")
+
+    return APIResponse(
+        success=True,
+        message=f"Retrieved {len(visitors_list)} profile visitors.",
+        data=VisitorsListResponse(
+            total_count=total_count,
+            unread_count=total_count,
+            visitors=visitors_list,
+        ),
+    )
+
+
+@router.delete("/visitors/{visitor_id}", response_model=APIResponse[dict])
+async def dismiss_profile_visitor(
+    visitor_id: str = Path(..., description="The visitor UUID to dismiss"),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Dismisses a visitor impression so they no longer appear in the visitors tray.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+        visitor_uuid = uuid.UUID(visitor_id)
+
+        stmt = delete(ProfileImpression).where(
+            ProfileImpression.target_id == user_uuid,
+            ProfileImpression.visitor_id == visitor_uuid,
+        )
+        await db.execute(stmt)
+        await db.commit()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid visitor UUID.")
+    except Exception:
+        await db.rollback()
+
+    return APIResponse(
+        success=True,
+        message="Visitor impression dismissed successfully.",
+        data={"visitor_id": visitor_id, "dismissed": True}
+    )
+
