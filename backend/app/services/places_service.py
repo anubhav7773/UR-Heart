@@ -1,16 +1,14 @@
 import math
 import re
-import urllib.parse
 from typing import List, Optional, Tuple
 import httpx
-from app.services.geo_engine import GeoEngineService
 from app.models.schemas import MeetupSpotData, MeetupSpotsResponse
 
 
 CATEGORY_LABELS = {
     "chai": "Chai & Snacks",
-    "cafe": "Cafes & Bakeries",
-    "restaurant": "Restaurants & Dhabas",
+    "cafe": "Cafes & Bakes",
+    "restaurant": "Restaurants",
     "hotel": "Hotels & Lounges",
 }
 
@@ -33,6 +31,13 @@ BLACKLIST_TAG_KEYS = {
     "railway",
 }
 
+# Multiple High-Availability Overpass Mirrors to prevent 504 / timeout fails
+OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculates geodesic distance in kilometers between two points."""
@@ -46,16 +51,15 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         * math.sin(dlon / 2) ** 2
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return round(R * c, 2)
+    return round(R * c, 1)
 
 
 class PlacesService:
     """
-    Real POI Engine (OpenStreetMap Overpass API) with strict 0-70km real geo-query.
+    High-Speed, Bulletproof Places Engine (Multi-Mirror OpenStreetMap Overpass API)
+    Strict 0-70km real geo-query with center coordinates support for nodes, ways, and relations.
     Completely zero mock/dummy data generation.
     """
-
-    OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
     @classmethod
     def compute_midpoint(
@@ -90,7 +94,6 @@ class PlacesService:
     ) -> MeetupSpotsResponse:
         """
         Fetches and ranks REAL verified commercial date spots around (lat, lon) within max 70 km.
-        Strictly drops all fake/mock fallbacks and non-commercial nodes.
         """
         capped_radius = min(max(radius_meters, 1000), 70000)
         max_radius_km = round(capped_radius / 1000.0, 1)
@@ -98,7 +101,7 @@ class PlacesService:
         spots: List[MeetupSpotData] = []
 
         try:
-            spots = await cls._query_overpass(
+            spots = await cls._query_overpass_mirrors(
                 lat=lat,
                 lon=lon,
                 radius_meters=capped_radius,
@@ -106,7 +109,6 @@ class PlacesService:
                 is_midpoint=is_midpoint,
             )
         except Exception:
-            # High availability: return empty list on network error (ZERO fake data)
             spots = []
 
         # Apply category filter if specified
@@ -128,7 +130,7 @@ class PlacesService:
         )
 
     @classmethod
-    async def _query_overpass(
+    async def _query_overpass_mirrors(
         cls,
         lat: float,
         lon: float,
@@ -137,35 +139,43 @@ class PlacesService:
         is_midpoint: bool = False,
     ) -> List[MeetupSpotData]:
         """
-        Queries OpenStreetMap Overpass API for real commercial POIs within radius_meters (up to 70 km).
+        Queries high-speed Overpass mirrors with resilient multi-server fallback.
+        Uses concise nwr (node, way, relation) query with name filter.
         """
         query = f"""
-        [out:json][timeout:15];
+        [out:json][timeout:25];
         (
-          node["amenity"~"cafe|restaurant|fast_food|food_court|bar"](around:{radius_meters},{lat},{lon});
-          node["tourism"~"hotel|guest_house|resort"](around:{radius_meters},{lat},{lon});
-          node["shop"="bakery"](around:{radius_meters},{lat},{lon});
+          nwr["amenity"~"cafe|restaurant|fast_food"]["name"](around:{radius_meters},{lat},{lon});
+          nwr["tourism"~"hotel|guest_house"]["name"](around:{radius_meters},{lat},{lon});
         );
-        out body 40;
-        >;
-        out skel qt;
+        out center 60;
         """
 
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            resp = await client.post(cls.OVERPASS_URL, data={"data": query})
-            if resp.status_code != 200:
-                return []
-            data = resp.json()
+        data = None
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for mirror in OVERPASS_MIRRORS:
+                try:
+                    resp = await client.post(mirror, data={"data": query})
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data and "elements" in data:
+                            break
+                except Exception:
+                    continue
+
+        if not data or "elements" not in data:
+            return []
 
         elements = data.get("elements", [])
         results: List[MeetupSpotData] = []
+        seen_names = set()
 
         for el in elements:
             tags = el.get("tags", {})
             name = (tags.get("name") or tags.get("brand") or "").strip()
 
-            # 1. Drop unnamed / placeholder points
-            if not name or len(name) < 2:
+            # 1. Drop unnamed / placeholder points or duplicate names
+            if not name or len(name) < 2 or name.lower() in seen_names:
                 continue
             if name.lower() in ("unnamed", "point", "null", "none", "node"):
                 continue
@@ -178,39 +188,38 @@ class PlacesService:
             if any(k in tags for k in BLACKLIST_TAG_KEYS):
                 continue
 
-            node_lat = el.get("lat")
-            node_lon = el.get("lon")
-            if node_lat is None or node_lon is None:
+            # Center coordinates for ways/nodes/relations
+            s_lat = el.get("lat") or el.get("center", {}).get("lat")
+            s_lon = el.get("lon") or el.get("center", {}).get("lon")
+            if s_lat is None or s_lon is None:
                 continue
 
-            node_lat = float(node_lat)
-            node_lon = float(node_lon)
-            if node_lat == 0.0 and node_lon == 0.0:
+            s_lat = float(s_lat)
+            s_lon = float(s_lon)
+            if s_lat == 0.0 and s_lon == 0.0:
                 continue
 
             # Compute real geodesic distance
-            dist_km = haversine(lat, lon, node_lat, node_lon)
+            dist_km = haversine(lat, lon, s_lat, s_lon)
             if dist_km > max_radius_km:
                 continue
 
+            seen_names.add(name.lower())
             dist_m = int(dist_km * 1000)
 
             # Classify category
             amenity = tags.get("amenity", "").lower()
             tourism = tags.get("tourism", "").lower()
-            shop = tags.get("shop", "").lower()
             cuisine = tags.get("cuisine", "").lower()
 
-            if tourism in ("hotel", "guest_house", "resort") or amenity == "bar":
-                cat = "hotel"
-            elif amenity in ("restaurant", "food_court"):
-                cat = "restaurant"
-            elif "tea" in cuisine or "chai" in cuisine or "street_food" in cuisine or amenity == "fast_food":
+            if amenity == "cafe" or "tea" in cuisine or "chai" in name.lower() or "chai" in cuisine:
                 cat = "chai"
-            elif amenity == "cafe" or shop == "bakery" or "coffee" in cuisine:
+            elif amenity == "fast_food":
                 cat = "cafe"
+            elif tourism in ("hotel", "guest_house", "resort"):
+                cat = "hotel"
             else:
-                cat = "cafe"
+                cat = "restaurant"
 
             if is_midpoint:
                 dist_label = f"{dist_m}m from mid-way" if dist_m < 1000 else f"{dist_km:.1f} km from mid-way"
@@ -224,8 +233,8 @@ class PlacesService:
             ]
             clean_addr = ", ".join([p for p in addr_parts if p]) or f"{dist_km:.1f} km from you"
 
-            # Precise Google Maps Search URL with exact coordinates + business name
-            maps_url = f"https://www.google.com/maps/search/?api=1&query={node_lat},{node_lon}"
+            # Precise Google Maps Search URL with exact coordinates
+            maps_url = f"https://www.google.com/maps/search/?api=1&query={s_lat},{s_lon}"
 
             results.append(
                 MeetupSpotData(
@@ -237,8 +246,8 @@ class PlacesService:
                     distance_km=dist_km,
                     distance_label=dist_label,
                     address=clean_addr,
-                    latitude=node_lat,
-                    longitude=node_lon,
+                    latitude=s_lat,
+                    longitude=s_lon,
                     maps_url=maps_url,
                     phone=tags.get("phone") or tags.get("contact:phone"),
                     rating=4.5,
