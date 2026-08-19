@@ -33,6 +33,8 @@ class ChatMessage {
   final bool isDelivered;
   final bool isRead;
   final bool isDeleted;
+  final String messageType;
+  final Map<String, dynamic>? metadata;
 
   ChatMessage({
     required this.id,
@@ -47,6 +49,8 @@ class ChatMessage {
     this.isDelivered = false,
     this.isRead = false,
     this.isDeleted = false,
+    this.messageType = 'text',
+    this.metadata,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -67,6 +71,10 @@ class ChatMessage {
       parsedTime = DateTime.now();
     }
 
+    final rawMeta = json['metadata'] ?? json['extra_metadata'];
+    final Map<String, dynamic>? parsedMeta =
+        rawMeta is Map ? Map<String, dynamic>.from(rawMeta) : null;
+
     return ChatMessage(
       id: (json['id'] ?? json['message_id'] ?? '').toString(),
       clientMsgId: json['client_msg_id']?.toString(),
@@ -86,6 +94,8 @@ class ChatMessage {
       isDelivered: isDelivered,
       isRead: isRead,
       isDeleted: isDeleted,
+      messageType: (json['message_type'] ?? json['media_type'] ?? 'text').toString(),
+      metadata: parsedMeta,
     );
   }
 
@@ -102,6 +112,8 @@ class ChatMessage {
     bool? isDelivered,
     bool? isRead,
     bool? isDeleted,
+    String? messageType,
+    Map<String, dynamic>? metadata,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -116,6 +128,8 @@ class ChatMessage {
       isDelivered: isDelivered ?? this.isDelivered,
       isRead: isRead ?? this.isRead,
       isDeleted: isDeleted ?? this.isDeleted,
+      messageType: messageType ?? this.messageType,
+      metadata: metadata ?? this.metadata,
     );
   }
 }
@@ -1643,11 +1657,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _suggestSpotInChat(MeetupSpot spot) {
-    final String text =
-        '📍 Meetup Spot Suggestion: ${spot.name} (${spot.categoryLabel}, ${spot.distanceLabel})\n'
-        'Address: ${spot.address}\n'
-        'Google Maps: ${spot.mapsUrl}';
-    _sendMessage(text: text);
+    final Map<String, dynamic> spotMetadata = {
+      'spot_id': spot.id,
+      'name': spot.name,
+      'category': spot.categoryLabel,
+      'distance_km': spot.distanceKm,
+      'latitude': spot.latitude,
+      'longitude': spot.longitude,
+      'address': spot.address,
+    };
+    _sendMessage(
+      text: 'Suggested a meetup spot: ${spot.name}',
+      messageType: 'meetup_spot',
+      metadata: spotMetadata,
+    );
   }
 
   Future<void> _fetchWhatsAppBridgeStatus() async {
@@ -1961,7 +1984,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _sendMessage({String? mediaUrl, String? text}) async {
+  Future<void> _sendMessage({
+    String? mediaUrl,
+    String? text,
+    String messageType = 'text',
+    Map<String, dynamic>? metadata,
+  }) async {
     final String content = text ?? _messageController.text.trim();
     if (content.isEmpty && mediaUrl == null) return;
 
@@ -1979,6 +2007,8 @@ class _ChatScreenState extends State<ChatScreen> {
       isSent: false,
       isDelivered: false,
       isRead: false,
+      messageType: messageType,
+      metadata: metadata,
     );
 
     setState(() {
@@ -2006,6 +2036,8 @@ class _ChatScreenState extends State<ChatScreen> {
         clientMsgId: clientMsgId,
         content: content,
         mediaUrl: mediaUrl,
+        messageType: messageType,
+        metadata: metadata,
       );
       final data = response.data?['data'];
       if (data is Map && mounted) {
@@ -2937,6 +2969,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         isMe: isMe,
                         time: timeStr,
                         mediaUrl: msg.mediaUrl,
+                        messageType: msg.messageType,
+                        metadata: msg.metadata,
                         senderAvatarUrl: _displayRecipient.avatarUrl,
                         status: msg.status,
                         isSent: msg.isSent,

@@ -127,6 +127,8 @@ async def init_db() -> None:
         ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ DEFAULT NULL;
         ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
         ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+        ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) DEFAULT 'text';
+        ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS extra_metadata JSONB DEFAULT NULL;
 
         -- Sachet transactions table
         ALTER TABLE sachet_transactions ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ DEFAULT NULL;

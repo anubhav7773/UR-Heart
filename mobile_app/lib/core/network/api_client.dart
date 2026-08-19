@@ -397,13 +397,15 @@ class ApiClient {
     return await dio.post('/chat/$matchId/read');
   }
 
-  // 17. Send Chat Message (Text / Media)
+  // 17. Send Chat Message (Text / Meetup Spot / Media)
   Future<Response> sendMessage({
     required String matchId,
     String? clientMsgId,
     String? content,
     String? mediaUrl,
     String mediaType = 'text',
+    String messageType = 'text',
+    Map<String, dynamic>? metadata,
   }) async {
     return await dio.post('/chat/send', data: {
       'match_id': matchId,
@@ -411,6 +413,8 @@ class ApiClient {
       if (content != null) 'content': content,
       if (mediaUrl != null) 'media_url': mediaUrl,
       'media_type': mediaType,
+      'message_type': messageType,
+      if (metadata != null) 'metadata': metadata,
     });
   }
 

@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from enum import Enum
-from typing import Generic, List, Optional, TypeVar, Any
+from typing import Generic, List, Optional, TypeVar, Any, Dict
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 T = TypeVar("T")
@@ -655,6 +655,9 @@ class ChatMessageRead(BaseModel):
     content: Optional[str] = None
     media_url: Optional[str] = None
     media_type: str = "text"
+    message_type: str = "text"
+    metadata: Optional[Dict[str, Any]] = None
+    extra_metadata: Optional[Dict[str, Any]] = None
     status: str = "sent"  # 'sent', 'delivered', 'read'
     is_sent: bool = True
     is_delivered: bool = False
@@ -675,11 +678,18 @@ class UnsendMessageData(BaseModel):
 
 
 class SendMessageRequest(BaseModel):
-    match_id: str
+    match_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     client_msg_id: Optional[str] = None
     content: Optional[str] = None
     media_url: Optional[str] = None
     media_type: str = "text"
+    message_type: str = "text"
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class MessageCreate(SendMessageRequest):
+    pass
 
 
 # 14. Safety & Moderation Schemas

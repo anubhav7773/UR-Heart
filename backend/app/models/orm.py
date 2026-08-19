@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum as SQLEnum,
     ForeignKey,
     Numeric,
+    JSON,
     func,
 )
 from sqlalchemy.types import UserDefinedType
@@ -306,6 +307,8 @@ class ChatMessage(Base):
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     media_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     media_type: Mapped[str] = mapped_column(String(20), default="text")  # text, image, audio
+    message_type: Mapped[str] = mapped_column(String(20), default="text", server_default="text")  # text, meetup_spot
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=None)
     status: Mapped[str] = mapped_column(String(20), default="sent", server_default="sent")  # sent, delivered, read
     is_delivered: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

@@ -442,7 +442,10 @@ async def get_chat_messages(
             sender_id=str(msg.sender_id),
             content=msg.content,
             media_url=msg.media_url,
-            media_type=msg.media_type or "text",
+            media_type=getattr(msg, "message_type", None) or msg.media_type or "text",
+            message_type=getattr(msg, "message_type", None) or msg.media_type or "text",
+            metadata=getattr(msg, "extra_metadata", None),
+            extra_metadata=getattr(msg, "extra_metadata", None),
             client_msg_id=msg.client_msg_id,
             status=msg.status or "sent",
             is_sent=True,
@@ -551,7 +554,13 @@ async def send_chat_message(
     Guards against leaks with heuristic & de-obfuscation content filtering before ₹499 Safe Bridge unlock.
     Computes WhatsApp-style message delivery status (sent, delivered, read) based on recipient presence.
     """
-    match_uuid = uuid.UUID(payload.match_id)
+    match_id_str = payload.match_id or payload.conversation_id
+    if not match_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must supply match_id or conversation_id",
+        )
+    match_uuid = uuid.UUID(match_id_str)
     sender_uuid = uuid.UUID(current_user_id)
 
     # 1. Fetch match to determine recipient and Safe Bridge unlock state
@@ -570,17 +579,46 @@ async def send_chat_message(
             getattr(match_obj, "user2_bridge_paid", False)
         )
 
-    # Media Removal Guard: Chat is strictly text-only across all tiers
-    if payload.media_url or (payload.media_type and payload.media_type != "text"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Chat media attachments are disabled. Chat is strictly text-only across all tiers."
-        )
+    msg_type = (payload.message_type or payload.media_type or "text").lower()
+    meta = payload.metadata or {}
 
-    # Content Filter & De-obfuscation Interception Guard
-    if payload.content:
-        # Use unified guard wrapper which raises a structured HTTPException when a leak is detected
-        guard_or_raise(payload.content, is_bridge_unlocked)
+    # 1. Normal Text Sanitization & Safe Bridge Enforcement
+    if msg_type == "text":
+        # Media Removal Guard: Chat is strictly text-only across all tiers
+        if payload.media_url or (payload.media_type and payload.media_type != "text"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Chat media attachments are disabled. Chat is strictly text-only across all tiers."
+            )
+        # Content Filter & De-obfuscation Interception Guard
+        if payload.content:
+            guard_or_raise(payload.content, is_bridge_unlocked)
+
+    # 2. Strict Meetup Spot Security Guard (Prevent payload spoofing & link bypass)
+    elif msg_type == "meetup_spot":
+        required_fields = ["name", "latitude", "longitude", "distance_km", "category"]
+        if not all(field in meta for field in required_fields):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid meetup spot payload structure. Mandatory geometric fields required.",
+            )
+        try:
+            lat = float(meta["latitude"])
+            lon = float(meta["longitude"])
+            dist = float(meta["distance_km"])
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180 and dist <= 50.0):
+                raise ValueError("Coordinate or distance out of bounds")
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Corrupted location coordinates or distance exceeds 50 km hard ceiling.",
+            )
+        # Strip any malicious user-injected text / links
+        clean_name = str(meta.get("name", "Local Spot")).strip()
+        payload.content = f"Suggested a meetup spot: {clean_name}"
+    else:
+        if payload.content:
+            guard_or_raise(payload.content, is_bridge_unlocked)
 
     # 0. Deduplication Check via client_msg_id
     if payload.client_msg_id:
@@ -599,7 +637,10 @@ async def send_chat_message(
                         client_msg_id=existing_msg.client_msg_id,
                         content=existing_msg.content,
                         media_url=existing_msg.media_url,
-                        media_type=existing_msg.media_type,
+                        media_type=getattr(existing_msg, "message_type", None) or existing_msg.media_type or "text",
+                        message_type=getattr(existing_msg, "message_type", None) or existing_msg.media_type or "text",
+                        metadata=getattr(existing_msg, "extra_metadata", None),
+                        extra_metadata=getattr(existing_msg, "extra_metadata", None),
                         status=existing_msg.status or "sent",
                         is_sent=True,
                         is_delivered=bool(existing_msg.is_delivered or existing_msg.status in ("delivered", "read")),
@@ -656,7 +697,9 @@ async def send_chat_message(
         client_msg_id=payload.client_msg_id,
         content=payload.content,
         media_url=payload.media_url,
-        media_type=payload.media_type or "text",
+        media_type=msg_type,
+        message_type=msg_type,
+        extra_metadata=meta if meta else None,
         status=msg_status,
         is_delivered=is_delivered,
         is_read=is_read,
@@ -690,7 +733,7 @@ async def send_chat_message(
     # Broadcast message to active WebSocket connection
     try:
         await ws_manager.broadcast_to_match(
-            payload.match_id,
+            str(match_uuid),
             {
                 "type": "message",
                 "id": str(new_msg.id),
@@ -699,7 +742,9 @@ async def send_chat_message(
                 "client_msg_id": new_msg.client_msg_id,
                 "content": new_msg.content,
                 "media_url": new_msg.media_url,
-                "media_type": new_msg.media_type,
+                "media_type": msg_type,
+                "message_type": msg_type,
+                "metadata": meta if meta else None,
                 "status": new_msg.status,
                 "is_sent": True,
                 "is_delivered": new_msg.is_delivered,
@@ -726,13 +771,14 @@ async def send_chat_message(
                     send_push_notification,
                     fcm_token=recip_token,
                     title=sender_name,
-                    body=payload.content or "Sent you a media attachment.",
+                    body=payload.content or "Sent you a message.",
                     data={
-                        "type": "chat",
+                        "type": "chat_message",
+                        "match_id": str(match_uuid),
                         "sender_id": str(sender_uuid),
-                        "match_id": str(payload.match_id),
-                        "conversation_id": str(payload.match_id),
-                    },
+                        "sender_name": sender_name,
+                        "click_action": "FLUTTER_NOTIFICATION_CLICK"
+                    }
                 )
             else:
                 print(f"[FCM] Skipped dispatch: recipient user {recipient_id} has no registered FCM token.")
@@ -748,7 +794,10 @@ async def send_chat_message(
             client_msg_id=new_msg.client_msg_id,
             content=new_msg.content,
             media_url=new_msg.media_url,
-            media_type=new_msg.media_type,
+            media_type=msg_type,
+            message_type=msg_type,
+            metadata=meta if meta else None,
+            extra_metadata=meta if meta else None,
             status=new_msg.status,
             is_sent=True,
             is_delivered=new_msg.is_delivered,

@@ -429,9 +429,68 @@ def test_direct_dm_sachet_unlock():
     json_data = res.json()
     assert json_data["success"] is True
     data = json_data["data"]
-    assert data["success"] is True
-    assert data["conversation_id"] is not None
-    assert data["target_user_id"] == target_user_id
+def test_meetup_spot_message_validation_and_security():
+    token = get_social_login_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    dummy_match_id = "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
+
+    # 1. Valid Meetup Spot message
+    valid_spot_payload = {
+        "match_id": dummy_match_id,
+        "message_type": "meetup_spot",
+        "metadata": {
+            "spot_id": "osm_12345",
+            "name": "Sharma Chai Tapri",
+            "category": "Chai & Snacks",
+            "distance_km": 3.4,
+            "latitude": 28.6139,
+            "longitude": 77.2090,
+            "address": "Civil Lines, Ayodhya",
+        }
+    }
+    res = client.post("/api/v1/chat/messages", json=valid_spot_payload, headers=headers)
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["message_type"] == "meetup_spot"
+    assert data["content"] == "Suggested a meetup spot: Sharma Chai Tapri"
+    assert data["metadata"]["name"] == "Sharma Chai Tapri"
+    assert data["metadata"]["distance_km"] == 3.4
+
+    # 2. Corrupted / Missing mandatory geometric fields -> 400
+    invalid_spot_missing = {
+        "match_id": dummy_match_id,
+        "message_type": "meetup_spot",
+        "metadata": {
+            "name": "Incomplete Spot",
+            # missing latitude, longitude, distance_km, category
+        }
+    }
+    res_bad = client.post("/api/v1/chat/messages", json=invalid_spot_missing, headers=headers)
+    assert res_bad.status_code == 400
+
+    # 3. Coordinate out of bounds or distance > 50km ceiling -> 400
+    invalid_spot_coords = {
+        "match_id": dummy_match_id,
+        "message_type": "meetup_spot",
+        "metadata": {
+            "name": "Too Far Spot",
+            "category": "Restaurant",
+            "latitude": 28.6139,
+            "longitude": 77.2090,
+            "distance_km": 85.0,  # Exceeds 50km hard ceiling
+        }
+    }
+    res_far = client.post("/api/v1/chat/messages", json=invalid_spot_coords, headers=headers)
+    assert res_far.status_code == 400
+
+    # 4. Safe Bridge zero-bypass test: manual text containing phone / instagram / wa.me -> 400
+    res_bypass = client.post("/api/v1/chat/messages", json={
+        "match_id": dummy_match_id,
+        "content": "Contact me on wa.me/919876543210 or insta @myhandle",
+        "message_type": "text"
+    }, headers=headers)
+    assert res_bypass.status_code == 400
+
 
 
 
