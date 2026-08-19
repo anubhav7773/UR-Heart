@@ -18,6 +18,8 @@ class MeetupSpot {
   final String mapsUrl;
   final String? phone;
   final double? rating;
+  final String? placeId;
+  final bool isVerified;
 
   const MeetupSpot({
     required this.id,
@@ -33,6 +35,8 @@ class MeetupSpot {
     required this.mapsUrl,
     this.phone,
     this.rating,
+    this.placeId,
+    this.isVerified = true,
   });
 
   factory MeetupSpot.fromJson(Map<String, dynamic> json) {
@@ -50,27 +54,43 @@ class MeetupSpot {
       mapsUrl: (json['maps_url'] ?? '').toString(),
       phone: json['phone']?.toString(),
       rating: (json['rating'] as num?)?.toDouble(),
+      placeId: json['place_id']?.toString(),
+      isVerified: json['is_verified'] != false,
     );
   }
 }
 
 class MeetupSpotsSheet extends StatefulWidget {
   final Function(MeetupSpot spot) onSuggestSpot;
+  final double? partnerLat;
+  final double? partnerLon;
+  final String? partnerName;
 
   const MeetupSpotsSheet({
     super.key,
     required this.onSuggestSpot,
+    this.partnerLat,
+    this.partnerLon,
+    this.partnerName,
   });
 
   static Future<void> show({
     required BuildContext context,
     required Function(MeetupSpot spot) onSuggestSpot,
+    double? partnerLat,
+    double? partnerLon,
+    String? partnerName,
   }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => MeetupSpotsSheet(onSuggestSpot: onSuggestSpot),
+      builder: (_) => MeetupSpotsSheet(
+        onSuggestSpot: onSuggestSpot,
+        partnerLat: partnerLat,
+        partnerLon: partnerLon,
+        partnerName: partnerName,
+      ),
     );
   }
 
@@ -83,13 +103,16 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
   String? _errorMessage;
   List<MeetupSpot> _spots = [];
   String _selectedCategory = 'all'; // all, chai, cafe, restaurant, hotel
+  bool _isMidpoint = false;
+  double? _userDistanceKm;
+  String? _notice;
 
   final List<Map<String, String>> _categories = const [
     {'key': 'all', 'label': 'Sabhi (All)', 'icon': 'explore'},
     {'key': 'chai', 'label': 'Chai & Snacks', 'icon': 'chai'},
-    {'key': 'cafe', 'label': 'Cafes', 'icon': 'cafe'},
+    {'key': 'cafe', 'label': 'Cafes & Bakes', 'icon': 'cafe'},
     {'key': 'restaurant', 'label': 'Restaurants', 'icon': 'restaurant'},
-    {'key': 'hotel', 'label': 'Hotels', 'icon': 'hotel'},
+    {'key': 'hotel', 'label': 'Hotels & Lounges', 'icon': 'hotel'},
   ];
 
   @override
@@ -106,13 +129,19 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
 
     try {
       final pos = await LocationService.instance.getCurrentLocation();
-      final double lat = pos?.latitude ?? 28.6139; // Default or live fix
-      final double lon = pos?.longitude ?? 77.2090;
+      final double myLat = pos?.latitude ?? 28.6139;
+      final double myLon = pos?.longitude ?? 77.2090;
+
+      final bool hasPartnerCoords =
+          widget.partnerLat != null && widget.partnerLon != null;
 
       final res = await ApiClient.instance.getMeetupSpots(
-        lat: lat,
-        lon: lon,
-        radiusMeters: 15000,
+        lat: hasPartnerCoords ? null : myLat,
+        lon: hasPartnerCoords ? null : myLon,
+        lat1: hasPartnerCoords ? myLat : null,
+        lon1: hasPartnerCoords ? myLon : null,
+        lat2: hasPartnerCoords ? widget.partnerLat : null,
+        lon2: hasPartnerCoords ? widget.partnerLon : null,
         category: _selectedCategory == 'all' ? null : _selectedCategory,
       );
 
@@ -123,11 +152,15 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
           _spots = rawSpots
               .map((e) => MeetupSpot.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList();
+          _isMidpoint = data['is_midpoint'] == true;
+          _userDistanceKm = (data['user_distance_km'] as num?)?.toDouble();
+          _notice = data['notice']?.toString();
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Could not load date spots. Please check location permissions.';
+        _errorMessage =
+            'Could not load commercial date spots. Please check network or location permissions.';
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -142,12 +175,27 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
     _fetchSpots();
   }
 
-  Future<void> _launchMaps(String url) async {
-    if (url.isEmpty) return;
+  /// High-Reliability Google Maps Direct Search Navigation
+  Future<void> _launchMaps(MeetupSpot spot) async {
+    final query = Uri.encodeComponent('${spot.name}, ${spot.address}');
+    final String googleMapsUrl = (spot.placeId != null && spot.placeId!.isNotEmpty)
+        ? 'https://www.google.com/maps/search/?api=1&query=$query&query_place_id=${spot.placeId}'
+        : 'https://www.google.com/maps/search/?api=1&query=$query';
+    final String fallbackUrl =
+        'https://www.google.com/maps/search/?api=1&query=${spot.latitude},${spot.longitude}';
+
     try {
-      final uri = Uri.parse(url);
+      final uri = Uri.parse(googleMapsUrl);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      final fallbackUri = Uri.parse(fallbackUrl);
+      if (await canLaunchUrl(fallbackUri)) {
+        await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
       }
     } catch (_) {}
   }
@@ -170,9 +218,9 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.88,
+      initialChildSize: 0.90,
       minChildSize: 0.5,
-      maxChildSize: 0.95,
+      maxChildSize: 0.96,
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
@@ -207,42 +255,108 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                       decoration: BoxDecoration(
                         color: AppTheme.primaryColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                        ),
                       ),
-                      child: const Icon(Icons.place_rounded, color: AppTheme.primaryColor, size: 22),
+                      child: const Icon(Icons.place_rounded,
+                          color: AppTheme.primaryColor, size: 22),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Nearby Date Spot Radar',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                _isMidpoint
+                                    ? 'Midpoint Date Radar'
+                                    : 'Nearby Date Spot Radar',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              if (_isMidpoint) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor
+                                        .withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'MIDWAY',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryColor,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            'Tea stalls to cafes & hotels, sorted nearest first',
-                            style: TextStyle(fontSize: 12, color: AppTheme.mutedTextColor),
+                            _isMidpoint && _userDistanceKm != null
+                                ? 'Fair midway zone (${_userDistanceKm!.toStringAsFixed(1)} km between you & ${widget.partnerName ?? "partner"})'
+                                : 'Tea stalls, cafes, restaurants & hotels nearest to you',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.mutedTextColor),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: AppTheme.mutedTextColor),
+                      icon: const Icon(Icons.close,
+                          color: AppTheme.mutedTextColor),
                     ),
                   ],
                 ),
               ),
 
+              // Midpoint Notice Card (if midway mode active)
+              if (_isMidpoint && _userDistanceKm != null)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.backgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.compare_arrows_rounded,
+                          size: 16, color: AppTheme.primaryColor),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _notice ??
+                              'Spot distance measured from exact midway point between both users.',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Filter Chips Bar
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Row(
                   children: _categories.map((cat) {
                     final isSelected = _selectedCategory == cat['key'];
@@ -254,20 +368,28 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                         avatar: Icon(
                           _getCategoryIcon(cat['key']!),
                           size: 16,
-                          color: isSelected ? Colors.white : AppTheme.mutedTextColor,
+                          color: isSelected
+                              ? Colors.white
+                              : AppTheme.mutedTextColor,
                         ),
                         label: Text(
                           cat['label']!,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected ? Colors.white : AppTheme.mutedTextColor,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white
+                                : AppTheme.mutedTextColor,
                           ),
                         ),
                         backgroundColor: AppTheme.backgroundColor,
                         selectedColor: AppTheme.primaryColor,
                         side: BorderSide(
-                          color: isSelected ? AppTheme.primaryColor : AppTheme.cardBorderColor,
+                          color: isSelected
+                              ? AppTheme.primaryColor
+                              : AppTheme.cardBorderColor,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
@@ -278,13 +400,15 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                 ),
               ),
 
+              const SizedBox(height: 4),
               const Divider(color: AppTheme.cardBorderColor, height: 1),
 
               // Spots List View
               Expanded(
                 child: _isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+                        child: CircularProgressIndicator(
+                            color: AppTheme.primaryColor),
                       )
                     : _errorMessage != null
                         ? Center(
@@ -293,37 +417,68 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.location_off_outlined, size: 48, color: AppTheme.mutedTextColor),
+                                  const Icon(Icons.location_off_outlined,
+                                      size: 48,
+                                      color: AppTheme.mutedTextColor),
                                   const SizedBox(height: 12),
                                   Text(
                                     _errorMessage!,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(color: AppTheme.mutedTextColor, fontSize: 13),
+                                    style: const TextStyle(
+                                        color: AppTheme.mutedTextColor,
+                                        fontSize: 13),
                                   ),
                                   const SizedBox(height: 16),
                                   ElevatedButton(
                                     onPressed: _fetchSpots,
-                                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-                                    child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primaryColor),
+                                    child: const Text('Retry',
+                                        style: TextStyle(color: Colors.white)),
                                   ),
                                 ],
                               ),
                             ),
                           )
                         : _spots.isEmpty
-                            ? const Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.explore_off_outlined, size: 44, color: AppTheme.mutedTextColor),
-                                    SizedBox(height: 12),
-                                    Text('No date spots found in this category', style: TextStyle(color: Colors.white70)),
-                                  ],
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.storefront_outlined,
+                                          size: 48,
+                                          color: AppTheme.mutedTextColor),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        _isMidpoint
+                                            ? 'No commercial meetup spots found directly midway.\nShowing top verified spots in nearest town center.'
+                                            : 'No verified date spots found in this category.',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      OutlinedButton(
+                                        onPressed: () =>
+                                            _onCategorySelected('all'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppTheme.primaryColor,
+                                          side: const BorderSide(
+                                              color: AppTheme.primaryColor),
+                                        ),
+                                        child: const Text('View All Categories'),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               )
                             : ListView.builder(
                                 controller: scrollController,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                                 itemCount: _spots.length,
                                 itemBuilder: (context, index) {
                                   final spot = _spots[index];
@@ -350,7 +505,7 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row 1: Name, Category Badge & Distance Pill
+          // Row 1: Name & Verified Badge + Distance Pill
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -358,17 +513,57 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      spot.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            spot.name,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        if (spot.isVerified) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.verifiedBlue
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: AppTheme.verifiedBlue
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified_rounded,
+                                    size: 11, color: AppTheme.verifiedBlue),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Verified',
+                                  style: TextStyle(
+                                    color: AppTheme.verifiedBlue,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
+                    // Category Badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppTheme.surfaceColor,
                         borderRadius: BorderRadius.circular(8),
@@ -387,18 +582,22 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                 ),
               ),
               const SizedBox(width: 8),
+
               // Distance Tag Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.greenAccent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.4)),
+                  border: Border.all(
+                      color: Colors.greenAccent.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.navigation_outlined, size: 12, color: Colors.greenAccent),
+                    const Icon(Icons.navigation_outlined,
+                        size: 12, color: Colors.greenAccent),
                     const SizedBox(width: 4),
                     Text(
                       spot.distanceLabel,
@@ -419,14 +618,16 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
           // Row 2: Address String
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, size: 14, color: AppTheme.mutedTextColor),
+              const Icon(Icons.location_on_outlined,
+                  size: 14, color: AppTheme.mutedTextColor),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   spot.address,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.mutedTextColor),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppTheme.mutedTextColor),
                 ),
               ),
             ],
@@ -434,18 +635,20 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
 
           const SizedBox(height: 12),
 
-          // Row 3: Action Buttons (Maps & Suggest in Chat)
+          // Row 3: Action Buttons (Maps Navigation & Suggest in Chat)
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _launchMaps(spot.mapsUrl),
+                  onPressed: () => _launchMaps(spot),
                   icon: const Icon(Icons.map_outlined, size: 16),
-                  label: const Text('Open Maps', style: TextStyle(fontSize: 12)),
+                  label: const Text('Open Maps',
+                      style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     side: const BorderSide(color: AppTheme.cardBorderColor),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                 ),
@@ -458,11 +661,14 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
                     widget.onSuggestSpot(spot);
                   },
                   icon: const Icon(Icons.send_rounded, size: 14),
-                  label: const Text('Suggest in Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  label: const Text('Suggest in Chat',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                 ),

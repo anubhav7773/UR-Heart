@@ -254,18 +254,34 @@ class ApiClient {
     });
   }
 
-  // 10h. Get Nearby Date Spots (Chai, Cafes, Restaurants, Hotels)
+  // 10h. Get Nearby Date Spots (Chai, Cafes, Restaurants, Hotels) with Midpoint support
   Future<Response> getMeetupSpots({
-    required double lat,
-    required double lon,
-    int radiusMeters = 15000,
+    double? lat,
+    double? lon,
+    double? lat1,
+    double? lon1,
+    double? lat2,
+    double? lon2,
+    int? radiusMeters,
     String? category,
   }) async {
-    final Map<String, dynamic> query = {
-      'lat': lat,
-      'lon': lon,
-      'radius_meters': radiusMeters,
-    };
+    final Map<String, dynamic> query = {};
+    if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
+      query['lat1'] = lat1;
+      query['lon1'] = lon1;
+      query['lat2'] = lat2;
+      query['lon2'] = lon2;
+    } else if (lat != null && lon != null) {
+      query['lat'] = lat;
+      query['lon'] = lon;
+    } else {
+      query['lat'] = 28.6139;
+      query['lon'] = 77.2090;
+    }
+
+    if (radiusMeters != null) {
+      query['radius_meters'] = radiusMeters;
+    }
     if (category != null && category.isNotEmpty) {
       query['category'] = category;
     }

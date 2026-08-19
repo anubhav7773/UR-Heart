@@ -541,13 +541,15 @@ class MeetupSpotData(BaseModel):
     category_label: str  # Chai & Snacks, Cafes, Restaurants, Hotels
     distance_meters: int
     distance_km: float
-    distance_label: str  # e.g., "350m away", "1.2 km away"
+    distance_label: str  # e.g., "350m away", "1.2 km away", "2.4 km from mid-way"
     address: str
     latitude: float
     longitude: float
     maps_url: str
     phone: Optional[str] = None
     rating: Optional[float] = None
+    place_id: Optional[str] = None
+    is_verified: bool = True
 
 
 class MeetupSpotsResponse(BaseModel):
@@ -555,6 +557,10 @@ class MeetupSpotsResponse(BaseModel):
     spots: List[MeetupSpotData]
     center_lat: float
     center_lon: float
+    is_midpoint: bool = False
+    user_distance_km: Optional[float] = None
+    search_radius_meters: int = 15000
+    notice: Optional[str] = None
 
 
 class WhatsAppBridgeStatusData(BaseModel):

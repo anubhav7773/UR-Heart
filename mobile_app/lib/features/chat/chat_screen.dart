@@ -135,6 +135,8 @@ class Conversation {
   final bool isOnline;
   final bool isVerified;
   final DateTime? lastActiveAt;
+  final double? latitude;
+  final double? longitude;
 
   const Conversation({
     required this.id,
@@ -150,6 +152,8 @@ class Conversation {
     this.isOnline = false,
     this.isVerified = false,
     this.lastActiveAt,
+    this.latitude,
+    this.longitude,
   });
 
   /// A match is considered an active conversation if messages have been exchanged.
@@ -269,6 +273,17 @@ class Conversation {
     final bool lastMsgIsMe = json['last_message_is_me'] == true ||
         (json['last_message'] is Map && json['last_message']['is_me'] == true);
 
+    final double? pLat = (json['partner']?['latitude'] ??
+            json['partner']?['lat'] ??
+            json['latitude'] ??
+            json['lat'] as num?)
+        ?.toDouble();
+    final double? pLon = (json['partner']?['longitude'] ??
+            json['partner']?['lon'] ??
+            json['longitude'] ??
+            json['lon'] as num?)
+        ?.toDouble();
+
     return Conversation(
       id: convId,
       matchId: mId,
@@ -283,6 +298,8 @@ class Conversation {
       isOnline: online,
       isVerified: verified,
       lastActiveAt: lastActive,
+      latitude: pLat,
+      longitude: pLon,
     );
   }
 
@@ -294,6 +311,8 @@ class Conversation {
       isVerified: isVerified,
       isOnline: isOnline,
       lastActiveAt: lastActiveAt,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 }
@@ -306,6 +325,8 @@ class ChatRecipient {
   final bool isVerified;
   final bool isOnline;
   final DateTime? lastActiveAt;
+  final double? latitude;
+  final double? longitude;
 
   const ChatRecipient({
     required this.id,
@@ -314,6 +335,8 @@ class ChatRecipient {
     this.isVerified = false,
     this.isOnline = false,
     this.lastActiveAt,
+    this.latitude,
+    this.longitude,
   });
 
   factory ChatRecipient.fromConversation(Map<String, dynamic> conversation) {
@@ -326,6 +349,8 @@ class ChatRecipient {
     bool? isVerified,
     bool? isOnline,
     DateTime? lastActiveAt,
+    double? latitude,
+    double? longitude,
   }) {
     return ChatRecipient(
       id: id,
@@ -334,6 +359,8 @@ class ChatRecipient {
       isVerified: isVerified ?? this.isVerified,
       isOnline: isOnline ?? this.isOnline,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 }
@@ -2304,6 +2331,8 @@ class _ChatScreenState extends State<ChatScreen> {
       isLocationUnlocked: _isLocationUnlocked,
       partnerPhone: _unlockedPhoneNumber,
       partnerMapsUrl: _partnerMapsUrl,
+      partnerLat: _displayRecipient.latitude,
+      partnerLon: _displayRecipient.longitude,
       myWhatsAppConsent: _myWhatsAppConsent,
       partnerWhatsAppConsent: _partnerWhatsAppConsent,
       myLocationConsent: _myLocationConsent,
