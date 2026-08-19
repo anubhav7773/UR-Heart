@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user_id, register_conversation_participants
+from app.core.rate_limiter import rate_limit
 from app.core.config import settings
 from app.models.orm import (
     User,
@@ -70,8 +71,16 @@ def compute_distance_km(lat1, lon1, lat2, lon2) -> Optional[float]:
         return None
 
 
-@router.get("", response_model=APIResponse[FeedData])
-@router.get("/", response_model=APIResponse[FeedData])
+@router.get(
+    "",
+    response_model=APIResponse[FeedData],
+    dependencies=[Depends(rate_limit(max_requests=40, window_seconds=60, by_user=True))]
+)
+@router.get(
+    "/",
+    response_model=APIResponse[FeedData],
+    dependencies=[Depends(rate_limit(max_requests=40, window_seconds=60, by_user=True))]
+)
 async def get_feed(
     response: Response,
     limit: int = Query(default=10, ge=1, le=100),

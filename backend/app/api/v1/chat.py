@@ -9,8 +9,15 @@ from sqlalchemy import select, or_, and_, update, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db, AsyncSessionLocal
-from app.core.security import get_current_user_id, _active_conversations, register_conversation_participants
+from app.core.security import (
+    get_current_user_id,
+    decode_access_token,
+    verify_conversation_access_raw,
+    _active_conversations,
+    register_conversation_participants,
+)
 from app.core.sanitizer import sanitize_user_input
+from app.core.rate_limiter import rate_limit
 from app.models.orm import Match, ChatMessage, User, UserPhoto, BlockedUser
 from app.services.notification_engine import NotificationEngineService
 from app.services.fcm_service import send_push_notification
@@ -183,13 +190,32 @@ ws_manager = ConnectionManager()
 async def chat_websocket_endpoint(
     websocket: WebSocket,
     match_id: str,
+    token: Optional[str] = None,
     user_id: Optional[str] = None
 ):
     """
     Bidirectional real-time WebSocket connection for instant chat message delivery,
     WhatsApp/Location consent sync, typing indicators, and double blue ticks.
+    Hardened with cryptographic token handshake & IDOR participant verification.
     """
-    await ws_manager.connect(match_id, websocket, user_id=user_id)
+    extracted_user_id = None
+    if token:
+        extracted_user_id = decode_access_token(token)
+    elif user_id:
+        extracted_user_id = user_id
+
+    # 1. Cryptographic Handshake Token Verification
+    if not extracted_user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    # 2. Strict IDOR Authorization Check (Is user in this conversation?)
+    is_participant = await verify_conversation_access_raw(match_id, extracted_user_id)
+    if not is_participant:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await ws_manager.connect(match_id, websocket, user_id=extracted_user_id)
     try:
         while True:
             data = await websocket.receive_json()
@@ -577,7 +603,11 @@ async def unsend_chat_message(
     )
 
 
-@router.post("/send", response_model=APIResponse[ChatMessageRead])
+@router.post(
+    "/send",
+    response_model=APIResponse[ChatMessageRead],
+    dependencies=[Depends(rate_limit(max_requests=5, window_seconds=5, by_user=True))]
+)
 @router.post("/message", response_model=APIResponse[ChatMessageRead])
 @router.post("/messages", response_model=APIResponse[ChatMessageRead])
 async def send_chat_message(

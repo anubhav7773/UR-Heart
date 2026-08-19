@@ -18,6 +18,7 @@ except ImportError:
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.sanitizer import sanitize_user_input
+from app.core.rate_limiter import rate_limit
 from app.models.schemas import (
     APIResponse,
     UploadPhotoData,
@@ -465,10 +466,22 @@ async def update_fcm_token(
     )
 
 
-@router.post("/users/location")
-@router.put("/users/location")
-@router.post("/location")
-@router.put("/location")
+@router.post(
+    "/users/location",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
+@router.put(
+    "/users/location",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
+@router.post(
+    "/location",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
+@router.put(
+    "/location",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
 async def update_user_location(
     payload: dict,
     current_user_id: str = Depends(get_current_user_id),

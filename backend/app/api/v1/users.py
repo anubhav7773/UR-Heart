@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user_id
+from app.core.rate_limiter import rate_limit
 from app.models.orm import User
 from app.models.schemas import APIResponse
 
@@ -21,27 +22,22 @@ async def update_fcm_token(
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Persists the authenticated device's FCM push notification token to the database.
-    Accepts either {"fcm_token": "..."} or {"token": "..."} in JSON body.
-    """
-    token = str(payload.get("fcm_token") or payload.get("token") or "").strip()
-    if not token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fcm_token is required.")
+    token = payload.get("fcm_token") or payload.get("token")
+    if not token or not isinstance(token, str) or len(token.strip()) < 10:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid FCM token payload.")
 
     try:
-        user_id = uuid.UUID(current_user_id)
-        user_result = await db.execute(select(User).where(User.id == user_id))
-        user = user_result.scalars().first()
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
-        user.fcm_token = token
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        print(f"[FCM_SAVE] Successfully saved token for user {user.id}: {token[:15]}...")
-    except HTTPException:
-        raise
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID.")
+
+    try:
+        stmt = select(User).where(User.id == user_uuid)
+        res = await db.execute(stmt)
+        user = res.scalars().first()
+        if user:
+            user.fcm_token = token.strip()
+            await db.commit()
     except Exception as e:
         await db.rollback()
         print(f"[FCM_SAVE] ERROR saving FCM token for user {current_user_id}: {e}")
@@ -50,10 +46,22 @@ async def update_fcm_token(
     return APIResponse(success=True, message="FCM token updated successfully.", data={"fcm_token": token})
 
 
-@router.post("/location")
-@router.post("/location/")
-@router.put("/location")
-@router.put("/location/")
+@router.post(
+    "/location",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
+@router.post(
+    "/location/",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
+@router.put(
+    "/location",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
+@router.put(
+    "/location/",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
 async def update_user_location(
     payload: dict,
     current_user_id: str = Depends(get_current_user_id),

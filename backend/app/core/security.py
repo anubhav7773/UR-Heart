@@ -178,3 +178,41 @@ async def verify_conversation_access(
     return match_id
 
 
+async def verify_conversation_access_raw(conversation_id: str, user_id: str) -> bool:
+    """
+    Direct async check whether user_id is a valid participant of conversation_id / match_id.
+    Returns True if participant, False otherwise.
+    """
+    match_id_str = str(conversation_id)
+    user_id_str = str(user_id)
+
+    # 1. Check in-memory conversation registry first
+    if match_id_str in _active_conversations:
+        u1, u2 = _active_conversations[match_id_str]
+        return user_id_str in (u1, u2)
+
+    # 2. Check Database
+    try:
+        import uuid
+        from sqlalchemy import select
+        from app.core.database import AsyncSessionLocal
+        from app.models.orm import Match
+
+        match_uuid = uuid.UUID(match_id_str)
+        user_uuid = uuid.UUID(user_id_str)
+
+        async with AsyncSessionLocal() as db:
+            stmt = select(Match).where(Match.id == match_uuid)
+            res = await db.execute(stmt)
+            match_obj = res.scalars().first()
+            if match_obj:
+                u1, u2 = str(match_obj.user1_id), str(match_obj.user2_id)
+                _active_conversations[match_id_str] = (u1, u2)
+                return user_id_str in (u1, u2)
+    except Exception:
+        pass
+
+    return False
+
+
+
