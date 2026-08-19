@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../navigation/nav_keys.dart';
 import '../network/api_client.dart';
 import '../security/storage_manager.dart';
+import 'notification_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -34,7 +37,6 @@ class FcmService {
 
   String? _fcmToken;
   GlobalKey<ScaffoldMessengerState>? _foregroundMessengerKey;
-  GlobalKey<NavigatorState>? _navigatorKey;
 
   String? get fcmToken => _fcmToken;
 
@@ -42,8 +44,7 @@ class FcmService {
     GlobalKey<ScaffoldMessengerState>? foregroundMessengerKey,
     GlobalKey<NavigatorState>? navigatorKey,
   }) async {
-    _foregroundMessengerKey = foregroundMessengerKey;
-    _navigatorKey = navigatorKey;
+    _foregroundMessengerKey = foregroundMessengerKey ?? appMessengerKey;
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     try {
@@ -89,22 +90,8 @@ class FcmService {
         _showForegroundSnackBar(message);
       });
 
-      // 5. Background App Launch via Notification Tap Handler
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        if (kDebugMode) {
-          print('FCM App Opened from Notification Tap: ${message.data}');
-        }
-        _handleNotificationTap(message);
-      });
-
-      // 6. Cold Launch via Notification Tap Handler
-      final initialMessage = await _fcm.getInitialMessage();
-      if (initialMessage != null) {
-        if (kDebugMode) {
-          print('FCM Cold Launch from Notification Tap: ${initialMessage.data}');
-        }
-        _handleNotificationTap(initialMessage);
-      }
+      // 5. Background & Terminated Notification Click Listeners
+      await NotificationRouter.setupNotificationListeners();
     } catch (e) {
       if (kDebugMode) {
         print('FCM Service Initialization notice: $e');
@@ -126,6 +113,9 @@ class FcmService {
           if (kDebugMode) {
             print('Local Notification Tapped with payload: ${response.payload}');
           }
+          if (response.payload != null && response.payload!.isNotEmpty) {
+            NotificationRouter.handlePayloadString(response.payload);
+          }
         },
       );
 
@@ -144,6 +134,7 @@ class FcmService {
       final notification = message.notification;
       final title = notification?.title ?? message.data['title'] ?? 'New Notification';
       final body = notification?.body ?? message.data['body'] ?? '';
+      final String payloadJson = jsonEncode(message.data);
 
       _localNotifications.show(
         message.hashCode,
@@ -159,6 +150,7 @@ class FcmService {
             icon: '@mipmap/ic_launcher',
           ),
         ),
+        payload: payloadJson,
       );
     } catch (e) {
       if (kDebugMode) {
@@ -170,7 +162,7 @@ class FcmService {
   void _showForegroundSnackBar(RemoteMessage message) {
     final notification = message.notification;
     final data = message.data;
-    final messenger = _foregroundMessengerKey?.currentState;
+    final messenger = _foregroundMessengerKey?.currentState ?? appMessengerKey.currentState;
 
     if (messenger != null && (notification != null || data.isNotEmpty)) {
       final title = notification?.title ?? data['title'] ?? 'New Message';
@@ -200,29 +192,10 @@ class FcmService {
           action: SnackBarAction(
             label: 'VIEW',
             textColor: Colors.amber,
-            onPressed: () => _handleNotificationTap(message),
+            onPressed: () => NotificationRouter.handleNotificationClick(message),
           ),
         ),
       );
-    }
-  }
-
-  void _handleNotificationTap(RemoteMessage message) {
-    final data = message.data;
-    final String? type = data['type'];
-    final String? matchId = data['match_id'] ?? data['conversation_id'];
-
-    if (kDebugMode) {
-      print('Handling Notification Tap: type=$type, matchId=$matchId');
-    }
-
-    final navState = _navigatorKey?.currentState;
-    if (navState == null) return;
-
-    if (type == 'match' && matchId != null && matchId.isNotEmpty) {
-      navState.pushNamed('/chat_screen', arguments: {'match_id': matchId});
-    } else if (type == 'chat' && matchId != null && matchId.isNotEmpty) {
-      navState.pushNamed('/chat_screen', arguments: {'match_id': matchId});
     }
   }
 

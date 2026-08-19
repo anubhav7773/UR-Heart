@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'core/navigation/nav_keys.dart';
 import 'core/network/api_client.dart';
 import 'core/security/storage_manager.dart';
 import 'core/services/fcm_service.dart';
@@ -23,8 +24,6 @@ const webFirebaseOptions = FirebaseOptions(
   messagingSenderId: '1038187472582',
   appId: '1:1038187472582:web:eef9e7296a2900f19119c7',
 );
-
-final GlobalKey<ScaffoldMessengerState> appMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,7 +83,10 @@ void main() async {
       webProvider: ReCaptchaV3Provider('6LeA_sample_site_key'),
     );
 
-    await FcmService.instance.initialize(foregroundMessengerKey: appMessengerKey);
+    await FcmService.instance.initialize(
+      foregroundMessengerKey: appMessengerKey,
+      navigatorKey: rootNavigatorKey,
+    );
   } catch (e) {
     if (kDebugMode) {
       print('AdMob / AppCheck initialization notice: ${e.toString()}');
@@ -125,6 +127,7 @@ class _RuralHeartAppState extends State<RuralHeartApp> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // ONLY update online presence heartbeat — NEVER reset/refresh explore feed on resume
     if (state == AppLifecycleState.resumed) {
       _sendPresenceUpdate(true);
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
@@ -148,6 +151,7 @@ class _RuralHeartAppState extends State<RuralHeartApp> with WidgetsBindingObserv
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'UR-Heart',
+      navigatorKey: rootNavigatorKey,
       scaffoldMessengerKey: appMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
@@ -155,6 +159,7 @@ class _RuralHeartAppState extends State<RuralHeartApp> with WidgetsBindingObserv
     );
   }
 }
+
 class RootSplashHandler extends StatefulWidget {
   const RootSplashHandler({super.key});
 
