@@ -8,7 +8,7 @@ from sqlalchemy import select, or_, and_, func, case
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, register_conversation_participants
 from app.core.config import settings
 from app.models.orm import (
     User,
@@ -617,6 +617,7 @@ async def send_direct_dm(
         )
 
     match_id_str = str(uuid.uuid4())
+    register_conversation_participants(match_id_str, current_user_id, payload.target_user_id)
     msg_id = uuid.uuid4()
     sender_name = current_user.full_name if current_user and current_user.full_name else "Someone"
 
@@ -645,6 +646,7 @@ async def send_direct_dm(
             match_obj.mutual_message_count = (match_obj.mutual_message_count or 0) + 1
 
         match_id_str = str(match_obj.id)
+        register_conversation_participants(match_id_str, current_user_id, payload.target_user_id)
         chat_msg = ChatMessage(
             id=msg_id,
             match_id=match_obj.id,

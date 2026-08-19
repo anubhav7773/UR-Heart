@@ -295,6 +295,8 @@ class CompleteProfileRequest(BaseModel):
 class CompleteProfileData(BaseModel):
     user_id: str
     is_profile_complete: bool
+    bio: Optional[str] = None
+    full_name: Optional[str] = None
 
 
 # 5. User Response & Profile Schemas

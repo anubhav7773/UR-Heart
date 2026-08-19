@@ -9,7 +9,8 @@ from sqlalchemy import select, or_, and_, update, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db, AsyncSessionLocal
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, _active_conversations, register_conversation_participants
+from app.core.sanitizer import sanitize_user_input
 from app.models.orm import Match, ChatMessage, User, UserPhoto, BlockedUser
 from app.services.notification_engine import NotificationEngineService
 from app.services.fcm_service import send_push_notification
@@ -423,6 +424,43 @@ async def get_chat_messages(
     """
     try:
         match_uuid = uuid.UUID(match_id)
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid match_id format."
+        )
+
+    match_id_str = str(match_id)
+    current_user_str = str(current_user_id)
+
+    # 1. Check in-memory conversation registry
+    if match_id_str in _active_conversations:
+        u1, u2 = _active_conversations[match_id_str]
+        if current_user_str not in (u1, u2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You are not a participant in this conversation."
+            )
+
+    # 2. Check Database
+    try:
+        match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+        match_obj = match_res.scalars().first()
+        if match_obj:
+            u1, u2 = str(match_obj.user1_id), str(match_obj.user2_id)
+            _active_conversations[match_id_str] = (u1, u2)
+            if current_user_str not in (u1, u2):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied. You are not a participant in this conversation."
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    try:
         msgs_res = await db.execute(
             select(ChatMessage)
             .where(
@@ -563,13 +601,31 @@ async def send_chat_message(
     match_uuid = uuid.UUID(match_id_str)
     sender_uuid = uuid.UUID(current_user_id)
 
-    # 1. Fetch match to determine recipient and Safe Bridge unlock state
+    # 1. Check in-memory conversation registry
+    if match_id_str in _active_conversations:
+        u1, u2 = _active_conversations[match_id_str]
+        if current_user_id not in (u1, u2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You are not a participant in this conversation."
+            )
+
+    # 2. Fetch match to determine recipient and Safe Bridge unlock state
     match_obj = None
     try:
         match_res = await db.execute(select(Match).where(Match.id == match_uuid))
         match_obj = match_res.scalars().first()
     except Exception:
         pass
+
+    if match_obj:
+        u1, u2 = str(match_obj.user1_id), str(match_obj.user2_id)
+        _active_conversations[match_id_str] = (u1, u2)
+        if current_user_id not in (u1, u2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You are not a participant in this conversation."
+            )
 
     # STRICT MUTUAL SAFE BRIDGE ENFORCEMENT: BOTH users must pay ₹499
     is_bridge_unlocked = False
@@ -592,6 +648,7 @@ async def send_chat_message(
             )
         # Content Filter & De-obfuscation Interception Guard
         if payload.content:
+            payload.content = sanitize_user_input(payload.content)
             guard_or_raise(payload.content, is_bridge_unlocked)
 
     # 2. Strict Meetup Spot Security Guard (Prevent payload spoofing & link bypass)

@@ -4,7 +4,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security_bearer = HTTPBearer(auto_error=False)
@@ -116,4 +118,63 @@ async def admin_required(
             )
 
     return current_user_id
+
+
+_active_conversations: dict[str, tuple[str, str]] = {}
+
+
+def register_conversation_participants(match_id: str, user1_id: str, user2_id: str):
+    """Registers conversation participant IDs for access control."""
+    _active_conversations[str(match_id)] = (str(user1_id), str(user2_id))
+
+
+async def verify_conversation_access(
+    match_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Optional[AsyncSession] = Depends(get_db)
+) -> str:
+    """
+    Blocks IDOR: Verifies current_user_id is an active participant in match_id / conversation_id.
+    Returns 403 Forbidden if not authorized.
+    """
+    import uuid
+    from sqlalchemy import select, or_
+    from app.models.orm import Match
+
+    match_id_str = str(match_id)
+    current_user_str = str(current_user_id)
+
+    # 1. Check in-memory conversation registry first
+    if match_id_str in _active_conversations:
+        u1, u2 = _active_conversations[match_id_str]
+        if current_user_str not in (u1, u2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You are not a participant in this conversation."
+            )
+        return match_id
+
+    # 2. Check Database
+    if db is not None:
+        try:
+            match_uuid = uuid.UUID(match_id_str)
+            user_uuid = uuid.UUID(current_user_str)
+            stmt = select(Match).where(Match.id == match_uuid)
+            res = await db.execute(stmt)
+            match_obj = res.scalars().first()
+            if match_obj:
+                u1, u2 = str(match_obj.user1_id), str(match_obj.user2_id)
+                _active_conversations[match_id_str] = (u1, u2)
+                if current_user_str not in (u1, u2):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied. You are not a participant in this conversation."
+                    )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    return match_id
+
 

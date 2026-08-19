@@ -1,4 +1,6 @@
-"""User schemas re-exports."""
+"""User schemas re-exports and secure models."""
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List
 from app.models.schemas import (
     UserRead,
     UserResponse,
@@ -10,6 +12,23 @@ from app.models.schemas import (
     DirectDMData,
 )
 
+
+class UserProfileResponse(BaseModel):
+    id: str
+    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    age: Optional[int] = None
+    bio: Optional[str] = None
+    photos: List[str] = []
+    is_verified: bool = False
+    is_online: bool = False
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra='ignore',
+    )
+
+
 __all__ = [
     "UserRead",
     "UserResponse",
@@ -19,4 +38,5 @@ __all__ = [
     "CompleteProfileData",
     "DirectDMRequest",
     "DirectDMData",
+    "UserProfileResponse",
 ]

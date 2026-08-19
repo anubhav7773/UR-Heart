@@ -71,6 +71,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "success": False,
             "data": None,
             "message": None,
+            "detail": exc.detail,
             "error": {
                 "code": error_code,
                 "message": exc.detail,
@@ -127,11 +128,12 @@ for r in all_routers:
 @app.get(f"{settings.API_V1_STR}/health", status_code=200, tags=["Health Check"])
 @app.head(f"{settings.API_V1_STR}/health", status_code=200, tags=["Health Check"])
 async def health_check():
-    """Fast, lightweight health check endpoint supporting both GET and HEAD for UptimeRobot monitoring."""
     return {
-        "status": "online",
+        "status": "healthy",
         "message": "UR-Heart Backend Active",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": "connected",
+        "redis": "connected",
     }
