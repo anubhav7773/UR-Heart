@@ -288,6 +288,22 @@ class ApiClient {
     return await dio.get('/places/meetup-spots', queryParameters: query);
   }
 
+  // 10i. Get Verified Nearby Date Spots directly (/places/nearby)
+  Future<Response> getNearbySpots({
+    required double lat,
+    required double lon,
+    String? category,
+  }) async {
+    final Map<String, dynamic> query = {
+      'lat': lat,
+      'lon': lon,
+    };
+    if (category != null && category.isNotEmpty && category != 'all') {
+      query['category'] = category;
+    }
+    return await dio.get('/places/nearby', queryParameters: query);
+  }
+
   // 10i. Unsend Chat Message (Delete for Everyone)
   Future<Response> unsendMessage({
     required String messageId,

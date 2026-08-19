@@ -2356,6 +2356,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openMeetupActionsSheet() {
+    final myPos = LocationService.instance.getLastCachedLocation();
     MeetupActionsSheet.show(
       context: context,
       matchId: widget.matchId,
@@ -2365,6 +2366,8 @@ class _ChatScreenState extends State<ChatScreen> {
       isLocationUnlocked: _isLocationUnlocked,
       partnerPhone: _unlockedPhoneNumber,
       partnerMapsUrl: _partnerMapsUrl,
+      userLat: myPos?.latitude,
+      userLon: myPos?.longitude,
       partnerLat: _displayRecipient.latitude,
       partnerLon: _displayRecipient.longitude,
       myWhatsAppConsent: _myWhatsAppConsent,

@@ -20,6 +20,8 @@ class MeetupActionsSheet extends StatelessWidget {
   final bool isMeetupUnlocked;
   final bool myBridgePaid;
   final bool partnerBridgePaid;
+  final double? userLat;
+  final double? userLon;
   final double? partnerLat;
   final double? partnerLon;
   final VoidCallback onLaunchWhatsApp;
@@ -37,6 +39,8 @@ class MeetupActionsSheet extends StatelessWidget {
     required this.isLocationUnlocked,
     this.partnerPhone,
     this.partnerMapsUrl,
+    this.userLat,
+    this.userLon,
     this.partnerLat,
     this.partnerLon,
     this.myWhatsAppConsent = false,
@@ -64,6 +68,8 @@ class MeetupActionsSheet extends StatelessWidget {
     required bool isLocationUnlocked,
     String? partnerPhone,
     String? partnerMapsUrl,
+    double? userLat,
+    double? userLon,
     double? partnerLat,
     double? partnerLon,
     bool myWhatsAppConsent = false,
@@ -93,6 +99,8 @@ class MeetupActionsSheet extends StatelessWidget {
         isLocationUnlocked: isLocationUnlocked,
         partnerPhone: partnerPhone,
         partnerMapsUrl: partnerMapsUrl,
+        userLat: userLat,
+        userLon: userLon,
         partnerLat: partnerLat,
         partnerLon: partnerLon,
         myWhatsAppConsent: myWhatsAppConsent,
@@ -273,6 +281,8 @@ class MeetupActionsSheet extends StatelessWidget {
                         MeetupSpotsSheet.show(
                           context: context,
                           onSuggestSpot: onSuggestSpotInChat,
+                          userLat: userLat,
+                          userLon: userLon,
                           partnerLat: partnerLat,
                           partnerLon: partnerLon,
                           partnerName: partnerName,

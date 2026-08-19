@@ -284,3 +284,12 @@ class PlacesService:
                 except Exception:
                     continue
         return []
+
+
+async def fetch_verified_nearby_spots(lat: float, lon: float, category: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Top-level helper function for fetching verified nearby spots directly as dictionary objects.
+    """
+    response = await PlacesService.fetch_nearby_spots(lat=lat, lon=lon, category_filter=category)
+    return [s.model_dump() for s in response.spots]
+

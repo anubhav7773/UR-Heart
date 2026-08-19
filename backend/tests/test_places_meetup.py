@@ -207,3 +207,26 @@ def test_api_places_midpoint_endpoint():
         assert len(data["spots"]) > 0
         assert all(s["is_verified"] is True for s in data["spots"])
         assert all("mid-way" in s["distance_label"] for s in data["spots"])
+
+
+def test_api_places_nearby_endpoint():
+    _CACHE.clear()
+    lat, lon = 28.6139, 77.2090
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = make_mock_response()
+
+        res = client.get(f"/api/v1/places/nearby?lat={lat}&lon={lon}")
+        assert res.status_code == 200
+        json_data = res.json()
+        assert json_data["status"] == "success"
+        assert "count" in json_data
+        assert "data" in json_data
+        assert isinstance(json_data["data"], list)
+        assert len(json_data["data"]) > 0
+        names = [s["name"] for s in json_data["data"]]
+        assert "Blue Tokai Coffee Roasters" in names
+        assert "Saravana Bhavan" in names
+
+
+

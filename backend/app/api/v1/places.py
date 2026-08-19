@@ -1,10 +1,24 @@
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.api.v1.auth import get_current_user_id
 from app.models.schemas import APIResponse, MeetupSpotsResponse
-from app.services.places_service import PlacesService
+from app.services.places_service import PlacesService, fetch_verified_nearby_spots
 
 router = APIRouter(prefix="/places", tags=["Places & Date Radar"])
+
+
+@router.get("/nearby")
+async def get_nearby_spots(
+    lat: float = Query(..., description="Latitude"),
+    lon: float = Query(..., description="Longitude"),
+    category: Optional[str] = Query(None, description="Category filter"),
+):
+    """
+    Direct low-latency nearby places endpoint returning raw list for instant mobile radar queries.
+    """
+    print(f"--> [DEBUG] Places API hit with lat={lat}, lon={lon}")
+    spots = await fetch_verified_nearby_spots(lat, lon, category=category)
+    return {"status": "success", "count": len(spots), "data": spots}
 
 
 @router.get("/meetup-spots", response_model=APIResponse[MeetupSpotsResponse])

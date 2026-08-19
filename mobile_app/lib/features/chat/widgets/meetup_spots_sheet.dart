@@ -64,6 +64,8 @@ class MeetupSpot {
 
 class MeetupSpotsSheet extends StatefulWidget {
   final Function(MeetupSpot spot) onSuggestSpot;
+  final double? userLat;
+  final double? userLon;
   final double? partnerLat;
   final double? partnerLon;
   final String? partnerName;
@@ -71,6 +73,8 @@ class MeetupSpotsSheet extends StatefulWidget {
   const MeetupSpotsSheet({
     super.key,
     required this.onSuggestSpot,
+    this.userLat,
+    this.userLon,
     this.partnerLat,
     this.partnerLon,
     this.partnerName,
@@ -79,6 +83,8 @@ class MeetupSpotsSheet extends StatefulWidget {
   static Future<void> show({
     required BuildContext context,
     required Function(MeetupSpot spot) onSuggestSpot,
+    double? userLat,
+    double? userLon,
     double? partnerLat,
     double? partnerLon,
     String? partnerName,
@@ -89,6 +95,8 @@ class MeetupSpotsSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => MeetupSpotsSheet(
         onSuggestSpot: onSuggestSpot,
+        userLat: userLat,
+        userLon: userLon,
         partnerLat: partnerLat,
         partnerLon: partnerLon,
         partnerName: partnerName,
@@ -131,41 +139,76 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
     });
 
     try {
-      final pos = await LocationService.instance.getCurrentLocation();
-      final double myLat = pos?.latitude ?? 28.6139;
-      final double myLon = pos?.longitude ?? 77.2090;
+      // 1. Prioritize widget passed coordinates or cached position (0 latency)
+      double myLat = widget.userLat ?? 0.0;
+      double myLon = widget.userLon ?? 0.0;
 
-      final bool hasPartnerCoords =
-          widget.partnerLat != null && widget.partnerLon != null;
+      if (myLat == 0.0 || myLon == 0.0) {
+        final pos = await LocationService.instance.getFastLocation();
+        if (pos != null) {
+          myLat = pos.latitude;
+          myLon = pos.longitude;
+        }
+      }
 
-      // 5-Second Timeout Guard (Kills infinite spinner)
-      final res = await ApiClient.instance
-          .getMeetupSpots(
-            lat: hasPartnerCoords ? null : myLat,
-            lon: hasPartnerCoords ? null : myLon,
-            lat1: hasPartnerCoords ? myLat : null,
-            lon1: hasPartnerCoords ? myLon : null,
-            lat2: hasPartnerCoords ? widget.partnerLat : null,
-            lon2: hasPartnerCoords ? widget.partnerLon : null,
-          )
+      if (myLat == 0.0 || myLon == 0.0) {
+        myLat = 28.6139;
+        myLon = 77.2090;
+      }
+
+      final bool hasPartnerCoords = widget.partnerLat != null &&
+          widget.partnerLon != null &&
+          widget.partnerLat != 0.0 &&
+          widget.partnerLon != 0.0;
+
+      // 2. 5-Second Timeout Guard (Kills infinite spinner)
+      final res = await (hasPartnerCoords
+              ? ApiClient.instance.getMeetupSpots(
+                  lat1: myLat,
+                  lon1: myLon,
+                  lat2: widget.partnerLat,
+                  lon2: widget.partnerLon,
+                )
+              : ApiClient.instance.getNearbySpots(
+                  lat: myLat,
+                  lon: myLon,
+                ))
           .timeout(
             const Duration(seconds: 5),
             onTimeout: () => throw TimeoutException('Radar query timed out'),
           );
 
-      if (res.data != null && res.data['data'] != null) {
-        final data = res.data['data'];
-        final rawSpots = data['spots'] as List<dynamic>? ?? [];
+      if (res.data != null) {
+        final rawData = res.data;
+        final List<dynamic> rawSpots = (rawData is Map && rawData['data'] is List)
+            ? (rawData['data'] as List)
+            : ((rawData is Map &&
+                    rawData['data'] is Map &&
+                    rawData['data']['spots'] is List)
+                ? (rawData['data']['spots'] as List)
+                : []);
+
         final parsed = rawSpots
-            .map((e) => MeetupSpot.fromJson(Map<String, dynamic>.from(e as Map)))
+            .map((e) =>
+                MeetupSpot.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
+
+        final bool isMidpoint = (rawData is Map && rawData['data'] is Map)
+            ? (rawData['data']['is_midpoint'] == true)
+            : false;
+        final double? userDist = (rawData is Map && rawData['data'] is Map)
+            ? (rawData['data']['user_distance_km'] as num?)?.toDouble()
+            : null;
+        final String? notice = (rawData is Map && rawData['data'] is Map)
+            ? rawData['data']['notice']?.toString()
+            : null;
 
         setState(() {
           _allSpots = parsed;
           _filteredSpots = _applyCategoryFilter(parsed, _selectedCategory);
-          _isMidpoint = data['is_midpoint'] == true;
-          _userDistanceKm = (data['user_distance_km'] as num?)?.toDouble();
-          _notice = data['notice']?.toString();
+          _isMidpoint = isMidpoint;
+          _userDistanceKm = userDist;
+          _notice = notice;
           _isLoading = false;
         });
       } else {
@@ -175,7 +218,8 @@ class _MeetupSpotsSheetState extends State<MeetupSpotsSheet> {
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Radar fetch error: $e');
       if (mounted) {
         setState(() {
           _allSpots = [];

@@ -13,6 +13,21 @@ class LocationService {
   String? _lastError;
   String? get lastError => _lastError;
 
+  Position? getLastCachedLocation() => _currentPosition;
+
+  /// Fast non-blocking location fetch: returns cached or last known position first
+  Future<Position?> getFastLocation() async {
+    if (_currentPosition != null) return _currentPosition;
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        _currentPosition = last;
+        return last;
+      }
+    } catch (_) {}
+    return getCurrentLocation();
+  }
+
   /// Requests GPS location permissions and fetches active device coordinates.
   Future<Position?> getCurrentLocation() async {
     _lastError = null;
