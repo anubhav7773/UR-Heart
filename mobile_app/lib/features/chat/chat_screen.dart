@@ -18,6 +18,7 @@ import 'chat_provider.dart';
 import 'message_bubble.dart';
 import 'widgets/safe_bridge_paywall_sheet.dart';
 import 'widgets/meetup_spots_sheet.dart';
+import 'widgets/meetup_actions_sheet.dart';
 
 class ChatMessage {
   final String id;
@@ -31,6 +32,7 @@ class ChatMessage {
   final bool isSent;
   final bool isDelivered;
   final bool isRead;
+  final bool isDeleted;
 
   ChatMessage({
     required this.id,
@@ -44,6 +46,7 @@ class ChatMessage {
     this.isSent = true,
     this.isDelivered = false,
     this.isRead = false,
+    this.isDeleted = false,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -52,6 +55,7 @@ class ChatMessage {
     final bool isRead = json['is_read'] == true || rawStatus == 'read';
     final bool isDelivered =
         json['is_delivered'] == true || rawStatus == 'delivered' || isRead;
+    final bool isDeleted = json['is_deleted'] == true;
 
     DateTime parsedTime;
     try {
@@ -67,9 +71,10 @@ class ChatMessage {
       id: (json['id'] ?? json['message_id'] ?? '').toString(),
       clientMsgId: json['client_msg_id']?.toString(),
       senderId: (json['sender_id'] ?? '').toString(),
-      text:
-          (json['content'] ?? json['text'] ?? json['message'] ?? '').toString(),
-      mediaUrl: json['media_url']?.toString(),
+      text: isDeleted
+          ? ''
+          : (json['content'] ?? json['text'] ?? json['message'] ?? '').toString(),
+      mediaUrl: isDeleted ? null : json['media_url']?.toString(),
       isViewOnce: json['is_view_once'] == true,
       timestamp: parsedTime,
       status: isRead
@@ -80,6 +85,7 @@ class ChatMessage {
       isSent: true,
       isDelivered: isDelivered,
       isRead: isRead,
+      isDeleted: isDeleted,
     );
   }
 
@@ -95,6 +101,7 @@ class ChatMessage {
     bool? isSent,
     bool? isDelivered,
     bool? isRead,
+    bool? isDeleted,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -108,6 +115,7 @@ class ChatMessage {
       isSent: isSent ?? this.isSent,
       isDelivered: isDelivered ?? this.isDelivered,
       isRead: isRead ?? this.isRead,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }
@@ -1075,9 +1083,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _myMeetupConsent = false;
   bool _partnerMeetupConsent = false;
   bool _isMeetupUnlocked = false;
-  bool _isMeetupVotingLoading = false;
-
-  bool _isConsentLoading = false;
 
   final List<ChatMessage> _messages = [];
   final Set<String> _processedMessageIds = {};
@@ -1279,6 +1284,23 @@ class _ChatScreenState extends State<ChatScreen> {
               duration: const Duration(seconds: 5),
             ),
           );
+        }
+        return;
+      }
+
+      if (type == 'MESSAGE_UNSENT') {
+        if (mounted) {
+          final msgId = (data['message_id'] ?? '').toString();
+          if (msgId.isNotEmpty) {
+            setState(() {
+              final idx = _messages.indexWhere(
+                  (m) => m.id == msgId || m.clientMsgId == msgId);
+              if (idx != -1) {
+                _messages[idx] =
+                    _messages[idx].copyWith(isDeleted: true, text: '');
+              }
+            });
+          }
         }
         return;
       }
@@ -1539,7 +1561,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _fetchConsentStatus() async {
-    setState(() => _isConsentLoading = true);
     try {
       final response = await ApiClient.instance.getBridgeStatus(widget.matchId);
       if (response.data != null && response.data['data'] != null) {
@@ -1563,13 +1584,10 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (_) {
       _fetchWhatsAppBridgeStatus();
-    } finally {
-      if (mounted) setState(() => _isConsentLoading = false);
     }
   }
 
   Future<void> _submitMeetupConsent(bool agree) async {
-    setState(() => _isMeetupVotingLoading = true);
     try {
       final res = await ApiClient.instance.updateMeetupConsent(
         matchId: widget.matchId,
@@ -1592,16 +1610,7 @@ class _ChatScreenState extends State<ChatScreen> {
           SnackBar(content: Text('Meetup consent notice: $e')),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isMeetupVotingLoading = false);
     }
-  }
-
-  void _openMeetupSpotsExplorer() {
-    MeetupSpotsSheet.show(
-      context: context,
-      onSuggestSpot: (spot) => _suggestSpotInChat(spot),
-    );
   }
 
   void _suggestSpotInChat(MeetupSpot spot) {
@@ -1631,27 +1640,6 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (_) {}
-  }
-
-  Future<void> _openSafeShareDialog() async {
-    await SafeBridgePaywallSheet.show(
-      context: context,
-      matchId: widget.matchId,
-      partnerName: _displayRecipient.name,
-      totalMessages: _mutualMessageCount,
-      initialMyWhatsapp: _myWhatsAppConsent,
-      initialMyLocation: _myLocationConsent,
-      initialPartnerWhatsapp: _partnerWhatsAppConsent,
-      initialPartnerLocation: _partnerLocationConsent,
-      initialMyPaid: _myBridgePaid,
-      initialPartnerPaid: _partnerBridgePaid,
-      initialIsUnlocked: _isWhatsAppUnlocked || _isLocationUnlocked,
-      initialPartnerPhone: _unlockedPhoneNumber,
-      initialPartnerMapsUrl: _partnerMapsUrl,
-      onStateChanged: () {
-        _fetchConsentStatus();
-      },
-    );
   }
 
   Future<void> _launchWhatsAppChat() async {
@@ -2306,326 +2294,267 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ============================================================================
-  // 4-STATE MUTUAL PAYMENT BANNER HELPER METHODS (₹499 × 2)
-  // ============================================================================
-
-  Color _getBannerBackgroundColor() {
-    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
-      return Colors.green.withValues(alpha: 0.15);
-    } else if (_mutualMessageCount < 15) {
-      return Colors.amber.withValues(alpha: 0.12);
-    } else if (_myBridgePaid && _partnerBridgePaid) {
-      return Colors.green.withValues(alpha: 0.15);
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return Colors.teal.withValues(alpha: 0.15);
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return Colors.orange.withValues(alpha: 0.15);
-    } else {
-      return Colors.purple.withValues(alpha: 0.12);
-    }
+  void _openMeetupActionsSheet() {
+    MeetupActionsSheet.show(
+      context: context,
+      matchId: widget.matchId,
+      partnerName: _displayRecipient.name,
+      totalMessages: _mutualMessageCount,
+      isWhatsAppUnlocked: _isWhatsAppUnlocked,
+      isLocationUnlocked: _isLocationUnlocked,
+      partnerPhone: _unlockedPhoneNumber,
+      partnerMapsUrl: _partnerMapsUrl,
+      myWhatsAppConsent: _myWhatsAppConsent,
+      partnerWhatsAppConsent: _partnerWhatsAppConsent,
+      myLocationConsent: _myLocationConsent,
+      partnerLocationConsent: _partnerLocationConsent,
+      myMeetupConsent: _myMeetupConsent,
+      partnerMeetupConsent: _partnerMeetupConsent,
+      isMeetupUnlocked: _isMeetupUnlocked,
+      myBridgePaid: _myBridgePaid,
+      partnerBridgePaid: _partnerBridgePaid,
+      onLaunchWhatsApp: _launchWhatsAppChat,
+      onLaunchGoogleMaps: _launchGoogleMapsRoute,
+      onSuggestSpotInChat: (spot) => _suggestSpotInChat(spot),
+      onVoteMeetupConsent: (agree) => _submitMeetupConsent(agree),
+      onRefreshStatus: _fetchConsentStatus,
+    );
   }
 
-  Color _getBannerBorderColor() {
-    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
-      return Colors.greenAccent;
-    } else if (_mutualMessageCount < 15) {
-      return Colors.amber.shade700;
-    } else if (_myBridgePaid && _partnerBridgePaid) {
-      return Colors.greenAccent;
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return Colors.tealAccent;
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return Colors.deepOrange;
-    } else {
-      return Colors.purpleAccent;
-    }
-  }
-
-  IconData _getBannerIcon() {
-    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
-      return Icons.lock_open_rounded;
-    } else if (_mutualMessageCount < 15) {
-      return Icons.lock_clock;
-    } else if (_myBridgePaid && _partnerBridgePaid) {
-      return Icons.lock_open_rounded;
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return Icons.hourglass_top_rounded;
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return Icons.flash_on;
-    } else {
-      return Icons.shield_outlined;
-    }
-  }
-
-  Color _getBannerIconColor() {
-    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
-      return Colors.greenAccent;
-    } else if (_mutualMessageCount < 15) {
-      return Colors.amber;
-    } else if (_myBridgePaid && _partnerBridgePaid) {
-      return Colors.greenAccent;
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return Colors.tealAccent;
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return Colors.deepOrange;
-    } else {
-      return Colors.purpleAccent;
-    }
-  }
-
-  String _getBannerTitle() {
-    if (_isWhatsAppUnlocked && _isLocationUnlocked) {
-      return '🎉 Safe Contact & Live Route Unlocked!';
-    } else if (_isWhatsAppUnlocked) {
-      return '🎉 Safe WhatsApp Unlocked!';
-    } else if (_isLocationUnlocked) {
-      return '🎉 Live Route Unlocked!';
-    } else if (_mutualMessageCount < 15) {
-      return '🔒 Safe Meet & WhatsApp Bridge — Milestone Required';
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return '⏳ You\'ve unlocked! Waiting for ${_displayRecipient.name}. (1/2 Unlocked)';
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return '🔥 ${_displayRecipient.name} unlocked Safe Bridge!';
-    } else {
-      return '🔒 Safe Meet & WhatsApp Bridge — Both users must unlock (₹499 each)';
-    }
-  }
-
-  String _getBannerSubtitle() {
-    if (_isWhatsAppUnlocked && _isLocationUnlocked) {
-      return 'WhatsApp & Turn-by-Turn Route are ready.';
-    } else if (_isWhatsAppUnlocked) {
-      return 'WhatsApp: ${_unlockedPhoneNumber ?? "Contact Available"}';
-    } else if (_isLocationUnlocked) {
-      return 'Google Maps navigation is ready.';
-    } else if (_mutualMessageCount < 15) {
-      return 'Exchange ${15 - _mutualMessageCount} more messages to unlock mutual consent & ₹499 bridge.';
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return 'Your ₹499 payment is complete. Waiting for match to pay ₹499 to reveal contacts.';
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return 'Your match has paid ₹499! Pay ₹499 now to view WhatsApp & Route.';
-    } else {
-      return 'Both users must pay ₹499 each to unlock Safe Bridge.';
-    }
-  }
-
-  String _getBannerButtonText() {
-    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
-      return 'View';
-    } else if (_mutualMessageCount < 15) {
-      return '$_mutualMessageCount/15';
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return 'Waiting...';
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return '₹499';
-    } else {
-      return '₹499';
-    }
-  }
-
-  Color _getBannerButtonColor() {
-    if (_isWhatsAppUnlocked || _isLocationUnlocked) {
-      return Colors.green.shade700;
-    } else if (_mutualMessageCount < 15) {
-      return Colors.amber.shade900;
-    } else if (_myBridgePaid && !_partnerBridgePaid) {
-      return Colors.teal.shade800;
-    } else if (!_myBridgePaid && _partnerBridgePaid) {
-      return Colors.deepOrange.shade700;
-    } else {
-      return const Color(0xFF00BFA5);
-    }
-  }
-
-  bool _getBannerButtonEnabled() {
-    return true;
-  }
-
-  Widget _buildMutualMeetupConsentCard() {
-    final bool isBridgeUnlocked = _isWhatsAppUnlocked ||
-        _isLocationUnlocked ||
-        (_myBridgePaid && _partnerBridgePaid);
-    if (!isBridgeUnlocked) return const SizedBox.shrink();
-
-    final bool bothAgreed =
-        _isMeetupUnlocked || (_myMeetupConsent && _partnerMeetupConsent);
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bothAgreed
-            ? AppTheme.primaryColor.withValues(alpha: 0.12)
-            : AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: bothAgreed ? AppTheme.primaryColor : AppTheme.cardBorderColor,
-          width: 1,
+  void _showUnsendMessageSheet(ChatMessage msg) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: const BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border(
+            top: BorderSide(color: AppTheme.cardBorderColor, width: 1),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: bothAgreed
-                      ? AppTheme.primaryColor.withValues(alpha: 0.2)
-                      : AppTheme.backgroundColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  bothAgreed ? Icons.celebration_outlined : Icons.handshake_outlined,
-                  color: bothAgreed ? AppTheme.primaryColor : AppTheme.secondaryColor,
-                  size: 20,
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.mutedTextColor.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      bothAgreed
-                          ? 'Mutual Meetup Consent Confirmed!'
-                          : (_myMeetupConsent && !_partnerMeetupConsent
-                              ? 'Meetup Request Sent'
-                              : 'Plan a Safe Meetup?'),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      bothAgreed
-                          ? 'Tap to explore all nearby meetup spots (Chai, Cafe, Hotel).'
-                          : (_myMeetupConsent && !_partnerMeetupConsent
-                              ? 'Aapne haan bola hai. Match ke response ka wait kar rahe hain... (1/2)'
-                              : 'Kya aap apne partner ke sath kahin milna chahte hain?'),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: bothAgreed ? Colors.white70 : AppTheme.mutedTextColor,
-                      ),
-                    ),
-                  ],
+              const Text(
+                'Message Options',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded,
+                      color: AppTheme.primaryColor, size: 20),
+                ),
+                title: const Text(
+                  'Unsend Message',
+                  style: TextStyle(
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Remove this message for both of you',
+                  style: TextStyle(fontSize: 11, color: AppTheme.mutedTextColor),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmAndUnsendMessage(msg);
+                },
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.backgroundColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      color: AppTheme.mutedTextColor, size: 20),
+                ),
+                title: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                onTap: () => Navigator.pop(ctx),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          if (_isMeetupVotingLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(4.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppTheme.primaryColor),
-                ),
-              ),
-            )
-          else if (bothAgreed)
-            SizedBox(
-              width: double.infinity,
-              height: 38,
-              child: ElevatedButton.icon(
-                onPressed: _openMeetupSpotsExplorer,
-                icon: const Icon(Icons.place_rounded, size: 16),
-                label: const Text(
-                  'Explore Nearby Meetup Spots',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            )
-          else if (_myMeetupConsent && !_partnerMeetupConsent)
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.backgroundColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.cardBorderColor),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.hourglass_top_rounded,
-                            size: 14, color: AppTheme.secondaryColor),
-                        SizedBox(width: 6),
-                        Text(
-                          'Waiting for partner (1/2)',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.secondaryColor,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () => _submitMeetupConsent(false),
-                  child: const Text('Change (No)',
-                      style: TextStyle(
-                          fontSize: 11, color: AppTheme.mutedTextColor)),
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _submitMeetupConsent(true),
-                    icon: const Icon(Icons.check_rounded, size: 16),
-                    label: const Text('Haan, bilkul',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _submitMeetupConsent(false),
-                    icon: const Icon(Icons.close_rounded, size: 16),
-                    label: const Text('Abhi nahi',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.mutedTextColor,
-                      side: const BorderSide(color: AppTheme.cardBorderColor),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                ),
-              ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmAndUnsendMessage(ChatMessage msg) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded,
+                color: AppTheme.primaryColor, size: 24),
+            SizedBox(width: 10),
+            Text('Unsend Message?',
+                style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'Unsend this message? It will be removed for both of you in this conversation.',
+          style: TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppTheme.mutedTextColor)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _unsendMessage(msg.id);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
+            child: const Text('Unsend',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _unsendMessage(String messageId) async {
+    // Optimistic local update
+    setState(() {
+      final idx = _messages
+          .indexWhere((m) => m.id == messageId || m.clientMsgId == messageId);
+      if (idx != -1) {
+        _messages[idx] = _messages[idx].copyWith(isDeleted: true, text: '');
+      }
+    });
+
+    try {
+      await ApiClient.instance.unsendMessage(messageId: messageId);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unsend notice: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildSafeMeetAppBarPill() {
+    final bool isBridgeActive = _isWhatsAppUnlocked ||
+        _isLocationUnlocked ||
+        (_myBridgePaid && _partnerBridgePaid);
+    final bool bothMeetupAgreed =
+        _isMeetupUnlocked || (_myMeetupConsent && _partnerMeetupConsent);
+
+    return InkWell(
+      onTap: _openMeetupActionsSheet,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          gradient: bothMeetupAgreed
+              ? const LinearGradient(
+                  colors: [Color(0xFFE91E63), Color(0xFFFF4081)],
+                )
+              : (isBridgeActive
+                  ? LinearGradient(
+                      colors: [Colors.teal.shade800, Colors.teal.shade500],
+                    )
+                  : null),
+          color: (bothMeetupAgreed || isBridgeActive)
+              ? null
+              : AppTheme.backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: bothMeetupAgreed
+                ? AppTheme.primaryColor
+                : (isBridgeActive
+                    ? Colors.tealAccent
+                    : AppTheme.cardBorderColor),
+            width: 1,
+          ),
+          boxShadow: (bothMeetupAgreed || isBridgeActive)
+              ? [
+                  BoxShadow(
+                    color: (bothMeetupAgreed
+                            ? AppTheme.primaryColor
+                            : Colors.tealAccent)
+                        .withValues(alpha: 0.35),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              bothMeetupAgreed
+                  ? Icons.celebration_rounded
+                  : (isBridgeActive
+                      ? Icons.shield_rounded
+                      : Icons.shield_outlined),
+              size: 14,
+              color: (bothMeetupAgreed || isBridgeActive)
+                  ? Colors.white
+                  : AppTheme.secondaryColor,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              bothMeetupAgreed
+                  ? 'Safe Meet (2/2)'
+                  : (isBridgeActive
+                      ? 'Safe Meet Active'
+                      : (_mutualMessageCount >= 15
+                          ? 'Safe Share'
+                          : '$_mutualMessageCount/15')),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: (bothMeetupAgreed || isBridgeActive)
+                    ? Colors.white
+                    : AppTheme.secondaryColor,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2717,12 +2646,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
         ),
         actions: [
+          // Sleek Safe Meet Action Pill in AppBar
+          _buildSafeMeetAppBarPill(),
+
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             color: AppTheme.cardColor,
             onSelected: (val) {
               if (val == 'safe_share') {
-                _openSafeShareDialog();
+                _openMeetupActionsSheet();
               } else if (val == 'profile') {
                 _showMatchProfileBottomSheet();
               } else if (val == 'report') {
@@ -2754,7 +2686,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Text(
                         _mutualMessageCount < 15
                             ? 'Safe Share ($_mutualMessageCount/15)'
-                            : 'Safe Share (WhatsApp/Maps)',
+                            : 'Safe Share (WhatsApp/Maps/Spots)',
                         style: TextStyle(
                           color: (_isWhatsAppUnlocked || _isLocationUnlocked)
                               ? Colors.greenAccent
@@ -2841,150 +2773,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-          // STRICT 4-STATE MUTUAL PAYMENT BANNER (₹499 × 2)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            color: AppTheme.surfaceColor,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _getBannerBackgroundColor(),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: _getBannerBorderColor(),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _getBannerIcon(),
-                        color: _getBannerIconColor(),
-                        size: 24,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getBannerTitle(),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _getBannerSubtitle(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: _getBannerIconColor(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_isConsentLoading)
-                        const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2.5, color: Colors.tealAccent),
-                        )
-                      else
-                        ElevatedButton(
-                          onPressed: _getBannerButtonEnabled() ? _openSafeShareDialog : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _getBannerButtonColor(),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: Text(
-                            _getBannerButtonText(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (_isWhatsAppUnlocked || _isLocationUnlocked) ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        if (_isWhatsAppUnlocked)
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _launchWhatsAppChat,
-                              icon: const Icon(Icons.chat, size: 14),
-                              label: const Text(
-                                '💬 Chat on WhatsApp',
-                                style: TextStyle(
-                                    fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.greenAccent.shade700,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ),
-                        if (_isWhatsAppUnlocked && _isLocationUnlocked)
-                          const SizedBox(width: 8),
-                        if (_isLocationUnlocked)
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _launchGoogleMapsRoute,
-                              icon: const Icon(Icons.navigation, size: 14),
-                              label: const Text(
-                                '📍 Open Route in Google Maps',
-                                style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blueAccent.shade700,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: 'Manage Sharing',
-                          icon: const Icon(Icons.tune,
-                              color: Colors.white70, size: 18),
-                          padding: EdgeInsets.zero,
-                          constraints:
-                              const BoxConstraints(minWidth: 32, minHeight: 32),
-                          onPressed: _openSafeShareDialog,
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-
-          // MUTUAL MEETUP CONSENT CARD (2/2 Unlocked -> Nearby Date Spot Radar)
-          _buildMutualMeetupConsentCard(),
-
-          // Messages List View
+          // Messages List View (100% clean and dedicated to conversation)
           Expanded(
             child: _messages.isEmpty
                 ? Center(
@@ -3092,6 +2881,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         isSent: msg.isSent,
                         isDelivered: msg.isDelivered,
                         isRead: msg.isRead,
+                        isDeleted: msg.isDeleted,
+                        onLongPress: isMe && !msg.isDeleted
+                            ? () => _showUnsendMessageSheet(msg)
+                            : null,
                       );
                     },
                   ),

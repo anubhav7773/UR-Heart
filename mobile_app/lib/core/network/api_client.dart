@@ -272,6 +272,13 @@ class ApiClient {
     return await dio.get('/places/meetup-spots', queryParameters: query);
   }
 
+  // 10i. Unsend Chat Message (Delete for Everyone)
+  Future<Response> unsendMessage({
+    required String messageId,
+  }) async {
+    return await dio.delete('/chat/messages/$messageId');
+  }
+
   // 11. Remote Ad Configuration
   Future<Response> getAdConfig() async {
     return await dio.get('/ads/config');

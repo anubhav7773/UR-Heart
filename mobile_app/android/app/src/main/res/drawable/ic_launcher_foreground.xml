@@ -1,10 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Outer Ambient Glow Ring -->
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="#22FF3366"
+        android:pathData="M54,22 C41,7 16,15 16,37 C16,62 54,90 54,90 C54,90 92,62 92,37 C92,15 67,7 54,22 Z"/>
+
+    <!-- Mid Glow Heart -->
+    <path
+        android:fillColor="#55FF3366"
+        android:pathData="M54,26 C43,13 21,20 21,38 C21,59 54,84 54,84 C54,84 87,59 87,38 C87,20 65,13 54,26 Z"/>
+
+    <!-- Core Radiant Heart -->
+    <path
+        android:fillColor="#FFFF3366"
         android:pathData="M54,30 C45,18 27,24 27,39 C27,57 54,78 54,78 C54,78 81,57 81,39 C81,24 63,18 54,30 Z"/>
+
+    <!-- Inner Specular Light Accent -->
+    <path
+        android:fillColor="#44FFFFFF"
+        android:pathData="M54,34 C48,25 35,29 35,40 C35,51 54,68 54,68 C54,68 73,51 73,40 C73,29 60,25 54,34 Z"/>
 </vector>

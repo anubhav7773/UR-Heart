@@ -247,6 +247,24 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> unsendMessage(String messageId) async {
+    try {
+      final response = await ApiClient.instance.unsendMessage(messageId: messageId);
+      if (response.statusCode == 200 || (response.data != null && response.data['success'] == true)) {
+        _messages.removeWhere((m) => m.id == messageId || m.clientMsgId == messageId);
+        _uniqueMessageIds.remove(messageId);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      if (kDebugMode) {
+        print('[ChatProvider] Error un-sending message: $e');
+      }
+      return false;
+    }
+  }
+
   DateTime _parseResponseTimestamp(dynamic value, DateTime fallback) {
     try {
       return DateTime.parse(value?.toString() ?? '').toLocal();

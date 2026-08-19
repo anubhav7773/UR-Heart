@@ -379,3 +379,27 @@ def test_get_conversations_and_matches():
     assert isinstance(json_data2["data"], list)
 
 
+def test_unsend_chat_message():
+    token = get_social_login_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    dummy_match_id = "00000000-0000-0000-0000-000000000001"
+
+    # Send a message
+    send_payload = {
+        "match_id": dummy_match_id,
+        "content": "Hello for unsend test",
+    }
+    send_res = client.post("/api/v1/chat/messages", json=send_payload, headers=headers)
+    assert send_res.status_code == 200
+    msg_id = send_res.json()["data"]["id"]
+
+    # Unsend the message (DELETE /api/v1/chat/messages/{message_id})
+    unsend_res = client.delete(f"/api/v1/chat/messages/{msg_id}", headers=headers)
+    assert unsend_res.status_code == 200
+    unsend_data = unsend_res.json()
+    assert unsend_data["success"] is True
+    assert unsend_data["data"]["is_deleted"] is True
+    assert unsend_data["data"]["message_id"] == msg_id
+
+
+

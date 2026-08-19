@@ -654,9 +654,18 @@ class ChatMessageRead(BaseModel):
     is_delivered: bool = False
     is_read: bool = False
     read_at: Optional[str] = None
+    is_deleted: bool = False
+    deleted_at: Optional[str] = None
     created_at: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UnsendMessageData(BaseModel):
+    message_id: str
+    match_id: str
+    is_deleted: bool = True
+    message: str = "Message unsent successfully."
 
 
 class SendMessageRequest(BaseModel):

@@ -13,6 +13,8 @@ class MessageBubbleWidget extends StatelessWidget {
   final bool isSent;
   final bool isDelivered;
   final bool isRead;
+  final bool isDeleted;
+  final VoidCallback? onLongPress;
 
   const MessageBubbleWidget({
     super.key,
@@ -26,14 +28,16 @@ class MessageBubbleWidget extends StatelessWidget {
     this.isSent = true,
     this.isDelivered = false,
     this.isRead = false,
+    this.isDeleted = false,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool hasMedia = mediaUrl != null && mediaUrl!.isNotEmpty;
+    final bool hasMedia = !isDeleted && mediaUrl != null && mediaUrl!.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
       child: Row(
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -57,112 +61,147 @@ class MessageBubbleWidget extends StatelessWidget {
             const SizedBox(width: 8),
           ],
 
-          // Bubble Box Container
+          // Bubble Box Container with Gesture Detector for Long Press Unsend
           Flexible(
-            child: Container(
-              padding: EdgeInsets.all(hasMedia ? 6.0 : 12.0),
-              decoration: BoxDecoration(
-                gradient: isMe ? AppTheme.sentBubbleGradient : null,
-                color: isMe ? null : AppTheme.receivedBubbleColor,
-                border: isMe ? null : Border.all(color: AppTheme.receivedBubbleBorderColor, width: 1),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(isMe ? 20 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 20),
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
+            child: GestureDetector(
+              onLongPress: (!isDeleted && isMe) ? onLongPress : null,
+              child: Container(
+                padding: EdgeInsets.all(hasMedia ? 6.0 : 12.0),
+                decoration: BoxDecoration(
+                  gradient: (isMe && !isDeleted) ? AppTheme.sentBubbleGradient : null,
+                  color: isDeleted
+                      ? AppTheme.surfaceColor.withValues(alpha: 0.5)
+                      : (isMe ? null : AppTheme.receivedBubbleColor),
+                  border: isDeleted
+                      ? Border.all(color: AppTheme.cardBorderColor.withValues(alpha: 0.5), width: 1)
+                      : (isMe ? null : Border.all(color: AppTheme.receivedBubbleBorderColor, width: 1)),
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft: Radius.circular(isMe ? 20 : 4),
+                    bottomRight: Radius.circular(isMe ? 4 : 20),
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment:
-                    isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Optional Media Attachment Image Box
-                  if (hasMedia) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: CachedNetworkImage(
-                        imageUrl: mediaUrl!,
-                        width: 220,
-                        height: 180,
-                        memCacheWidth: 440,
-                        memCacheHeight: 360,
-                        maxWidthDiskCache: 600,
-                        maxHeightDiskCache: 600,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          width: 220,
-                          height: 180,
-                          color: Colors.black26,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
+                  boxShadow: isDeleted
+                      ? null
+                      : const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                ),
+                child: Column(
+                  crossAxisAlignment:
+                      isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Deleted Placeholder State
+                    if (isDeleted)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.block_flipped,
+                              size: 13,
+                              color: AppTheme.mutedTextColor.withValues(alpha: 0.8),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isMe ? 'You unsent a message' : 'This message was unsent',
+                              style: TextStyle(
+                                color: AppTheme.mutedTextColor.withValues(alpha: 0.85),
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      // Optional Media Attachment Image Box
+                      if (hasMedia) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: CachedNetworkImage(
+                            imageUrl: mediaUrl!,
+                            width: 220,
+                            height: 180,
+                            memCacheWidth: 440,
+                            memCacheHeight: 360,
+                            maxWidthDiskCache: 600,
+                            maxHeightDiskCache: 600,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: 220,
+                              height: 180,
+                              color: Colors.black26,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width: 220,
+                              height: 140,
+                              color: Colors.black38,
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.broken_image_rounded, color: Colors.white54, size: 32),
+                                  SizedBox(height: 4),
+                                  Text('Media unavailable', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                        errorWidget: (context, url, error) => Container(
-                          width: 220,
-                          height: 140,
-                          color: Colors.black38,
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.broken_image_rounded, color: Colors.white54, size: 32),
-                              SizedBox(height: 4),
-                              Text('Media unavailable', style: TextStyle(fontSize: 11, color: Colors.white54)),
-                            ],
+                        if (message.isNotEmpty) const SizedBox(height: 8),
+                      ],
+
+                      // Text Message Content
+                      if (message.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasMedia ? 8.0 : 0.0,
+                            vertical: hasMedia ? 4.0 : 0.0,
+                          ),
+                          child: Text(
+                            message,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              height: 1.35,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    if (message.isNotEmpty) const SizedBox(height: 8),
-                  ],
 
-                  // Text Message Content
-                  if (message.isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: hasMedia ? 8.0 : 0.0,
-                        vertical: hasMedia ? 4.0 : 0.0,
-                      ),
-                      child: Text(
-                        message,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
+                      const SizedBox(height: 4),
 
-                  const SizedBox(height: 4),
-
-                  // Timestamp & Read Receipt Checkmark
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        time,
-                        style: TextStyle(
-                          color: isMe ? Colors.white70 : AppTheme.mutedTextColor,
-                          fontSize: 10,
-                        ),
+                      // Timestamp & Read Receipt Checkmark
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            time,
+                            style: TextStyle(
+                              color: isMe ? Colors.white70 : AppTheme.mutedTextColor,
+                              fontSize: 10,
+                            ),
+                          ),
+                          if (isMe) ...[
+                            const SizedBox(width: 4),
+                            _buildStatusIcon(),
+                          ],
+                        ],
                       ),
-                      if (isMe) ...[
-                        const SizedBox(width: 4),
-                        _buildStatusIcon(),
-                      ],
                     ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -174,17 +213,14 @@ class MessageBubbleWidget extends StatelessWidget {
   }
 
   /// ABSOLUTE 3-State WhatsApp Tick Logic for Outbound Messages:
-  /// - INCOMING MESSAGES: NO TICKS (enforced at line 180)
+  /// - INCOMING MESSAGES: NO TICKS
   /// - OUTGOING MESSAGES ONLY:
   ///   1. Read (Double Blue Tick): `isRead == true` OR `status == 'read'`
   ///   2. Delivered (Double Grey Tick): `status == 'delivered'` OR `isDelivered == true`
   ///   3. Sent (Single Grey Tick): `status == 'sent'` OR `isSent == true`
   ///   4. Sending (Clock): Default pending state
   Widget _buildStatusIcon() {
-    // CRITICAL ENFORCEMENT: Incoming messages NEVER show ticks
     if (!isMe) return const SizedBox.shrink();
-
-    // OUTGOING MESSAGES ONLY - Strict 3-state evaluation
 
     // State 1: READ - Double Blue Tick
     if (isRead == true || status.toLowerCase() == 'read') {
