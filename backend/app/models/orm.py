@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Numeric,
     JSON,
+    Index,
     func,
 )
 from sqlalchemy.types import UserDefinedType
@@ -73,6 +74,10 @@ class SachetPlanTypeEnum(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index("idx_users_gender_active", "gender", "is_active"),
+        Index("idx_users_last_seen", "last_seen"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -242,6 +247,9 @@ class ChaiInvite(Base):
 
 class Swipe(Base):
     __tablename__ = "swipes"
+    __table_args__ = (
+        Index("idx_swipes_swiper_swiped", "swiper_id", "swiped_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -262,6 +270,9 @@ class Swipe(Base):
 
 class Match(Base):
     __tablename__ = "matches"
+    __table_args__ = (
+        Index("idx_matches_pair", "user1_id", "user2_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -293,6 +304,10 @@ class Match(Base):
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
+    __table_args__ = (
+        Index("idx_messages_match_created", "match_id", "created_at"),
+        Index("idx_messages_unread", "match_id", "is_read", "sender_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

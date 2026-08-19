@@ -21,8 +21,9 @@ engine = create_async_engine(
     db_url,
     echo=False,
     future=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=15,
+    max_overflow=10,
+    pool_timeout=10,
     pool_recycle=1800,
     pool_pre_ping=True,
     connect_args=connect_args,
@@ -32,7 +33,6 @@ AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False,
-    autocommit=False,
     autoflush=False,
 )
 
@@ -115,9 +115,12 @@ async def init_db() -> None:
 
         -- Performance Indexes
         CREATE INDEX IF NOT EXISTS idx_messages_match_created ON chat_messages (match_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_messages_unread ON chat_messages (match_id, is_read, sender_id);
         CREATE INDEX IF NOT EXISTS idx_swipes_swiper_swiped ON swipes (swiper_id, swiped_id);
+        CREATE INDEX IF NOT EXISTS idx_users_gender_active ON users (gender, is_active);
         CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users (last_seen DESC);
         CREATE INDEX IF NOT EXISTS idx_matches_users ON matches (user1_id, user2_id);
+        CREATE INDEX IF NOT EXISTS idx_matches_pair ON matches (user1_id, user2_id);
 
         -- Chat messages table
         ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_msg_id VARCHAR(64);
@@ -224,9 +227,12 @@ async def init_db() -> None:
         "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS last_rewarded_claim_at TIMESTAMPTZ DEFAULT NULL;",
         "ALTER TABLE user_ad_counters ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();",
         "CREATE INDEX IF NOT EXISTS idx_messages_match_created ON chat_messages (match_id, created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_messages_unread ON chat_messages (match_id, is_read, sender_id);",
         "CREATE INDEX IF NOT EXISTS idx_swipes_swiper_swiped ON swipes (swiper_id, swiped_id);",
+        "CREATE INDEX IF NOT EXISTS idx_users_gender_active ON users (gender, is_active);",
         "CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users (last_seen DESC);",
         "CREATE INDEX IF NOT EXISTS idx_matches_users ON matches (user1_id, user2_id);",
+        "CREATE INDEX IF NOT EXISTS idx_matches_pair ON matches (user1_id, user2_id);",
     ]
 
     for query in individual_queries:
@@ -236,3 +242,26 @@ async def init_db() -> None:
         except Exception as e:
             # Ignore duplicate column / schema notices
             pass
+
+
+async def apply_performance_indexes(session: AsyncSession) -> None:
+    """Explicit one-time execution of performance composite indexes."""
+    raw_indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_messages_match_created ON chat_messages (match_id, created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_messages_unread ON chat_messages (match_id, is_read, sender_id);",
+        "CREATE INDEX IF NOT EXISTS idx_swipes_swiper_swiped ON swipes (swiper_id, swiped_id);",
+        "CREATE INDEX IF NOT EXISTS idx_users_gender_active ON users (gender, is_active);",
+        "CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users (last_seen DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_matches_users ON matches (user1_id, user2_id);",
+        "CREATE INDEX IF NOT EXISTS idx_matches_pair ON matches (user1_id, user2_id);",
+    ]
+    for q in raw_indexes:
+        try:
+            await session.execute(text(q))
+        except Exception:
+            pass
+    try:
+        await session.commit()
+    except Exception:
+        pass
+
