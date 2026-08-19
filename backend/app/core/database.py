@@ -75,7 +75,9 @@ async def init_db() -> None:
         ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_swipes INT DEFAULT 0;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_url VARCHAR(500) DEFAULT NULL;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_duration_seconds INT DEFAULT 0;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS location_geom geography(Point, 4326) DEFAULT NULL;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS location_geom geometry(Point, 4326) DEFAULT NULL;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT DEFAULT NULL;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS photos TEXT[] DEFAULT ARRAY[]::TEXT[];
         ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT TRUE;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ DEFAULT NULL;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
@@ -91,7 +93,7 @@ async def init_db() -> None:
         
         -- Populate location_geom if coordinates exist
         UPDATE users 
-        SET location_geom = ST_SetSRID(ST_MakePoint(longitude::float, latitude::float), 4326)::geography
+        SET location_geom = ST_SetSRID(ST_MakePoint(longitude::float, latitude::float), 4326)
         WHERE location_geom IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL;
 
         -- Spatial Index
@@ -185,7 +187,9 @@ async def init_db() -> None:
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_swipes INT DEFAULT 0;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_url VARCHAR(500) DEFAULT NULL;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_bio_duration_seconds INT DEFAULT 0;",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS location_geom geography(Point, 4326);",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS location_geom geometry(Point, 4326);",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS photos TEXT[];",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT TRUE;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;",

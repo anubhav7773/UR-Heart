@@ -84,12 +84,26 @@ async def update_user_location(
         user_result = await db.execute(select(User).where(User.id == user_id))
         user = user_result.scalars().first()
         if user is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
-        user.latitude = latitude
-        user.longitude = longitude
+            from app.models.orm import GenderEnum as ORMGenderEnum, IntentEnum as ORMIntentEnum
+            user = User(
+                id=user_id,
+                full_name="User",
+                dob=date(2000, 1, 1),
+                gender=ORMGenderEnum.male,
+                interested_in=ORMGenderEnum.female,
+                intent=ORMIntentEnum.casual,
+                latitude=latitude,
+                longitude=longitude,
+                is_active=True,
+            )
+            db.add(user)
+            await db.flush()
+        else:
+            user.latitude = latitude
+            user.longitude = longitude
         try:
             await db.execute(
-                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography WHERE id = :uid"),
+                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326) WHERE id = :uid"),
                 {"lng": longitude, "lat": latitude, "uid": user_id}
             )
         except Exception:
@@ -99,8 +113,9 @@ async def update_user_location(
         raise
     except (TypeError, ValueError):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid GPS coordinates.")
-    except Exception:
+    except Exception as e:
         await db.rollback()
+        print(f"[LOCATION UPDATE ERROR] {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to save GPS location.")
 
     return APIResponse(
@@ -114,7 +129,7 @@ def _serialize_user_profile(user: User) -> dict:
     from datetime import date
     today = date.today()
     age = today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day)) if user.dob else None
-    photos = [p.photo_url for p in user.photos] if user.photos else []
+    photos = [p.photo_url for p in user.photos] if user.photos else ([user.photo_url] if getattr(user, 'photo_url', None) else [])
     is_approved = bool(user.is_verified and getattr(user, 'verification_status', None) and user.verification_status.value == "APPROVED")
     return {
         "id": str(user.id),
@@ -127,6 +142,7 @@ def _serialize_user_profile(user: User) -> dict:
         "gender": user.gender.value if user.gender else "male",
         "intent": user.intent.value if user.intent else "casual",
         "photos": photos,
+        "photo_url": photos[0] if photos else None,
         "is_verified": is_approved,
         "is_admin": bool(getattr(user, "is_admin", False)),
     }

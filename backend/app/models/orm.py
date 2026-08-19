@@ -21,12 +21,15 @@ from sqlalchemy.dialects.postgresql import UUID
 import enum
 
 
-class GeographyPoint(UserDefinedType):
-    """PostGIS Geography Point (SRID 4326) spatial data type."""
+class GeometryPoint(UserDefinedType):
+    """PostGIS Geometry Point (SRID 4326) spatial data type."""
     cache_ok = True
 
     def get_col_spec(self, **kw):
-        return "geography(Point, 4326)"
+        return "geometry(Point, 4326)"
+
+
+GeographyPoint = GeometryPoint
 
 
 class Base(DeclarativeBase):
@@ -163,6 +166,7 @@ class User(Base):
     )
 
     fcm_token: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, default=None)
+    photo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
 
     photos: Mapped[List["UserPhoto"]] = relationship(
         "UserPhoto", back_populates="user", cascade="all, delete-orphan", order_by="UserPhoto.display_order", lazy="selectin"

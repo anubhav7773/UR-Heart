@@ -45,9 +45,10 @@ from app.core.security import get_current_user_id
 router = APIRouter(prefix="/profile", tags=["Profile Management & Media Uploads"])
 
 # Initialize Supabase Python Client safely
-if HAS_SUPABASE and settings.SUPABASE_URL and settings.SUPABASE_KEY:
+if HAS_SUPABASE and settings.SUPABASE_URL and (settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY):
     try:
-        supabase: Client | None = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        supa_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+        supabase: Client | None = create_client(settings.SUPABASE_URL, supa_key)
     except Exception:
         supabase = None
 else:
@@ -140,7 +141,23 @@ async def get_user_profile(
     photos = user.photos if user.photos else []
     today = date.today()
     age = today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day)) if user.dob else None
-    photo_urls = [p.photo_url for p in photos]
+    photo_urls = [p.photo_url for p in photos] if photos else []
+    if not photo_urls and getattr(user, 'photo_url', None):
+        photo_urls = [user.photo_url]
+
+    # Fallback to direct raw query if photo_urls is still empty
+    if not photo_urls:
+        try:
+            raw_res = await db.execute(text("SELECT photos, photo_url FROM users WHERE id = :uid"), {"uid": user.id})
+            raw_row = raw_res.first()
+            if raw_row:
+                raw_photos, raw_photo_url = raw_row[0], raw_row[1]
+                if raw_photos and isinstance(raw_photos, list) and len(raw_photos) > 0:
+                    photo_urls = [str(u) for u in raw_photos if u]
+                elif raw_photo_url:
+                    photo_urls = [str(raw_photo_url)]
+        except Exception:
+            pass
 
     is_self = str(user.id) == current_user_id
 
@@ -160,6 +177,7 @@ async def get_user_profile(
         "latitude": float(user.latitude) if (is_self and user.latitude is not None) else None,
         "longitude": float(user.longitude) if (is_self and user.longitude is not None) else None,
         "photos": photo_urls,
+        "photo_url": photo_urls[0] if photo_urls else None,
         "is_profile_complete": bool(len(photo_urls) >= 1),
         "is_online": is_online,
         "last_seen": last_active.isoformat() if last_active else None,
@@ -239,6 +257,21 @@ async def upload_profile_photo(
     if public_url:
         try:
             user_uuid = uuid.UUID(current_user_id)
+            user_res = await db.execute(select(User).where(User.id == user_uuid))
+            user_obj = user_res.scalars().first()
+            if not user_obj:
+                user_obj = User(
+                    id=user_uuid,
+                    full_name="User",
+                    dob=date(2000, 1, 1),
+                    gender=ORMGenderEnum.male,
+                    interested_in=ORMGenderEnum.female,
+                    intent=ORMIntentEnum.casual,
+                    is_active=True,
+                )
+                db.add(user_obj)
+                await db.flush()
+
             existing_res = await db.execute(
                 select(UserPhoto).where(UserPhoto.user_id == user_uuid).order_by(UserPhoto.display_order)
             )
@@ -251,11 +284,27 @@ async def upload_profile_photo(
                 display_order=len(existing_photos) + 1,
             )
             db.add(new_photo)
-            await db.commit()
-        except Exception:
-            await db.rollback()
 
-    return {"photo_url": public_url}
+            all_photos = [p.photo_url for p in existing_photos] + [public_url]
+            try:
+                await db.execute(
+                    text("UPDATE users SET photo_url = :purl, photos = :purls WHERE id = :uid"),
+                    {"purl": all_photos[0], "purls": all_photos, "uid": user_uuid}
+                )
+            except Exception:
+                pass
+
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            print(f"[PHOTO DB INSERT ERROR] {e}")
+
+    return {
+        "success": True,
+        "message": "Photo uploaded successfully.",
+        "photo_url": public_url,
+        "data": {"photo_url": public_url}
+    }
 
 
 @router.post("/complete", response_model=APIResponse[CompleteProfileData])
@@ -345,6 +394,7 @@ async def complete_profile(
             for p in existing_photos:
                 await db.delete(p)
 
+            new_photo_urls = []
             for idx, p_input in enumerate(payload.photos, start=1):
                 photo = UserPhoto(
                     id=uuid.uuid4(),
@@ -354,13 +404,23 @@ async def complete_profile(
                     display_order=p_input.display_order if p_input.display_order is not None else idx,
                 )
                 db.add(photo)
+                new_photo_urls.append(p_input.photo_url)
+
+            if new_photo_urls:
+                try:
+                    await db.execute(
+                        text("UPDATE users SET photo_url = :purl, photos = :purls WHERE id = :uid"),
+                        {"purl": new_photo_urls[0], "purls": new_photo_urls, "uid": user_uuid}
+                    )
+                except Exception:
+                    pass
         except Exception:
             pass
 
     if user.latitude is not None and user.longitude is not None:
         try:
             await db.execute(
-                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography WHERE id = :uid"),
+                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326) WHERE id = :uid"),
                 {"lng": float(user.longitude), "lat": float(user.latitude), "uid": user_uuid}
             )
         except Exception:
@@ -509,12 +569,25 @@ async def update_user_location(
         user_obj = user_res.scalars().first()
 
         if not user_obj:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
-        user_obj.latitude = latitude
-        user_obj.longitude = longitude
+            user_obj = User(
+                id=user_uuid,
+                full_name="User",
+                dob=date(2000, 1, 1),
+                gender=ORMGenderEnum.male,
+                interested_in=ORMGenderEnum.female,
+                intent=ORMIntentEnum.casual,
+                latitude=latitude,
+                longitude=longitude,
+                is_active=True,
+            )
+            db.add(user_obj)
+            await db.flush()
+        else:
+            user_obj.latitude = latitude
+            user_obj.longitude = longitude
         try:
             await db.execute(
-                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography WHERE id = :uid"),
+                text("UPDATE users SET location_geom = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326) WHERE id = :uid"),
                 {"lng": longitude, "lat": latitude, "uid": user_uuid}
             )
         except Exception:
@@ -524,8 +597,9 @@ async def update_user_location(
         raise
     except (TypeError, ValueError):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid GPS coordinates.")
-    except Exception:
+    except Exception as e:
         await db.rollback()
+        print(f"[PROFILE LOCATION UPDATE ERROR] {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to save GPS location.")
 
     return APIResponse(

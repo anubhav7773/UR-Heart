@@ -606,7 +606,7 @@ async def unsend_chat_message(
 @router.post(
     "/send",
     response_model=APIResponse[ChatMessageRead],
-    dependencies=[Depends(rate_limit(max_requests=5, window_seconds=5, by_user=True))]
+    dependencies=[Depends(rate_limit(max_requests=5, window_seconds=30, by_user=True))]
 )
 @router.post("/message", response_model=APIResponse[ChatMessageRead])
 @router.post("/messages", response_model=APIResponse[ChatMessageRead])

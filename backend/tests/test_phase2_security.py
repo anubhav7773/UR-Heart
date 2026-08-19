@@ -71,23 +71,53 @@ def test_websocket_accepts_valid_participant():
         ws.send_json({"type": "typing", "is_typing": True})
 
 
-def test_rate_limiting_chat_flood():
+@pytest.mark.asyncio
+async def test_rate_limiting_chat_flood():
     """Verify sending >5 rapid messages triggers 429 Too Many Requests."""
+    from httpx import AsyncClient, ASGITransport
     limiter.reset()
-    token_b, user_b_id = create_test_user_session("rate_limit_user_b")
-    token_c, user_c_id = create_test_user_session("rate_limit_user_c")
 
-    match_bc_id = setup_match_between_users(token_b, user_c_id)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res_b = await ac.post("/api/v1/auth/social-login", json={
+            "provider": "google",
+            "id_token": "mock_token_rate_limit_user_b",
+            "device_id": "device_rate_limit_user_b",
+            "fcm_token": "fcm_rate_limit_user_b"
+        })
+        token_b = res_b.json()["data"]["access_token"]
 
-    headers = {"Authorization": f"Bearer {token_b}"}
-    payload = {
-        "match_id": match_bc_id,
-        "content": "Rapid chat message",
-    }
+        res_c = await ac.post("/api/v1/auth/social-login", json={
+            "provider": "google",
+            "id_token": "mock_token_rate_limit_user_c",
+            "device_id": "device_rate_limit_user_c",
+            "fcm_token": "fcm_rate_limit_user_c"
+        })
+        user_c_id = res_c.json()["data"]["user_id"]
 
-    status_codes = []
-    for _ in range(8):
-        res = client.post("/api/v1/chat/send", json=payload, headers=headers)
-        status_codes.append(res.status_code)
+        headers = {"Authorization": f"Bearer {token_b}"}
+        verify_payload = {
+            "razorpay_payment_id": f"pay_test_{user_c_id[:8]}",
+            "razorpay_order_id": f"order_test_{user_c_id[:8]}",
+            "razorpay_signature": "mock_sig_valid",
+            "plan_type": "PLAN_DIRECT_DM_49"
+        }
+        await ac.post("/api/v1/payments/verify", json=verify_payload, headers=headers)
+        dm_payload = {
+            "target_user_id": user_c_id,
+            "message": "Private direct conversation message"
+        }
+        dm_res = await ac.post("/api/v1/feed/direct-dm", json=dm_payload, headers=headers)
+        match_bc_id = dm_res.json()["data"]["match_id"]
 
-    assert 429 in status_codes, "Security Alert: Rate limiter failed to block rapid chat spam!"
+        payload = {
+            "match_id": match_bc_id,
+            "content": "Rapid chat message",
+        }
+
+        status_codes = []
+        for _ in range(8):
+            res = await ac.post("/api/v1/chat/send", json=payload, headers=headers)
+            status_codes.append(res.status_code)
+
+        assert 429 in status_codes, f"Security Alert: Rate limiter failed to block rapid chat spam! Got codes: {status_codes}"
+

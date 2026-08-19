@@ -492,6 +492,74 @@ def test_meetup_spot_message_validation_and_security():
     assert res_bypass.status_code == 400
 
 
+@pytest.mark.asyncio
+async def test_user_location_update():
+    from httpx import AsyncClient, ASGITransport
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        login_res = await ac.post("/api/v1/auth/social-login", json={
+            "provider": "google",
+            "id_token": "mock_id_token_12345",
+            "device_id": "device_test_99",
+            "fcm_token": "fcm_test_token"
+        })
+        assert login_res.status_code == 200
+        token = login_res.json()["data"]["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # 1. Update location via POST /api/v1/users/location
+        payload = {"latitude": 26.7880, "longitude": 82.1300}
+        res = await ac.post("/api/v1/users/location", json=payload, headers=headers)
+        assert res.status_code == 200
+        json_data = res.json()
+        assert json_data["success"] is True
+        assert json_data["data"]["latitude"] == 26.7880
+        assert json_data["data"]["longitude"] == 82.1300
+
+        # 2. Update location via PUT /api/v1/users/location
+        payload2 = {"latitude": 26.7900, "longitude": 82.1350}
+        res2 = await ac.put("/api/v1/users/location", json=payload2, headers=headers)
+        assert res2.status_code == 200
+        assert res2.json()["success"] is True
+
+        # 3. Invalid location coords should return 422
+        res_invalid = await ac.post("/api/v1/users/location", json={"latitude": 999.0, "longitude": 82.0}, headers=headers)
+        assert res_invalid.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_profile_photo_upload_and_get():
+    from httpx import AsyncClient, ASGITransport
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        login_res = await ac.post("/api/v1/auth/social-login", json={
+            "provider": "google",
+            "id_token": "mock_id_token_12345",
+            "device_id": "device_test_99",
+            "fcm_token": "fcm_test_token"
+        })
+        assert login_res.status_code == 200
+        token = login_res.json()["data"]["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Upload photo via POST /api/v1/profile/photos
+        dummy_image = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9"
+        files = {"file": ("test_photo.jpg", dummy_image, "image/jpeg")}
+        res_upload = await ac.post("/api/v1/profile/photos", files=files, headers=headers)
+        assert res_upload.status_code in (200, 201)
+        upload_data = res_upload.json()
+        photo_url = upload_data.get("photo_url") or (upload_data.get("data") and upload_data["data"].get("photo_url"))
+        assert photo_url is not None
+        assert len(photo_url) > 0
+
+        # 2. Get profile via GET /api/v1/profile and verify photo is returned
+        res_profile = await ac.get("/api/v1/profile", headers=headers)
+        assert res_profile.status_code == 200
+        p_data = res_profile.json()["data"]
+        assert "photos" in p_data
+        assert len(p_data["photos"]) >= 1
+        assert p_data["photos"][0] == photo_url
+
+
+
 
 
 
