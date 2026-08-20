@@ -1239,9 +1239,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Count active passes
     int activeCount = 0;
     if (activePasses != null) {
-      if (activePasses['is_boosted'] == true) activeCount++;
-      if (activePasses['has_direct_dm'] == true || activePasses['is_direct_dm_active'] == true) activeCount++;
-      if (activePasses['is_ad_free'] == true) activeCount++;
+      final now = DateTime.now().toUtc();
+      bool isIsoActive(String? iso) {
+        if (iso == null) return false;
+        final dt = DateTime.tryParse(iso)?.toUtc();
+        return dt != null && dt.isAfter(now);
+      }
+
+      if (activePasses['is_boosted'] == true || isIsoActive(activePasses['boost_expires_at'])) activeCount++;
+      if (activePasses['has_direct_dm'] == true || activePasses['is_direct_dm_active'] == true || isIsoActive(activePasses['direct_dm_expires_at'])) activeCount++;
+      if (activePasses['is_ad_free'] == true || isIsoActive(activePasses['ad_free_expires_at'])) activeCount++;
       if (activePasses['has_safe_bridge'] == true) activeCount++;
     }
 
