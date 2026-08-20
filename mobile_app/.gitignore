@@ -43,3 +43,20 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android local & signing properties
+android/local.properties
+android/key.properties
+*.keystore
+*.jks
+local.properties
+key.properties
+
+# Ephemeral & Gradle build files
+.gradle/
+android/.gradle/
+android/app/.gradle/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+
