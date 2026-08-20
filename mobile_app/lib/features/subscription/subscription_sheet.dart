@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/theme/app_theme.dart';
@@ -132,38 +133,48 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
     final selectedPlan = _selectedPlan;
 
+    // STEP 1: Pop the bottom modal sheet cleanly FIRST
+    navigator.pop(true);
+
+    // STEP 2: Crucial delay (250ms) to allow Flutter modal transition to fully unmount
+    await Future.delayed(const Duration(milliseconds: 250));
+
     try {
-      // Step 1: Create order on backend (strictly decoupled, no secondary dialog)
+      // STEP 3: Create order on backend (Phase 1 endpoint)
       final orderResponse = await ApiClient.instance.createSachetOrder(
         planType: selectedPlan.id,
       );
 
-      if (orderResponse.data == null) {
+      final dynamic rawData = orderResponse.data?['data'] ?? orderResponse.data;
+      if (rawData == null) {
         throw Exception('Failed to generate order from server');
       }
 
-      final dynamic rawData = orderResponse.data['data'] ?? orderResponse.data;
-      final Map<String, dynamic> orderData = Map<String, dynamic>.from(rawData);
+      final Map<String, dynamic> data = Map<String, dynamic>.from(rawData);
+      final String orderId = (data['order_id'] ?? '').toString();
+      final int amountInPaise = data['amount_in_paise'] != null
+          ? (data['amount_in_paise'] as num).toInt()
+          : (selectedPlan.price * 100);
+      final String keyId = (data['razorpay_key_id'] ?? 'rzp_test_sample').toString();
+      final String description = (data['description'] ?? 'UR-Heart - ${selectedPlan.title}').toString();
 
-      // Step 2: Cleanly dismiss the bottom sheet FIRST
-      navigator.pop(true);
-
-      // Step 3: Crucial delay to let Flutter route animation settle and free the Activity context
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      // Step 4: Launch Razorpay via persistent singleton
       final currentUser = FirebaseAuth.instance.currentUser;
-      final paymentResult = await PaymentService().startCheckout(
-        orderData: orderData,
+
+      // STEP 4: Launch Native Razorpay via persistent Singleton
+      final PaymentSuccessResponse paymentResult = await PaymentService().openCheckout(
+        orderId: orderId,
+        amountInPaise: amountInPaise,
+        razorpayKeyId: keyId,
+        description: description,
         userEmail: currentUser?.email,
         userPhone: currentUser?.phoneNumber,
       );
 
-      // Step 5: Verify payment on backend
+      // STEP 5: Verify Payment on Backend
       await ApiClient.instance.verifyPayment(
         paymentId: paymentResult.paymentId ?? '',
         orderId: paymentResult.orderId ?? '',
@@ -173,20 +184,20 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
 
       await StorageManager.instance.setPremiumStatus(true);
 
-      scaffoldMessenger.showSnackBar(
+      // STEP 6: Success feedback and activation
+      messenger.showSnackBar(
         SnackBar(
-          content: Text('Payment Successful! ${selectedPlan.title} (₹${selectedPlan.price}) unlocked.'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 4),
+          content: Text('🎉 ${selectedPlan.title} activated successfully!'),
         ),
       );
     } catch (e) {
-      debugPrint('[PAYMENT_FLOW_ERROR] $e');
-      if (mounted) setState(() => _isProcessing = false);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Payment cancelled or failed: $e'),
+      debugPrint('[CHECKOUT_FLOW_FAILED] $e');
+      messenger.showSnackBar(
+        const SnackBar(
           backgroundColor: Colors.redAccent,
+          content: Text('Payment cancelled or failed. Please try again.'),
         ),
       );
     }

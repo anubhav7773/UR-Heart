@@ -218,6 +218,7 @@ _mock_user_passes = {}
 
 
 @router.post("/verify", response_model=APIResponse[VerifyPaymentData])
+@router.post("/verify-sachet", response_model=APIResponse[VerifyPaymentData])
 async def verify_payment(
     payload: VerifyPaymentRequest,
     current_user_id: str = Depends(get_current_user_id),
