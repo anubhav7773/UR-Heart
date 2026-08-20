@@ -5,6 +5,71 @@ import '../../core/security/storage_manager.dart';
 import '../../core/theme/app_theme.dart';
 import 'payment_service.dart';
 
+class SachetPlanItem {
+  final String id;
+  final String title;
+  final int price;
+  final String validity;
+  final String tag;
+  final String hindiSubtitle;
+  final String description;
+  final IconData icon;
+
+  const SachetPlanItem({
+    required this.id,
+    required this.title,
+    required this.price,
+    required this.validity,
+    required this.tag,
+    required this.hindiSubtitle,
+    required this.description,
+    required this.icon,
+  });
+}
+
+final List<SachetPlanItem> availablePlans = [
+  const SachetPlanItem(
+    id: 'boost',
+    title: 'Profile Boost',
+    price: 29,
+    validity: '1 Hour',
+    tag: '10x Discovery',
+    hindiSubtitle: '1 Ghante ke liye 10x Jyada Discovery',
+    description: 'Apni profile ko discovery feed me top priority par layein aur 10x jyada views paayein.',
+    icon: Icons.rocket_launch,
+  ),
+  const SachetPlanItem(
+    id: 'direct_dm',
+    title: 'Direct DM Pass',
+    price: 49,
+    validity: '1 Hour',
+    tag: 'Instant DM',
+    hindiSubtitle: '1 Ghante tak bina match ke direct message bhejein',
+    description: '1 Ghante tak bina match ke direct message bhejein kisi bhi profile ko.',
+    icon: Icons.flash_on,
+  ),
+  const SachetPlanItem(
+    id: 'zero_ads',
+    title: 'Zero Ads VIP Pass',
+    price: 199,
+    validity: '30 Days',
+    tag: 'VIP Pro',
+    hindiSubtitle: '30 Din ke liye bilkul Zero Ads',
+    description: '30 Dinon tak bina kisi ads ke full app smoothly use karein.',
+    icon: Icons.block,
+  ),
+  const SachetPlanItem(
+    id: 'safe_bridge',
+    title: 'Safe Meet & WhatsApp Bridge',
+    price: 499,
+    validity: 'Chat Lock',
+    tag: 'Maps & WA',
+    hindiSubtitle: '15 Messages ke baad WhatsApp aur Live Maps Unlock',
+    description: 'Direct WhatsApp chat & Google Maps turn-by-turn route unlock karein.',
+    icon: Icons.lock_outline,
+  ),
+];
+
 class SubscriptionSheet extends StatefulWidget {
   final String? initialPlanType;
 
@@ -19,7 +84,7 @@ class SubscriptionSheet extends StatefulWidget {
 
 class _SubscriptionSheetState extends State<SubscriptionSheet> {
   bool _isProcessing = false;
-  late String _selectedPlanType;
+  late SachetPlanItem _selectedPlan;
 
   String? _activePassBadge;
   bool _hasActivePass = false;
@@ -27,8 +92,23 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
   @override
   void initState() {
     super.initState();
-    _selectedPlanType = widget.initialPlanType ?? 'PLAN_DIRECT_DM_49';
+    _selectedPlan = _resolveInitialPlan(widget.initialPlanType);
     _fetchActivePassStatus();
+  }
+
+  SachetPlanItem _resolveInitialPlan(String? planKey) {
+    if (planKey == null) return availablePlans[1]; // default to direct_dm
+    final key = planKey.toLowerCase().trim();
+    if (key.contains('boost')) {
+      return availablePlans[0];
+    } else if (key.contains('dm') || key.contains('direct') || key.contains('49')) {
+      return availablePlans[1];
+    } else if (key.contains('ad') || key.contains('zero') || key.contains('199')) {
+      return availablePlans[2];
+    } else if (key.contains('bridge') || key.contains('safe') || key.contains('499')) {
+      return availablePlans[3];
+    }
+    return availablePlans[1];
   }
 
   Future<void> _fetchActivePassStatus() async {
@@ -44,7 +124,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
         }
       }
     } catch (_) {
-      // Non-blocking fallback
+      // Non-blocking status lookup
     }
   }
 
@@ -54,20 +134,22 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final selectedPlan = _selectedPlanType;
+    final selectedPlan = _selectedPlan;
 
     try {
-      // Step 1: Create order on backend
+      // Step 1: Create order on backend (strictly decoupled, no secondary dialog)
       final orderResponse = await ApiClient.instance.createSachetOrder(
-        planType: selectedPlan,
+        planType: selectedPlan.id,
       );
 
-      if (orderResponse.data == null || orderResponse.data['data'] == null) {
+      if (orderResponse.data == null) {
         throw Exception('Failed to generate order from server');
       }
-      final orderData = Map<String, dynamic>.from(orderResponse.data['data']);
 
-      // Step 2: Cleanly dismiss the modal bottom sheet FIRST
+      final dynamic rawData = orderResponse.data['data'] ?? orderResponse.data;
+      final Map<String, dynamic> orderData = Map<String, dynamic>.from(rawData);
+
+      // Step 2: Cleanly dismiss the bottom sheet FIRST
       navigator.pop(true);
 
       // Step 3: Crucial delay to let Flutter route animation settle and free the Activity context
@@ -86,14 +168,14 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
         paymentId: paymentResult.paymentId ?? '',
         orderId: paymentResult.orderId ?? '',
         signature: paymentResult.signature ?? '',
-        planType: selectedPlan,
+        planType: selectedPlan.id,
       );
 
       await StorageManager.instance.setPremiumStatus(true);
 
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text('Payment Successful! ${_getPlanDisplayName(selectedPlan)} unlocked.'),
+          content: Text('Payment Successful! ${selectedPlan.title} (₹${selectedPlan.price}) unlocked.'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 4),
         ),
@@ -107,51 +189,6 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
           backgroundColor: Colors.redAccent,
         ),
       );
-    }
-  }
-
-  String _getPlanDisplayName(String planKey) {
-    switch (planKey) {
-      case 'PLAN_BOOST_29':
-        return '🚀 Profile Boost (₹29)';
-      case 'PLAN_DIRECT_DM_49':
-        return '⚡ Direct DM Pass (₹49)';
-      case 'PLAN_AD_FREE_199':
-        return '🚫 Ad-Free VIP (₹199)';
-      case 'PLAN_SAFE_BRIDGE_499':
-        return '🔒 Safe Bridge (₹499)';
-      default:
-        return 'UR Heart Pass';
-    }
-  }
-
-  String _getPlanPriceLabel() {
-    switch (_selectedPlanType) {
-      case 'PLAN_BOOST_29':
-        return '₹29';
-      case 'PLAN_DIRECT_DM_49':
-        return '₹49';
-      case 'PLAN_AD_FREE_199':
-        return '₹199';
-      case 'PLAN_SAFE_BRIDGE_499':
-        return '₹499';
-      default:
-        return '₹49';
-    }
-  }
-
-  String _getPlanValidityLabel() {
-    switch (_selectedPlanType) {
-      case 'PLAN_BOOST_29':
-        return '1 Hour 10x Discovery';
-      case 'PLAN_DIRECT_DM_49':
-        return '1 Hour Instant Direct DM';
-      case 'PLAN_AD_FREE_199':
-        return '30 Days Zero Ads';
-      case 'PLAN_SAFE_BRIDGE_499':
-        return 'Dual WhatsApp & Maps Unlock';
-      default:
-        return 'Valid 1 Hour';
     }
   }
 
@@ -221,49 +258,19 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
                 ),
               ),
 
-            // 4 Distinct Standardized Plans Grid
+            // 4 Distinct Standardized Plans Grid (Tabs)
             Row(
-              children: [
-                _buildPlanTile(
-                  'PLAN_BOOST_29',
-                  '🚀 Boost',
-                  '₹29',
-                  '1 Hour',
-                  '10x Discovery',
-                ),
-                const SizedBox(width: 6),
-                _buildPlanTile(
-                  'PLAN_DIRECT_DM_49',
-                  '⚡ Direct DM',
-                  '₹49',
-                  '1 Hour',
-                  'Instant DM',
-                ),
-                const SizedBox(width: 6),
-                _buildPlanTile(
-                  'PLAN_AD_FREE_199',
-                  '🚫 Zero Ads',
-                  '₹199',
-                  '30 Days',
-                  'VIP Pro',
-                ),
-                const SizedBox(width: 6),
-                _buildPlanTile(
-                  'PLAN_SAFE_BRIDGE_499',
-                  '🔒 Safe Bridge',
-                  '₹499',
-                  'Chat Lock',
-                  'Maps & WA',
-                ),
-              ],
+              children: availablePlans.map((plan) {
+                return _buildPlanTile(plan);
+              }).toList(),
             ),
             const SizedBox(height: 18),
 
             // Detailed Highlight Box for Selected Plan
-            _buildPlanDescriptionBanner(),
+            _buildPlanDescriptionBanner(_selectedPlan),
             const SizedBox(height: 18),
 
-            // Pay Action Button
+            // Pay Action Button (pure payment trigger, NO secondary modals)
             ElevatedButton.icon(
               onPressed: _isProcessing ? null : _initiateSachetPayment,
               icon: _isProcessing
@@ -276,7 +283,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
               label: Text(
                 _isProcessing
                     ? 'Connecting to Razorpay...'
-                    : 'Pay ${_getPlanPriceLabel()} via UPI (${_getPlanValidityLabel()})',
+                    : 'Pay ₹${_selectedPlan.price} via UPI (${_selectedPlan.validity} ${_selectedPlan.title})',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
@@ -293,47 +300,22 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     );
   }
 
-  Widget _buildPlanDescriptionBanner() {
-    String title;
-    String hindiSubtitle;
-    String detail;
-    IconData icon;
+  Widget _buildPlanDescriptionBanner(SachetPlanItem plan) {
     Color accentColor;
-
-    switch (_selectedPlanType) {
-      case 'PLAN_BOOST_29':
-        title = '🚀 Profile Boost (₹29)';
-        hindiSubtitle = '1 Ghante ke liye 10x Jyada Discovery';
-        detail = 'Apni profile ko discovery feed me top priority par layein aur 10x jyada views paayein.';
-        icon = Icons.bolt;
+    switch (plan.id) {
+      case 'boost':
         accentColor = Colors.amber;
         break;
-      case 'PLAN_DIRECT_DM_49':
-        title = '⚡ Direct DM Pass (₹49)';
-        hindiSubtitle = '1 Ghante tak bina match ke direct message bhejein';
-        detail = 'Kisi bhi profile ko bina mutual match ka intezar kiye turant instant direct message bhejein.';
-        icon = Icons.send_rounded;
+      case 'direct_dm':
         accentColor = Colors.cyanAccent;
         break;
-      case 'PLAN_AD_FREE_199':
-        title = '🚫 Ad-Free VIP (₹199)';
-        hindiSubtitle = '30 Din ke liye bilkul Zero Ads';
-        detail = '100% Ad-Free anubhav: Koi feed cards nahi, koi 20-skip video ads nahi, bilkul smooth UI.';
-        icon = Icons.block;
+      case 'zero_ads':
         accentColor = Colors.greenAccent;
         break;
-      case 'PLAN_SAFE_BRIDGE_499':
-        title = '🔒 Safe Bridge (₹499)';
-        hindiSubtitle = '15 Messages ke baad WhatsApp aur Live Maps Unlock';
-        detail = 'Dual payment safety flow: Dono users ke 15 messages aur consent ke baad secure contact unlock.';
-        icon = Icons.lock_open_rounded;
+      case 'safe_bridge':
         accentColor = const Color(0xFFE91E63);
         break;
       default:
-        title = 'UR Heart Pass';
-        hindiSubtitle = 'Instant upgrade';
-        detail = 'Unlock premium dating features on UR Heart.';
-        icon = Icons.star;
         accentColor = Colors.amber;
     }
 
@@ -353,7 +335,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
               color: accentColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: accentColor, size: 22),
+            child: Icon(plan.icon, color: accentColor, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -361,17 +343,17 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  '${plan.title} (₹${plan.price})',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: accentColor),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  hindiSubtitle,
+                  plan.hindiSubtitle,
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  detail,
+                  plan.description,
                   style: const TextStyle(fontSize: 11, color: Colors.white70),
                 ),
               ],
@@ -382,70 +364,74 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     );
   }
 
-  Widget _buildPlanTile(
-    String planKey,
-    String title,
-    String price,
-    String validity,
-    String subtitle,
-  ) {
-    final bool isSelected = _selectedPlanType == planKey;
+  Widget _buildPlanTile(SachetPlanItem plan) {
+    final bool isSelected = _selectedPlan.id == plan.id;
 
     return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedPlanType = planKey),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
-          decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.2) : AppTheme.surfaceColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected ? AppTheme.primaryColor : Colors.grey[800]!,
-              width: isSelected ? 2 : 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3.0),
+        child: InkWell(
+          // CRITICAL: Tapping card ONLY updates local selectedPlan state
+          onTap: () {
+            setState(() {
+              _selectedPlan = plan;
+            });
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+            decoration: BoxDecoration(
+              color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.2) : AppTheme.surfaceColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? AppTheme.primaryColor : Colors.grey[800]!,
+                width: isSelected ? 2 : 1,
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                price,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.primaryColor : Colors.black45,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  validity,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(plan.icon, size: 16, color: isSelected ? AppTheme.primaryColor : Colors.white70),
+                const SizedBox(height: 4),
+                Text(
+                  plan.title.replaceFirst(' Pass', ''),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : Colors.white70,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '₹${plan.price}',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                ),
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppTheme.primaryColor : Colors.black45,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    plan.validity,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.white : Colors.white70,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 7.5, color: Colors.grey),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  plan.tag,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 7.5, color: Colors.grey),
+                ),
+              ],
+            ),
           ),
         ),
       ),

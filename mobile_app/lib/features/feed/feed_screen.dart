@@ -339,20 +339,34 @@ class _FeedScreenState extends State<FeedScreen> {
 
       if (!isDirectDmActive) {
         if (!mounted) return;
+        // User does not have an active Direct DM pass -> Show Monetization Sheet
         final upgraded = await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          builder: (_) => const SubscriptionSheet(initialPlanType: 'PLAN_DIRECT_DM_49'),
+          builder: (_) => const SubscriptionSheet(initialPlanType: 'direct_dm'),
         );
+        
+        // If sheet was dismissed without purchase, stop here cleanly
         if (upgraded != true) return;
+
+        // Confirm pass activation after purchase before opening composer
+        final verifyRes = await ApiClient.instance.dio.get('/payments/active-pass');
+        final verifyData = verifyRes.data?['data'];
+        if (verifyData?['is_direct_dm_active'] != true) return;
       }
 
       if (!mounted) return;
       _showDirectDmComposer(targetUserId, name);
     } catch (e) {
+      debugPrint('[DIRECT_DM_ACTION_ERROR] $e');
       if (!mounted) return;
-      _showDirectDmComposer(targetUserId, name);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to verify Direct DM status: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
