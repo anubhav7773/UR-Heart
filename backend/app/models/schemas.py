@@ -120,9 +120,11 @@ class VerifyOTPData(BaseModel):
     is_admin: bool = False
 
 
-# Email Password Firebase Schemas
+# Email Password Firebase & Direct Schemas
 class EmailSignupRequest(BaseModel):
-    id_token: str = Field(..., description="Firebase Auth User ID Token")
+    id_token: Optional[str] = Field(None, description="Firebase Auth User ID Token")
+    email: Optional[str] = Field(None, description="User registered email address")
+    password: Optional[str] = Field(None, description="User password")
     full_name: str = Field(..., min_length=2, max_length=100, description="Full Name")
     device_id: str = Field(..., description="Unique mobile device identifier")
     fcm_token: Optional[str] = Field(None, description="Firebase Cloud Messaging push token")

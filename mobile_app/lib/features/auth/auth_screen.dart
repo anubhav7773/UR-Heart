@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -147,6 +148,104 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  void _showVerificationEmailDialog(String email, {User? firebaseUser}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFE91E63), width: 1.2),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.mark_email_unread_rounded, color: Color(0xFFE91E63), size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Verification Email Sent!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please verify your email before logging in.',
+                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'A verification link has been sent to:\n$email\n\nPlease check your inbox and spam folder, click the link to verify your email, and then sign in.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                try {
+                  final u = firebaseUser ?? FirebaseAuth.instance.currentUser;
+                  await u?.sendEmailVerification();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Verification link re-sent! Please check your inbox and spam folder.'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 4),
+                      ),
+                    );
+                  }
+                } catch (err) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Could not resend email: $err'),
+                        backgroundColor: Colors.redAccent,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text(
+                'Resend Link',
+                style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE91E63),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (mounted) {
+                  Navigator.of(ctx).pop();
+                  setState(() {
+                    _isSignUpMode = false;
+                    _passwordController.clear();
+                  });
+                }
+              },
+              child: const Text('OK / Go to Sign In', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _handleEmailPasswordAuth() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -163,6 +262,12 @@ class _AuthScreenState extends State<AuthScreen> {
           email: email,
           password: password,
         );
+        // Automatically send email verification link upon registration
+        try {
+          await userCredential.user?.sendEmailVerification();
+        } catch (e) {
+          debugPrint('[Auth] Could not send initial verification email: $e');
+        }
       } else {
         userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: email,
@@ -170,30 +275,59 @@ class _AuthScreenState extends State<AuthScreen> {
         );
       }
 
-      final String? idToken = await userCredential.user?.getIdToken();
+      final User? fbUser = userCredential.user;
+      final String? idToken = await fbUser?.getIdToken();
       if (idToken == null || idToken.isEmpty) {
         throw Exception('Firebase authentication failed to generate ID token.');
       }
 
       dynamic response;
       if (_isSignUpMode) {
-        response = await ApiClient.instance.emailSignup(
-          idToken: idToken,
-          fullName: fullName.isNotEmpty ? fullName : email.split('@')[0],
-          deviceId: 'flutter_native_android',
-        );
+        try {
+          response = await ApiClient.instance.emailSignup(
+            idToken: idToken,
+            fullName: fullName.isNotEmpty ? fullName : email.split('@')[0],
+            deviceId: 'flutter_native_android',
+          );
+        } on DioException catch (dioErr) {
+          final statusCode = dioErr.response?.statusCode;
+          final detail = dioErr.response?.data is Map
+              ? (dioErr.response?.data['detail'] ?? dioErr.response?.data['message'])
+              : null;
+          if (statusCode == 403 || (detail != null && detail.toString().toLowerCase().contains('verify'))) {
+            if (mounted) {
+              _showVerificationEmailDialog(email, firebaseUser: fbUser);
+            }
+            return;
+          }
+          rethrow;
+        }
       } else {
-        response = await ApiClient.instance.emailLoginToken(
-          idToken: idToken,
-          deviceId: 'flutter_native_android',
-        );
+        try {
+          response = await ApiClient.instance.emailLoginToken(
+            idToken: idToken,
+            deviceId: 'flutter_native_android',
+          );
+        } on DioException catch (dioErr) {
+          final statusCode = dioErr.response?.statusCode;
+          final detail = dioErr.response?.data is Map
+              ? (dioErr.response?.data['detail'] ?? dioErr.response?.data['message'])
+              : null;
+          if (statusCode == 403 || (detail != null && detail.toString().toLowerCase().contains('not verified'))) {
+            if (mounted) {
+              _showVerificationEmailDialog(email, firebaseUser: fbUser);
+            }
+            return;
+          }
+          rethrow;
+        }
       }
 
-      final data = response.data['data'];
+      final data = response?.data['data'];
       if (data != null) {
         await _handleSuccessLogin(data);
       } else {
-        final errMsg = response.data['detail'] ?? response.data['message'] ?? 'Backend returned empty envelope.';
+        final errMsg = response?.data['detail'] ?? response?.data['message'] ?? 'Backend returned empty envelope.';
         throw Exception(errMsg);
       }
     } on FirebaseAuthException catch (e) {
@@ -214,15 +348,45 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         );
       }
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final dynamic resData = e.response?.data;
+      String errorDetail = '';
+      if (resData is Map) {
+        errorDetail = resData['detail'] ?? resData['message'] ?? '';
+      }
+      if (statusCode == 403 || errorDetail.toLowerCase().contains('not verified') || errorDetail.toLowerCase().contains('check your inbox')) {
+        if (mounted) {
+          _showVerificationEmailDialog(email, firebaseUser: FirebaseAuth.instance.currentUser);
+        }
+      } else {
+        final msg = errorDetail.isNotEmpty ? errorDetail : (e.message ?? 'Network request failed.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(msg),
+              backgroundColor: Colors.redAccent,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Auth Error: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-            duration: const Duration(seconds: 6),
-          ),
-        );
+      final errStr = e.toString();
+      if (errStr.toLowerCase().contains('not verified') || errStr.toLowerCase().contains('403')) {
+        if (mounted) {
+          _showVerificationEmailDialog(email, firebaseUser: FirebaseAuth.instance.currentUser);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Auth Error: $errStr'),
+              backgroundColor: Colors.redAccent,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

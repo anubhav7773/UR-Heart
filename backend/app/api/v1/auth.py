@@ -45,6 +45,55 @@ def is_admin_identifier(email: Optional[str], phone: Optional[str] = None) -> bo
     return False
 
 
+# Common Disposable & Temporary Email Domains
+DISPOSABLE_EMAIL_DOMAINS = {
+    "mailinator.com", "tempmail.com", "10minutemail.com", "guerrillamail.com",
+    "yopmail.com", "sharklasers.com", "dispostable.com", "trashmail.com",
+    "getairmail.com", "crazymailing.com", "fakeinbox.com", "temp-mail.org",
+    "generator.email", "maildrop.cc", "inboxbear.com", "mohmal.com",
+    "mytemp.email", "tempail.com", "burnermail.io", "emailondeck.com",
+    "getnada.com", "trashmail.net", "tempmailaddress.com", "throwawaymailaddress.com",
+    "tempinbox.com", "guerrillamail.net", "guerrillamail.biz", "guerrillamail.de",
+    "guerrillamail.org", "grr.la", "guerrillamailblock.com", "pokemail.net",
+    "spam4.me", "superrito.com", "armyspy.com", "cuvox.de", "dayrep.com",
+    "fleckens.hu", "gustr.com", "jourrapide.com", "rhyta.com", "teleworm.us",
+    "tinemail.com", "throwaway.email", "tempmailo.com", "fakemailgenerator.com",
+    "trashmail.me", "trash-mail.com", "tempinbox.xyz", "dropmail.me",
+    "mohmal.in", "nada.ltd", "nada.email", "tempmail.net", "10mail.org",
+    "mintemail.com", "mytempemail.com", "fakemail.net", "throwawaymail.com",
+    "bouncr.com", "jetable.org", "getairmail.cf", "disposablemail.com",
+    "trashmail.org", "spambog.com", "spambog.de", "mailnull.com",
+    "temp-mail.io", "emailfake.com", "zillamail.com", "fakemail.com",
+    "tempmail.dev", "disposable.com", "temp-email.com", "trash-email.com",
+}
+
+
+def is_disposable_email(email: str) -> bool:
+    if not email or "@" not in email:
+        return False
+    domain = email.strip().lower().split("@")[-1]
+    if domain in DISPOSABLE_EMAIL_DOMAINS:
+        return True
+    for d in DISPOSABLE_EMAIL_DOMAINS:
+        if domain.endswith(f".{d}"):
+            return True
+    return False
+
+
+def validate_signup_email(email: str) -> None:
+    if not email or "@" not in email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid email address is required."
+        )
+    if is_disposable_email(email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Disposable and temporary email addresses are not allowed. Please use a permanent email address."
+        )
+
+
+
 # Fast2SMS SMS Gateway Credentials & Active OTP In-Memory Store (5-Min Expiry)
 FAST2SMS_API_KEY = "XpyeJ4EN26nsazjOgVWCS70xFDLKYUMuocqPTRdwtHGirlbBZAzacATYetJ8CMpLUjDIoRNiSbvkwXP3"
 _active_otp_store = {}
@@ -291,51 +340,67 @@ async def email_signup(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Verifies Firebase Email/Password User ID Token, creates user record in Supabase DB,
-    and returns JWT session tokens.
+    Registers user via Firebase ID Token or direct Email/Password.
+    Blocks disposable email domains and enforces strict email verification before session tokens are issued.
     """
     logger.info(f"[Email-Signup] Incoming payload for device_id={payload.device_id}")
 
-    if not payload.id_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Firebase id_token is required."
-        )
+    verified_email = None
+    is_email_verified = False
+    full_name = payload.full_name
 
-    try:
-        from app.core.firebase import initialize_firebase, fb_auth
-        initialize_firebase()
-        decoded_claims = fb_auth.verify_id_token(payload.id_token)
-    except Exception as e:
-        if payload.id_token == "mock_firebase_id_token_12345":
-            if not _is_mock_auth_allowed():
-                logger.warning("[Security] Mock credentials attempted in production environment for email-signup.")
+    if payload.id_token:
+        try:
+            from app.core.firebase import initialize_firebase, fb_auth
+            initialize_firebase()
+            decoded_claims = fb_auth.verify_id_token(payload.id_token)
+            verified_email = decoded_claims.get("email")
+            is_email_verified = bool(decoded_claims.get("email_verified", False))
+            if decoded_claims.get("name") and not full_name:
+                full_name = decoded_claims.get("name")
+        except Exception as e:
+            if payload.id_token == "mock_firebase_id_token_12345":
+                if not _is_mock_auth_allowed():
+                    logger.warning("[Security] Mock credentials attempted in production environment for email-signup.")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Mock credentials disabled in production environment"
+                    )
+                verified_email = f"signup_{payload.device_id[:8]}@ruralheart.com"
+                is_email_verified = True
+            else:
+                logger.error(f"[Email-Signup] Token verification error: {str(e)}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Mock credentials disabled in production environment"
+                    detail=f"Firebase ID Token verification failed: {str(e)}"
                 )
-            decoded_claims = {
-                "email": f"signup_{payload.device_id[:8]}@ruralheart.com",
-                "name": payload.full_name,
-            }
-        else:
-            logger.error(f"[Email-Signup] Token verification error: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Firebase ID Token verification failed: {str(e)}"
-            )
+    elif payload.email:
+        verified_email = payload.email.strip().lower()
+        is_email_verified = False
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either id_token or email is required."
+        )
 
-    verified_email = decoded_claims.get("email")
     if not verified_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verified email is missing from token claims."
+            detail="Valid email address is missing from payload."
         )
+
+    # 1. Block Fake / Disposable Emails
+    validate_signup_email(verified_email)
+
+    # Admin check: auto-verify designated admin accounts
+    is_admin = is_admin_identifier(verified_email)
+    if is_admin:
+        is_email_verified = True
 
     user_id = str(uuid.uuid4())
     is_complete = False
     is_premium = False
-    is_admin = False
+    user = None
 
     try:
         res = await db.execute(select(User).where(User.email == verified_email))
@@ -346,28 +411,47 @@ async def email_signup(
             user = User(
                 id=uuid.UUID(user_id),
                 email=verified_email,
-                full_name=payload.full_name or verified_email.split("@")[0].capitalize(),
+                full_name=full_name or verified_email.split("@")[0].capitalize(),
                 dob=date(2000, 1, 1),
                 gender=ORMGenderEnum.male,
                 interested_in=ORMGenderEnum.female,
                 intent=ORMIntentEnum.casual,
                 is_active=True,
                 is_premium=False,
+                is_verified=is_email_verified,
+                email_confirmed_at=datetime.now(timezone.utc) if is_email_verified else None,
+                is_admin=is_admin,
             )
             db.add(user)
             await db.commit()
             await db.refresh(user)
+        else:
+            if is_email_verified and not user.is_verified:
+                user.is_verified = True
+                user.email_confirmed_at = user.email_confirmed_at or datetime.now(timezone.utc)
+            if is_admin and not user.is_admin:
+                user.is_admin = True
+            await db.commit()
+            await db.refresh(user)
 
         user_id = str(user.id)
-        is_premium = user.is_premium
+        is_premium = bool(user.is_premium)
         is_admin = bool(getattr(user, "is_admin", False))
-        if user.email and is_admin_identifier(user.email):
-            if not user.is_admin:
-                user.is_admin = True
-                await db.commit()
-            is_admin = True
+        photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
+        photos = photo_count_res.scalars().all()
+        is_complete = len(photos) >= 1
+    except HTTPException:
+        raise
     except Exception as db_err:
         logger.warning(f"[Email-Signup] Supabase DB lookup warning: {db_err}")
+
+    # 2. Strict Email Verification Check:
+    # If not verified and not admin, block session token issuance and return HTTP 403 Forbidden
+    if not is_admin and not is_email_verified and not (user and (user.is_verified or user.email_confirmed_at is not None)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email not verified. Please check your inbox and verify your email address to log in."
+        )
 
     access_token = create_access_token(subject=user_id)
 
@@ -390,17 +474,21 @@ async def email_login_endpoint(
 ):
     """
     Verifies Firebase Email/Password User ID Token or fallback email/password,
-    fetches user profile from Supabase DB, and returns JWT session tokens.
+    strictly verifies if email is confirmed (email_confirmed_at is not None or is_verified == True),
+    and returns JWT session tokens, or HTTP 403 Forbidden if unverified.
     """
     logger.info(f"[Email-Login] Incoming token payload for device_id={payload.device_id}")
 
     verified_email = None
+    is_token_verified = False
+
     if payload.id_token:
         try:
             from app.core.firebase import initialize_firebase, fb_auth
             initialize_firebase()
             decoded_claims = fb_auth.verify_id_token(payload.id_token)
             verified_email = decoded_claims.get("email")
+            is_token_verified = bool(decoded_claims.get("email_verified", False))
         except Exception as e:
             if payload.id_token == "mock_firebase_id_token_12345":
                 if not _is_mock_auth_allowed():
@@ -410,6 +498,7 @@ async def email_login_endpoint(
                         detail="Mock credentials disabled in production environment"
                     )
                 verified_email = f"login_{payload.device_id[:8]}@ruralheart.com"
+                is_token_verified = True
             else:
                 logger.error(f"[Email-Login] Token verification error: {str(e)}")
                 raise HTTPException(
@@ -417,23 +506,24 @@ async def email_login_endpoint(
                     detail=f"Firebase ID Token verification failed: {str(e)}"
                 )
     elif payload.email:
-        verified_email = payload.email
+        verified_email = payload.email.strip().lower()
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Either id_token or email is required."
         )
 
-    if not verified_email:
+    if not verified_email or "@" not in verified_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verified email is missing from payload."
+            detail="Verified email is missing or invalid from payload."
         )
 
+    is_admin = is_admin_identifier(verified_email)
     user_id = str(uuid.uuid4())
     is_complete = False
     is_premium = False
-    is_admin = False
+    user = None
 
     try:
         res = await db.execute(select(User).where(User.email == verified_email))
@@ -450,24 +540,40 @@ async def email_login_endpoint(
                 intent=ORMIntentEnum.casual,
                 is_active=True,
                 is_premium=False,
+                is_verified=(is_token_verified or is_admin),
+                email_confirmed_at=datetime.now(timezone.utc) if (is_token_verified or is_admin) else None,
+                is_admin=is_admin,
             )
             db.add(user)
             await db.commit()
             await db.refresh(user)
+        else:
+            if (is_token_verified or is_admin) and not user.is_verified:
+                user.is_verified = True
+                user.email_confirmed_at = user.email_confirmed_at or datetime.now(timezone.utc)
+            if is_admin and not user.is_admin:
+                user.is_admin = True
+            await db.commit()
+            await db.refresh(user)
 
         user_id = str(user.id)
-        is_premium = user.is_premium
+        is_premium = bool(user.is_premium)
         is_admin = bool(getattr(user, "is_admin", False))
-        if user.email and is_admin_identifier(user.email):
-            if not user.is_admin:
-                user.is_admin = True
-                await db.commit()
-            is_admin = True
         photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
         photos = photo_count_res.scalars().all()
         is_complete = len(photos) == 5
+    except HTTPException:
+        raise
     except Exception as db_err:
         logger.warning(f"[Email-Login] Supabase DB lookup warning: {db_err}")
+
+    # Strict Email Verification Check:
+    # Check if user's email is confirmed (email_confirmed_at is not None or is_verified == True or is_admin == True)
+    if not is_admin and not is_token_verified and not (user and (user.is_verified or user.email_confirmed_at is not None)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email not verified. Please check your inbox and verify your email address to log in."
+        )
 
     access_token = create_access_token(subject=user_id)
 
@@ -656,73 +762,6 @@ async def verify_otp(
     return APIResponse(success=True, data=data)
 
 
-@router.post("/auth/email-login", response_model=APIResponse[SocialLoginData])
-async def email_login(
-    payload: EmailPasswordLoginRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Authenticates user via Email & Password fallback option.
-    """
-    if "@" not in payload.email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please provide a valid email address."
-        )
-
-    user_id = str(uuid.uuid4())
-    is_complete = False
-    is_premium = False
-    is_admin = False
-
-    try:
-        result = await db.execute(select(User).where(User.email == payload.email))
-        user = result.scalars().first()
-
-        if not user:
-            user = User(
-                id=uuid.UUID(user_id),
-                email=payload.email,
-                full_name=payload.email.split("@")[0].capitalize(),
-                dob=date(2000, 1, 1),
-                gender=ORMGenderEnum.male,
-                interested_in=ORMGenderEnum.female,
-                intent=ORMIntentEnum.casual,
-                is_active=True,
-                is_premium=False,
-            )
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-
-        user_id = str(user.id)
-        is_premium = user.is_premium
-        is_admin = bool(getattr(user, "is_admin", False))
-        if user.email and is_admin_identifier(user.email):
-            if not user.is_admin:
-                user.is_admin = True
-                await db.commit()
-            is_admin = True
-        photo_count_res = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
-        photos = photo_count_res.scalars().all()
-        is_complete = len(photos) == 5
-    except Exception:
-        pass
-
-    access_token = create_access_token(subject=user_id)
-
-    data = SocialLoginData(
-        user_id=user_id,
-        access_token=access_token,
-        token_type="Bearer",
-        expires_in=1296000,
-        is_profile_complete=is_complete,
-        is_premium=is_premium,
-        is_admin=is_admin,
-    )
-    return APIResponse(success=True, data=data)
-
-
 @router.post("/profile/complete", response_model=APIResponse[CompleteProfileData], status_code=status.HTTP_201_CREATED)
 async def complete_profile(
     payload: CompleteProfileRequest,
@@ -731,7 +770,7 @@ async def complete_profile(
 ):
     """
     Submits user metadata, 5 photo URLs, and GPS location during initial onboarding.
-    Requires valid Bearer token.
+    Requires valid Bearer token and verified email address for email users.
     """
     dob_val = payload.dob or payload.date_of_birth
     age = calculate_age(dob_val)
@@ -741,56 +780,68 @@ async def complete_profile(
             detail="Users must be at least 18 years old to join RuralHeart."
         )
 
-    if payload.photos and len(payload.photos) > 0 and len(payload.photos) != 5:
-        # If photos are explicitly sent, allow between 1 and 5
-        pass
-
     try:
         user_uuid = uuid.UUID(current_user_id)
         result = await db.execute(select(User).where(User.id == user_uuid))
         user = result.scalars().first()
 
-        if user:
-            user.full_name = payload.full_name or user.full_name
-            if dob_val:
-                user.dob = dob_val
-            if payload.gender:
-                user.gender = ORMGenderEnum(payload.gender.value)
-            if payload.interested_in:
-                user.interested_in = ORMGenderEnum(payload.interested_in.value)
-            if payload.intent:
-                user.intent = ORMIntentEnum(payload.intent.value)
-            user.bio = payload.bio if payload.bio is not None else user.bio
-            user.area_name = payload.area_name if payload.area_name is not None else user.area_name
-            user.village_pin_code = payload.village_pin_code if payload.village_pin_code is not None else user.village_pin_code
-            user.latitude = payload.latitude if payload.latitude is not None else user.latitude
-            user.longitude = payload.longitude if payload.longitude is not None else user.longitude
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User account not found."
+            )
 
-            existing_photos = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
-            for photo in existing_photos.scalars().all():
-                await db.delete(photo)
+        # Block unverified email users from completing onboarding
+        if user.email and not is_admin_identifier(user.email) and not (user.is_verified or user.email_confirmed_at is not None):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Email not verified. Please check your inbox and verify your email address to log in."
+            )
 
-            for p in payload.photos:
-                new_photo = UserPhoto(
-                    id=uuid.uuid4(),
-                    user_id=user.id,
-                    photo_url=p.photo_url,
-                    is_first_impression=p.is_first_impression,
-                    display_order=p.display_order
-                )
-                db.add(new_photo)
+        user.full_name = payload.full_name or user.full_name
+        if dob_val:
+            user.dob = dob_val
+        if payload.gender:
+            user.gender = ORMGenderEnum(payload.gender.value)
+        if payload.interested_in:
+            user.interested_in = ORMGenderEnum(payload.interested_in.value)
+        if payload.intent:
+            user.intent = ORMIntentEnum(payload.intent.value)
+        user.bio = payload.bio if payload.bio is not None else user.bio
+        user.area_name = payload.area_name if payload.area_name is not None else user.area_name
+        user.village_pin_code = payload.village_pin_code if payload.village_pin_code is not None else user.village_pin_code
+        user.latitude = payload.latitude if payload.latitude is not None else user.latitude
+        user.longitude = payload.longitude if payload.longitude is not None else user.longitude
 
-            existing_counter = await db.execute(select(UserAdCounter).where(UserAdCounter.user_id == user.id))
-            if not existing_counter.scalars().first():
-                ad_counter = UserAdCounter(user_id=user.id, persistent_skip_count=0, total_interstitials_shown=0)
-                db.add(ad_counter)
+        existing_photos = await db.execute(select(UserPhoto).where(UserPhoto.user_id == user.id))
+        for photo in existing_photos.scalars().all():
+            await db.delete(photo)
 
-            await db.commit()
-    except Exception:
-        pass
+        for p in payload.photos:
+            new_photo = UserPhoto(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                photo_url=p.photo_url,
+                is_first_impression=p.is_first_impression,
+                display_order=p.display_order
+            )
+            db.add(new_photo)
+
+        existing_counter = await db.execute(select(UserAdCounter).where(UserAdCounter.user_id == user.id))
+        if not existing_counter.scalars().first():
+            ad_counter = UserAdCounter(user_id=user.id, persistent_skip_count=0, total_interstitials_shown=0)
+            db.add(ad_counter)
+
+        await db.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Complete-Profile] Error: {e}")
+        await db.rollback()
 
     return APIResponse(
         success=True,
         message="Profile created successfully.",
         data=CompleteProfileData(user_id=current_user_id, is_profile_complete=True)
     )
+

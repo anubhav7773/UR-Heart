@@ -135,6 +135,9 @@ class User(Base):
     bonus_swipes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    email_confirmed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verification_status: Mapped[VerificationStatusEnum] = mapped_column(
         SQLEnum(VerificationStatusEnum, name="verification_status_enum", native_enum=False, values_callable=lambda obj: [e.value for e in obj]),

@@ -112,10 +112,34 @@ def test_verify_otp():
     assert "user_id" in json_resp["data"]
 
 
-def test_email_login():
+def test_email_signup_disposable_blocked():
     payload = {
-        "email": "rahul.ayodhya@ruralheart.com",
+        "email": "scammer@mailinator.com",
         "password": "Password123!",
+        "full_name": "Fake User",
+        "device_id": "test_device_fake_1"
+    }
+    response = client.post("/api/v1/auth/email-signup", json=payload)
+    assert response.status_code == 400
+    json_resp = response.json()
+    assert "disposable" in json_resp["detail"].lower()
+
+
+def test_email_login_unverified_blocked():
+    payload = {
+        "email": "unverified.user@gmail.com",
+        "password": "Password123!",
+        "device_id": "test_device_unverified_1"
+    }
+    response = client.post("/api/v1/auth/email-login", json=payload)
+    assert response.status_code == 403
+    json_resp = response.json()
+    assert json_resp["detail"] == "Email not verified. Please check your inbox and verify your email address to log in."
+
+
+def test_email_login_firebase_mock():
+    payload = {
+        "id_token": "mock_firebase_id_token_12345",
         "device_id": "test_device_email_1"
     }
     response = client.post("/api/v1/auth/email-login", json=payload)
@@ -123,6 +147,21 @@ def test_email_login():
     json_resp = response.json()
     assert json_resp["success"] is True
     assert "access_token" in json_resp["data"]
+
+
+def test_admin_email_login_auto_verified():
+    payload = {
+        "email": "kshtriyaanubhav9120@gmail.com",
+        "password": "AdminPassword123!",
+        "device_id": "test_device_admin_1"
+    }
+    response = client.post("/api/v1/auth/email-login", json=payload)
+    assert response.status_code == 200
+    json_resp = response.json()
+    assert json_resp["success"] is True
+    assert json_resp["data"]["is_admin"] is True
+    assert "access_token" in json_resp["data"]
+
 
 
 def test_chai_status():
