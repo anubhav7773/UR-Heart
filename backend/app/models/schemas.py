@@ -585,11 +585,34 @@ class WhatsAppBridgeStatusData(BaseModel):
 
 
 # 11. Sachet Micro-Transaction Schemas
+class SachetOrderRequest(BaseModel):
+    plan_type: str = Field(
+        ...,
+        description="boost, direct_dm, zero_ads, safe_bridge, PLAN_BOOST_29, PLAN_DIRECT_DM_49, etc."
+    )
+    amount: Optional[float] = Field(None, gt=0, description="Amount in INR (Rupees)")
+    target_user_id: Optional[str] = None
+
+
 class CreateSachetOrderRequest(BaseModel):
     plan_type: str = Field(
         ...,
-        description="'PLAN_BOOST_29' (₹29), 'PLAN_DIRECT_DM_49' (₹49), 'PLAN_AD_FREE_199' (₹199), 'PLAN_SAFE_BRIDGE_499' (₹499)"
+        description="boost, direct_dm, zero_ads, safe_bridge, PLAN_BOOST_29, PLAN_DIRECT_DM_49, etc."
     )
+    amount: Optional[float] = Field(None, gt=0, description="Amount in INR (Rupees)")
+    target_user_id: Optional[str] = None
+
+
+class SachetOrderResponse(BaseModel):
+    success: bool = True
+    order_id: str
+    amount: float
+    amount_in_paise: int
+    currency: str = "INR"
+    razorpay_key_id: str
+    plan_type: str
+    description: str
+    data: Optional[dict] = None
 
 
 class CreateSachetOrderData(BaseModel):

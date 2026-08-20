@@ -2,18 +2,25 @@ from datetime import datetime, timedelta, timezone
 import uuid
 import hmac
 import hashlib
+import time
 from typing import Optional
+try:
+    import razorpay
+except ImportError:
+    razorpay = None
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, or_, and_
 
 from app.core.database import get_db
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_optional_user_id
 from app.models.orm import User, SachetTransaction, Match
 from app.models.schemas import (
     APIResponse,
     CreateOrderData,
+    SachetOrderRequest,
     CreateSachetOrderRequest,
+    SachetOrderResponse,
     CreateSachetOrderData,
     VerifyPaymentRequest,
     VerifyPaymentData,
@@ -38,33 +45,37 @@ PLAN_AMOUNTS = {
 }
 
 
-def normalize_plan_type(plan_str: str) -> tuple[str, float]:
+def normalize_plan_type(plan_str: str, override_amount: Optional[float] = None) -> tuple[str, float]:
     """
-    Maps input plan type strings (including aliases) strictly to one of the 4 defined tiers.
+    Maps input plan type strings (including aliases) strictly to one of the 4 defined tiers,
+    or accepts custom pricing if explicitly provided.
     """
     p = (plan_str or "").strip().upper()
     if p in ("PLAN_BOOST_29", "BOOST_29", "SUPER_BOOST", "BOOST", "₹29"):
-        return PLAN_BOOST_29, 29.0
+        return PLAN_BOOST_29, float(override_amount) if override_amount else 29.0
     elif p in ("PLAN_DIRECT_DM_49", "DIRECT_DM_49", "DIRECT_DM", "FAST_PASS", "CHAI_INVITE", "DIRECT_INVITE", "₹49", "₹9"):
-        return PLAN_DIRECT_DM_49, 49.0
-    elif p in ("PLAN_AD_FREE_199", "AD_FREE_199", "AD_FREE", "MONTHLY", "SUBSCRIPTION", "VIP", "₹199", "₹99"):
-        return PLAN_AD_FREE_199, 199.0
+        return PLAN_DIRECT_DM_49, float(override_amount) if override_amount else 49.0
+    elif p in ("PLAN_AD_FREE_199", "AD_FREE_199", "AD_FREE", "ZERO_ADS", "MONTHLY", "SUBSCRIPTION", "VIP", "₹199", "₹99"):
+        return PLAN_AD_FREE_199, float(override_amount) if override_amount else 199.0
     elif p in ("PLAN_SAFE_BRIDGE_499", "SAFE_BRIDGE_499", "SAFE_BRIDGE", "WHATSAPP_BRIDGE", "₹499"):
-        return PLAN_SAFE_BRIDGE_499, 499.0
+        return PLAN_SAFE_BRIDGE_499, float(override_amount) if override_amount else 499.0
     else:
-        # Default fallback if recognized as legacy or error
         p_lower = plan_str.lower().strip()
         if "boost" in p_lower:
-            return PLAN_BOOST_29, 29.0
+            return PLAN_BOOST_29, float(override_amount) if override_amount else 29.0
         elif "dm" in p_lower or "invite" in p_lower or "pass" in p_lower:
-            return PLAN_DIRECT_DM_49, 49.0
-        elif "ad" in p_lower or "month" in p_lower or "vip" in p_lower:
-            return PLAN_AD_FREE_199, 199.0
+            return PLAN_DIRECT_DM_49, float(override_amount) if override_amount else 49.0
+        elif "ad" in p_lower or "month" in p_lower or "vip" in p_lower or "zero" in p_lower:
+            return PLAN_AD_FREE_199, float(override_amount) if override_amount else 199.0
         elif "bridge" in p_lower:
-            return PLAN_SAFE_BRIDGE_499, 499.0
+            return PLAN_SAFE_BRIDGE_499, float(override_amount) if override_amount else 499.0
+
+        if override_amount and override_amount > 0:
+            return plan_str, float(override_amount)
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid plan_type. Supported tiers: PLAN_BOOST_29 (₹29), PLAN_DIRECT_DM_49 (₹49), PLAN_AD_FREE_199 (₹199), PLAN_SAFE_BRIDGE_499 (₹499)."
+            detail="Invalid plan_type. Supported tiers: boost / PLAN_BOOST_29 (₹29), direct_dm / PLAN_DIRECT_DM_49 (₹49), zero_ads / PLAN_AD_FREE_199 (₹199), safe_bridge / PLAN_SAFE_BRIDGE_499 (₹499)."
         )
 
 
@@ -74,45 +85,133 @@ async def create_razorpay_order():
     Initiates a Razorpay UPI order session for the Ad-Free VIP (₹199) tier.
     """
     order_id = f"order_{uuid.uuid4().hex[:14]}"
+    key_id = str(settings.RAZORPAY_KEY_ID or "rzp_test_sample").strip()
     data = CreateOrderData(
         order_id=order_id,
         amount=199.0,
         amount_inr=199.0,
         amount_in_paise=19900,
         currency="INR",
-        razorpay_key_id=str(settings.RAZORPAY_KEY_ID or "rzp_test_sample").strip(),
+        razorpay_key_id=key_id,
         plan_name="Ad-Free VIP",
         description="UR-Heart - Ad-Free VIP",
     )
     return APIResponse(success=True, data=data)
 
 
-@router.post("/create-sachet-order", response_model=APIResponse[CreateSachetOrderData])
-@router.post("/sachet/create-order", response_model=APIResponse[CreateSachetOrderData])
-async def create_sachet_order(payload: CreateSachetOrderRequest):
+@router.post("/create-sachet-order", response_model=SachetOrderResponse)
+@router.post("/sachet/create-order", response_model=SachetOrderResponse)
+async def create_sachet_order(
+    request: SachetOrderRequest,
+    current_user_id: Optional[str] = Depends(get_optional_user_id),
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Initiates a Razorpay UPI order session strictly across 4 standard tiers:
-    - PLAN_BOOST_29: ₹29.00 (1 Hour 10x Discovery Multiplier)
-    - PLAN_DIRECT_DM_49: ₹49.00 (1 Hour Instant DM Pass)
-    - PLAN_AD_FREE_199: ₹199.00 (30 Days Zero Ads VIP)
-    - PLAN_SAFE_BRIDGE_499: ₹499.00 (Safe Bridge WhatsApp & Maps Unlock)
+    Initiates a Razorpay order session across flexible and standard tiers:
+    - boost / PLAN_BOOST_29: ₹29.00 (1 Hour 10x Discovery Multiplier)
+    - direct_dm / PLAN_DIRECT_DM_49: ₹49.00 (1 Hour Instant DM Pass)
+    - zero_ads / PLAN_AD_FREE_199: ₹199.00 (30 Days Zero Ads VIP)
+    - safe_bridge / PLAN_SAFE_BRIDGE_499: ₹499.00 (Safe Bridge WhatsApp & Maps Unlock)
     """
-    standard_plan, amount = normalize_plan_type(payload.plan_type)
-    order_id = f"order_{standard_plan.lower()}_{uuid.uuid4().hex[:10]}"
-    plan_name = f"{standard_plan.replace('_', ' ').title()}"
+    try:
+        # Validate Razorpay Credentials
+        key_id = str(settings.RAZORPAY_KEY_ID or "").strip()
+        key_secret = str(settings.RAZORPAY_KEY_SECRET or "").strip()
 
-    data = CreateSachetOrderData(
-        order_id=order_id,
-        amount=float(amount),
-        amount_inr=float(amount),
-        amount_in_paise=int(round(amount * 100)),
-        currency="INR",
-        plan_type=standard_plan,
-        plan_name=plan_name,
-        description=f"UR-Heart - {plan_name}",
-        razorpay_key_id=str(settings.RAZORPAY_KEY_ID or "rzp_test_sample").strip(),
-    )
-    return APIResponse(success=True, data=data)
+        if not key_id or not key_secret:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Razorpay credentials not properly configured on server."
+            )
+
+        standard_plan, amount_in_inr = normalize_plan_type(request.plan_type, request.amount)
+        amount_in_paise = int(round(amount_in_inr * 100))
+
+        # Receipt must be unique and <= 40 chars
+        user_snippet = str(current_user_id).replace("-", "")[:8]
+        receipt_id = f"rcpt_{user_snippet}_{int(time.time())}"
+
+        plan_titles = {
+            "boost": "Profile Boost",
+            "PLAN_BOOST_29": "Profile Boost",
+            "direct_dm": "Direct DM Pass",
+            "PLAN_DIRECT_DM_49": "Direct DM Pass",
+            "zero_ads": "Zero Ads VIP Pass",
+            "PLAN_AD_FREE_199": "Zero Ads VIP Pass",
+            "safe_bridge": "Safe Meet & WhatsApp Bridge",
+            "PLAN_SAFE_BRIDGE_499": "Safe Meet & WhatsApp Bridge",
+        }
+        plan_title = plan_titles.get(
+            request.plan_type,
+            plan_titles.get(standard_plan, request.plan_type.replace("_", " ").title())
+        )
+
+        order_id = f"order_{standard_plan.lower()}_{uuid.uuid4().hex[:10]}"
+
+        if key_id and key_secret and key_id != "rzp_test_sample":
+            try:
+                client = razorpay.Client(auth=(key_id, key_secret))
+                order_data = {
+                    "amount": amount_in_paise,
+                    "currency": "INR",
+                    "receipt": receipt_id,
+                    "payment_capture": 1,
+                    "notes": {
+                        "user_id": str(current_user_id),
+                        "plan_type": request.plan_type,
+                        "target_user_id": str(request.target_user_id) if request.target_user_id else ""
+                    }
+                }
+                razorpay_order = client.order.create(data=order_data)
+                if "id" in razorpay_order:
+                    order_id = str(razorpay_order["id"])
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="Failed to generate Razorpay order ID"
+                    )
+            except Exception as rzp_e:
+                if isinstance(rzp_e, HTTPException):
+                    raise rzp_e
+                if "rzp_test" in key_id or key_id == "rzp_test_sample":
+                    order_id = f"order_{standard_plan.lower()}_{uuid.uuid4().hex[:10]}"
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail=f"Razorpay order generation failed: {str(rzp_e)}"
+                    )
+
+        data_dict = {
+            "order_id": order_id,
+            "amount": amount_in_inr,
+            "amount_inr": amount_in_inr,
+            "amount_in_paise": amount_in_paise,
+            "currency": "INR",
+            "razorpay_key_id": key_id,
+            "plan_type": request.plan_type,
+            "plan_name": plan_title,
+            "description": f"UR-Heart - {plan_title}",
+        }
+
+        return SachetOrderResponse(
+            success=True,
+            order_id=order_id,
+            amount=amount_in_inr,
+            amount_in_paise=amount_in_paise,
+            currency="INR",
+            razorpay_key_id=key_id,
+            plan_type=request.plan_type,
+            description=f"UR-Heart - {plan_title}",
+            data=data_dict
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Order creation failed: {str(e)}"
+        )
 
 
 _mock_user_passes = {}

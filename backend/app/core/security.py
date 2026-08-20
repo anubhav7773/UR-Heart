@@ -70,6 +70,15 @@ async def get_current_user_id(
     return user_id
 
 
+async def get_optional_user_id(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+) -> Optional[str]:
+    """Optional bearer security dependency that returns user_id if valid token is present, or None."""
+    if not credentials or not credentials.credentials:
+        return None
+    return decode_access_token(credentials.credentials)
+
+
 SUPER_ADMIN_EMAIL = "kshtriyaanubhav9120@gmail.com"
 
 
