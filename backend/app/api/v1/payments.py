@@ -407,12 +407,18 @@ async def get_active_pass_status(
                 "is_boosted": is_boosted,
                 "boost_remaining_minutes": boost_remaining_mins,
                 "boost_badge_text": boost_badge,
+                "boost_remaining": f"{boost_remaining_mins}m left • 10x Discovery" if is_boosted else "1 Hour • 10x Discovery",
                 "boosted_until": boosted_until_str,
                 "is_direct_dm_active": is_direct_dm_active,
+                "has_direct_dm": is_direct_dm_active,
                 "direct_dm_remaining_minutes": direct_dm_remaining_mins,
+                "direct_dm_remaining": f"{direct_dm_remaining_mins}m left • Unlimited DMs" if is_direct_dm_active else "1 Hour • Unlimited Direct DMs",
                 "direct_dm_until": direct_dm_until_str,
                 "is_ad_free": is_ad_free,
+                "ad_free_remaining": "30 Days • Completely Ad-Free",
                 "ad_free_until": ad_free_until_str,
+                "has_safe_bridge": bool(active_txn and active_txn.plan_type == PLAN_SAFE_BRIDGE_499),
+                "safe_bridge_remaining": "Chat Lock • WA & Maps",
             }
         )
     except Exception:

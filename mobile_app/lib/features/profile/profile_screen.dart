@@ -8,12 +8,12 @@ import '../../core/theme/app_theme.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_screen.dart';
 import '../settings/blocked_users_screen.dart';
-import '../subscription/subscription_sheet.dart';
 import '../../screens/admin_verification_screen.dart';
 import '../../core/utils/feedback_helper.dart';
 import '../../core/services/app_update_service.dart';
 import '../../core/services/image_guard_service.dart';
 import 'edit_profile_screen.dart';
+import 'manage_subscriptions_sheet.dart';
 import 'profile_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -29,6 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
+  Map<String, dynamic>? _activePasses;
   bool _isBoosted = false;
   String? _boostBadgeText;
 
@@ -46,6 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final passRes = await ApiClient.instance.getActivePassStatus();
         if (passRes.data != null && passRes.data['data'] != null) {
           final passData = passRes.data['data'];
+          _activePasses = Map<String, dynamic>.from(passData);
           _isBoosted = passData['is_boosted'] ?? false;
           _boostBadgeText = passData['boost_badge_text'];
         }
@@ -969,62 +971,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Super Boost (₹29) / VIP Promotion Card
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.secondaryColor.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '10x Visibility Super Boost',
-                          style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _isBoosted ? 'Active on your profile now' : 'Be #1 in candidate feeds for 1 hour (₹29)',
-                          style: const TextStyle(fontSize: 12, color: AppTheme.mutedTextColor),
-                        ),
-                      ],
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => const SubscriptionSheet(),
-                      ).then((_) => _fetchProfile());
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.secondaryColor,
-                      foregroundColor: Colors.black87,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Text(_isBoosted ? 'Extend' : 'Boost ₹29', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
+            // Monetization & VIP Passes Hub Tile
+            _buildManagePassesTile(context, _activePasses),
             const SizedBox(height: 14),
 
             // Video Verification Status Card
@@ -1274,6 +1222,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  void _openManageSubscriptionsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const ManageSubscriptionsSheet(),
+    ).then((_) => _fetchProfile());
+  }
+
+  Widget _buildManagePassesTile(BuildContext context, Map<String, dynamic>? activePasses) {
+    // Count active passes
+    int activeCount = 0;
+    if (activePasses != null) {
+      if (activePasses['is_boosted'] == true) activeCount++;
+      if (activePasses['has_direct_dm'] == true || activePasses['is_direct_dm_active'] == true) activeCount++;
+      if (activePasses['is_ad_free'] == true) activeCount++;
+      if (activePasses['has_safe_bridge'] == true) activeCount++;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A1625), Color(0xFF1E1E2E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFF3366).withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF3366).withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF3366).withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.workspace_premium, color: Color(0xFFFF3366), size: 24),
+        ),
+        title: const Text(
+          'Monetization & VIP Passes',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: Text(
+          activeCount > 0 ? '$activeCount Active Pass${activeCount > 1 ? "es" : ""}' : 'Boost, Direct DM & VIP Pro',
+          style: TextStyle(
+            color: activeCount > 0 ? const Color(0xFF4ADE80) : Colors.white60,
+            fontSize: 13,
+            fontWeight: activeCount > 0 ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+        onTap: () {
+          _openManageSubscriptionsSheet(context);
+        },
       ),
     );
   }
