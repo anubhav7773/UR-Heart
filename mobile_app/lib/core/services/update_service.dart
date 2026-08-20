@@ -90,7 +90,7 @@ class UpdateService {
     }
   }
 
-  /// Clean semantic tag e.g. "v1.2.0" -> "1.2.0"
+  /// Clean semantic tag e.g. "v1.2.0-beta" -> "1.2.0"
   String _cleanVersion(String v) {
     var cleaned = v.trim();
     if (cleaned.startsWith('v') || cleaned.startsWith('V')) {
@@ -100,16 +100,23 @@ class UpdateService {
     if (plusIndex != -1) {
       cleaned = cleaned.substring(0, plusIndex);
     }
-    return cleaned;
+    final dashIndex = cleaned.indexOf('-');
+    if (dashIndex != -1) {
+      cleaned = cleaned.substring(0, dashIndex);
+    }
+    return cleaned.trim();
   }
 
-  /// Compares semantic versions (e.g. 1.0.1 > 1.0.0)
+  /// Compares semantic versions (e.g. 1.1.0 > 1.0.0)
   bool _isNewerVersion(String latest, String current) {
-    if (latest.isEmpty) return false;
-    if (current.isEmpty) return true;
+    final cleanLatest = _cleanVersion(latest);
+    final cleanCurrent = _cleanVersion(current);
 
-    final latestParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    final currentParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    if (cleanLatest.isEmpty) return false;
+    if (cleanCurrent.isEmpty) return true;
+
+    final latestParts = cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final currentParts = cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
     while (latestParts.length < 3) {
       latestParts.add(0);

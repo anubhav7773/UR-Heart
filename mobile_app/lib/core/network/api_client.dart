@@ -613,4 +613,9 @@ class ApiClient {
       'message': message,
     });
   }
+
+  // 31. Delete Account Permanently (DELETE /users/me)
+  Future<Response> deleteAccount() async {
+    return await dio.delete('/users/me');
+  }
 }

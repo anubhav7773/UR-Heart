@@ -15,7 +15,68 @@ class AppUpdateService {
   bool _isChecking = false;
   bool _dialogShown = false;
 
-  /// Checks backend for latest APK release and prompts user with direct in-app download
+  /// Clean semantic version string (strip 'v' prefix, '+build', and '-suffix' like '-beta' or '-release')
+  static String cleanVersion(String v) {
+    var cleaned = v.trim();
+    if (cleaned.startsWith('v') || cleaned.startsWith('V')) {
+      cleaned = cleaned.substring(1);
+    }
+    // Strip build metadata '+' (e.g. 1.1.0+2 -> 1.1.0)
+    final plusIndex = cleaned.indexOf('+');
+    if (plusIndex != -1) {
+      cleaned = cleaned.substring(0, plusIndex);
+    }
+    // Strip prerelease suffixes '-' (e.g. 1.1.0-beta -> 1.1.0)
+    final dashIndex = cleaned.indexOf('-');
+    if (dashIndex != -1) {
+      cleaned = cleaned.substring(0, dashIndex);
+    }
+    return cleaned.trim();
+  }
+
+  /// Semantic version comparison helper ([major, minor, patch] + build number)
+  /// Returns true only if serverVersion is strictly newer than installedVersion
+  static bool isServerVersionNewer({
+    required String installedVersion,
+    required String latestVersion,
+    int installedBuild = 0,
+    int latestBuild = 0,
+  }) {
+    try {
+      final cleanInstalled = cleanVersion(installedVersion);
+      final cleanLatest = cleanVersion(latestVersion);
+
+      if (cleanLatest.isEmpty) return false;
+      if (cleanInstalled.isEmpty) return true;
+
+      final v1Parts = cleanInstalled.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
+      final v2Parts = cleanLatest.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
+
+      while (v1Parts.length < 3) {
+        v1Parts.add(0);
+      }
+      while (v2Parts.length < 3) {
+        v2Parts.add(0);
+      }
+
+      for (int i = 0; i < 3; i++) {
+        if (v2Parts[i] > v1Parts[i]) return true;
+        if (v2Parts[i] < v1Parts[i]) return false;
+      }
+
+      // If semantic versions (major.minor.patch) are identical, compare build numbers if present
+      if (latestBuild > 0 && installedBuild > 0) {
+        return latestBuild > installedBuild;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks backend for latest APK release and prompts user with direct in-app download.
+  /// When called automatically on launch (showNoUpdateToast = false), dialog is only shown if force_update == true.
+  /// When called manually (showNoUpdateToast = true), dialog is shown for any newer version or green snackbar if up-to-date.
   Future<void> checkForUpdate(BuildContext context, {bool showNoUpdateToast = false}) async {
     if (_isChecking || _dialogShown) return;
     _isChecking = true;
@@ -31,11 +92,11 @@ class AppUpdateService {
         if (data != null) {
           final latestVersion = (data['latest_version'] ?? installedVersion).toString();
           final latestBuild = (data['latest_build_number'] as num?)?.toInt() ?? 0;
-          final apkUrl = (data['apk_url'] ?? '').toString();
+          final apkUrl = (data['download_url'] ?? data['apk_url'] ?? '').toString();
           final releaseNotes = (data['release_notes'] ?? 'General performance enhancements & bug fixes.').toString();
-          final isForceUpdate = data['is_force_update'] == true;
+          final isForceUpdate = (data['force_update'] == true || data['is_force_update'] == true);
 
-          final hasUpdate = _isNewerVersion(
+          final hasUpdate = isServerVersionNewer(
             installedVersion: installedVersion,
             latestVersion: latestVersion,
             installedBuild: installedBuild,
@@ -46,7 +107,10 @@ class AppUpdateService {
               apkUrl.toLowerCase() != 'null' &&
               (apkUrl.startsWith('http://') || apkUrl.startsWith('https://'));
 
-          if (hasUpdate && isValidApkUrl && context.mounted) {
+          final bool isManual = showNoUpdateToast;
+          final bool shouldShowDialog = hasUpdate && isValidApkUrl && (isForceUpdate || isManual);
+
+          if (shouldShowDialog && context.mounted) {
             _dialogShown = true;
             await showDialog(
               context: context,
@@ -59,7 +123,7 @@ class AppUpdateService {
               ),
             );
             _dialogShown = false;
-          } else if (showNoUpdateToast && context.mounted) {
+          } else if (isManual && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('UR-Heart is up to date (v$installedVersion)! ✨'),
@@ -76,33 +140,6 @@ class AppUpdateService {
       }
     } finally {
       _isChecking = false;
-    }
-  }
-
-  /// Semantic version comparison helper ([major, minor, patch] + build number)
-  bool _isNewerVersion({
-    required String installedVersion,
-    required String latestVersion,
-    required int installedBuild,
-    required int latestBuild,
-  }) {
-    try {
-      final v1Parts = installedVersion.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
-      final v2Parts = latestVersion.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
-
-      for (int i = 0; i < 3; i++) {
-        final p1 = i < v1Parts.length ? v1Parts[i] : 0;
-        final p2 = i < v2Parts.length ? v2Parts[i] : 0;
-        if (p2 > p1) return true;
-        if (p2 < p1) return false;
-      }
-
-      if (latestBuild > 0 && installedBuild > 0) {
-        return latestBuild > installedBuild;
-      }
-      return false;
-    } catch (_) {
-      return false;
     }
   }
 }

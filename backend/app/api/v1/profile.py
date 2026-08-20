@@ -1137,3 +1137,17 @@ async def dismiss_profile_visitor(
         data={"visitor_id": visitor_id, "dismissed": True}
     )
 
+
+@router.delete("", response_model=APIResponse[dict])
+@router.delete("/", response_model=APIResponse[dict])
+async def delete_profile_account(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Alias for DELETE /api/v1/users/me: Cascade account deletion.
+    """
+    from app.api.v1.users import delete_current_user_account
+    return await delete_current_user_account(current_user_id=current_user_id, db=db)
+
+

@@ -1,16 +1,170 @@
 import uuid
+import httpx
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from sqlalchemy import select, text
+from sqlalchemy import select, delete, text, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user_id
 from app.core.rate_limiter import rate_limit
-from app.models.orm import User
+from app.models.orm import (
+    User,
+    UserPhoto,
+    Match,
+    ChatMessage,
+    Swipe,
+    ProfileImpression,
+    BlockedUser,
+    UserReport,
+    ChaiInvite,
+    ChaiStatus,
+    UserAdCounter,
+    SachetTransaction,
+)
 from app.models.schemas import APIResponse
 
-router = APIRouter(prefix="/users", tags=["User Location"])
+router = APIRouter(prefix="/users", tags=["User Location & Account Management"])
+
+
+@router.delete("/me", response_model=APIResponse[dict])
+@router.delete("/me/", response_model=APIResponse[dict])
+async def delete_current_user_account(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Production-ready cascade account deletion:
+    1. Removes all user uploaded assets from Supabase Storage bucket 'profile-photos' using SUPABASE_SERVICE_ROLE_KEY.
+    2. Deletes or cascade removes all related DB records:
+       - user_photos
+       - matches (where user is user1 or user2)
+       - chat_messages (sender or match messages)
+       - swipes (swiper or swiped)
+       - profile_impressions (visitor or target)
+       - blocked_users & user_reports
+       - chai_invites & chai_status
+       - user_ad_counters & sachet_transactions
+       - public.users row
+    3. Deletes user from Supabase Auth & Firebase Auth.
+    4. Returns success confirmation.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID format.")
+
+    # 1. Fetch user & associated photos to delete from storage
+    user_stmt = select(User).where(User.id == user_uuid)
+    user_res = await db.execute(user_stmt)
+    user = user_res.scalars().first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found.")
+
+    photos_stmt = select(UserPhoto).where(UserPhoto.user_id == user_uuid)
+    photos_res = await db.execute(photos_stmt)
+    user_photos = photos_res.scalars().all()
+
+    photo_paths = []
+    for p in user_photos:
+        if p.photo_url:
+            if "profile-photos/" in p.photo_url:
+                photo_paths.append(p.photo_url.split("profile-photos/")[-1].split("?")[0])
+            else:
+                photo_paths.append(p.photo_url.split("/")[-1].split("?")[0])
+
+    if getattr(user, "photo_url", None) and user.photo_url:
+        if "profile-photos/" in user.photo_url:
+            photo_paths.append(user.photo_url.split("profile-photos/")[-1].split("?")[0])
+        else:
+            photo_paths.append(user.photo_url.split("/")[-1].split("?")[0])
+
+    if getattr(user, "verification_video_url", None) and user.verification_video_url:
+        if "profile-photos/" in user.verification_video_url:
+            photo_paths.append(user.verification_video_url.split("profile-photos/")[-1].split("?")[0])
+
+    photo_paths = list(set(filter(None, photo_paths)))
+
+    # 2. Delete all uploaded assets from Supabase Storage
+    try:
+        supa_url = (settings.SUPABASE_URL or "").rstrip("/")
+        supa_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+        if supa_url and supa_key and photo_paths:
+            try:
+                from supabase import create_client
+                supa_client = create_client(supa_url, supa_key)
+                supa_client.storage.from_("profile-photos").remove(photo_paths)
+            except Exception:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.request(
+                        "DELETE",
+                        f"{supa_url}/storage/v1/object/profile-photos",
+                        headers={"Authorization": f"Bearer {supa_key}", "apikey": supa_key, "Content-Type": "application/json"},
+                        json={"prefixes": photo_paths}
+                    )
+    except Exception as e:
+        print(f"[ACCOUNT_DELETE STORAGE NOTICE] {e}")
+
+    # 3. Database Cascade Cleanup
+    try:
+        # Chat messages
+        matches_subquery = select(Match.id).where(or_(Match.user1_id == user_uuid, Match.user2_id == user_uuid))
+        await db.execute(delete(ChatMessage).where(or_(ChatMessage.sender_id == user_uuid, ChatMessage.match_id.in_(matches_subquery))))
+
+        # Matches
+        await db.execute(delete(Match).where(or_(Match.user1_id == user_uuid, Match.user2_id == user_uuid)))
+
+        # Swipes & Profile Impressions
+        await db.execute(delete(Swipe).where(or_(Swipe.swiper_id == user_uuid, Swipe.swiped_id == user_uuid)))
+        await db.execute(delete(ProfileImpression).where(or_(ProfileImpression.visitor_id == user_uuid, ProfileImpression.target_id == user_uuid)))
+
+        # Safety & Reports
+        await db.execute(delete(BlockedUser).where(or_(BlockedUser.blocker_id == user_uuid, BlockedUser.blocked_id == user_uuid)))
+        await db.execute(delete(UserReport).where(or_(UserReport.reporter_id == user_uuid, UserReport.reported_id == user_uuid)))
+
+        # Chai invites & status
+        await db.execute(delete(ChaiInvite).where(or_(ChaiInvite.sender_id == user_uuid, ChaiInvite.receiver_id == user_uuid)))
+        await db.execute(delete(ChaiStatus).where(ChaiStatus.user_id == user_uuid))
+
+        # Ad counters & transactions
+        await db.execute(delete(UserAdCounter).where(UserAdCounter.user_id == user_uuid))
+        await db.execute(delete(SachetTransaction).where(SachetTransaction.user_id == user_uuid))
+
+        # User photos
+        await db.execute(delete(UserPhoto).where(UserPhoto.user_id == user_uuid))
+
+        # User master record
+        await db.execute(delete(User).where(User.id == user_uuid))
+
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        print(f"[ACCOUNT_DELETE DB ERROR] {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to cascade delete user records.")
+
+    # 4. Supabase Auth & Firebase Auth Cleanup
+    try:
+        if settings.SUPABASE_URL and (settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY):
+            from supabase import create_client
+            supa_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+            supa_admin = create_client(settings.SUPABASE_URL, supa_key)
+            supa_admin.auth.admin.delete_user(str(user_uuid))
+    except Exception as e:
+        print(f"[ACCOUNT_DELETE SUPABASE AUTH NOTICE] {e}")
+
+    try:
+        import firebase_admin.auth as fb_auth
+        fb_auth.delete_user(str(user_uuid))
+    except Exception:
+        pass
+
+    return APIResponse(
+        success=True,
+        message="Account successfully deleted",
+        data={"deleted_user_id": str(user_uuid)}
+    )
+
 
 
 @router.post("/fcm-token")

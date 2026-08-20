@@ -10,7 +10,6 @@ import '../auth/auth_screen.dart';
 import '../settings/blocked_users_screen.dart';
 import '../subscription/subscription_sheet.dart';
 import '../../screens/admin_verification_screen.dart';
-import '../../screens/activity_screen.dart';
 import '../../core/utils/feedback_helper.dart';
 import '../../core/services/app_update_service.dart';
 import '../../core/services/image_guard_service.dart';
@@ -115,6 +114,160 @@ class _ProfileScreenState extends State<ProfileScreen> {
         (route) => false,
       );
     }
+  }
+
+  Future<void> _showDeleteAccountDialog(BuildContext context) async {
+    bool isDeleting = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: !isDeleting,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: Color(0x33FF4D67), width: 1),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_forever_rounded,
+                      color: Colors.redAccent,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Delete Account Permanently?',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: const Text(
+                'All your profile details, matches, photos, and messages will be permanently removed. This action cannot be undone.',
+                style: TextStyle(
+                  color: AppTheme.mutedTextColor,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              actions: [
+                OutlinedButton(
+                  onPressed: isDeleting ? null : () => Navigator.pop(dialogContext),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.cardBorderColor),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setDialogState(() => isDeleting = true);
+                          try {
+                            final res = await ApiClient.instance.deleteAccount();
+                            if (res.statusCode == 200) {
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+
+                              // 1. Clear local cache, JWT access/refresh tokens, SharedPreferences & SecureStorage
+                              await AppAuthProvider.instance.purgeSession();
+
+                              // 2. Sign out of Firebase Auth
+                              try {
+                                await FirebaseAuth.instance.signOut();
+                              } catch (_) {}
+
+                              if (!context.mounted) return;
+
+                              // 3. Navigate back to Auth screen and clear navigation history
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(builder: (context) => const AuthScreen()),
+                                (route) => false,
+                              );
+
+                              // 4. Show success snackbar
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Your account has been permanently deleted.'),
+                                  backgroundColor: Colors.redAccent,
+                                  duration: Duration(seconds: 4),
+                                ),
+                              );
+                            } else {
+                              setDialogState(() => isDeleting = false);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(res.data?['message'] ?? 'Failed to delete account. Please try again.'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            setDialogState(() => isDeleting = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Network error during account deletion. Please try again.'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  ),
+                  child: isDeleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Delete',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showEditProfileSheet() {
@@ -576,6 +729,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    Color? titleColor,
     Widget? trailing,
   }) {
     return Container(
@@ -597,8 +751,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         title: Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: titleColor ?? Colors.white,
             fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
@@ -1000,18 +1154,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                   _buildActionTile(
-                    icon: Icons.history_outlined,
-                    iconColor: AppTheme.primaryColor,
-                    title: 'Activity',
-                    subtitle: 'View your matches, likes, and passes history',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ActivityScreen()),
-                      );
-                    },
-                  ),
-                  _buildActionTile(
                     icon: Icons.badge_outlined,
                     iconColor: AppTheme.verifiedBlue,
                     title: 'Edit Profile & Verification',
@@ -1045,7 +1187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle: 'Send feedback and suggestions directly',
                     onTap: () {
                       final userId = _profileData?['id'] ?? _profileData?['user_id'] ?? FirebaseAuth.instance.currentUser?.uid;
-                      sendFeedbackEmail(userId: userId?.toString(), appVersion: 'v1.0.0-release');
+                      sendFeedbackEmail(userId: userId?.toString());
                     },
                   ),
                   _buildActionTile(
@@ -1056,6 +1198,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {
                       AppUpdateService.instance.checkForUpdate(context, showNoUpdateToast: true);
                     },
+                  ),
+                  _buildActionTile(
+                    icon: Icons.delete_forever_rounded,
+                    iconColor: Colors.redAccent,
+                    titleColor: Colors.redAccent,
+                    title: 'Delete Account',
+                    subtitle: 'Permanently erase your profile, photos, and chat history',
+                    onTap: () => _showDeleteAccountDialog(context),
                   ),
                 ],
               ),
