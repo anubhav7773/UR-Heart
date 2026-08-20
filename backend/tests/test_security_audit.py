@@ -209,3 +209,34 @@ def test_websocket_participant_accepted():
     # Participant User B connects to match_bc room
     with client.websocket_connect(f"/api/v1/chat/ws/{match_bc_id}?token={token_b}") as websocket:
         websocket.send_json({"type": "typing", "is_typing": True})
+
+
+def test_mass_assignment_privilege_escalation_blocked():
+    """Verify malicious injection of is_admin, is_boosted, ad_free_until into profile update is ignored."""
+    token, user_id = create_test_user_session("mass_assign_tester")
+    headers = {"Authorization": f"Bearer {token}", "X-Device-Id": "mass_assign_tester"}
+
+    malicious_payload = {
+        "bio": "Legitimate updated bio text",
+        "is_boosted": True,
+        "is_admin": True,
+        "ad_free_until": "2099-01-01T00:00:00Z"
+    }
+
+    # 1. Send update request
+    res = client.put("/api/v1/profile", json=malicious_payload, headers=headers)
+    assert res.status_code == 200
+    res_data = res.json()
+    assert res_data["success"] is True
+    assert res_data["data"]["bio"] == "Legitimate updated bio text"
+    assert res_data["data"]["is_admin"] is False
+    assert res_data["data"]["is_boosted"] is False
+
+    # 2. Query profile back and verify bio updated but privileged fields were NOT mutated
+    get_res = client.get("/api/v1/profile/me", headers=headers)
+    assert get_res.status_code == 200
+    profile = get_res.json()["data"]
+
+    assert profile["bio"] == "Legitimate updated bio text"
+    assert profile.get("is_admin") is False
+    assert profile.get("is_boosted", False) is False

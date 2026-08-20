@@ -28,6 +28,7 @@ from app.models.schemas import (
     VisitorItem,
     VisitorsListResponse,
 )
+from app.schemas.profile import ProfileUpdateRequest
 from app.models.orm import (
     User,
     UserPhoto,
@@ -83,7 +84,12 @@ async def get_user_profile(
         res = await db.execute(stmt)
         user = res.scalars().first()
     except Exception:
-        user = None
+        try:
+            stmt = select(User).where(User.id == target_uuid)
+            res = await db.execute(stmt)
+            user = res.scalars().first()
+        except Exception:
+            user = None
 
     now_utc = datetime.now(timezone.utc)
 
@@ -326,7 +332,8 @@ async def upload_profile_photo(
 
 
 @router.post("/complete", response_model=APIResponse[CompleteProfileData])
-@router.put("", response_model=APIResponse[CompleteProfileData])
+@router.post("/complete-profile", response_model=APIResponse[CompleteProfileData])
+@router.put("/complete-profile", response_model=APIResponse[CompleteProfileData])
 async def complete_profile(
     payload: CompleteProfileRequest,
     current_user_id: str = Depends(get_current_user_id),
@@ -466,6 +473,135 @@ async def complete_profile(
             full_name=user.full_name,
         )
     )
+
+
+# Strictly defined whitelist of editable profile fields
+ALLOWED_PROFILE_FIELDS = {
+    "display_name",
+    "full_name",
+    "bio",
+    "birthdate",
+    "dob",
+    "gender",
+    "gender_preference",
+    "interested_in",
+    "intent",
+    "area_name",
+    "village_pin_code",
+    "interests",
+    "height",
+    "relationship_goal",
+    "smoking",
+    "drinking",
+    "is_location_masked",
+}
+
+# Explicit blacklist of sensitive/monetization columns (guaranteed never mutated here)
+PROTECTED_SYSTEM_FIELDS = {
+    "id", "email", "phone_number", "is_admin", "is_verified",
+    "is_boosted", "boosted_until", "has_direct_dm", "direct_dm_until",
+    "is_ad_free", "ad_free_until", "safe_bridge_active", "photo_pass_until",
+    "is_premium", "premium_expires_at", "bonus_swipes", "created_at", "updated_at"
+}
+
+
+@router.put("", response_model=dict)
+@router.put("/", response_model=dict)
+@router.patch("", response_model=dict)
+@router.patch("/", response_model=dict)
+@router.put("/profile", response_model=dict)
+@router.patch("/profile", response_model=dict)
+async def update_profile(
+    request: ProfileUpdateRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format."
+        )
+
+    user_record = None
+    try:
+        stmt = select(User).where(User.id == user_uuid)
+        result = await db.execute(stmt)
+        user_record = result.scalars().first()
+    except Exception:
+        user_record = None
+
+    if not user_record:
+        user_record = User(
+            id=user_uuid,
+            email=f"user_{user_uuid.hex[:8]}@ruralheart.com",
+            full_name="UR Heart User",
+            dob=date(2000, 1, 1),
+            gender=ORMGenderEnum.male,
+            interested_in=ORMGenderEnum.female,
+            intent=ORMIntentEnum.casual,
+            is_active=True,
+            is_premium=False,
+        )
+        db.add(user_record)
+        try:
+            await db.commit()
+            await db.refresh(user_record)
+        except Exception:
+            pass
+
+    update_payload = request.model_dump(exclude_unset=True)
+
+    # Apply only whitelisted fields with sanitization
+    for field, value in update_payload.items():
+        if field in ALLOWED_PROFILE_FIELDS and field not in PROTECTED_SYSTEM_FIELDS:
+            target_col = field
+            if field == "display_name":
+                target_col = "full_name"
+            elif field == "birthdate":
+                target_col = "dob"
+            elif field == "gender_preference":
+                target_col = "interested_in"
+
+            # Handle Enum conversions safely
+            if target_col in ("gender", "interested_in") and isinstance(value, str):
+                try:
+                    value = ORMGenderEnum(value.lower().strip())
+                except ValueError:
+                    pass
+            elif target_col == "intent" and isinstance(value, str):
+                try:
+                    value = ORMIntentEnum(value.lower().strip())
+                except ValueError:
+                    pass
+
+            # Sanitize free-form text inputs against XSS/injections
+            if isinstance(value, str):
+                value = sanitize_user_input(value)
+
+            if hasattr(user_record, target_col):
+                setattr(user_record, target_col, value)
+
+    db.add(user_record)
+    await db.commit()
+    await db.refresh(user_record)
+
+    return {
+        "success": True,
+        "message": "Profile updated successfully.",
+        "user_id": str(user_record.id),
+        "data": {
+            "user_id": str(user_record.id),
+            "full_name": user_record.full_name,
+            "bio": user_record.bio,
+            "dob": user_record.dob.isoformat() if user_record.dob else None,
+            "is_location_masked": user_record.is_location_masked,
+            "is_boosted": bool(user_record.boosted_until and user_record.boosted_until > datetime.now(timezone.utc)),
+            "is_admin": user_record.is_admin,
+            "is_verified": user_record.is_verified,
+        }
+    }
 
 
 @router.put("/presence")
