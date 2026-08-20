@@ -1,35 +1,25 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 
 class PaymentService {
-  static final PaymentService instance = PaymentService._internal();
-  PaymentService._internal();
+  static final PaymentService _instance = PaymentService._internal();
+  factory PaymentService() => _instance;
+  static PaymentService get instance => _instance;
 
-  Razorpay? _razorpay;
+  late Razorpay _razorpay;
+  Completer<PaymentSuccessResponse>? _paymentCompleter;
 
-  Function(PaymentSuccessResponse)? onSuccessCallback;
-  Function(PaymentFailureResponse)? onErrorCallback;
-  Function(ExternalWalletResponse)? onExternalWalletCallback;
-
-  void initialize({
-    Function(PaymentSuccessResponse)? onSuccess,
-    Function(PaymentFailureResponse)? onError,
-    Function(ExternalWalletResponse)? onExternalWallet,
-  }) {
-    if (onSuccess != null) onSuccessCallback = onSuccess;
-    if (onError != null) onErrorCallback = onError;
-    if (onExternalWallet != null) onExternalWalletCallback = onExternalWallet;
-
-    if (!kIsWeb && _razorpay == null) {
+  PaymentService._internal() {
+    if (!kIsWeb) {
       try {
         _razorpay = Razorpay();
-        _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-        _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-        _razorpay!.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
-        debugPrint('[PaymentService] Razorpay SDK initialized & listeners registered successfully');
+        _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+        _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+        _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+        debugPrint('[PaymentService] Persistent Razorpay singleton initialized & listeners registered');
       } catch (e) {
         debugPrint('[PaymentService] Razorpay SDK initialization notice: ${e.toString()}');
       }
@@ -37,104 +27,108 @@ class PaymentService {
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    debugPrint('[RAZORPAY_SUCCESS] Payment ID: ${response.paymentId} | Order ID: ${response.orderId} | Signature: ${response.signature}');
-    onSuccessCallback?.call(response);
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    debugPrint('[RAZORPAY_ERROR] Payment Error Code: ${response.code} | Message: ${response.message} | Error: ${response.error}');
-    onErrorCallback?.call(response);
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    debugPrint('[RAZORPAY_EXTERNAL_WALLET] External Wallet: ${response.walletName}');
-    onExternalWalletCallback?.call(response);
-  }
-
-  Future<bool> startSachetCheckout({
-    required String planType,
-    String? userPhone,
-    String? userEmail,
-    Map<String, dynamic>? customOrderData,
-  }) async {
-    try {
-      Map<String, dynamic> orderData;
-      if (customOrderData != null) {
-        orderData = customOrderData;
-      } else {
-        final response = await ApiClient.instance.createSachetOrder(planType: planType);
-        if (response.data != null && response.data['data'] != null) {
-          orderData = Map<String, dynamic>.from(response.data['data']);
-        } else {
-          debugPrint('[PaymentService] Error: Could not retrieve order data from response: ${response.data}');
-          return false;
-        }
-      }
-
-      final String razorpayKeyId = orderData['razorpay_key_id'] ?? 'rzp_test_YOUR_KEY';
-      final int amountInPaise = (orderData['amount_in_paise'] as num?)?.toInt() ??
-          (((orderData['amount'] ?? orderData['amount_inr'] ?? 29) as num).toDouble() * 100).toInt();
-      final String orderId = orderData['order_id'] ?? '';
-      final String planName = orderData['plan_name'] ?? orderData['plan_type'] ?? '$planType Pass';
-
-      if (kIsWeb) {
-        debugPrint('[PaymentService] Web environment detected. Completing simulated payment.');
-        await StorageManager.instance.setPremiumStatus(true);
-        return true;
-      }
-
-      final String? currentAuthPhone = FirebaseAuth.instance.currentUser?.phoneNumber?.replaceAll('+', '');
-      final String? currentAuthEmail = FirebaseAuth.instance.currentUser?.email;
-
-      var options = {
-        'key': razorpayKeyId,
-        'amount': amountInPaise, // MUST be integer in paise (e.g. 1900 for Rs 19)
-        'name': 'UR-Heart',
-        'description': planName,
-        'order_id': orderId, // must be valid order_id from backend
-        'timeout': 180, // in seconds
-        'prefill': {
-          'contact': userPhone ?? currentAuthPhone ?? '9999999999',
-          'email': userEmail ?? currentAuthEmail ?? 'user@urheart.app'
-        },
-        'external': {
-          'wallets': ['paytm']
-        }
-      };
-
-      debugPrint('[RAZORPAY_OPEN] Options: $options');
-
-      // Re-verify Razorpay instance is ready and attached
-      if (_razorpay == null) {
-        initialize();
-      }
-
-      if (_razorpay != null) {
-        try {
-          _razorpay!.open(options);
-          return true;
-        } catch (e) {
-          debugPrint('[PaymentService] Error launching Razorpay Sheet: ${e.toString()}');
-          return false;
-        }
-      } else {
-        await StorageManager.instance.setPremiumStatus(true);
-        return true;
-      }
-    } catch (e) {
-      debugPrint('[PaymentService] Sachet order creation exception: ${e.toString()}');
-      return false;
+    debugPrint('[RAZORPAY_SUCCESS] Payment ID: ${response.paymentId}, Order ID: ${response.orderId}');
+    if (_paymentCompleter != null && !_paymentCompleter!.isCompleted) {
+      _paymentCompleter!.complete(response);
     }
   }
 
-  void clearCallbacks() {
-    onSuccessCallback = null;
-    onErrorCallback = null;
-    onExternalWalletCallback = null;
+  void _handlePaymentError(PaymentFailureResponse response) {
+    debugPrint('[RAZORPAY_FAILURE] Code: ${response.code}, Message: ${response.message}');
+    if (_paymentCompleter != null && !_paymentCompleter!.isCompleted) {
+      _paymentCompleter!.completeError(
+        Exception('Payment failed [${response.code}]: ${response.message ?? "User cancelled or payment dismissed"}'),
+      );
+    }
   }
 
-  void dispose() {
-    _razorpay?.clear();
-    _razorpay = null;
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    debugPrint('[RAZORPAY_EXTERNAL_WALLET] Wallet: ${response.walletName}');
+  }
+
+  Future<PaymentSuccessResponse> startCheckout({
+    required Map<String, dynamic> orderData,
+    String? userEmail,
+    String? userPhone,
+  }) async {
+    if (kIsWeb) {
+      debugPrint('[PaymentService] Web environment detected. Simulating payment success.');
+      await StorageManager.instance.setPremiumStatus(true);
+      return PaymentSuccessResponse(
+        'pay_simulated_${DateTime.now().millisecondsSinceEpoch}',
+        orderData['order_id'] ?? 'order_simulated',
+        'sig_simulated',
+        null,
+      );
+    }
+
+    _paymentCompleter = Completer<PaymentSuccessResponse>();
+
+    // Calculate strict integer paise
+    final int amountInPaise = orderData['amount_in_paise'] != null
+        ? (orderData['amount_in_paise'] as num).toInt()
+        : ((orderData['amount'] ?? orderData['amount_inr'] ?? 29) as num).toDouble().toInt() * 100;
+
+    // Sanitize phone number to standard 10 digits
+    String sanitizedPhone = (userPhone ?? '').replaceAll(RegExp(r'\D'), '');
+    if (sanitizedPhone.length > 10) {
+      sanitizedPhone = sanitizedPhone.substring(sanitizedPhone.length - 10);
+    }
+    if (sanitizedPhone.length != 10) {
+      sanitizedPhone = '9876543210'; // Safe fallback for Razorpay validation
+    }
+
+    final Map<String, dynamic> options = {
+      'key': orderData['razorpay_key_id'] ?? 'rzp_test_sample',
+      'amount': amountInPaise,
+      'name': 'UR-Heart',
+      'description': orderData['description'] ?? 'UR-Heart In-App Purchase',
+      'order_id': orderData['order_id'],
+      'currency': 'INR',
+      'timeout': 300,
+      'prefill': {
+        'contact': sanitizedPhone,
+        'email': (userEmail != null && userEmail.contains('@')) ? userEmail : 'user@urheart.app',
+      },
+      'theme': {
+        'color': '#FF3366',
+        'backdrop_color': '#121212',
+      },
+      'modal': {
+        'confirm_close': true,
+        'animation': true,
+      },
+      'retry': {'enabled': true, 'max_count': 3},
+    };
+
+    debugPrint('[RAZORPAY_OPEN] Launching native checkout with options: $options');
+
+    try {
+      _razorpay.open(options);
+    } catch (e, stack) {
+      debugPrint('[RAZORPAY_ERROR] Failed to open native checkout: $e\n$stack');
+      throw Exception('Could not launch payment gateway: $e');
+    }
+
+    return _paymentCompleter!.future;
+  }
+
+  /// Convenience wrapper for initiating Sachet Pass checkout directly
+  Future<PaymentSuccessResponse> startSachetCheckout({
+    required String planType,
+    String? userPhone,
+    String? userEmail,
+  }) async {
+    final response = await ApiClient.instance.createSachetOrder(planType: planType);
+    if (response.data != null && response.data['data'] != null) {
+      final orderData = Map<String, dynamic>.from(response.data['data']);
+      return await startCheckout(
+        orderData: orderData,
+        userEmail: userEmail,
+        userPhone: userPhone,
+      );
+    } else {
+      throw Exception('Failed to generate order from server: ${response.data}');
+    }
   }
 }

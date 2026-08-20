@@ -1,6 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/network/api_client.dart';
 import '../../core/security/storage_manager.dart';
 import '../../core/theme/app_theme.dart';
@@ -30,12 +29,6 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     super.initState();
     _selectedPlanType = widget.initialPlanType ?? 'PLAN_DIRECT_DM_49';
     _fetchActivePassStatus();
-
-    PaymentService.instance.initialize(
-      onSuccess: _handlePaymentSuccess,
-      onError: _handlePaymentError,
-      onExternalWallet: _handleExternalWallet,
-    );
   }
 
   Future<void> _fetchActivePassStatus() async {
@@ -55,89 +48,65 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     }
   }
 
-  @override
-  void dispose() {
-    PaymentService.instance.clearCallbacks();
-    super.dispose();
-  }
-
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    try {
-      await ApiClient.instance.verifyPayment(
-        paymentId: response.paymentId ?? '',
-        orderId: response.orderId ?? '',
-        signature: response.signature ?? '',
-        planType: _selectedPlanType,
-      );
-    } catch (e) {
-      debugPrint('Payment verification notice: ${e.toString()}');
-    }
-
-    await StorageManager.instance.setPremiumStatus(true);
-    if (!mounted) return;
-    Navigator.pop(context, true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Payment Successful & Verified! Plan: ${_getPlanDisplayName(_selectedPlanType)}'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    if (!mounted) return;
-    setState(() => _isProcessing = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Payment Cancelled/Failed: ${response.message ?? "User cancelled or error occurred"}'),
-        backgroundColor: Colors.redAccent,
-      ),
-    );
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    debugPrint('External Wallet Selected: ${response.walletName}');
-  }
-
-  Future<void> _completeSimulatedPayment(String orderId) async {
-    await StorageManager.instance.setPremiumStatus(true);
-    if (!mounted) return;
-    Navigator.pop(context, true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Pass Activated! Plan: ${_getPlanDisplayName(_selectedPlanType)}'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
   Future<void> _initiateSachetPayment() async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final selectedPlan = _selectedPlanType;
+
     try {
-      final success = await PaymentService.instance.startSachetCheckout(
-        planType: _selectedPlanType,
+      // Step 1: Create order on backend
+      final orderResponse = await ApiClient.instance.createSachetOrder(
+        planType: selectedPlan,
       );
 
-      if (kIsWeb && success) {
-        await _completeSimulatedPayment('order_web_simulated');
-      } else if (!success) {
-        if (mounted) setState(() => _isProcessing = false);
+      if (orderResponse.data == null || orderResponse.data['data'] == null) {
+        throw Exception('Failed to generate order from server');
       }
+      final orderData = Map<String, dynamic>.from(orderResponse.data['data']);
+
+      // Step 2: Cleanly dismiss the modal bottom sheet FIRST
+      navigator.pop(true);
+
+      // Step 3: Crucial delay to let Flutter route animation settle and free the Activity context
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      // Step 4: Launch Razorpay via persistent singleton
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final paymentResult = await PaymentService().startCheckout(
+        orderData: orderData,
+        userEmail: currentUser?.email,
+        userPhone: currentUser?.phoneNumber,
+      );
+
+      // Step 5: Verify payment on backend
+      await ApiClient.instance.verifyPayment(
+        paymentId: paymentResult.paymentId ?? '',
+        orderId: paymentResult.orderId ?? '',
+        signature: paymentResult.signature ?? '',
+        planType: selectedPlan,
+      );
+
+      await StorageManager.instance.setPremiumStatus(true);
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Payment Successful! ${_getPlanDisplayName(selectedPlan)} unlocked.'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     } catch (e) {
-      debugPrint('Razorpay Checkout exception: ${e.toString()}');
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Payment initiation failed: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+      debugPrint('[PAYMENT_FLOW_ERROR] $e');
+      if (mounted) setState(() => _isProcessing = false);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Payment cancelled or failed: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 

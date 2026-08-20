@@ -450,6 +450,8 @@ class CreateOrderData(BaseModel):
     amount_in_paise: int = 19900
     currency: str = "INR"
     razorpay_key_id: str
+    plan_name: str = "Ad-Free VIP"
+    description: str = "UR-Heart - Ad-Free VIP"
 
 
 # 9. Chai Status & Chai Invite Schemas
@@ -597,7 +599,8 @@ class CreateSachetOrderData(BaseModel):
     amount_in_paise: int
     currency: str = "INR"
     plan_type: str
-    plan_name: Optional[str] = None
+    plan_name: str
+    description: str
     razorpay_key_id: str
 
 

@@ -80,12 +80,15 @@ async def create_razorpay_order():
         amount_inr=199.0,
         amount_in_paise=19900,
         currency="INR",
-        razorpay_key_id=settings.RAZORPAY_KEY_ID or "rzp_test_sample",
+        razorpay_key_id=str(settings.RAZORPAY_KEY_ID or "rzp_test_sample").strip(),
+        plan_name="Ad-Free VIP",
+        description="UR-Heart - Ad-Free VIP",
     )
     return APIResponse(success=True, data=data)
 
 
 @router.post("/create-sachet-order", response_model=APIResponse[CreateSachetOrderData])
+@router.post("/sachet/create-order", response_model=APIResponse[CreateSachetOrderData])
 async def create_sachet_order(payload: CreateSachetOrderRequest):
     """
     Initiates a Razorpay UPI order session strictly across 4 standard tiers:
@@ -96,16 +99,18 @@ async def create_sachet_order(payload: CreateSachetOrderRequest):
     """
     standard_plan, amount = normalize_plan_type(payload.plan_type)
     order_id = f"order_{standard_plan.lower()}_{uuid.uuid4().hex[:10]}"
+    plan_name = f"{standard_plan.replace('_', ' ').title()}"
 
     data = CreateSachetOrderData(
         order_id=order_id,
-        amount=amount,
-        amount_inr=amount,
-        amount_in_paise=int(amount * 100),
+        amount=float(amount),
+        amount_inr=float(amount),
+        amount_in_paise=int(round(amount * 100)),
         currency="INR",
         plan_type=standard_plan,
-        plan_name=f"{standard_plan} Pass",
-        razorpay_key_id=settings.RAZORPAY_KEY_ID or "rzp_test_sample",
+        plan_name=plan_name,
+        description=f"UR-Heart - {plan_name}",
+        razorpay_key_id=str(settings.RAZORPAY_KEY_ID or "rzp_test_sample").strip(),
     )
     return APIResponse(success=True, data=data)
 
