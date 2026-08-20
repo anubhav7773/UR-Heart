@@ -52,6 +52,31 @@ if HAS_SLOWAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# 3. Security Headers & Bot Protection Middleware
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    # Bot & Scanner Protection
+    user_agent = request.headers.get("user-agent", "").lower()
+    if any(bot in user_agent for bot in ["sqlmap", "nikto", "dirbuster", "masscan", "wpscan", "zgrab"]):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"success": False, "detail": "Automated security scanners and scrapers are strictly blocked."}
+        )
+
+    response = await call_next(request)
+
+    # Standard Security Headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; media-src 'self' https:;"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(self), camera=(), microphone=()"
+
+    return response
+
+
 # 3. Custom Global Exception Handler for Uniform API Envelope Error Structure (API_SPEC.md)
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):

@@ -52,7 +52,17 @@ async def upload_verification_video(
             detail="Invalid user ID session."
         )
 
-    filename = file.filename or f"verify_{uuid.uuid4().hex[:8]}.mp4"
+    filename = (file.filename or f"verify_{uuid.uuid4().hex[:8]}.mp4").lower()
+    
+    # Security: Validate video extension whitelist
+    allowed_video_ext = {".mp4", ".mov", ".m4v", ".webm", ".avi"}
+    file_ext = "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
+    if file_ext not in allowed_video_ext:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid video format '{file_ext}'. Allowed formats: .mp4, .mov, .m4v, .webm"
+        )
+
     try:
         contents = await file.read()
     except Exception:
@@ -62,6 +72,13 @@ async def upload_verification_video(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded video file is empty."
+        )
+
+    # Security: Max 25MB for verification video
+    if len(contents) > 25 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Video file size exceeds the 25MB limit."
         )
 
     file_path = f"verify_{user_uuid.hex}_{uuid.uuid4().hex[:8]}_{filename.split('/')[-1].split('\\')[-1]}"

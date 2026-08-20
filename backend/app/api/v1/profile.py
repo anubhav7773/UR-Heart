@@ -209,7 +209,17 @@ async def upload_profile_photo(
     Reads file bytes (`contents = await file.read()`) and uploads directly to Supabase Storage bucket 'profile-photos'.
     Gets public URL using `supabase.storage.from_('profile-photos').get_public_url(file_path)` and inserts/updates DB photo reference directly.
     """
-    filename = file.filename or f"photo_{uuid.uuid4().hex[:8]}.jpg"
+    filename = (file.filename or f"photo_{uuid.uuid4().hex[:8]}.jpg").lower()
+    
+    # Security: Validate file extension whitelist
+    allowed_extensions = {".jpg", ".jpeg", ".png", ".webp"}
+    file_ext = "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type '{file_ext}'. Only .jpg, .jpeg, .png, and .webp images are allowed."
+        )
+
     try:
         contents = await file.read()
     except Exception:
@@ -219,6 +229,14 @@ async def upload_profile_photo(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded file is empty."
+        )
+
+    # Security: Validate maximum file size limit (5MB)
+    max_size_bytes = 5 * 1024 * 1024
+    if len(contents) > max_size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds the 5MB maximum allowed limit."
         )
 
     file_path = f"{uuid.uuid4().hex}_{filename.split('/')[-1].split('\\')[-1]}"
@@ -862,7 +880,17 @@ async def upload_voice_bio(
             detail="Invalid user token session."
         )
 
-    filename = file.filename or f"voice_{uuid.uuid4().hex[:8]}.m4a"
+    filename = (file.filename or f"voice_{uuid.uuid4().hex[:8]}.m4a").lower()
+
+    # Security: Validate audio extension whitelist
+    allowed_audio_ext = {".m4a", ".mp3", ".aac", ".wav", ".ogg"}
+    file_ext = "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
+    if file_ext not in allowed_audio_ext:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid audio format '{file_ext}'. Allowed formats: .m4a, .mp3, .aac, .wav, .ogg"
+        )
+
     try:
         contents = await file.read()
     except Exception:
@@ -872,6 +900,13 @@ async def upload_voice_bio(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded audio file is empty."
+        )
+
+    # Security: Max 10MB for voice bio
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Audio file size exceeds the 10MB limit."
         )
 
     file_path = f"voice_bios/{user_uuid.hex}_{filename.split('/')[-1].split('\\')[-1]}"

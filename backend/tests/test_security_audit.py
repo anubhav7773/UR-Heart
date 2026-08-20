@@ -134,3 +134,20 @@ def test_sanitizer_unit_defense():
     assert sanitize_user_input("hello\x00world") == "helloworld"
     assert sanitize_user_input("   Normal Text   ") == "Normal Text"
     assert sanitize_user_input("<script>evil()</script>") == "&lt;script&gt;evil()&lt;/script&gt;"
+
+
+def test_security_headers_present():
+    """Verify standard security headers are attached on API responses."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers.get("X-Content-Type-Options") == "nosniff"
+    assert response.headers.get("X-Frame-Options") == "DENY"
+    assert response.headers.get("X-XSS-Protection") == "1; mode=block"
+    assert "Strict-Transport-Security" in response.headers
+    assert "Content-Security-Policy" in response.headers
+
+
+def test_scanner_bot_blocked():
+    """Verify automated scanning tools are blocked by middleware."""
+    scanner_response = client.get("/health", headers={"User-Agent": "sqlmap/1.5.2#stable"})
+    assert scanner_response.status_code == 403
