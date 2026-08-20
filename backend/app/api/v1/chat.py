@@ -191,25 +191,24 @@ async def chat_websocket_endpoint(
     websocket: WebSocket,
     match_id: str,
     token: Optional[str] = None,
-    user_id: Optional[str] = None
 ):
     """
     Bidirectional real-time WebSocket connection for instant chat message delivery,
     WhatsApp/Location consent sync, typing indicators, and double blue ticks.
-    Hardened with cryptographic token handshake & IDOR participant verification.
+    Strictly hardened with cryptographic JWT token handshake & IDOR participant verification.
     """
-    extracted_user_id = None
-    if token:
-        extracted_user_id = decode_access_token(token)
-    elif user_id:
-        extracted_user_id = user_id
+    # 1. Reject if no token is provided
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
 
-    # 1. Cryptographic Handshake Token Verification
+    # 2. Decode and verify JWT Token
+    extracted_user_id = decode_access_token(token)
     if not extracted_user_id:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # 2. Strict IDOR Authorization Check (Is user in this conversation?)
+    # 3. Strict IDOR Authorization Check (Is user a participant in this match?)
     is_participant = await verify_conversation_access_raw(match_id, extracted_user_id)
     if not is_participant:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -222,7 +221,7 @@ async def chat_websocket_endpoint(
             event_type = data.get("type", "message") if isinstance(data, dict) else "message"
 
             if event_type == "read_receipt":
-                reader = data.get("reader_id") or data.get("user_id") or user_id
+                reader = data.get("reader_id") or extracted_user_id
                 await ws_manager.broadcast_to_match(
                     match_id,
                     {
@@ -239,7 +238,7 @@ async def chat_websocket_endpoint(
                     {
                         "type": "typing",
                         "match_id": match_id,
-                        "user_id": data.get("user_id") or user_id,
+                        "user_id": extracted_user_id,
                         "is_typing": data.get("is_typing", True),
                     },
                     sender_ws=websocket

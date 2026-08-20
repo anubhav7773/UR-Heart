@@ -10,7 +10,7 @@ def create_test_user_session(identifier: str):
     res = client.post("/api/v1/auth/social-login", json={
         "provider": "google",
         "id_token": f"mock_token_{identifier}",
-        "device_id": f"device_{identifier}",
+        "device_id": f"{identifier}",
         "fcm_token": f"fcm_{identifier}"
     })
     assert res.status_code == 200
@@ -151,3 +151,49 @@ def test_scanner_bot_blocked():
     """Verify automated scanning tools are blocked by middleware."""
     scanner_response = client.get("/health", headers={"User-Agent": "sqlmap/1.5.2#stable"})
     assert scanner_response.status_code == 403
+
+
+from starlette.websockets import WebSocketDisconnect
+
+
+def test_websocket_missing_token_rejected():
+    """Verify WebSocket connection is rejected with 1008 if no token is passed."""
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect("/api/v1/chat/ws/00000000-0000-0000-0000-000000000001"):
+            pass
+    assert excinfo.value.code == 1008
+
+
+def test_websocket_invalid_token_rejected():
+    """Verify WebSocket connection is rejected with 1008 if an invalid token is passed."""
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect("/api/v1/chat/ws/00000000-0000-0000-0000-000000000001?token=invalid_token_xyz"):
+            pass
+    assert excinfo.value.code == 1008
+
+
+def test_websocket_third_party_user_rejected():
+    """Verify WebSocket connection is rejected with 1008 if user is not in match."""
+    token_a, user_a_id = create_test_user_session("ws_attacker_a")
+    token_b, user_b_id = create_test_user_session("ws_victim_b")
+    token_c, user_c_id = create_test_user_session("ws_victim_c")
+
+    match_bc_id = setup_match_between_users(token_b, user_c_id)
+
+    # Attacker User A attempts to connect to match_bc room
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect(f"/api/v1/chat/ws/{match_bc_id}?token={token_a}"):
+            pass
+    assert excinfo.value.code == 1008
+
+
+def test_websocket_participant_accepted():
+    """Verify authorized participant can connect to WebSocket successfully."""
+    token_b, user_b_id = create_test_user_session("ws_participant_b")
+    token_c, user_c_id = create_test_user_session("ws_participant_c")
+
+    match_bc_id = setup_match_between_users(token_b, user_c_id)
+
+    # Participant User B connects to match_bc room
+    with client.websocket_connect(f"/api/v1/chat/ws/{match_bc_id}?token={token_b}") as websocket:
+        websocket.send_json({"type": "typing", "is_typing": True})

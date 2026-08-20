@@ -1255,10 +1255,16 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _connectWebSocket() {
+  Future<void> _connectWebSocket() async {
     try {
       _wsSubscription?.cancel();
       _wsChannel?.sink.close();
+
+      final token = await StorageManager.instance.getAuthToken();
+      if (token == null || token.isEmpty) {
+        if (kDebugMode) print('[Chat WS Warning] No active session token found');
+        return;
+      }
 
       final baseUri = Uri.parse(ApiClient.baseUrl);
       final isHttps = baseUri.scheme == 'https';
@@ -1266,7 +1272,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final wsHost = baseUri.host;
       final wsPort = baseUri.hasPort ? ':${baseUri.port}' : '';
       final wsUrl =
-          '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?user_id=$_currentUserId';
+          '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?token=${Uri.encodeComponent(token)}';
 
       _wsChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
       _wsSubscription = _wsChannel?.stream.listen(
