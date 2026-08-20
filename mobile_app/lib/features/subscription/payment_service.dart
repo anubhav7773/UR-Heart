@@ -100,11 +100,13 @@ class PaymentService {
       },
       'modal': {
         'confirm_close': true,
+        'animation': true,
       },
       'retry': {
         'enabled': true,
         'max_count': 3,
       },
+      'send_sms_hash': true,
     };
 
     debugPrint('[RAZORPAY_DISPATCH] Dispatching options: $options');

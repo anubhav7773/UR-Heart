@@ -8,7 +8,8 @@ try:
     import razorpay
 except ImportError:
     razorpay = None
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+import json
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, or_, and_
 
@@ -467,22 +468,80 @@ async def get_active_pass_status(
     )
 
 
+@router.post("/razorpay/webhook")
 @router.post("/webhook")
 async def razorpay_webhook(
-    payload: dict,
-    x_razorpay_signature: str = Header(default=None)
+    request: Request,
+    x_razorpay_signature: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Processes automated payment confirmation callbacks from Razorpay.
+    Accepts events on /payments/razorpay/webhook and /payments/webhook.
     """
-    event = payload.get("event")
-    if event == "order.paid":
-        return {
-            "status": "success",
-            "message": "User pass activated and validity timestamp updated."
-        }
+    try:
+        payload_body = await request.body()
+        payload_str = payload_body.decode("utf-8") if payload_body else "{}"
 
-    return {"status": "ignored"}
+        # 1. Verify Webhook Signature if Secret is configured
+        if settings.RAZORPAY_WEBHOOK_SECRET and settings.RAZORPAY_WEBHOOK_SECRET != "sample_webhook_secret" and x_razorpay_signature:
+            expected_signature = hmac.new(
+                key=settings.RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
+                msg=payload_body,
+                digestmod=hashlib.sha256
+            ).hexdigest()
+
+            if not hmac.compare_digest(expected_signature, x_razorpay_signature):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid webhook signature"
+                )
+
+        try:
+            event_data = json.loads(payload_str) if payload_str else {}
+        except Exception:
+            event_data = {}
+
+        event_type = event_data.get("event")
+
+        # 2. Handle Payment / Order Captured
+        if event_type in ["payment.captured", "order.paid"]:
+            payment_entity = event_data.get("payload", {}).get("payment", {}).get("entity", {})
+            notes = payment_entity.get("notes", {})
+            user_id_str = notes.get("user_id")
+            plan_type_str = notes.get("plan_type")
+
+            if user_id_str:
+                now_utc = datetime.now(timezone.utc)
+                plan_name, _ = normalize_plan_type(plan_type_str or "PLAN_BOOST_29")
+                try:
+                    user_uuid = uuid.UUID(str(user_id_str))
+                    u_res = await db.execute(select(User).where(User.id == user_uuid))
+                    user = u_res.scalars().first()
+                    if user:
+                        if plan_name == PLAN_BOOST_29:
+                            user.boosted_until = now_utc + timedelta(hours=1)
+                        elif plan_name == PLAN_DIRECT_DM_49:
+                            user.direct_dm_until = now_utc + timedelta(hours=1)
+                        elif plan_name == PLAN_AD_FREE_199:
+                            user.ad_free_until = now_utc + timedelta(days=30)
+                            user.is_premium = True
+                        db.add(user)
+                        await db.commit()
+                except Exception:
+                    await db.rollback()
+
+                _mock_user_passes[str(user_id_str)] = {
+                    "plan_type": plan_name,
+                    "valid_until": now_utc + timedelta(hours=1 if plan_name != PLAN_AD_FREE_199 else 24 * 30),
+                }
+
+        return {"status": "ok", "event_received": event_type}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/sachet/direct-dm", response_model=APIResponse[DirectDMSachetResponse])

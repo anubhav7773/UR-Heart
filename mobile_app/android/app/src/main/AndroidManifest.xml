@@ -10,6 +10,18 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
 
+    <!-- Native UPI Apps Detection (GPay, PhonePe, Paytm, BHIM & Generic UPI Intent) -->
+    <queries>
+        <package android:name="com.google.android.apps.nbu.paisa.user" /> <!-- GPay -->
+        <package android:name="com.phonepe.app" /> <!-- PhonePe -->
+        <package android:name="net.one97.paytm" /> <!-- Paytm -->
+        <package android:name="in.org.npci.upiapp" /> <!-- BHIM -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+    </queries>
+
     <application
         android:label="UR Heart"
         android:name="${applicationName}"

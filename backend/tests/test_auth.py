@@ -239,6 +239,46 @@ def test_create_sachet_order():
     assert "Safe Meet & WhatsApp Bridge" in j4["description"]
 
 
+def test_razorpay_webhook_endpoints():
+    payload = {
+        "provider": "google",
+        "id_token": "mock_id_token_webhook_test",
+        "device_id": "device_test_wh",
+        "fcm_token": "fcm_test_token_wh"
+    }
+    login_resp = client.post("/api/v1/auth/social-login", json=payload).json()
+    user_id = login_resp["data"]["user_id"]
+
+    webhook_payload = {
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_test_webhook_123",
+                    "amount": 2900,
+                    "currency": "INR",
+                    "status": "captured",
+                    "notes": {
+                        "user_id": user_id,
+                        "plan_type": "PLAN_BOOST_29"
+                    }
+                }
+            }
+        }
+    }
+
+    # Test /api/v1/payments/razorpay/webhook
+    res1 = client.post("/api/v1/payments/razorpay/webhook", json=webhook_payload)
+    assert res1.status_code == 200
+    assert res1.json()["status"] == "ok"
+    assert res1.json()["event_received"] == "payment.captured"
+
+    # Test /api/v1/payments/webhook
+    res2 = client.post("/api/v1/payments/webhook", json=webhook_payload)
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "ok"
+
+
 def test_direct_dm_flow():
     # Sender user
     token1 = get_social_login_token()
