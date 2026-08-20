@@ -29,8 +29,13 @@ from app.models.schemas import (
     DirectDMSachetResponse,
 )
 from app.core.config import settings
+from app.core.rate_limiter import rate_limit
 
-router = APIRouter(prefix="/payments", tags=["UR Heart Payment Passes & Subscriptions"])
+router = APIRouter(
+    prefix="/payments",
+    tags=["UR Heart Payment Passes & Subscriptions"],
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, by_user=True))]
+)
 
 # Standardized 4-Tier Monetization Plan Constants
 PLAN_BOOST_29 = "PLAN_BOOST_29"

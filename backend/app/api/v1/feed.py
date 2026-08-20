@@ -74,12 +74,12 @@ def compute_distance_km(lat1, lon1, lat2, lon2) -> Optional[float]:
 @router.get(
     "",
     response_model=APIResponse[FeedData],
-    dependencies=[Depends(rate_limit(max_requests=40, window_seconds=60, by_user=True))]
+    dependencies=[Depends(rate_limit(max_requests=60, window_seconds=60, by_user=True))]
 )
 @router.get(
     "/",
     response_model=APIResponse[FeedData],
-    dependencies=[Depends(rate_limit(max_requests=40, window_seconds=60, by_user=True))]
+    dependencies=[Depends(rate_limit(max_requests=60, window_seconds=60, by_user=True))]
 )
 async def get_feed(
     response: Response,
@@ -402,8 +402,16 @@ async def get_feed(
     return APIResponse(success=True, data=FeedData(cards=cards))
 
 
-@router.post("/swipe", response_model=APIResponse[SwipeData])
-@router.post("/swipe/", response_model=APIResponse[SwipeData])
+@router.post(
+    "/swipe",
+    response_model=APIResponse[SwipeData],
+    dependencies=[Depends(rate_limit(max_requests=60, window_seconds=60, by_user=True))]
+)
+@router.post(
+    "/swipe/",
+    response_model=APIResponse[SwipeData],
+    dependencies=[Depends(rate_limit(max_requests=60, window_seconds=60, by_user=True))]
+)
 async def swipe_action(
     payload: SwipeRequest,
     current_user_id: str = Depends(get_current_user_id),
@@ -571,7 +579,11 @@ async def swipe_action(
     return APIResponse(success=True, data=swipe_data)
 
 
-@router.post("/direct-dm", response_model=APIResponse[DirectDMData])
+@router.post(
+    "/direct-dm",
+    response_model=APIResponse[DirectDMData],
+    dependencies=[Depends(rate_limit(max_requests=15, window_seconds=60, by_user=True))]
+)
 async def send_direct_dm(
     payload: DirectDMRequest,
     current_user_id: str = Depends(get_current_user_id),

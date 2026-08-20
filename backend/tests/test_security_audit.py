@@ -2,17 +2,29 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.sanitizer import sanitize_user_input
+from app.core.rate_limiter import limiter
 
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def reset_limiter_fixture():
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
 def create_test_user_session(identifier: str):
-    res = client.post("/api/v1/auth/social-login", json={
-        "provider": "google",
-        "id_token": f"mock_token_{identifier}",
-        "device_id": f"{identifier}",
-        "fcm_token": f"fcm_{identifier}"
-    })
+    res = client.post(
+        "/api/v1/auth/social-login",
+        json={
+            "provider": "google",
+            "id_token": f"mock_token_{identifier}",
+            "device_id": f"{identifier}",
+            "fcm_token": f"fcm_{identifier}"
+        },
+        headers={"X-Device-Id": f"dev_{identifier}"}
+    )
     assert res.status_code == 200
     data = res.json()["data"]
     return data["access_token"], data["user_id"]

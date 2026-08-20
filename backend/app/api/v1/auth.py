@@ -32,8 +32,13 @@ from app.models.schemas import (
     CompleteProfileRequest,
     CompleteProfileData,
 )
+from app.core.rate_limiter import rate_limit
 
-router = APIRouter(prefix="", tags=["Authentication & Onboarding"])
+router = APIRouter(
+    prefix="",
+    tags=["Authentication & Onboarding"],
+    dependencies=[Depends(rate_limit(max_requests=5, window_seconds=60, by_user=False))]
+)
 
 # Designated Creator & Admin Account Credentials
 ADMIN_EMAILS = {"kshtriyaanubhav9120@gmail.com"}
