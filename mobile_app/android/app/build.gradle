@@ -39,7 +39,7 @@ android {
 
     defaultConfig {
         applicationId "com.ruralheart.app"
-        minSdkVersion flutter.minSdkVersion
+        minSdkVersion 24
         targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

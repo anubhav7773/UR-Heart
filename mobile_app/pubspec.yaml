@@ -50,6 +50,7 @@ dependencies:
   package_info_plus: ^8.0.0
   open_filex: ^4.5.0
   http: ^1.2.0
+  webview_flutter: ^4.10.0
 
   # Audio Recording & Playback (Voice Bio)
   record: ^5.1.2
