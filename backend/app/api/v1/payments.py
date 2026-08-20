@@ -76,9 +76,11 @@ async def create_razorpay_order():
     order_id = f"order_{uuid.uuid4().hex[:14]}"
     data = CreateOrderData(
         order_id=order_id,
+        amount=199.0,
         amount_inr=199.0,
+        amount_in_paise=19900,
         currency="INR",
-        razorpay_key_id=settings.RAZORPAY_KEY_ID or "rzp_test_dummy_key",
+        razorpay_key_id=settings.RAZORPAY_KEY_ID or "rzp_test_sample",
     )
     return APIResponse(success=True, data=data)
 
@@ -97,10 +99,13 @@ async def create_sachet_order(payload: CreateSachetOrderRequest):
 
     data = CreateSachetOrderData(
         order_id=order_id,
+        amount=amount,
         amount_inr=amount,
+        amount_in_paise=int(amount * 100),
         currency="INR",
         plan_type=standard_plan,
-        razorpay_key_id=settings.RAZORPAY_KEY_ID or "rzp_test_dummy_key",
+        plan_name=f"{standard_plan} Pass",
+        razorpay_key_id=settings.RAZORPAY_KEY_ID or "rzp_test_sample",
     )
     return APIResponse(success=True, data=data)
 

@@ -445,7 +445,9 @@ class UploadMediaData(BaseModel):
 
 class CreateOrderData(BaseModel):
     order_id: str
-    amount_inr: float
+    amount: float = 199.0
+    amount_inr: float = 199.0
+    amount_in_paise: int = 19900
     currency: str = "INR"
     razorpay_key_id: str
 
@@ -590,9 +592,12 @@ class CreateSachetOrderRequest(BaseModel):
 
 class CreateSachetOrderData(BaseModel):
     order_id: str
+    amount: float
     amount_inr: float
+    amount_in_paise: int
     currency: str = "INR"
     plan_type: str
+    plan_name: Optional[str] = None
     razorpay_key_id: str
 
 

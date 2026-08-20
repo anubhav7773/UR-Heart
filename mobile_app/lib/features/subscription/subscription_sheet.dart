@@ -57,7 +57,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
 
   @override
   void dispose() {
-    PaymentService.instance.dispose();
+    PaymentService.instance.clearCallbacks();
     super.dispose();
   }
 
@@ -70,9 +70,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
         planType: _selectedPlanType,
       );
     } catch (e) {
-      if (kDebugMode) {
-        print('Payment verification notice: ${e.toString()}');
-      }
+      debugPrint('Payment verification notice: ${e.toString()}');
     }
 
     await StorageManager.instance.setPremiumStatus(true);
@@ -92,16 +90,14 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     setState(() => _isProcessing = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Payment Cancelled/Failed: ${response.message}'),
+        content: Text('Payment Cancelled/Failed: ${response.message ?? "User cancelled or error occurred"}'),
         backgroundColor: Colors.redAccent,
       ),
     );
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
-    if (kDebugMode) {
-      print('External Wallet Selected: ${response.walletName}');
-    }
+    debugPrint('External Wallet Selected: ${response.walletName}');
   }
 
   Future<void> _completeSimulatedPayment(String orderId) async {
@@ -118,6 +114,7 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
   }
 
   Future<void> _initiateSachetPayment() async {
+    if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
     try {
@@ -127,13 +124,20 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
 
       if (kIsWeb && success) {
         await _completeSimulatedPayment('order_web_simulated');
+      } else if (!success) {
+        if (mounted) setState(() => _isProcessing = false);
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Razorpay Checkout exception: ${e.toString()}');
+      debugPrint('Razorpay Checkout exception: ${e.toString()}');
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment initiation failed: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
     }
   }
 

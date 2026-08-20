@@ -201,26 +201,37 @@ def test_create_sachet_order():
     # 1. PLAN_BOOST_29 (₹29)
     res1 = client.post("/api/v1/payments/create-sachet-order", json={"plan_type": "PLAN_BOOST_29"})
     assert res1.status_code == 200
-    assert res1.json()["data"]["amount_inr"] == 29.0
-    assert res1.json()["data"]["plan_type"] == "PLAN_BOOST_29"
+    d1 = res1.json()["data"]
+    assert d1["amount"] == 29.0
+    assert d1["amount_in_paise"] == 2900
+    assert d1["currency"] == "INR"
+    assert "razorpay_key_id" in d1
+    assert "order_id" in d1
+    assert d1["plan_type"] == "PLAN_BOOST_29"
 
     # 2. PLAN_DIRECT_DM_49 (₹49)
     res2 = client.post("/api/v1/payments/create-sachet-order", json={"plan_type": "PLAN_DIRECT_DM_49"})
     assert res2.status_code == 200
-    assert res2.json()["data"]["amount_inr"] == 49.0
-    assert res2.json()["data"]["plan_type"] == "PLAN_DIRECT_DM_49"
+    d2 = res2.json()["data"]
+    assert d2["amount"] == 49.0
+    assert d2["amount_in_paise"] == 4900
+    assert d2["plan_type"] == "PLAN_DIRECT_DM_49"
 
     # 3. PLAN_AD_FREE_199 (₹199)
     res3 = client.post("/api/v1/payments/create-sachet-order", json={"plan_type": "PLAN_AD_FREE_199"})
     assert res3.status_code == 200
-    assert res3.json()["data"]["amount_inr"] == 199.0
-    assert res3.json()["data"]["plan_type"] == "PLAN_AD_FREE_199"
+    d3 = res3.json()["data"]
+    assert d3["amount"] == 199.0
+    assert d3["amount_in_paise"] == 19900
+    assert d3["plan_type"] == "PLAN_AD_FREE_199"
 
     # 4. PLAN_SAFE_BRIDGE_499 (₹499)
     res4 = client.post("/api/v1/payments/create-sachet-order", json={"plan_type": "PLAN_SAFE_BRIDGE_499"})
     assert res4.status_code == 200
-    assert res4.json()["data"]["amount_inr"] == 499.0
-    assert res4.json()["data"]["plan_type"] == "PLAN_SAFE_BRIDGE_499"
+    d4 = res4.json()["data"]
+    assert d4["amount"] == 499.0
+    assert d4["amount_in_paise"] == 49900
+    assert d4["plan_type"] == "PLAN_SAFE_BRIDGE_499"
 
 
 def test_direct_dm_flow():
