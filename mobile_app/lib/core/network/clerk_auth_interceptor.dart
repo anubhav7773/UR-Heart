@@ -51,6 +51,9 @@ class ClerkAuthInterceptor extends QueuedInterceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    // 0. Attach Stopwatch for network latency benchmarking
+    options.extra['request_stopwatch'] = Stopwatch()..start();
+
     // 1. If Authorization header is not manually provided, inject Clerk Bearer token
     if (!options.headers.containsKey('Authorization') ||
         options.headers['Authorization'] == null ||
@@ -67,7 +70,7 @@ class ClerkAuthInterceptor extends QueuedInterceptor {
 
     if (kDebugMode) {
       final hasAuth = options.headers.containsKey('Authorization');
-      print('🚀 [DioRequest] ${options.method} ${options.uri} (Auth: ${hasAuth ? "Bearer ..." : "None"})');
+      print('🚀 [DioClient] ${options.method} ${options.uri} (Auth: ${hasAuth ? "Bearer [Active]" : "None"})');
     }
 
     return handler.next(options);
@@ -75,17 +78,23 @@ class ClerkAuthInterceptor extends QueuedInterceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final stopwatch = response.requestOptions.extra['request_stopwatch'] as Stopwatch?;
+    final elapsedMs = stopwatch != null ? '${stopwatch.elapsedMilliseconds}ms' : 'N/A';
+
     if (kDebugMode) {
-      print('✅ [DioResponse] [${response.statusCode}] ${response.requestOptions.path}');
+      print('✅ [DioClient] [${response.statusCode}] ${response.requestOptions.path} (${elapsedMs})');
     }
     return handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    final stopwatch = err.requestOptions.extra['request_stopwatch'] as Stopwatch?;
+    final elapsedMs = stopwatch != null ? '${stopwatch.elapsedMilliseconds}ms' : 'N/A';
     final statusCode = err.response?.statusCode;
+
     if (kDebugMode) {
-      print('❌ [DioError] [$statusCode] ${err.requestOptions.path}: ${err.response?.data ?? err.message}');
+      print('❌ [DioClient] [$statusCode] ${err.requestOptions.path} (${elapsedMs}): ${err.response?.data ?? err.message}');
     }
 
     // Handle 401 Unauthorized session expiration
