@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/auth/oauth_redirect_handler.dart';
-import '../../../../core/network/api_client.dart';
 import '../../../../core/network/user_repository.dart';
-import '../../../../core/security/storage_manager.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../auth_provider.dart';
+import '../controllers/auth_controller.dart';
+import '../controllers/auth_state.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/email_auth_tab.dart';
 import 'widgets/google_auth_button.dart';
@@ -25,13 +24,16 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
+  late final AuthController _authController;
   bool _isSignUp = false;
-  bool _isLoading = false;
   AuthMethodTab _selectedTab = AuthMethodTab.phone;
 
   @override
   void initState() {
     super.initState();
+    _authController = AuthController();
+    _authController.addListener(_onAuthStateChanged);
+
     // Listen for OAuth deep link callbacks
     OAuthRedirectHandler.instance.onOAuthCallback.listen((event) {
       if (!mounted) return;
@@ -44,6 +46,26 @@ class _AuthScreenState extends State<AuthScreen> {
         _showErrorBanner('OAuth Failed: ${event.errorDescription ?? event.error}');
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _authController.removeListener(_onAuthStateChanged);
+    _authController.dispose();
+    super.dispose();
+  }
+
+  void _onAuthStateChanged() {
+    final state = _authController.state;
+    if (state is AuthAuthenticated) {
+      _onAuthSuccess(
+        token: state.token,
+        userId: state.userId,
+        isProfileComplete: state.isProfileComplete,
+      );
+    } else if (state is AuthError) {
+      _showErrorBanner(state.errorMessage);
+    }
   }
 
   void _showErrorBanner(String message) {
@@ -105,104 +127,35 @@ class _AuthScreenState extends State<AuthScreen> {
   // 1. Google OAuth Action
   // ===========================================================================
   Future<void> _handleGoogleOAuth() async {
-    setState(() => _isLoading = true);
-    try {
-      // Clerk OAuth Launch via URL Launcher with callback scheme clerk://oauth_callback
-      final clerkOauthUrl = Uri.parse(
-        'https://accounts.ruralheart.com/oauth/google?redirect_url=clerk://oauth_callback',
-      );
-
-      if (await canLaunchUrl(clerkOauthUrl)) {
-        await launchUrl(clerkOauthUrl, mode: LaunchMode.externalApplication);
-      } else {
-        // Fallback to local social-login endpoint simulation
-        final res = await ApiClient.instance.socialLogin(
-          provider: 'google',
-          idToken: 'mock_google_id_token_${DateTime.now().millisecondsSinceEpoch}',
-          deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-        );
-        final data = res.data?['data'] ?? {};
-        await _onAuthSuccess(
-          token: data['access_token'] ?? 'mock_token',
-          userId: data['user_id'] ?? 'user_1',
-          isProfileComplete: data['is_profile_complete'] == true,
-        );
-      }
-    } catch (e) {
-      _showErrorBanner('Google sign-in encountered an issue. Please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    await _authController.signInWithGoogle();
   }
 
   // ===========================================================================
   // 2. Phone / SMS OTP Strategy
   // ===========================================================================
   Future<bool> _handleSendPhoneOtp(String fullPhoneNumber) async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await ApiClient.instance.sendOtp(phoneNumber: fullPhoneNumber);
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        return true;
-      }
-      _showErrorBanner('Failed to send OTP code. Please check the number.');
-      return false;
-    } catch (e) {
-      // Fallback for simulation / mock environment
-      return true;
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    return await _authController.sendPhoneOTP(fullPhoneNumber);
   }
 
   Future<void> _handleVerifyPhoneOtp(String fullPhoneNumber, String otpCode) async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await ApiClient.instance.verifyOtp(
-        phoneNumber: fullPhoneNumber,
-        otpCode: otpCode,
-        deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-      );
-      final data = res.data?['data'] ?? {};
-      await _onAuthSuccess(
-        token: data['access_token'] ?? 'token_verified',
-        userId: data['user_id'] ?? 'user_phone_verified',
-        isProfileComplete: data['is_profile_complete'] == true,
-      );
-    } catch (e) {
-      _showErrorBanner('Invalid OTP code. Please verify and try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    await _authController.verifyPhoneOTP(otpCode);
   }
 
   // ===========================================================================
   // 3. Email / Password Strategy
   // ===========================================================================
   Future<void> _handleEmailSubmit(String email, String password) async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await ApiClient.instance.firebaseLogin(
-        idToken: 'email_auth_${DateTime.now().millisecondsSinceEpoch}',
-        deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-      );
-      final data = res.data?['data'] ?? {};
-      await _onAuthSuccess(
-        token: data['access_token'] ?? 'token_email_auth',
-        userId: data['user_id'] ?? 'user_email_auth',
-        isProfileComplete: data['is_profile_complete'] == true,
-      );
-    } catch (e) {
-      _showErrorBanner('Authentication failed. Please check your credentials.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (_isSignUp) {
+      await _authController.signUpWithPassword(email: email, password: password);
+    } else {
+      await _authController.signInWithPassword(email: email, password: password);
     }
   }
 
   void _handleForgotPassword() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Password reset link has been dispatched to your email.'),
+        content: Text('Password reset instructions have been sent to your email.'),
         backgroundColor: Color(0xFF3B82F6),
       ),
     );
@@ -212,23 +165,7 @@ class _AuthScreenState extends State<AuthScreen> {
   // 4. Username / Password Strategy
   // ===========================================================================
   Future<void> _handleUsernameSubmit(String username, String password) async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await ApiClient.instance.firebaseLogin(
-        idToken: 'username_auth_${DateTime.now().millisecondsSinceEpoch}',
-        deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-      );
-      final data = res.data?['data'] ?? {};
-      await _onAuthSuccess(
-        token: data['access_token'] ?? 'token_username_auth',
-        userId: data['user_id'] ?? 'user_username_auth',
-        isProfileComplete: data['is_profile_complete'] == true,
-      );
-    } catch (e) {
-      _showErrorBanner('Username authentication failed.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    await _authController.signInWithUsername(username: username, password: password);
   }
 
   @override
@@ -254,7 +191,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   // 2. Primary Google Social Action
                   GoogleAuthButton(
-                    isLoading: _isLoading,
+                    isLoading: _authController.isLoading,
                     onPressed: _handleGoogleOAuth,
                   ),
                   const SizedBox(height: 20),
@@ -400,7 +337,7 @@ class _AuthScreenState extends State<AuthScreen> {
         return PhoneAuthTab(
           key: ValueKey('phone_$_isSignUp'),
           isSignUp: _isSignUp,
-          isLoading: _isLoading,
+          isLoading: _authController.isLoading,
           onSendOtp: _handleSendPhoneOtp,
           onVerifyOtp: _handleVerifyPhoneOtp,
         );
@@ -408,7 +345,7 @@ class _AuthScreenState extends State<AuthScreen> {
         return EmailAuthTab(
           key: ValueKey('email_$_isSignUp'),
           isSignUp: _isSignUp,
-          isLoading: _isLoading,
+          isLoading: _authController.isLoading,
           onSubmit: _handleEmailSubmit,
           onForgotPassword: _handleForgotPassword,
         );
@@ -416,7 +353,7 @@ class _AuthScreenState extends State<AuthScreen> {
         return UsernameAuthTab(
           key: ValueKey('username_$_isSignUp'),
           isSignUp: _isSignUp,
-          isLoading: _isLoading,
+          isLoading: _authController.isLoading,
           onSubmit: _handleUsernameSubmit,
         );
     }
