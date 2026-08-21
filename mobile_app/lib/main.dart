@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:clerk_auth/clerk_auth.dart';
+import 'core/auth/oauth_redirect_handler.dart';
 import 'core/navigation/nav_keys.dart';
 import 'core/network/api_client.dart';
 import 'core/security/storage_manager.dart';
@@ -33,6 +34,15 @@ const webFirebaseOptions = FirebaseOptions(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await PrivacyProtectionService.enableSecureScreen();
+
+  // 0. Initialize Deep Link & Clerk OAuth Redirect Infrastructure
+  try {
+    await OAuthRedirectHandler.instance.initialize();
+  } catch (e) {
+    if (kDebugMode) {
+      print('⚠️ OAuthRedirectHandler init error: $e');
+    }
+  }
 
   // 1. Initialize Clerk Authentication Client with publishable key
   try {

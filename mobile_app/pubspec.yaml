@@ -59,6 +59,7 @@ dependencies:
   intl: ^0.20.2
   sentry_flutter: ^8.14.2
   clerk_flutter: ^0.0.18-beta
+  app_links: ^6.3.2
 
 dev_dependencies:
   flutter_test:
