@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/navigation/nav_keys.dart';
 import 'core/network/api_client.dart';
 import 'core/security/storage_manager.dart';
@@ -97,7 +98,22 @@ void main() async {
     }
   }
 
-  runApp(const RuralHeartApp());
+  // 4. TODO: Initialize Clerk authentication when package version is stable
+  // Clerk integration is pending resolution of beta version conflicts
+  // When ready, add Clerk initialization with publishable key:
+  // await Clerk.initialize(
+  //   publishableKey: '[Your Clerk Publishable Key]',
+  // );
+
+  // 5. Initialize Sentry and wrap the app
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = 'https://04973e1a72f04bf6d0cdb86f8dae89f5@o4511946639015936.ingest.us.sentry.io/4511946784636928';
+      options.tracesSampleRate = 1.0;
+      options.profilesSampleRate = 1.0;
+    },
+    appRunner: () => runApp(const RuralHeartApp()),
+  );
 }
 
 class RuralHeartApp extends StatefulWidget {
