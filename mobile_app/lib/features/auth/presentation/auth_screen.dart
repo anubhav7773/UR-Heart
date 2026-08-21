@@ -287,30 +287,40 @@ class _AuthScreenState extends State<AuthScreen> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 9),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFF1F212D) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: isSelected ? Border.all(color: const Color(0xFF34384D), width: 1) : null,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: isSelected ? AppTheme.primaryColor : const Color(0xFF6B7280),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 14,
+                    color: isSelected ? AppTheme.primaryColor : const Color(0xFF6B7280),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : const Color(0xFF9CA3AF),
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF9CA3AF),
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

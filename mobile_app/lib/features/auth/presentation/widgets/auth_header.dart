@@ -70,7 +70,7 @@ class AuthHeader extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // 3. Encrypted Safety Badge
+        // 3. Encrypted Safety Badge (Antigravity Containment)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
@@ -78,34 +78,38 @@ class AuthHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0xFF252736), width: 1),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF10B981), // Emerald online pulse
-                  shape: BoxShape.circle,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF10B981), // Emerald online pulse
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.shield_outlined,
-                color: Color(0xFF34B7F1),
-                size: 14,
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'Hardware-Locked Security (RSA-2048)',
-                style: TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.2,
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.shield_outlined,
+                  color: Color(0xFF34B7F1),
+                  size: 14,
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                const Text(
+                  'Hardware-Locked Security (RSA-2048)',
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 20),

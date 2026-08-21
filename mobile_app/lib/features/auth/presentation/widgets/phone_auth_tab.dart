@@ -187,14 +187,19 @@ class _PhoneAuthTabState extends State<PhoneAuthTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Code sent to $_fullPhoneNumber',
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Text(
+                          'Code sent to $_fullPhoneNumber',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       GestureDetector(
                         onTap: () {
                           setState(() {
