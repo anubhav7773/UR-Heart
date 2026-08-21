@@ -1,9 +1,11 @@
 import uuid
 import httpx
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import select, delete, text, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -22,8 +24,17 @@ from app.models.orm import (
     ChaiStatus,
     UserAdCounter,
     SachetTransaction,
+    GenderEnum as ORMGenderEnum,
+    IntentEnum as ORMIntentEnum,
 )
-from app.models.schemas import APIResponse
+from app.models.schemas import APIResponse, ClerkUserClaims, UserSessionData
+from app.schemas.profile import ProfileUpdateRequest
+from app.services.clerk_auth import (
+    get_current_authenticated_user,
+    get_current_session,
+    get_current_clerk_claims,
+    ClerkUserSyncService,
+)
 
 router = APIRouter(prefix="/users", tags=["User Location & Account Management"])
 
@@ -280,26 +291,169 @@ async def update_user_location(
 
 
 def _serialize_user_profile(user: User) -> dict:
-    from datetime import date
     today = date.today()
     age = today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day)) if user.dob else None
     photos = [p.photo_url for p in user.photos] if user.photos else ([user.photo_url] if getattr(user, 'photo_url', None) else [])
-    is_approved = bool(user.is_verified and getattr(user, 'verification_status', None) and user.verification_status.value == "APPROVED")
+    is_approved = bool(user.is_verified and getattr(user, 'verification_status', None) and getattr(user.verification_status, 'value', str(user.verification_status)) == "APPROVED")
+    is_onboarded = bool(
+        user.bio
+        or len(photos) > 1
+        or (user.dob and user.dob != date(2000, 1, 1))
+    )
     return {
         "id": str(user.id),
         "user_id": str(user.id),
+        "clerk_id": getattr(user, "clerk_id", None),
+        "email": user.email,
+        "phone_number": user.phone_number,
         "full_name": user.full_name or "UR Heart User",
         "first_name": (user.full_name or "User").split()[0],
         "age": age,
+        "dob": user.dob.isoformat() if user.dob else None,
         "bio": user.bio or "",
         "area_name": user.area_name or "Ayodhya",
+        "village_pin_code": user.village_pin_code or "224001",
         "gender": user.gender.value if user.gender else "male",
+        "interested_in": user.interested_in.value if user.interested_in else "female",
         "intent": user.intent.value if user.intent else "casual",
         "photos": photos,
-        "photo_url": photos[0] if photos else None,
+        "photo_url": photos[0] if photos else user.photo_url,
         "is_verified": is_approved,
         "is_admin": bool(getattr(user, "is_admin", False)),
+        "is_online": bool(user.is_online),
+        "is_onboarded": is_onboarded,
+        "created_at": user.created_at.isoformat() if getattr(user, "created_at", None) else None,
     }
+
+
+@router.get("/me", response_model=APIResponse[dict])
+@router.get("/me/", response_model=APIResponse[dict])
+async def get_my_user_profile(
+    user: User = Depends(get_current_authenticated_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Protected endpoint: Retrieves the authenticated user's dating profile details,
+    photos, verification status, and onboarding completeness for Flutter clients.
+    """
+    res = await db.execute(
+        select(User)
+        .options(selectinload(User.photos), selectinload(User.ad_counter))
+        .where(User.id == user.id)
+    )
+    refreshed_user = res.scalars().first() or user
+    return APIResponse(
+        success=True,
+        message="User profile retrieved successfully.",
+        data=_serialize_user_profile(refreshed_user),
+    )
+
+
+@router.put("/me", response_model=APIResponse[dict])
+@router.put("/me/", response_model=APIResponse[dict])
+@router.patch("/me", response_model=APIResponse[dict])
+@router.patch("/me/", response_model=APIResponse[dict])
+async def update_my_user_profile(
+    payload: ProfileUpdateRequest,
+    user: User = Depends(get_current_authenticated_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Protected endpoint: Updates the authenticated user's dating profile fields.
+    Allows Flutter clients to modify display name, bio, DOB, gender preference, intent, location, etc.
+    """
+    # Fetch full user with relations
+    res = await db.execute(
+        select(User)
+        .options(selectinload(User.photos), selectinload(User.ad_counter))
+        .where(User.id == user.id)
+    )
+    db_user = res.scalars().first() or user
+
+    # Apply updates
+    if payload.full_name is not None:
+        db_user.full_name = payload.full_name.strip()
+    elif payload.display_name is not None:
+        db_user.full_name = payload.display_name.strip()
+
+    if payload.bio is not None:
+        db_user.bio = payload.bio.strip()
+
+    dob_val = payload.dob or payload.birthdate
+    if dob_val is not None:
+        db_user.dob = dob_val
+
+    if payload.gender is not None:
+        try:
+            db_user.gender = ORMGenderEnum(payload.gender.lower())
+        except ValueError:
+            pass
+
+    gender_pref = payload.interested_in or payload.gender_preference
+    if gender_pref is not None:
+        try:
+            db_user.interested_in = ORMGenderEnum(gender_pref.lower())
+        except ValueError:
+            pass
+
+    if payload.intent is not None:
+        try:
+            db_user.intent = ORMIntentEnum(payload.intent.lower())
+        except ValueError:
+            pass
+
+    if payload.area_name is not None:
+        db_user.area_name = payload.area_name.strip()
+
+    if payload.village_pin_code is not None:
+        db_user.village_pin_code = payload.village_pin_code.strip()
+
+    if payload.is_location_masked is not None:
+        db_user.is_location_masked = payload.is_location_masked
+
+    db_user.last_seen = datetime.now(timezone.utc)
+    db_user.is_online = True
+
+    try:
+        await db.commit()
+        await db.refresh(db_user)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update user profile: {e}",
+        )
+
+    return APIResponse(
+        success=True,
+        message="User profile updated successfully.",
+        data=_serialize_user_profile(db_user),
+    )
+
+
+@router.post("/sync", response_model=APIResponse[dict])
+@router.post("/sync/", response_model=APIResponse[dict])
+async def sync_my_user_profile(
+    claims: ClerkUserClaims = Depends(get_current_clerk_claims),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    On-Demand User Sync Endpoint:
+    - Auto-detects or provisions the database user profile using Clerk token claims.
+    - Returns comprehensive session data, profile details, and onboarding readiness.
+    """
+    user, is_new = await ClerkUserSyncService.sync_or_get_user(db, claims)
+    session = ClerkUserSyncService.build_user_session(user, claims)
+
+    return APIResponse(
+        success=True,
+        message="User database synchronization completed.",
+        data={
+            "is_new_user": is_new,
+            "user": _serialize_user_profile(user),
+            "session": session.model_dump(),
+        },
+    )
 
 
 @router.get("/activity")

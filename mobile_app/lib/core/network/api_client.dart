@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../security/storage_manager.dart';
 import '../utils/image_compressor.dart';
+import 'clerk_auth_interceptor.dart';
+import 'environment_config.dart';
 
 class ApiClient {
   static final ApiClient instance = ApiClient._internal();
@@ -10,28 +12,34 @@ class ApiClient {
 
   late final Dio dio;
 
-  // Base URL configuration for Render production deployment
-  static String get defaultBaseUrl => 'https://ur-heart.onrender.com/api/v1';
-  static String get baseUrl => defaultBaseUrl;
+  // Base URL configuration using EnvironmentConfig
+  static String get defaultBaseUrl => EnvironmentConfig.productionBaseUrl;
+  static String get baseUrl => EnvironmentConfig.baseUrl;
   String get currentBaseUrl => dio.options.baseUrl;
 
   ApiClient._internal() {
     dio = Dio(
       BaseOptions(
-        baseUrl: defaultBaseUrl,
+        baseUrl: EnvironmentConfig.baseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
       ),
     );
 
-    // Dynamic Auth Interceptor
+    // 1. Clerk Authentication Interceptor
+    dio.interceptors.add(ClerkAuthInterceptor());
+
+    // 2. Dynamic Base URL Interceptor
     dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = await StorageManager.instance.getAuthToken();
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
+        onRequest: (options, handler) {
+          final targetBaseUrl = EnvironmentConfig.baseUrl;
+          if (options.baseUrl != targetBaseUrl) {
+            options.baseUrl = targetBaseUrl;
           }
           return handler.next(options);
         },

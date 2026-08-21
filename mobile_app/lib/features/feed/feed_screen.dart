@@ -251,35 +251,38 @@ class _FeedScreenState extends State<FeedScreen> {
               // Option 1: Watch Rewarded Ad (Free +5 Swipes)
               Container(
                 decoration: BoxDecoration(
-                  color: AppTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.35)),
                 ),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                child: Material(
+                  color: AppTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.greenAccent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 24),
                     ),
-                    child: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 24),
-                  ),
-                  title: const Text('Watch Short Video (+5 Free Swipes)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Takes 15-30 seconds • Max 3/day', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
-                  trailing: ElevatedButton(
-                    onPressed: _isClaimingReward
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            _claimRewardedSwipes();
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.greenAccent.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    title: const Text('Watch Short Video (+5 Free Swipes)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Takes 15-30 seconds • Max 3/day', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
+                    trailing: ElevatedButton(
+                      onPressed: _isClaimingReward
+                          ? null
+                          : () {
+                              Navigator.pop(context);
+                              _claimRewardedSwipes();
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.greenAccent.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Watch', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                    child: const Text('Watch', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),
@@ -288,38 +291,41 @@ class _FeedScreenState extends State<FeedScreen> {
               // Option 2: Super Boost (₹29) or VIP Pro (₹99)
               Container(
                 decoration: BoxDecoration(
-                  color: AppTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.35)),
                 ),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.secondaryColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                child: Material(
+                  color: AppTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 24),
                     ),
-                    child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 24),
-                  ),
-                  title: const Text('Super Boost (₹29) & VIP Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('10x feed priority & unlimited swipes', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
-                  trailing: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => const SubscriptionSheet(),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.secondaryColor,
-                      foregroundColor: Colors.black87,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    title: const Text('Super Boost (₹29) & VIP Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('10x feed priority & unlimited swipes', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
+                    trailing: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => const SubscriptionSheet(),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.secondaryColor,
+                        foregroundColor: Colors.black87,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Explore', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                    child: const Text('Explore', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),
@@ -1374,26 +1380,29 @@ class _FeedScreenState extends State<FeedScreen> {
                                 // Action 1: Watch Rewarded Video for Free Swipes
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: AppTheme.backgroundColor,
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.35)),
                                   ),
-                                  child: ListTile(
-                                    onTap: _isClaimingReward ? null : _claimRewardedSwipes,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                    leading: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.greenAccent.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(10),
+                                  child: Material(
+                                    color: AppTheme.backgroundColor,
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: ListTile(
+                                      onTap: _isClaimingReward ? null : _claimRewardedSwipes,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      leading: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.greenAccent.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 22),
                                       ),
-                                      child: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 22),
+                                      title: Text(
+                                        _isClaimingReward ? 'Loading Video...' : 'Watch video (+5 free swipes)',
+                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                      ),
+                                      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                     ),
-                                    title: Text(
-                                      _isClaimingReward ? 'Loading Video...' : 'Watch video (+5 free swipes)',
-                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                    trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
@@ -1401,33 +1410,36 @@ class _FeedScreenState extends State<FeedScreen> {
                                 // Action 2: Super Boost (₹29) / VIP Pro
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: AppTheme.backgroundColor,
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.35)),
                                   ),
-                                  child: ListTile(
-                                    onTap: () {
-                                      showModalBottomSheet(
-                                        context: context,
-                                        isScrollControlled: true,
-                                        backgroundColor: Colors.transparent,
-                                        builder: (_) => const SubscriptionSheet(),
-                                      );
-                                    },
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                    leading: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.secondaryColor.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(10),
+                                  child: Material(
+                                    color: AppTheme.backgroundColor,
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: ListTile(
+                                      onTap: () {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (_) => const SubscriptionSheet(),
+                                        );
+                                      },
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      leading: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.secondaryColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 22),
                                       ),
-                                      child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 22),
+                                      title: const Text(
+                                        'Super Boost Profile (₹29)',
+                                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                      ),
+                                      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                     ),
-                                    title: const Text(
-                                      'Super Boost Profile (₹29)',
-                                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                    trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                   ),
                                 ),
                                 const SizedBox(height: 10),

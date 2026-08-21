@@ -85,6 +85,9 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    clerk_id: Mapped[Optional[str]] = mapped_column(
+        String(128), unique=True, index=True, nullable=True, default=None
+    )
     email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
     phone_number: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)

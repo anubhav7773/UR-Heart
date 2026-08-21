@@ -68,6 +68,7 @@ async def init_db() -> None:
         CREATE EXTENSION IF NOT EXISTS postgis;
 
         -- New columns for users table
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id VARCHAR(128);
         ALTER TABLE users ADD COLUMN IF NOT EXISTS boosted_until TIMESTAMPTZ DEFAULT NULL;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS direct_dm_until TIMESTAMPTZ DEFAULT NULL;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS ad_free_until TIMESTAMPTZ DEFAULT NULL;
@@ -90,6 +91,9 @@ async def init_db() -> None:
         ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token VARCHAR(512);
         ALTER TABLE users ADD COLUMN IF NOT EXISTS dob DATE;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+        
+        -- Create unique index on clerk_id if not exists
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_clerk_id ON users (clerk_id) WHERE clerk_id IS NOT NULL;
         
         -- Populate location_geom if coordinates exist
         UPDATE users 
@@ -180,6 +184,7 @@ async def init_db() -> None:
 
     # 3. Individual fallback column statements to guarantee completion even if non-Postgres dialect
     individual_queries = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id VARCHAR(128);",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS boosted_until TIMESTAMPTZ DEFAULT NULL;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS direct_dm_until TIMESTAMPTZ DEFAULT NULL;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS ad_free_until TIMESTAMPTZ DEFAULT NULL;",

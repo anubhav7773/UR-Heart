@@ -31,8 +31,21 @@ from app.models.schemas import (
     EmailLoginTokenData,
     CompleteProfileRequest,
     CompleteProfileData,
+    ClerkUserClaims,
+    ClerkSyncRequest,
+    ClerkSyncData,
+    UserSessionData,
 )
 from app.core.rate_limiter import rate_limit
+from app.services.clerk_auth import (
+    clerk_verifier,
+    ClerkJWKSVerifier,
+    ClerkUserSyncService,
+    get_current_clerk_claims,
+    get_current_authenticated_user,
+    get_current_session,
+    get_current_user_and_session,
+)
 
 router = APIRouter(
     prefix="",
@@ -848,5 +861,44 @@ async def complete_profile(
         success=True,
         message="Profile created successfully.",
         data=CompleteProfileData(user_id=current_user_id, is_profile_complete=True)
+    )
+
+
+@router.post("/auth/clerk-sync", response_model=APIResponse[ClerkSyncData])
+@router.post("/auth/clerk-sync/", response_model=APIResponse[ClerkSyncData])
+async def sync_clerk_auth(
+    payload: Optional[ClerkSyncRequest] = None,
+    claims: ClerkUserClaims = Depends(get_current_clerk_claims),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Seamless Clerk Authentication & User Auto-Synchronization Endpoint:
+    - Verifies incoming Clerk JWT via JWKS public keys.
+    - Synchronizes the Clerk user to the local PostgreSQL database (auto-creates basic profile if new).
+    - Saves optional FCM token & device details.
+    - Returns comprehensive session data and profile onboarding status.
+    """
+    user, is_new_user = await ClerkUserSyncService.sync_or_get_user(db, claims)
+
+    # Save FCM token if supplied
+    if payload and payload.fcm_token and payload.fcm_token.strip():
+        user.fcm_token = payload.fcm_token.strip()
+        await db.commit()
+
+    session_data = ClerkUserSyncService.build_user_session(user, claims)
+
+    return APIResponse(
+        success=True,
+        message="Clerk session synchronized successfully.",
+        data=ClerkSyncData(
+            user_id=str(user.id),
+            clerk_id=user.clerk_id or claims.clerk_id,
+            email=user.email,
+            full_name=user.full_name,
+            is_new_user=is_new_user,
+            is_onboarded=session_data.is_onboarded,
+            profile=session_data.model_dump(),
+            claims=claims.raw_claims,
+        ),
     )
 

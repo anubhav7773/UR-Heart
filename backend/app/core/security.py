@@ -39,9 +39,14 @@ def create_access_token(subject: str | Any, expires_delta: Optional[timedelta] =
 
 
 def decode_access_token(token: str) -> Optional[str]:
-    """Decodes and verifies a JWT token signature, extracting the user_id subject."""
+    """Decodes and verifies a local HS256 JWT token signature, extracting the user_id subject."""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM, "HS256"],
+            options={"verify_aud": False, "verify_iss": False},
+        )
         user_id: Optional[str] = payload.get("sub")
         return user_id
     except JWTError:
@@ -50,8 +55,14 @@ def decode_access_token(token: str) -> Optional[str]:
 
 async def get_current_user_id(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    db: AsyncSession = Depends(get_db),
 ) -> str:
-    """FastAPI bearer security dependency for validating current JWT token and extracting user_id."""
+    """
+    FastAPI bearer security dependency for validating authentication tokens:
+    - Supports Clerk RS256 JWKS tokens (with automatic DB user sync/resolution).
+    - Supports local HS256 JWT tokens.
+    Returns: Local database User UUID string.
+    """
     if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -59,7 +70,25 @@ async def get_current_user_id(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id = decode_access_token(credentials.credentials)
+    token = credentials.credentials
+
+    # 1. First attempt Clerk token verification (JWKS / PEM / RS256)
+    try:
+        from app.services.clerk_auth import clerk_verifier, ClerkUserSyncService
+        claims = await clerk_verifier.verify_token(token)
+        if claims and claims.sub:
+            # Auto-sync or retrieve the user from database
+            user, _ = await ClerkUserSyncService.sync_or_get_user(db, claims)
+            return str(user.id)
+    except HTTPException:
+        # Re-raise standard auth exceptions if it wasn't a local fallback
+        raise
+    except Exception as e:
+        # Fallback to local token check
+        pass
+
+    # 2. Fallback: Local HS256 token decoding
+    user_id = decode_access_token(token)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -72,11 +101,15 @@ async def get_current_user_id(
 
 async def get_optional_user_id(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    db: AsyncSession = Depends(get_db),
 ) -> Optional[str]:
     """Optional bearer security dependency that returns user_id if valid token is present, or None."""
     if not credentials or not credentials.credentials:
         return None
-    return decode_access_token(credentials.credentials)
+    try:
+        return await get_current_user_id(credentials, db)
+    except HTTPException:
+        return None
 
 
 SUPER_ADMIN_EMAIL = "kshtriyaanubhav9120@gmail.com"
