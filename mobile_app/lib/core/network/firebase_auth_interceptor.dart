@@ -1,30 +1,31 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../security/storage_manager.dart';
 
-/// Callback type for dynamically supplying the freshest Clerk session token.
-typedef ClerkTokenProvider = Future<String?> Function();
+/// Dynamic token provider callback
+typedef FirebaseTokenProvider = Future<String?> Function();
 
-/// Callback type for handling authentication expiration / unauthorized events.
+/// Callback invoked on 401 Unauthorized
 typedef OnUnauthorizedCallback = void Function(DioException error);
 
-/// Custom Dio Interceptor that automatically injects the active Clerk session JWT
-/// into the `Authorization: Bearer <token>` header for all backend requests.
-class ClerkAuthInterceptor extends QueuedInterceptor {
-  final ClerkTokenProvider? tokenProvider;
+/// Custom Dio Interceptor that automatically injects the active Firebase ID token
+/// into the `Authorization: Bearer <token>` header for all outgoing API requests.
+class FirebaseAuthInterceptor extends QueuedInterceptor {
+  final FirebaseTokenProvider? tokenProvider;
   final OnUnauthorizedCallback? onUnauthorized;
 
-  ClerkAuthInterceptor({
+  FirebaseAuthInterceptor({
     this.tokenProvider,
     this.onUnauthorized,
   });
 
-  /// Helper to asynchronously resolve the freshest available Clerk JWT token:
-  /// 1. Calls [tokenProvider] if provided.
-  /// 2. Falls back to secure local storage (`StorageManager.instance.getAuthToken()`).
-  Future<String?> resolveClerkSessionToken() async {
+  /// Resolves the freshest Firebase ID token:
+  /// 1. Calls [tokenProvider] if explicitly provided.
+  /// 2. Queries active `FirebaseAuth.instance.currentUser?.getIdToken()`.
+  /// 3. Falls back to secure local cache in `StorageManager.instance.getAuthToken()`.
+  Future<String?> resolveFirebaseToken({bool forceRefresh = false}) async {
     try {
-      // 1. Injected dynamic provider
       if (tokenProvider != null) {
         final token = await tokenProvider!();
         if (token != null && token.isNotEmpty) {
@@ -33,14 +34,23 @@ class ClerkAuthInterceptor extends QueuedInterceptor {
         }
       }
 
-      // 2. Fallback to FlutterSecureStorage
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final token = await currentUser.getIdToken(forceRefresh);
+        if (token != null && token.isNotEmpty) {
+          await StorageManager.instance.saveAuthToken(token);
+          await StorageManager.instance.saveUserId(currentUser.uid);
+          return token;
+        }
+      }
+
       final cachedToken = await StorageManager.instance.getAuthToken();
       if (cachedToken != null && cachedToken.isNotEmpty) {
         return cachedToken;
       }
     } catch (e) {
       if (kDebugMode) {
-        print('⚠️ [ClerkAuthInterceptor] Error resolving Clerk token: $e');
+        print('⚠️ [FirebaseAuthInterceptor] Error resolving Firebase token: $e');
       }
     }
     return null;
@@ -51,26 +61,23 @@ class ClerkAuthInterceptor extends QueuedInterceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // 0. Attach Stopwatch for network latency benchmarking
     options.extra['request_stopwatch'] = Stopwatch()..start();
 
-    // 1. If Authorization header is not manually provided, inject Clerk Bearer token
     if (!options.headers.containsKey('Authorization') ||
         options.headers['Authorization'] == null ||
         (options.headers['Authorization'] as String).isEmpty) {
-      final token = await resolveClerkSessionToken();
+      final token = await resolveFirebaseToken();
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
       }
     }
 
-    // 2. Inject standard headers
     options.headers['Accept'] = 'application/json';
     options.headers['X-Client-Platform'] = 'flutter';
 
     if (kDebugMode) {
       final hasAuth = options.headers.containsKey('Authorization');
-      print('🚀 [DioClient] ${options.method} ${options.uri} (Auth: ${hasAuth ? "Bearer [Active]" : "None"})');
+      print('🚀 [DioClient] ${options.method} ${options.uri} (Auth: ${hasAuth ? "Bearer [Firebase]" : "None"})');
     }
 
     return handler.next(options);
@@ -82,7 +89,7 @@ class ClerkAuthInterceptor extends QueuedInterceptor {
     final elapsedMs = stopwatch != null ? '${stopwatch.elapsedMilliseconds}ms' : 'N/A';
 
     if (kDebugMode) {
-      print('✅ [DioClient] [${response.statusCode}] ${response.requestOptions.path} (${elapsedMs})');
+      print('✅ [DioClient] [${response.statusCode}] ${response.requestOptions.path} ($elapsedMs)');
     }
     return handler.next(response);
   }
@@ -94,13 +101,12 @@ class ClerkAuthInterceptor extends QueuedInterceptor {
     final statusCode = err.response?.statusCode;
 
     if (kDebugMode) {
-      print('❌ [DioClient] [$statusCode] ${err.requestOptions.path} (${elapsedMs}): ${err.response?.data ?? err.message}');
+      print('❌ [DioClient] [$statusCode] ${err.requestOptions.path} ($elapsedMs): ${err.response?.data ?? err.message}');
     }
 
-    // Handle 401 Unauthorized session expiration
     if (statusCode == 401) {
       if (kDebugMode) {
-        print('🔒 [ClerkAuthInterceptor] Received 401 Unauthorized. Session expired.');
+        print('🔒 [FirebaseAuthInterceptor] Received 401 Unauthorized. Session expired.');
       }
       if (onUnauthorized != null) {
         onUnauthorized!(err);

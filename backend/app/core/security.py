@@ -1,12 +1,17 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, AsyncSessionLocal
+from app.models.orm import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security_bearer = HTTPBearer(auto_error=False)
@@ -59,7 +64,7 @@ async def get_current_user_id(
 ) -> str:
     """
     FastAPI bearer security dependency for validating authentication tokens:
-    - Supports Clerk RS256 JWKS tokens (with automatic DB user sync/resolution).
+    - Supports Firebase ID tokens (verified via Firebase Admin SDK or local user resolution).
     - Supports local HS256 JWT tokens.
     Returns: Local database User UUID string.
     """
@@ -72,19 +77,27 @@ async def get_current_user_id(
 
     token = credentials.credentials
 
-    # 1. First attempt Clerk token verification (JWKS / PEM / RS256)
+    # 1. Try Firebase Token Verification (if initialized)
     try:
-        from app.services.clerk_auth import clerk_verifier, ClerkUserSyncService
-        claims = await clerk_verifier.verify_token(token)
-        if claims and claims.sub:
-            # Auto-sync or retrieve the user from database
-            user, _ = await ClerkUserSyncService.sync_or_get_user(db, claims)
-            return str(user.id)
-    except HTTPException:
-        # Re-raise standard auth exceptions if it wasn't a local fallback
-        raise
-    except Exception as e:
-        # Fallback to local token check
+        import firebase_admin
+        from firebase_admin import auth as firebase_auth
+
+        if firebase_admin._apps:
+            decoded_token = firebase_auth.verify_id_token(token)
+            firebase_uid = decoded_token.get("uid") or decoded_token.get("sub")
+            email = decoded_token.get("email")
+            phone = decoded_token.get("phone_number")
+
+            if firebase_uid:
+                # Find user by phone, email, or id
+                stmt = select(User).where(
+                    (User.email == email) if email else (User.phone_number == phone) if phone else (User.id == uuid.UUID(firebase_uid) if len(firebase_uid) == 36 else False)
+                )
+                res = await db.execute(stmt)
+                user = res.scalars().first()
+                if user:
+                    return str(user.id)
+    except Exception:
         pass
 
     # 2. Fallback: Local HS256 token decoding
@@ -97,6 +110,35 @@ async def get_current_user_id(
         )
 
     return user_id
+
+
+async def get_current_authenticated_user(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    FastAPI dependency that resolves the full User ORM entity for the authenticated user.
+    """
+    try:
+        user_uuid = uuid.UUID(current_user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user identification token.",
+        )
+
+    res = await db.execute(
+        select(User)
+        .options(selectinload(User.photos), selectinload(User.ad_counter))
+        .where(User.id == user_uuid)
+    )
+    user = res.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User account not found.",
+        )
+    return user
 
 
 async def get_optional_user_id(
@@ -128,11 +170,6 @@ async def admin_required(
     FastAPI dependency for verifying that the current authenticated user has admin privileges.
     Validated by checking super admin email or admin flag against database.
     """
-    import uuid
-    from sqlalchemy import select
-    from app.core.database import AsyncSessionLocal
-    from app.models.orm import User
-
     try:
         user_uuid = uuid.UUID(current_user_id)
     except Exception:
@@ -177,16 +214,12 @@ async def verify_conversation_access(
 ) -> str:
     """
     Blocks IDOR: Verifies current_user_id is an active participant in match_id / conversation_id.
-    Returns 403 Forbidden if not authorized.
     """
-    import uuid
-    from sqlalchemy import select, or_
     from app.models.orm import Match
 
     match_id_str = str(match_id)
     current_user_str = str(current_user_id)
 
-    # 1. Check in-memory conversation registry first
     if match_id_str in _active_conversations:
         u1, u2 = _active_conversations[match_id_str]
         if current_user_str not in (u1, u2):
@@ -196,11 +229,9 @@ async def verify_conversation_access(
             )
         return match_id
 
-    # 2. Check Database
     if db is not None:
         try:
             match_uuid = uuid.UUID(match_id_str)
-            user_uuid = uuid.UUID(current_user_str)
             stmt = select(Match).where(Match.id == match_uuid)
             res = await db.execute(stmt)
             match_obj = res.scalars().first()
@@ -225,21 +256,16 @@ async def verify_conversation_access_raw(conversation_id: str, user_id: str) -> 
     Direct async check whether user_id is a valid participant of conversation_id / match_id.
     Returns True if participant, False otherwise.
     """
+    from app.models.orm import Match
+
     match_id_str = str(conversation_id)
     user_id_str = str(user_id)
 
-    # 1. Check in-memory conversation registry first
     if match_id_str in _active_conversations:
         u1, u2 = _active_conversations[match_id_str]
         return user_id_str in (u1, u2)
 
-    # 2. Check Database
     try:
-        import uuid
-        from sqlalchemy import select
-        from app.core.database import AsyncSessionLocal
-        from app.models.orm import Match
-
         match_uuid = uuid.UUID(match_id_str)
         user_uuid = uuid.UUID(user_id_str)
 
@@ -255,6 +281,3 @@ async def verify_conversation_access_raw(conversation_id: str, user_id: str) -> 
         pass
 
     return False
-
-
-

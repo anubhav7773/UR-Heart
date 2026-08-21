@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'clerk_auth_interceptor.dart';
 import 'environment_config.dart';
+import 'firebase_auth_interceptor.dart';
 
-/// Secure API Client Service with automated Clerk token injection,
+/// Secure API Client Service with automated Firebase token injection,
 /// environment-aware base URLs, and timeout resilience.
 class SecureApiClient {
   static final SecureApiClient instance = SecureApiClient._internal();
@@ -28,9 +28,9 @@ class SecureApiClient {
       ),
     );
 
-    // 1. Attach Clerk Authentication Interceptor
+    // 1. Attach Firebase Authentication Interceptor
     _dio.interceptors.add(
-      ClerkAuthInterceptor(
+      FirebaseAuthInterceptor(
         onUnauthorized: (error) {
           if (kDebugMode) {
             print('⚠️ [SecureApiClient] Session unauthorized callback triggered.');

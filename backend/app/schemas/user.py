@@ -10,17 +10,14 @@ from app.models.schemas import (
     CompleteProfileData,
     DirectDMRequest,
     DirectDMData,
-    ClerkUserClaims,
-    ClerkSyncRequest,
-    ClerkSyncData,
-    UserSessionData,
 )
 
 
 class UserProfileResponse(BaseModel):
     id: str
-    clerk_id: Optional[str] = None
+    firebase_uid: Optional[str] = None
     email: Optional[str] = None
+    phone_number: Optional[str] = None
     full_name: Optional[str] = None
     first_name: Optional[str] = None
     age: Optional[int] = None
@@ -29,6 +26,7 @@ class UserProfileResponse(BaseModel):
     interested_in: Optional[str] = None
     intent: Optional[str] = None
     area_name: Optional[str] = None
+    village_pin_code: Optional[str] = None
     photos: List[str] = []
     photo_url: Optional[str] = None
     is_verified: bool = False
@@ -52,8 +50,4 @@ __all__ = [
     "DirectDMRequest",
     "DirectDMData",
     "UserProfileResponse",
-    "ClerkUserClaims",
-    "ClerkSyncRequest",
-    "ClerkSyncData",
-    "UserSessionData",
 ]

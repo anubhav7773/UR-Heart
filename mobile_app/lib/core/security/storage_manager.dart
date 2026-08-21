@@ -67,6 +67,11 @@ class StorageManager {
     return val != null ? int.tryParse(val) ?? 0 : 0;
   }
 
+  Future<void> clearAuthData() async {
+    await _storage.delete(key: keyAuthToken);
+    await _storage.delete(key: keyUserId);
+  }
+
   Future<void> clearAll() async {
     await _storage.deleteAll();
   }

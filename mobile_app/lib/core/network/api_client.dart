@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../security/storage_manager.dart';
 import '../utils/image_compressor.dart';
-import 'clerk_auth_interceptor.dart';
 import 'environment_config.dart';
+import 'firebase_auth_interceptor.dart';
 
 class ApiClient {
   static final ApiClient instance = ApiClient._internal();
@@ -30,8 +30,8 @@ class ApiClient {
       ),
     );
 
-    // 1. Clerk Authentication Interceptor
-    dio.interceptors.add(ClerkAuthInterceptor());
+    // 1. Firebase Authentication Interceptor
+    dio.interceptors.add(FirebaseAuthInterceptor());
 
     // 2. Dynamic Base URL Interceptor
     dio.interceptors.add(

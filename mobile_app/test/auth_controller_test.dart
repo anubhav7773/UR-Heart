@@ -1,100 +1,93 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ruralheart_mobile/features/auth/controllers/auth_controller.dart';
 import 'package:ruralheart_mobile/features/auth/controllers/auth_state.dart';
-import 'package:ruralheart_mobile/features/auth/services/clerk_auth_service.dart';
-import 'package:ruralheart_mobile/features/auth/services/clerk_error_mapper.dart';
+import 'package:ruralheart_mobile/features/auth/services/firebase_auth_service.dart';
 
-/// Mock implementation of ClerkAuthService implementing interface
-class MockClerkAuthService implements ClerkAuthService {
+class MockFirebaseAuthService implements FirebaseAuthService {
   bool shouldSucceed = true;
-  String? mockToken = 'mock_jwt_session_12345';
-  String? mockUserId = 'user_clerk_mock_999';
+  String mockToken = 'mock_firebase_jwt_123';
+  String mockUserId = 'user_firebase_mock_999';
 
   @override
   String? pendingPhoneNumber;
 
   @override
-  Future<ClerkAuthResult> signInWithGoogle() async {
+  String? verificationId = 'mock_verification_id_123';
+
+  @override
+  User? currentUser;
+
+  @override
+  Future<AuthResult> signInWithGoogle() async {
     if (shouldSucceed) {
-      return ClerkAuthResult.success(token: mockToken!, userId: mockUserId!);
+      return AuthResult.success(token: mockToken, userId: mockUserId);
     }
-    return ClerkAuthResult.failure('Google OAuth failed');
+    return AuthResult.failure('Google sign-in was cancelled.');
   }
 
   @override
-  Future<ClerkAuthResult> signInWithPassword({
+  Future<AuthResult> signInWithEmailPassword({
     required String email,
     required String password,
   }) async {
     if (shouldSucceed) {
-      return ClerkAuthResult.success(token: mockToken!, userId: mockUserId!);
+      return AuthResult.success(token: mockToken, userId: mockUserId);
     }
-    return ClerkAuthResult.failure(ClerkErrorMapper.mapError('form_password_incorrect'));
+    return AuthResult.failure('Incorrect credentials. Please verify and try again.');
   }
 
   @override
-  Future<ClerkAuthResult> signUpWithPassword({
+  Future<AuthResult> signUpWithEmailPassword({
     required String email,
     required String password,
   }) async {
     if (shouldSucceed) {
-      return ClerkAuthResult.success(token: mockToken!, userId: mockUserId!);
+      return AuthResult.success(token: mockToken, userId: mockUserId);
     }
-    return ClerkAuthResult.failure(ClerkErrorMapper.mapError('form_identifier_exists'));
+    return AuthResult.failure('An account already exists with this email address.');
   }
 
   @override
-  Future<bool> initiatePhoneSignIn(String phoneNumber) async {
-    pendingPhoneNumber = phoneNumber;
-    return shouldSucceed;
+  Future<bool> sendPhoneOTP({
+    required String phoneNumber,
+    required Function(String verificationId, int? resendToken) onCodeSent,
+    required Function(String errorMessage) onVerificationFailed,
+  }) async {
+    if (shouldSucceed) {
+      pendingPhoneNumber = phoneNumber;
+      onCodeSent('mock_verification_id_123', null);
+      return true;
+    } else {
+      onVerificationFailed('Invalid phone number format.');
+      return false;
+    }
   }
 
   @override
-  Future<ClerkAuthResult> verifyPhoneOTP(String otpCode) async {
+  Future<AuthResult> verifyPhoneOTP({
+    required String otpCode,
+    String? customVerificationId,
+  }) async {
     if (shouldSucceed && otpCode == '123456') {
-      return ClerkAuthResult.success(token: mockToken!, userId: mockUserId!);
+      return AuthResult.success(token: mockToken, userId: mockUserId);
     }
-    return ClerkAuthResult.failure(ClerkErrorMapper.mapError('form_code_incorrect'));
+    return AuthResult.failure('Invalid or expired OTP verification code.');
   }
 
   @override
-  Future<ClerkAuthResult> signInWithUsername({
-    required String username,
-    required String password,
-  }) async {
-    if (shouldSucceed) {
-      return ClerkAuthResult.success(token: mockToken!, userId: mockUserId!);
-    }
-    return ClerkAuthResult.failure(ClerkErrorMapper.mapError('form_password_incorrect'));
-  }
+  Future<void> signOut() async {}
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('ClerkErrorMapper Tests', () {
-    test('Maps standard Clerk API error codes to human-readable strings', () {
-      expect(
-        ClerkErrorMapper.mapError('form_identifier_not_found'),
-        equals('No account found with this email, phone, or username.'),
-      );
-      expect(
-        ClerkErrorMapper.mapError('form_password_incorrect'),
-        equals('Incorrect password. Please verify and try again.'),
-      );
-      expect(
-        ClerkErrorMapper.mapError('form_code_incorrect'),
-        equals('Invalid 6-digit verification code. Please check and try again.'),
-      );
-    });
-  });
-
-  group('AuthController State Transition Tests', () {
-    late MockClerkAuthService mockService;
+  group('AuthController Native Firebase Auth Tests', () {
+    late MockFirebaseAuthService mockService;
     late AuthController controller;
 
     setUp(() {
-      mockService = MockClerkAuthService();
+      mockService = MockFirebaseAuthService();
       controller = AuthController(authService: mockService);
     });
 
@@ -110,30 +103,28 @@ void main() {
 
       expect(controller.state, isA<AuthAuthenticated>());
       final authState = controller.state as AuthAuthenticated;
-      expect(authState.token, equals('mock_jwt_session_12345'));
-      expect(authState.userId, equals('user_clerk_mock_999'));
+      expect(authState.token, equals('mock_firebase_jwt_123'));
+      expect(authState.userId, equals('user_firebase_mock_999'));
     });
 
-    test('signInWithPassword failure transitions to AuthError with mapped message', () async {
+    test('signInWithPassword failure transitions to AuthError', () async {
       mockService.shouldSucceed = false;
-      await controller.signInWithPassword(email: 'test@example.com', password: 'wrong_password');
+      await controller.signInWithPassword(email: 'test@example.com', password: 'wrong_pass');
 
       expect(controller.state, isA<AuthError>());
       final errorState = controller.state as AuthError;
-      expect(errorState.errorMessage, contains('Incorrect password'));
+      expect(errorState.errorMessage, contains('Incorrect credentials'));
     });
 
-    test('Phone OTP two-step lifecycle transitions: AuthInitial -> AuthOTPRequired -> AuthAuthenticated', () async {
+    test('Phone OTP lifecycle transitions: AuthInitial -> AuthOTPRequired -> AuthAuthenticated', () async {
       mockService.shouldSucceed = true;
 
-      // 1. Step 1: Send OTP
       final sent = await controller.sendPhoneOTP('+919876543210');
       expect(sent, isTrue);
       expect(controller.state, isA<AuthOTPRequired>());
       final otpState = controller.state as AuthOTPRequired;
       expect(otpState.phoneNumber, equals('+919876543210'));
 
-      // 2. Step 2: Verify OTP
       await controller.verifyPhoneOTP('123456');
       expect(controller.state, isA<AuthAuthenticated>());
     });

@@ -1,12 +1,11 @@
 import 'package:flutter/foundation.dart';
-import '../services/clerk_auth_service.dart';
-import '../services/clerk_error_mapper.dart';
+import '../services/firebase_auth_service.dart';
 import 'auth_state.dart';
 
 /// Unified Authentication Controller & State Notifier for Project UR-Heart.
-/// Manages state transitions, auto-retries, and token distribution for downstream interceptors.
+/// Manages Firebase Authentication state transitions, auto-retries, and token distribution.
 class AuthController extends ChangeNotifier {
-  final ClerkAuthService _authService;
+  final FirebaseAuthService _authService;
 
   AuthState _state = const AuthInitial();
   AuthState get state => _state;
@@ -14,8 +13,8 @@ class AuthController extends ChangeNotifier {
   bool get isLoading => _state is AuthLoading;
   bool get isAuthenticated => _state is AuthAuthenticated;
 
-  AuthController({ClerkAuthService? authService})
-      : _authService = authService ?? ClerkAuthService.instance;
+  AuthController({FirebaseAuthService? authService})
+      : _authService = authService ?? FirebaseAuthService.instance;
 
   void _setState(AuthState newState) {
     _state = newState;
@@ -28,10 +27,10 @@ class AuthController extends ChangeNotifier {
   }
 
   // ===========================================================================
-  // 1. Google OAuth Dispatch
+  // 1. Google Sign-In Dispatch
   // ===========================================================================
   Future<void> signInWithGoogle() async {
-    _setState(const AuthLoading(loadingMessage: 'Connecting with Google...'));
+    _setState(const AuthLoading(loadingMessage: 'Signing in with Google...'));
 
     try {
       final result = await _authService.signInWithGoogle();
@@ -45,7 +44,7 @@ class AuthController extends ChangeNotifier {
         _setState(AuthError(errorMessage: result.errorMessage ?? 'Google sign-in failed.'));
       }
     } catch (e) {
-      _setState(AuthError(errorMessage: ClerkErrorMapper.mapError(e)));
+      _setState(AuthError(errorMessage: e.toString()));
     }
   }
 
@@ -59,7 +58,7 @@ class AuthController extends ChangeNotifier {
     _setState(const AuthLoading(loadingMessage: 'Signing in with email...'));
 
     try {
-      final result = await _authService.signInWithPassword(
+      final result = await _authService.signInWithEmailPassword(
         email: email,
         password: password,
       );
@@ -73,7 +72,7 @@ class AuthController extends ChangeNotifier {
         _setState(AuthError(errorMessage: result.errorMessage ?? 'Email login failed.'));
       }
     } catch (e) {
-      _setState(AuthError(errorMessage: ClerkErrorMapper.mapError(e)));
+      _setState(AuthError(errorMessage: e.toString()));
     }
   }
 
@@ -84,7 +83,7 @@ class AuthController extends ChangeNotifier {
     _setState(const AuthLoading(loadingMessage: 'Creating your account...'));
 
     try {
-      final result = await _authService.signUpWithPassword(
+      final result = await _authService.signUpWithEmailPassword(
         email: email,
         password: password,
       );
@@ -98,36 +97,41 @@ class AuthController extends ChangeNotifier {
         _setState(AuthError(errorMessage: result.errorMessage ?? 'Sign up failed.'));
       }
     } catch (e) {
-      _setState(AuthError(errorMessage: ClerkErrorMapper.mapError(e)));
+      _setState(AuthError(errorMessage: e.toString()));
     }
   }
 
   // ===========================================================================
-  // 3. Phone & SMS OTP Dispatch (Two-Step Lifecycle)
+  // 3. Phone & SMS OTP Dispatch (Firebase verifyPhoneNumber)
   // ===========================================================================
   Future<bool> sendPhoneOTP(String phoneNumber) async {
     _setState(const AuthLoading(loadingMessage: 'Sending verification OTP...'));
 
     try {
-      final sent = await _authService.initiatePhoneSignIn(phoneNumber);
-      if (sent) {
-        _setState(AuthOTPRequired(phoneNumber: phoneNumber));
-        return true;
-      } else {
-        _setState(const AuthError(errorMessage: 'Failed to dispatch OTP. Please check the number.'));
-        return false;
-      }
+      final sent = await _authService.sendPhoneOTP(
+        phoneNumber: phoneNumber,
+        onCodeSent: (verificationId, resendToken) {
+          _setState(AuthOTPRequired(phoneNumber: phoneNumber));
+        },
+        onVerificationFailed: (errorMessage) {
+          _setState(AuthError(errorMessage: errorMessage));
+        },
+      );
+      return sent;
     } catch (e) {
-      _setState(AuthError(errorMessage: ClerkErrorMapper.mapError(e)));
+      _setState(AuthError(errorMessage: e.toString()));
       return false;
     }
   }
 
-  Future<void> verifyPhoneOTP(String otpCode) async {
+  Future<void> verifyPhoneOTP(String otpCode, {String? verificationId}) async {
     _setState(const AuthLoading(loadingMessage: 'Verifying OTP code...'));
 
     try {
-      final result = await _authService.verifyPhoneOTP(otpCode);
+      final result = await _authService.verifyPhoneOTP(
+        otpCode: otpCode,
+        customVerificationId: verificationId,
+      );
       if (result.isSuccess) {
         _setState(AuthAuthenticated(
           token: result.token!,
@@ -138,35 +142,27 @@ class AuthController extends ChangeNotifier {
         _setState(AuthError(errorMessage: result.errorMessage ?? 'Verification failed.'));
       }
     } catch (e) {
-      _setState(AuthError(errorMessage: ClerkErrorMapper.mapError(e)));
+      _setState(AuthError(errorMessage: e.toString()));
     }
   }
 
   // ===========================================================================
-  // 4. Username Dispatch
+  // 4. Username / Handle Dispatch
   // ===========================================================================
   Future<void> signInWithUsername({
     required String username,
     required String password,
   }) async {
-    _setState(const AuthLoading(loadingMessage: 'Authenticating username...'));
+    // Normalizes handle to email handle fallback or calls email/pass
+    final emailFallback = username.contains('@') ? username : '$username@ruralheart.app';
+    await signInWithPassword(email: emailFallback, password: password);
+  }
 
-    try {
-      final result = await _authService.signInWithUsername(
-        username: username,
-        password: password,
-      );
-      if (result.isSuccess) {
-        _setState(AuthAuthenticated(
-          token: result.token!,
-          userId: result.userId!,
-          isProfileComplete: result.isProfileComplete,
-        ));
-      } else {
-        _setState(AuthError(errorMessage: result.errorMessage ?? 'Username login failed.'));
-      }
-    } catch (e) {
-      _setState(AuthError(errorMessage: ClerkErrorMapper.mapError(e)));
-    }
+  // ===========================================================================
+  // 5. Sign Out
+  // ===========================================================================
+  Future<void> signOut() async {
+    await _authService.signOut();
+    resetState();
   }
 }

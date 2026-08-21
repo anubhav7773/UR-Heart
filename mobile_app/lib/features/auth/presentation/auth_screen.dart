@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/auth/oauth_redirect_handler.dart';
 import '../../../../core/network/user_repository.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../auth_provider.dart';
@@ -15,7 +14,7 @@ import 'widgets/username_auth_tab.dart';
 enum AuthMethodTab { phone, email, username }
 
 /// Production-Grade Obsidian Dark Authentication Screen for Project UR-Heart
-/// supporting Google OAuth, Phone/SMS OTP, Email/Password, and Username sign-in strategies.
+/// supporting Google Sign-In, Phone/SMS OTP, and Email/Password strategies.
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -33,19 +32,6 @@ class _AuthScreenState extends State<AuthScreen> {
     super.initState();
     _authController = AuthController();
     _authController.addListener(_onAuthStateChanged);
-
-    // Listen for OAuth deep link callbacks
-    OAuthRedirectHandler.instance.onOAuthCallback.listen((event) {
-      if (!mounted) return;
-      if (event.isSuccess) {
-        _onAuthSuccess(
-          token: event.sessionToken ?? 'oauth_active_session',
-          userId: event.createdSessionId ?? 'user_clerk_authenticated',
-        );
-      } else if (event.error != null) {
-        _showErrorBanner('OAuth Failed: ${event.errorDescription ?? event.error}');
-      }
-    });
   }
 
   @override

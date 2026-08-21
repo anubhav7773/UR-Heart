@@ -5,7 +5,7 @@ import 'secure_api_client.dart';
 /// Strongly-typed User Profile Model matching the FastAPI backend `/api/v1/users/me` schema
 class UserProfileModel {
   final String id;
-  final String? clerkId;
+  final String? firebaseUid;
   final String? email;
   final String? phoneNumber;
   final String fullName;
@@ -27,7 +27,7 @@ class UserProfileModel {
 
   UserProfileModel({
     required this.id,
-    this.clerkId,
+    this.firebaseUid,
     this.email,
     this.phoneNumber,
     required this.fullName,
@@ -63,7 +63,7 @@ class UserProfileModel {
 
     return UserProfileModel(
       id: json['id'] ?? json['user_id'] ?? '',
-      clerkId: json['clerk_id'] as String?,
+      firebaseUid: json['firebase_uid'] ?? json['uid'] as String?,
       email: json['email'] as String?,
       phoneNumber: json['phone_number'] as String?,
       fullName: json['full_name'] ?? 'User',
@@ -87,7 +87,7 @@ class UserProfileModel {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'clerk_id': clerkId,
+    'firebase_uid': firebaseUid,
     'email': email,
     'phone_number': phoneNumber,
     'full_name': fullName,
@@ -117,7 +117,6 @@ class UserRepository {
       : _apiClient = apiClient ?? SecureApiClient.instance;
 
   /// Fetches the authenticated user's profile from the backend (`GET /api/v1/users/me`)
-  /// The [ClerkAuthInterceptor] automatically attaches the active Clerk Bearer token.
   Future<UserProfileModel> fetchCurrentUserProfile() => fetchUserProfile();
 
   /// Fetches the authenticated user's profile from the backend (`GET /api/v1/users/me`)
@@ -199,34 +198,6 @@ class UserRepository {
     } catch (e) {
       if (kDebugMode) {
         print('❌ [UserRepository.updateUserProfile] Failed: $e');
-      }
-      rethrow;
-    }
-  }
-
-  /// Synchronizes Clerk session with FastAPI backend and registers FCM token (`POST /api/v1/auth/clerk-sync`)
-  Future<Map<String, dynamic>> syncClerkUserSession({
-    String? fcmToken,
-    String? deviceId,
-  }) async {
-    try {
-      final response = await _apiClient.post(
-        '/auth/clerk-sync',
-        data: {
-          if (fcmToken != null) 'fcm_token': fcmToken,
-          if (deviceId != null) 'device_id': deviceId,
-        },
-      );
-      if (response.statusCode == 200 && response.data != null) {
-        final raw = response.data;
-        if (raw is Map<String, dynamic> && raw['data'] is Map<String, dynamic>) {
-          return raw['data'] as Map<String, dynamic>;
-        }
-      }
-      return {};
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ [UserRepository.syncClerkUserSession] Failed: $e');
       }
       rethrow;
     }

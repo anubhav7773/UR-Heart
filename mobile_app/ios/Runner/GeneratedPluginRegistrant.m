@@ -18,12 +18,6 @@
 @import audioplayers_darwin;
 #endif
 
-#if __has_include(<device_info_plus/FPPDeviceInfoPlusPlugin.h>)
-#import <device_info_plus/FPPDeviceInfoPlusPlugin.h>
-#else
-@import device_info_plus;
-#endif
-
 #if __has_include(<firebase_app_check/FLTFirebaseAppCheckPlugin.h>)
 #import <firebase_app_check/FLTFirebaseAppCheckPlugin.h>
 #else
@@ -114,12 +108,6 @@
 @import package_info_plus;
 #endif
 
-#if __has_include(<passkeys_darwin/PasskeysPlugin.h>)
-#import <passkeys_darwin/PasskeysPlugin.h>
-#else
-@import passkeys_darwin;
-#endif
-
 #if __has_include(<path_provider_foundation/PathProviderPlugin.h>)
 #import <path_provider_foundation/PathProviderPlugin.h>
 #else
@@ -156,12 +144,6 @@
 @import sqflite_darwin;
 #endif
 
-#if __has_include(<ua_client_hints/UAClientHintsPlugin.h>)
-#import <ua_client_hints/UAClientHintsPlugin.h>
-#else
-@import ua_client_hints;
-#endif
-
 #if __has_include(<url_launcher_ios/URLLauncherPlugin.h>)
 #import <url_launcher_ios/URLLauncherPlugin.h>
 #else
@@ -185,7 +167,6 @@
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
   [AppLinksIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"AppLinksIosPlugin"]];
   [AudioplayersDarwinPlugin registerWithRegistrar:[registry registrarForPlugin:@"AudioplayersDarwinPlugin"]];
-  [FPPDeviceInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPDeviceInfoPlusPlugin"]];
   [FLTFirebaseAppCheckPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseAppCheckPlugin"]];
   [FLTFirebaseAuthPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseAuthPlugin"]];
   [FLTFirebaseCorePlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseCorePlugin"]];
@@ -201,14 +182,12 @@
   [FLTImagePickerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTImagePickerPlugin"]];
   [OpenFilePlugin registerWithRegistrar:[registry registrarForPlugin:@"OpenFilePlugin"]];
   [FPPPackageInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPPackageInfoPlusPlugin"]];
-  [PasskeysPlugin registerWithRegistrar:[registry registrarForPlugin:@"PasskeysPlugin"]];
   [PathProviderPlugin registerWithRegistrar:[registry registrarForPlugin:@"PathProviderPlugin"]];
   [RazorpayFlutterPlugin registerWithRegistrar:[registry registrarForPlugin:@"RazorpayFlutterPlugin"]];
   [RecordPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordPlugin"]];
   [SentryFlutterPlugin registerWithRegistrar:[registry registrarForPlugin:@"SentryFlutterPlugin"]];
   [SharedPreferencesPlugin registerWithRegistrar:[registry registrarForPlugin:@"SharedPreferencesPlugin"]];
   [SqflitePlugin registerWithRegistrar:[registry registrarForPlugin:@"SqflitePlugin"]];
-  [UAClientHintsPlugin registerWithRegistrar:[registry registrarForPlugin:@"UAClientHintsPlugin"]];
   [URLLauncherPlugin registerWithRegistrar:[registry registrarForPlugin:@"URLLauncherPlugin"]];
   [FVPVideoPlayerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FVPVideoPlayerPlugin"]];
   [WebViewFlutterPlugin registerWithRegistrar:[registry registrarForPlugin:@"WebViewFlutterPlugin"]];

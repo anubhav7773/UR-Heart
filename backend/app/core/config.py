@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     SUPABASE_KEY: Optional[str] = None
     SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
 
-    # Firebase Cloud Messaging (FCM)
+    # Firebase Authentication & Cloud Messaging (FCM)
     GOOGLE_CLOUD_PROJECT: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("GOOGLE_CLOUD_PROJECT", "FIREBASE_PROJECT_ID"),
@@ -51,36 +51,6 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_ID: str = "rzp_test_sample"
     RAZORPAY_KEY_SECRET: str = "sample_secret"
     RAZORPAY_WEBHOOK_SECRET: str = "sample_webhook_secret"
-
-    # Clerk Authentication & JWT Verification
-    CLERK_ISSUER: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("CLERK_ISSUER"),
-    )
-    CLERK_JWKS_URL: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("CLERK_JWKS_URL"),
-    )
-    CLERK_PEM_PUBLIC_KEY: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("CLERK_PEM_PUBLIC_KEY", "CLERK_PUBLIC_KEY", "CLERK_JWT_KEY"),
-    )
-    CLERK_AUDIENCE: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("CLERK_AUDIENCE"),
-    )
-    CLERK_AUTHORIZED_PARTY: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("CLERK_AUTHORIZED_PARTY", "CLERK_AZP"),
-    )
-    CLERK_SECRET_KEY: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("CLERK_SECRET_KEY", "CLERK_API_KEY"),
-    )
-    CLERK_JWKS_CACHE_TTL_SECONDS: int = Field(
-        default=3600,
-        validation_alias=AliasChoices("CLERK_JWKS_CACHE_TTL_SECONDS", "CLERK_CACHE_TTL"),
-    )
 
     # Ad Monetization & Business Thresholds
     IN_FEED_AD_INTERVAL: int = 5

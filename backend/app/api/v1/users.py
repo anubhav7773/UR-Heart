@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_current_authenticated_user
 from app.core.rate_limiter import rate_limit
 from app.models.orm import (
     User,
@@ -27,14 +27,8 @@ from app.models.orm import (
     GenderEnum as ORMGenderEnum,
     IntentEnum as ORMIntentEnum,
 )
-from app.models.schemas import APIResponse, ClerkUserClaims, UserSessionData
+from app.models.schemas import APIResponse
 from app.schemas.profile import ProfileUpdateRequest
-from app.services.clerk_auth import (
-    get_current_authenticated_user,
-    get_current_session,
-    get_current_clerk_claims,
-    ClerkUserSyncService,
-)
 
 router = APIRouter(prefix="/users", tags=["User Location & Account Management"])
 
@@ -434,24 +428,18 @@ async def update_my_user_profile(
 @router.post("/sync", response_model=APIResponse[dict])
 @router.post("/sync/", response_model=APIResponse[dict])
 async def sync_my_user_profile(
-    claims: ClerkUserClaims = Depends(get_current_clerk_claims),
+    user: User = Depends(get_current_authenticated_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     On-Demand User Sync Endpoint:
-    - Auto-detects or provisions the database user profile using Clerk token claims.
     - Returns comprehensive session data, profile details, and onboarding readiness.
     """
-    user, is_new = await ClerkUserSyncService.sync_or_get_user(db, claims)
-    session = ClerkUserSyncService.build_user_session(user, claims)
-
     return APIResponse(
         success=True,
         message="User database synchronization completed.",
         data={
-            "is_new_user": is_new,
             "user": _serialize_user_profile(user),
-            "session": session.model_dump(),
         },
     )
 
