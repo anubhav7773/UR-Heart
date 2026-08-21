@@ -7,9 +7,18 @@ enum Environment {
   production,
 }
 
+/// Dynamic Base URL and Environment Configuration for Project UR-Heart
 class EnvironmentConfig {
-  static Environment _currentEnv = kReleaseMode ? Environment.production : Environment.development;
+  // Default to production for live testing & reliable device connectivity
+  static Environment _currentEnv = Environment.production;
   static String? _customBaseUrl;
+
+  /// Whether the current development host should target Android Emulator loopback (10.0.2.2)
+  /// Set to true ONLY if explicitly running on Android SDK Emulator / QEMU
+  static bool useEmulatorHost = false;
+
+  /// Whether development on Android uses ADB reverse (127.0.0.1)
+  static bool useLocalhostReverse = true;
 
   /// Current active environment
   static Environment get currentEnvironment => _currentEnv;
@@ -31,17 +40,21 @@ class EnvironmentConfig {
     }
   }
 
-  /// Development base URL resolving local host according to platform:
-  /// - Android Emulator: http://10.0.2.2:8000/api/v1
-  /// - iOS Simulator / macOS / Windows / Linux: http://localhost:8000/api/v1
+  /// Development base URL resolving host according to platform and execution target:
   /// - Web: http://127.0.0.1:8000/api/v1
+  /// - Android Emulator (if useEmulatorHost is true): http://10.0.2.2:8000/api/v1
+  /// - Android Physical Device (via ADB Reverse / Localhost): http://127.0.0.1:8000/api/v1
+  /// - iOS Simulator / Desktop: http://localhost:8000/api/v1
   static String get devBaseUrl {
     if (kIsWeb) {
       return 'http://127.0.0.1:8000/api/v1';
     }
     try {
       if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8000/api/v1';
+        if (useEmulatorHost) {
+          return 'http://10.0.2.2:8000/api/v1';
+        }
+        return 'http://127.0.0.1:8000/api/v1';
       }
     } catch (_) {}
     return 'http://localhost:8000/api/v1';
@@ -50,10 +63,10 @@ class EnvironmentConfig {
   /// Staging environment base URL
   static const String stagingBaseUrl = 'https://staging.ur-heart.com/api/v1';
 
-  /// Production environment base URL (FastAPI backend on Render/Cloud)
+  /// Production environment base URL (FastAPI backend on Render Cloud)
   static const String productionBaseUrl = 'https://ur-heart.onrender.com/api/v1';
 
-  /// Resolves the current base URL
+  /// Resolves the current active base URL
   static String get baseUrl {
     if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
       return _customBaseUrl!;

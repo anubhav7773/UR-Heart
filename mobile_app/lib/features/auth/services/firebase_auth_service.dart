@@ -85,19 +85,22 @@ class FirebaseAuthService {
       await StorageManager.instance.saveAuthToken(token);
       await StorageManager.instance.saveUserId(user.uid);
 
-      // Backend sync via ApiClient
+      // Backend sync via ApiClient with fast fallback guard
       try {
         final res = await ApiClient.instance.firebaseLogin(
           idToken: token,
           deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-        );
+        ).timeout(const Duration(seconds: 10));
         final data = res.data?['data'] ?? {};
         return AuthResult.success(
           token: data['access_token'] ?? token,
           userId: data['user_id'] ?? user.uid,
           isProfileComplete: data['is_profile_complete'] == true,
         );
-      } catch (_) {
+      } catch (e) {
+        if (kDebugMode) {
+          print('ℹ️ [FirebaseAuthService] Backend handshake offline/slow, proceeding with Firebase session: $e');
+        }
         return AuthResult.success(token: token, userId: user.uid);
       }
     } catch (e) {
@@ -132,7 +135,7 @@ class FirebaseAuthService {
         final res = await ApiClient.instance.firebaseLogin(
           idToken: token,
           deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-        );
+        ).timeout(const Duration(seconds: 10));
         final data = res.data?['data'] ?? {};
         return AuthResult.success(
           token: data['access_token'] ?? token,
@@ -168,7 +171,7 @@ class FirebaseAuthService {
         final res = await ApiClient.instance.firebaseLogin(
           idToken: token,
           deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-        );
+        ).timeout(const Duration(seconds: 10));
         final data = res.data?['data'] ?? {};
         return AuthResult.success(
           token: data['access_token'] ?? token,
@@ -242,7 +245,7 @@ class FirebaseAuthService {
           phoneNumber: _pendingPhoneNumber ?? '+919999999999',
           otpCode: otpCode,
           deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-        );
+        ).timeout(const Duration(seconds: 10));
         final data = res.data?['data'] ?? {};
         final token = data['access_token'] ?? 'mock_token';
         final userId = data['user_id'] ?? 'user_verified';
@@ -279,7 +282,7 @@ class FirebaseAuthService {
         final res = await ApiClient.instance.firebaseLogin(
           idToken: token,
           deviceId: 'device_flutter_${DateTime.now().millisecondsSinceEpoch}',
-        );
+        ).timeout(const Duration(seconds: 10));
         final data = res.data?['data'] ?? {};
         return AuthResult.success(
           token: data['access_token'] ?? token,
@@ -328,7 +331,7 @@ class FirebaseAuthService {
     if (errStr.contains('invalid-verification-code') || errStr.contains('session-expired')) {
       return 'Invalid or expired OTP verification code.';
     }
-    if (errStr.contains('network-request-failed')) {
+    if (errStr.contains('network-request-failed') || errStr.contains('timeout')) {
       return 'Network connection error. Please check your internet.';
     }
     if (errStr.contains('too-many-requests')) {
