@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../navigation/nav_keys.dart';
 import '../security/storage_manager.dart';
+import '../../features/auth/auth_screen.dart';
 
 /// Dynamic token provider callback
 typedef FirebaseTokenProvider = Future<String?> Function();
@@ -15,10 +18,43 @@ class FirebaseAuthInterceptor extends QueuedInterceptor {
   final FirebaseTokenProvider? tokenProvider;
   final OnUnauthorizedCallback? onUnauthorized;
 
+  static bool _isHandling401 = false;
+
   FirebaseAuthInterceptor({
     this.tokenProvider,
     this.onUnauthorized,
   });
+
+  /// Triggers a clean session purge and redirects user to AuthScreen
+  static Future<void> handleSessionExpired() async {
+    if (_isHandling401) return;
+    _isHandling401 = true;
+    try {
+      if (kDebugMode) {
+        print('🔒 [FirebaseAuthInterceptor] 401 Unauthorized detected. Purging session.');
+      }
+      await StorageManager.instance.clearAll();
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+
+      final navState = rootNavigatorKey.currentState;
+      if (navState != null) {
+        navState.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ [FirebaseAuthInterceptor] Error during session purge: $e');
+      }
+    } finally {
+      Future.delayed(const Duration(seconds: 3), () {
+        _isHandling401 = false;
+      });
+    }
+  }
 
   /// Resolves the freshest Firebase ID token:
   /// 1. Calls [tokenProvider] if explicitly provided.
@@ -111,6 +147,7 @@ class FirebaseAuthInterceptor extends QueuedInterceptor {
       if (onUnauthorized != null) {
         onUnauthorized!(err);
       }
+      handleSessionExpired();
     }
 
     return handler.next(err);

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1133,6 +1134,11 @@ class _ChatScreenState extends State<ChatScreen> {
   WebSocketChannel? _wsChannel;
   StreamSubscription? _wsSubscription;
 
+  int _wsReconnectAttempts = 0;
+  Timer? _wsReconnectTimer;
+  bool _isConnectingWs = false;
+  bool _isDisposed = false;
+
   ChatRecipient? _recipientProfile;
   bool _isRecipientProfileLoading = true;
   String _recipientDistanceLabel = 'Location pending';
@@ -1248,7 +1254,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _realtimePollingTimer?.cancel();
     // Watchdog timer (every 10s) in case WebSocket connection drops
     _realtimePollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         _fetchMessages(silent: true);
         _fetchConsentStatus();
       }
@@ -1256,13 +1262,22 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _connectWebSocket() async {
+    if (_isDisposed || _isConnectingWs) return;
+    _isConnectingWs = true;
+    _wsReconnectTimer?.cancel();
+
     try {
       _wsSubscription?.cancel();
-      _wsChannel?.sink.close();
+      _wsSubscription = null;
+      try {
+        _wsChannel?.sink.close();
+      } catch (_) {}
+      _wsChannel = null;
 
       final token = await StorageManager.instance.getAuthToken();
       if (token == null || token.isEmpty) {
         if (kDebugMode) print('[Chat WS Warning] No active session token found');
+        _isConnectingWs = false;
         return;
       }
 
@@ -1277,18 +1292,43 @@ class _ChatScreenState extends State<ChatScreen> {
       _wsChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
       _wsSubscription = _wsChannel?.stream.listen(
         (rawData) {
+          _wsReconnectAttempts = 0;
           _handleIncomingWebSocketData(rawData);
         },
         onError: (err) {
           if (kDebugMode) print('[Chat WS Error] $err');
+          _scheduleWsReconnect();
         },
         onDone: () {
           if (kDebugMode) print('[Chat WS Closed]');
+          _scheduleWsReconnect();
         },
+        cancelOnError: true,
       );
     } catch (e) {
       if (kDebugMode) print('[Chat WS Connect Error] $e');
+      _scheduleWsReconnect();
+    } finally {
+      _isConnectingWs = false;
     }
+  }
+
+  void _scheduleWsReconnect() {
+    if (_isDisposed || !mounted) return;
+    _wsReconnectTimer?.cancel();
+
+    final delaySeconds = math.min(2 * math.pow(2, _wsReconnectAttempts).toInt(), 16);
+    _wsReconnectAttempts++;
+
+    if (kDebugMode) {
+      print('[Chat WS] Scheduling reconnect in ${delaySeconds}s (attempt $_wsReconnectAttempts)');
+    }
+
+    _wsReconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      if (!_isDisposed && mounted) {
+        _connectWebSocket();
+      }
+    });
   }
 
   void _handleIncomingWebSocketData(dynamic rawData) {
@@ -1585,8 +1625,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _wsReconnectTimer?.cancel();
     _wsSubscription?.cancel();
-    _wsChannel?.sink.close();
+    _wsSubscription = null;
+    try {
+      _wsChannel?.sink.close();
+    } catch (_) {}
+    _wsChannel = null;
     _realtimePollingTimer?.cancel();
     _inChatAdTimer?.cancel();
     _messageController.dispose();

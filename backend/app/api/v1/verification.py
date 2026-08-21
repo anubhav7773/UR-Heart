@@ -107,8 +107,13 @@ async def upload_verification_video(
                 filename=filename
             )
             public_url = cdn_url
+        except HTTPException:
+            raise
         except Exception:
-            public_url = f"https://r2.ruralheart.com/verification/{file_path}"
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Storage upload failed"
+            )
 
     try:
         user_res = await db.execute(select(User).where(User.id == user_uuid))

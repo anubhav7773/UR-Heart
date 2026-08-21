@@ -30,13 +30,21 @@ def create_test_user_session(identifier: str):
     return data["access_token"], data["user_id"]
 
 
+import hmac
+import hashlib
+from app.core.config import settings
+
 def setup_match_between_users(sender_token: str, recipient_user_id: str) -> str:
     headers = {"Authorization": f"Bearer {sender_token}"}
+    pay_id = f"pay_test_{recipient_user_id[:8]}"
+    order_id = f"order_test_{recipient_user_id[:8]}"
+    secret = settings.RAZORPAY_KEY_SECRET or "sample_secret"
+    sig = hmac.new(secret.encode("utf-8"), f"{order_id}|{pay_id}".encode("utf-8"), hashlib.sha256).hexdigest()
     # 1. Unlock Direct DM pass for sender
     verify_payload = {
-        "razorpay_payment_id": f"pay_test_{recipient_user_id[:8]}",
-        "razorpay_order_id": f"order_test_{recipient_user_id[:8]}",
-        "razorpay_signature": "mock_sig_valid",
+        "razorpay_payment_id": pay_id,
+        "razorpay_order_id": order_id,
+        "razorpay_signature": sig,
         "plan_type": "PLAN_DIRECT_DM_49"
     }
     v_res = client.post("/api/v1/payments/verify", json=verify_payload, headers=headers)
@@ -240,3 +248,65 @@ def test_mass_assignment_privilege_escalation_blocked():
     assert profile["bio"] == "Legitimate updated bio text"
     assert profile.get("is_admin") is False
     assert profile.get("is_boosted", False) is False
+
+
+def test_invalid_payment_signature_rejected():
+    """Verify that forged or malformed HMAC signatures in /verify are strictly rejected with 400."""
+    token, user_id = create_test_user_session("sig_verifier_user")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    forged_payload = {
+        "razorpay_payment_id": "pay_fake_123456",
+        "razorpay_order_id": "order_fake_123456",
+        "razorpay_signature": "forged_invalid_signature_hex",
+        "plan_type": "PLAN_BOOST_29"
+    }
+    res = client.post("/api/v1/payments/verify", json=forged_payload, headers=headers)
+    assert res.status_code == 400
+    assert "Invalid payment signature" in res.json().get("detail", "")
+
+
+def test_invalid_webhook_signature_rejected():
+    """Verify that razorpay webhook requests with invalid or missing HMAC signatures are rejected with 400."""
+    webhook_body = {
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_webhook_test_123",
+                    "amount": 2900,
+                    "currency": "INR"
+                }
+            }
+        }
+    }
+
+    # 1. Missing signature header
+    res_no_sig = client.post("/api/v1/payments/razorpay/webhook", json=webhook_body)
+    assert res_no_sig.status_code == 400
+
+    # 2. Forged signature header
+    res_bad_sig = client.post(
+        "/api/v1/payments/razorpay/webhook",
+        json=webhook_body,
+        headers={"X-Razorpay-Signature": "bad_hex_signature"}
+    )
+    assert res_bad_sig.status_code == 400
+    assert "Invalid webhook signature" in res_bad_sig.json().get("detail", "")
+
+
+@pytest.mark.asyncio
+async def test_storage_engine_upload_failure_raises_502(monkeypatch):
+    """Verify StorageEngineService raises 502 HTTPException when Supabase storage is unavailable or fails."""
+    from app.services.storage_engine import StorageEngineService
+    from fastapi import HTTPException
+    from app.core.config import settings
+
+    # Simulate unreachable/failing Supabase Storage endpoint
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://invalid-nonexistent-host.supabase.co")
+
+    with pytest.raises(HTTPException) as excinfo:
+        await StorageEngineService.upload_profile_photo(b"mock_raw_image_data", "test.jpg")
+    assert excinfo.value.status_code == 502
+    assert "Storage upload failed" in excinfo.value.detail
+

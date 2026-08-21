@@ -25,9 +25,9 @@
 -dontwarn com.google_mlkit_text_recognition.**
 -keep class com.google_mlkit_text_recognition.** { *; }
 
-# Razorpay & Payment Gateway
--dontwarn com.razorpay.**
--keep class com.razorpay.** { *; }
+# Google Play In-App Billing
+-dontwarn com.android.billingclient.**
+-keep class com.android.billingclient.** { *; }
 
 # Google Mobile Ads
 -dontwarn com.google.android.gms.ads.**

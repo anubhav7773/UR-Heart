@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ruralheart_mobile/features/auth/presentation/auth_screen.dart';
 import 'package:ruralheart_mobile/features/auth/presentation/widgets/auth_header.dart';
 import 'package:ruralheart_mobile/features/auth/presentation/widgets/google_auth_button.dart';
 

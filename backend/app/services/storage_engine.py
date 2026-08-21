@@ -1,8 +1,12 @@
 import io
 import uuid
+import logging
 import httpx
 from typing import Optional
+from fastapi import HTTPException, status
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 try:
     from PIL import Image
@@ -52,8 +56,15 @@ class StorageEngineService:
             except Exception:
                 processed_bytes = file_bytes
 
-        supabase_url = (settings.SUPABASE_URL or "https://mock.supabase.co").rstrip('/')
-        supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY or "mock_key"
+        supabase_url = (settings.SUPABASE_URL or "").rstrip('/')
+        supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY or ""
+
+        if not supabase_url or not supabase_key:
+            logger.error("Supabase Storage credentials not configured (SUPABASE_URL / key missing).")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Storage upload failed"
+            )
 
         # Supabase Storage REST API URL for specified bucket
         upload_url = f"{supabase_url}/storage/v1/object/{bucket_name}/{target_filename}"
@@ -71,8 +82,30 @@ class StorageEngineService:
                 res = await client.post(upload_url, content=processed_bytes, headers=headers)
                 if res.status_code in (200, 201):
                     return public_cdn_url
-        except Exception:
-            pass
+                else:
+                    logger.error(
+                        "Supabase storage upload failed with HTTP %s: %s (bucket: %s, file: %s)",
+                        res.status_code,
+                        res.text,
+                        bucket_name,
+                        target_filename
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="Storage upload failed"
+                    )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(
+                "Exception during Supabase storage upload to bucket '%s' for file '%s': %s",
+                bucket_name,
+                target_filename,
+                str(e),
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Storage upload failed"
+            )
 
-        # Fallback public CDN URL structure if Supabase is offline or initializing
-        return public_cdn_url

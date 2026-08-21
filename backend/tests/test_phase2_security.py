@@ -20,11 +20,18 @@ except ImportError:
             return data["access_token"], data["user_id"]
 
         def setup_match_between_users(sender_token: str, recipient_user_id: str) -> str:
+            import hmac
+            import hashlib
+            from app.core.config import settings
             headers = {"Authorization": f"Bearer {sender_token}"}
+            pay_id = f"pay_test_{recipient_user_id[:8]}"
+            order_id = f"order_test_{recipient_user_id[:8]}"
+            secret = settings.RAZORPAY_KEY_SECRET or "sample_secret"
+            sig = hmac.new(secret.encode("utf-8"), f"{order_id}|{pay_id}".encode("utf-8"), hashlib.sha256).hexdigest()
             verify_payload = {
-                "razorpay_payment_id": f"pay_test_{recipient_user_id[:8]}",
-                "razorpay_order_id": f"order_test_{recipient_user_id[:8]}",
-                "razorpay_signature": "mock_sig_valid",
+                "razorpay_payment_id": pay_id,
+                "razorpay_order_id": order_id,
+                "razorpay_signature": sig,
                 "plan_type": "PLAN_DIRECT_DM_49"
             }
             client.post("/api/v1/payments/verify", json=verify_payload, headers=headers)
@@ -95,10 +102,17 @@ async def test_rate_limiting_chat_flood():
         user_c_id = res_c.json()["data"]["user_id"]
 
         headers = {"Authorization": f"Bearer {token_b}"}
+        import hmac
+        import hashlib
+        from app.core.config import settings
+        pay_id = f"pay_test_{user_c_id[:8]}"
+        order_id = f"order_test_{user_c_id[:8]}"
+        secret = settings.RAZORPAY_KEY_SECRET or "sample_secret"
+        sig = hmac.new(secret.encode("utf-8"), f"{order_id}|{pay_id}".encode("utf-8"), hashlib.sha256).hexdigest()
         verify_payload = {
-            "razorpay_payment_id": f"pay_test_{user_c_id[:8]}",
-            "razorpay_order_id": f"order_test_{user_c_id[:8]}",
-            "razorpay_signature": "mock_sig_valid",
+            "razorpay_payment_id": pay_id,
+            "razorpay_order_id": order_id,
+            "razorpay_signature": sig,
             "plan_type": "PLAN_DIRECT_DM_49"
         }
         await ac.post("/api/v1/payments/verify", json=verify_payload, headers=headers)

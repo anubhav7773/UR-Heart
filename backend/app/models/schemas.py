@@ -750,9 +750,9 @@ class ReportUserData(BaseModel):
 
 # 15. Payment Verification Schemas
 class VerifyPaymentRequest(BaseModel):
-    razorpay_payment_id: str
-    razorpay_order_id: str
-    razorpay_signature: str
+    razorpay_payment_id: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
+    razorpay_signature: Optional[str] = None
     plan_type: Optional[str] = "monthly"
 
 
@@ -760,6 +760,21 @@ class VerifyPaymentData(BaseModel):
     verified: bool = True
     plan_type: str
     message: str = "Payment verified successfully."
+
+
+class VerifyGooglePlayRequest(BaseModel):
+    purchase_token: str
+    product_id: str
+    package_name: Optional[str] = "com.ruralheart.urheart"
+    match_id: Optional[str] = None
+
+
+class VerifyGooglePlayData(BaseModel):
+    status: str = "success"
+    product_id: str
+    plan_type: str
+    activated: bool = True
+    message: str = "Google Play In-App Purchase verified and activated successfully."
 
 
 # 16. Video Verification Schemas

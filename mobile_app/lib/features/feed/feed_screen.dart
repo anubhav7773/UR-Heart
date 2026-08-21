@@ -66,8 +66,20 @@ class _FeedScreenState extends State<FeedScreen> {
     } catch (_) {}
   }
 
+  Future<void> _stopVoiceBioAudio() async {
+    try {
+      if (_playingVoiceBioUrl != null) {
+        await _feedAudioPlayer.stop();
+        if (mounted) setState(() => _playingVoiceBioUrl = null);
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
+    try {
+      _feedAudioPlayer.stop();
+    } catch (_) {}
     _feedAudioPlayer.dispose();
     super.dispose();
   }
@@ -112,12 +124,7 @@ class _FeedScreenState extends State<FeedScreen> {
     if (_cards.isEmpty || _currentIndex >= _cards.length) return;
 
     // Stop active voice bio audio when swiping cards
-    try {
-      if (_playingVoiceBioUrl != null) {
-        await _feedAudioPlayer.stop();
-        setState(() => _playingVoiceBioUrl = null);
-      }
-    } catch (_) {}
+    await _stopVoiceBioAudio();
 
     final currentCard = _cards[_currentIndex];
     final String? targetUserId = currentCard['profile']?['user_id'];
@@ -870,6 +877,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _showProfileViewer(Map<String, dynamic> profile) {
+    _stopVoiceBioAudio();
     final photos = (profile['photos'] as List<dynamic>? ?? [])
         .map((photo) => photo.toString())
         .where((photo) => photo.isNotEmpty)

@@ -46,6 +46,9 @@ class _ProfileViewDialogState extends State<ProfileViewDialog> {
 
   @override
   void dispose() {
+    try {
+      _audioPlayer.stop();
+    } catch (_) {}
     _audioPlayer.dispose();
     _pageController.dispose();
     super.dispose();

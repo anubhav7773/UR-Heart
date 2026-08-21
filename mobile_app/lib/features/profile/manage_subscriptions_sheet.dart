@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
-import '../../core/security/storage_manager.dart';
 import '../subscription/payment_service.dart';
 
 class ManageSubscriptionsSheet extends StatefulWidget {
@@ -93,47 +92,29 @@ class _ManageSubscriptionsSheetState extends State<ManageSubscriptionsSheet> {
     final nav = Navigator.of(context, rootNavigator: true);
     final messenger = ScaffoldMessenger.of(context);
 
-    // Close bottom modal cleanly before native Razorpay opens
+    // Close bottom modal cleanly before native Google Play billing opens
     nav.pop();
     await Future.delayed(const Duration(milliseconds: 250));
 
     try {
-      final orderRes = await ApiClient.instance.createSachetOrder(planType: planType);
-      final dynamic rawData = orderRes.data?['data'] ?? orderRes.data;
-      if (rawData == null) {
-        throw Exception('Failed to generate order from server');
+      final bool success = await PaymentService.instance.buyProduct(planType);
+
+      if (success) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF10B981),
+            content: Text('🎉 $title updated successfully!'),
+          ),
+        );
+        _fetchActivePasses();
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Text('Payment cancelled or failed. Please try again.'),
+          ),
+        );
       }
-
-      final Map<String, dynamic> data = Map<String, dynamic>.from(rawData);
-      final String orderId = (data['order_id'] ?? '').toString();
-      final int amountInPaise = data['amount_in_paise'] != null
-          ? (data['amount_in_paise'] as num).toInt()
-          : (price * 100);
-      final String keyId = (data['razorpay_key_id'] ?? 'rzp_test_sample').toString();
-      final String description = (data['description'] ?? title).toString();
-
-      final result = await PaymentService.instance.openCheckout(
-        orderId: orderId,
-        amountInPaise: amountInPaise,
-        razorpayKeyId: keyId,
-        description: description,
-      );
-
-      await ApiClient.instance.verifyPayment(
-        paymentId: result.paymentId ?? '',
-        orderId: result.orderId ?? '',
-        signature: result.signature ?? '',
-        planType: planType,
-      );
-
-      await StorageManager.instance.setPremiumStatus(true);
-
-      messenger.showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFF10B981),
-          content: Text('🎉 $title updated successfully!'),
-        ),
-      );
     } catch (e) {
       debugPrint('[RENEWAL_CANCELLED_OR_FAILED] $e');
       messenger.showSnackBar(

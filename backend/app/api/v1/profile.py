@@ -274,8 +274,13 @@ async def upload_profile_photo(
                 filename=filename
             )
             public_url = cdn_url
+        except HTTPException:
+            raise
         except Exception:
-            public_url = f"https://r2.ruralheart.com/uploads/{file_path}"
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Storage upload failed"
+            )
 
     # Immediately insert/update UserPhoto in Postgres DB for current_user_id
     if public_url:
@@ -331,8 +336,8 @@ async def upload_profile_photo(
     }
 
 
-@router.post("/complete", response_model=APIResponse[CompleteProfileData])
-@router.post("/complete-profile", response_model=APIResponse[CompleteProfileData])
+@router.post("/complete", response_model=APIResponse[CompleteProfileData], status_code=status.HTTP_201_CREATED)
+@router.post("/complete-profile", response_model=APIResponse[CompleteProfileData], status_code=status.HTTP_201_CREATED)
 @router.put("/complete-profile", response_model=APIResponse[CompleteProfileData])
 async def complete_profile(
     payload: CompleteProfileRequest,
@@ -565,16 +570,22 @@ async def update_profile(
                 target_col = "interested_in"
 
             # Handle Enum conversions safely
-            if target_col in ("gender", "interested_in") and isinstance(value, str):
-                try:
-                    value = ORMGenderEnum(value.lower().strip())
-                except ValueError:
-                    pass
-            elif target_col == "intent" and isinstance(value, str):
-                try:
-                    value = ORMIntentEnum(value.lower().strip())
-                except ValueError:
-                    pass
+            if target_col in ("gender", "interested_in"):
+                if isinstance(value, str) and value.strip():
+                    try:
+                        value = ORMGenderEnum(value.lower().strip())
+                    except ValueError:
+                        continue
+                else:
+                    continue
+            elif target_col == "intent":
+                if isinstance(value, str) and value.strip():
+                    try:
+                        value = ORMIntentEnum(value.lower().strip())
+                    except ValueError:
+                        continue
+                else:
+                    continue
 
             # Sanitize free-form text inputs against XSS/injections
             if isinstance(value, str):
@@ -1071,8 +1082,13 @@ async def upload_voice_bio(
                 file_bytes=contents,
                 filename=filename
             )
+        except HTTPException:
+            raise
         except Exception:
-            public_url = f"https://r2.ruralheart.com/uploads/{file_path}"
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Storage upload failed"
+            )
 
     dur = min(max(1, duration_seconds), 15)
 

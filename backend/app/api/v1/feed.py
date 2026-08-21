@@ -190,7 +190,7 @@ async def get_feed(
                 if resolved_gender:
                     stmt = stmt.where(User.gender == resolved_gender)
 
-                result = await db.execute(stmt.limit(limit * 3))
+                result = await db.execute(stmt.limit(min(limit * 3, 50)))
                 raw_rows = result.all()
                 db_candidates = [(row[0], float(row[1]) if row[1] is not None else None) for row in raw_rows]
             except Exception as spatial_err:
@@ -213,7 +213,7 @@ async def get_feed(
             if resolved_gender:
                 stmt = stmt.where(User.gender == resolved_gender)
 
-            result = await db.execute(stmt.limit(limit * 3))
+            result = await db.execute(stmt.limit(min(limit * 3, 50)))
             db_candidates = [(u, None) for u in result.scalars().all()]
 
         for user, postgis_dist_km in db_candidates:
@@ -285,6 +285,7 @@ async def get_feed(
         # 5. Fallback Query: If fewer than limit cards, pull remaining active users
         if len(profile_cards) < limit:
             fallback_candidates: List[tuple[User, Optional[float]]] = []
+            fallback_limit = min(max(limit * 2, 10), 50)
             if current_point is not None and distance_expr is not None:
                 try:
                     fallback_stmt = (
@@ -296,7 +297,7 @@ async def get_feed(
                             case((User.boosted_until > func.now(), 1), else_=0).desc(),
                             User.created_at.desc()
                         )
-                        .limit(limit * 2)
+                        .limit(fallback_limit)
                     )
                     fallback_res = await db.execute(fallback_stmt)
                     fallback_candidates = [(row[0], float(row[1]) if row[1] is not None else None) for row in fallback_res.all()]
@@ -314,7 +315,7 @@ async def get_feed(
                         case((User.boosted_until > func.now(), 1), else_=0).desc(),
                         User.created_at.desc()
                     )
-                    .limit(limit * 2)
+                    .limit(fallback_limit)
                 )
                 fallback_res = await db.execute(fallback_stmt)
                 fallback_candidates = [(u, None) for u in fallback_res.scalars().all()]

@@ -4,8 +4,8 @@ from datetime import date
 
 
 class ProfileUpdateRequest(BaseModel):
-    display_name: Optional[str] = Field(None, min_length=2, max_length=50)
-    full_name: Optional[str] = Field(None, min_length=2, max_length=100)
+    display_name: Optional[str] = Field(None, max_length=50)
+    full_name: Optional[str] = Field(None, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
     birthdate: Optional[date] = None
     dob: Optional[date] = None

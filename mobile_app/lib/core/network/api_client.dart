@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import '../security/storage_manager.dart';
 import '../utils/image_compressor.dart';
 import 'environment_config.dart';
 import 'firebase_auth_interceptor.dart';
@@ -575,7 +574,22 @@ class ApiClient {
     });
   }
 
-  // 26. Verify Razorpay Payment (POST /payments/verify)
+  // 26. Verify Google Play In-App Purchase (POST /payments/verify-google-play)
+  Future<Response> verifyGooglePlayPurchase({
+    required String purchaseToken,
+    required String productId,
+    String? packageName,
+    String? matchId,
+  }) async {
+    return await dio.post('/payments/verify-google-play', data: {
+      'purchase_token': purchaseToken,
+      'product_id': productId,
+      if (packageName != null) 'package_name': packageName,
+      if (matchId != null) 'match_id': matchId,
+    });
+  }
+
+  // Legacy / Direct Payment Verification (POST /payments/verify)
   Future<Response> verifyPayment({
     required String paymentId,
     required String orderId,

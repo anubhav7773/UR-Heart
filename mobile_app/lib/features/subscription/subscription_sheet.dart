@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/network/api_client.dart';
-import '../../core/security/storage_manager.dart';
 import '../../core/theme/app_theme.dart';
 import 'payment_service.dart';
 
@@ -144,54 +141,25 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
     await Future.delayed(const Duration(milliseconds: 250));
 
     try {
-      // STEP 3: Create order on backend (Phase 1 endpoint)
-      final orderResponse = await ApiClient.instance.createSachetOrder(
-        planType: selectedPlan.id,
-      );
+      // STEP 3: Launch Google Play In-App Purchase via PaymentService singleton
+      final bool success = await PaymentService.instance.buyProduct(selectedPlan.id);
 
-      final dynamic rawData = orderResponse.data?['data'] ?? orderResponse.data;
-      if (rawData == null) {
-        throw Exception('Failed to generate order from server');
+      if (success) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+            content: Text('🎉 ${selectedPlan.title} activated successfully!'),
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Text('Payment cancelled or failed. Please try again.'),
+          ),
+        );
       }
-
-      final Map<String, dynamic> data = Map<String, dynamic>.from(rawData);
-      final String orderId = (data['order_id'] ?? '').toString();
-      final int amountInPaise = data['amount_in_paise'] != null
-          ? (data['amount_in_paise'] as num).toInt()
-          : (selectedPlan.price * 100);
-      final String keyId = (data['razorpay_key_id'] ?? 'rzp_test_sample').toString();
-      final String description = (data['description'] ?? 'UR-Heart - ${selectedPlan.title}').toString();
-
-      final currentUser = FirebaseAuth.instance.currentUser;
-
-      // STEP 4: Launch Native Razorpay via persistent Singleton
-      final PaymentSuccessResponse paymentResult = await PaymentService().openCheckout(
-        orderId: orderId,
-        amountInPaise: amountInPaise,
-        razorpayKeyId: keyId,
-        description: description,
-        userEmail: currentUser?.email,
-        userPhone: currentUser?.phoneNumber,
-      );
-
-      // STEP 5: Verify Payment on Backend
-      await ApiClient.instance.verifyPayment(
-        paymentId: paymentResult.paymentId ?? '',
-        orderId: paymentResult.orderId ?? '',
-        signature: paymentResult.signature ?? '',
-        planType: selectedPlan.id,
-      );
-
-      await StorageManager.instance.setPremiumStatus(true);
-
-      // STEP 6: Success feedback and activation
-      messenger.showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 4),
-          content: Text('🎉 ${selectedPlan.title} activated successfully!'),
-        ),
-      );
     } catch (e) {
       debugPrint('[CHECKOUT_FLOW_FAILED] $e');
       messenger.showSnackBar(
@@ -293,8 +261,8 @@ class _SubscriptionSheetState extends State<SubscriptionSheet> {
                   : const Icon(Icons.account_balance_wallet, color: Colors.white),
               label: Text(
                 _isProcessing
-                    ? 'Connecting to Razorpay...'
-                    : 'Pay ₹${_selectedPlan.price} via UPI (${_selectedPlan.validity} ${_selectedPlan.title})',
+                    ? 'Connecting to Google Play...'
+                    : 'Unlock ${_selectedPlan.title} • ₹${_selectedPlan.price}',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../subscription/payment_service.dart';
 
 class SafeBridgePaywallSheet extends StatefulWidget {
   final String matchId;
@@ -194,40 +195,54 @@ class _SafeBridgePaywallSheetState extends State<SafeBridgePaywallSheet> {
     setState(() => _isPaying = true);
 
     try {
-      // Direct Razorpay / Payment Gateway simulated bridge confirmation
-      final String paymentId = 'pay_bridge_${DateTime.now().millisecondsSinceEpoch}';
-      final res = await ApiClient.instance.submitBridgePayment(
+      final bool success = await PaymentService.instance.buyProduct(
+        PaymentService.skuSafeBridge499,
         matchId: widget.matchId,
-        paymentId: paymentId,
-        amount: 499.0,
       );
 
-      final data = res.data?['data'];
-      if (data is Map && mounted) {
-        setState(() {
-          _myPaid = true;
-          _partnerPaid = data['partner_payment_done'] ?? _partnerPaid;
-          _isUnlocked = data['is_fully_unlocked'] ?? false;
-          _partnerPhone = data['partner_phone'];
-          _partnerMapsUrl = data['partner_maps_url'];
-        });
-        widget.onStateChanged?.call();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _isUnlocked
-                  ? '🎉 Payment Successful! Safe Bridge is now fully unlocked!'
-                  : 'Payment Complete ✅ — Waiting for ${widget.partnerName} to unlock.',
-            ),
-            backgroundColor: Colors.green,
-          ),
+      if (success) {
+        final res = await ApiClient.instance.submitBridgePayment(
+          matchId: widget.matchId,
+          paymentId: 'gplay_bridge_${DateTime.now().millisecondsSinceEpoch}',
+          amount: 499.0,
         );
+
+        final data = res.data?['data'];
+        if (data is Map && mounted) {
+          setState(() {
+            _myPaid = true;
+            _partnerPaid = data['partner_payment_done'] ?? _partnerPaid;
+            _isUnlocked = data['is_fully_unlocked'] ?? false;
+            _partnerPhone = data['partner_phone'];
+            _partnerMapsUrl = data['partner_maps_url'];
+          });
+          widget.onStateChanged?.call();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isUnlocked
+                    ? '🎉 Payment Successful! Safe Bridge is now fully unlocked!'
+                    : 'Payment Complete ✅ — Waiting for ${widget.partnerName} to unlock.',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment cancelled or failed. Please try again.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payment failed: ${e.toString()}')),
+          SnackBar(content: Text('Payment notice: ${e.toString()}')),
         );
       }
     } finally {
