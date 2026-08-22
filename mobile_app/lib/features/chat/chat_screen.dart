@@ -1282,18 +1282,26 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       final baseUri = Uri.parse(ApiClient.baseUrl);
-      final isHttps = baseUri.scheme == 'https';
+      final isHttps = baseUri.scheme == 'https' || ApiClient.baseUrl.startsWith('https://');
       final wsScheme = isHttps ? 'wss' : 'ws';
       final wsHost = baseUri.host;
-      final wsPort = baseUri.hasPort ? ':${baseUri.port}' : '';
+      final int port = baseUri.hasPort ? baseUri.port : 0;
+      final wsPort = (port > 0 && port != 80 && port != 443) ? ':$port' : '';
       final wsUrl =
           '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?token=${Uri.encodeComponent(token)}';
 
-      _wsChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
+      _wsChannel = IOWebSocketChannel.connect(
+        Uri.parse(wsUrl),
+        pingInterval: const Duration(seconds: 15),
+      );
       _wsSubscription = _wsChannel?.stream.listen(
         (rawData) {
           _wsReconnectAttempts = 0;
-          _handleIncomingWebSocketData(rawData);
+          try {
+            _handleIncomingWebSocketData(rawData);
+          } catch (e) {
+            if (kDebugMode) print('[Chat WS Data Error] $e');
+          }
         },
         onError: (err) {
           if (kDebugMode) print('[Chat WS Error] $err');
@@ -1303,7 +1311,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (kDebugMode) print('[Chat WS Closed]');
           _scheduleWsReconnect();
         },
-        cancelOnError: true,
+        cancelOnError: false,
       );
     } catch (e) {
       if (kDebugMode) print('[Chat WS Connect Error] $e');
@@ -3013,9 +3021,13 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
-                      final isMe = (_currentUserId.isNotEmpty &&
-                              msg.senderId == _currentUserId) ||
-                          msg.senderId == 'current_user_id';
+                      final bool isMe = (_currentUserId.isNotEmpty &&
+                              (msg.senderId == _currentUserId ||
+                               msg.senderId.trim().toLowerCase() == _currentUserId.trim().toLowerCase())) ||
+                          msg.senderId == 'current_user_id' ||
+                          (widget.recipientUser.id.isNotEmpty &&
+                              msg.senderId.isNotEmpty &&
+                              msg.senderId != widget.recipientUser.id);
                       final String timeStr =
                           '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}';
 

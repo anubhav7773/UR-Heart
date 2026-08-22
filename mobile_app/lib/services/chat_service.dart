@@ -35,10 +35,11 @@ class ChatService {
 
       // 2. Build secure WebSocket URI
       final baseUri = Uri.parse(ApiClient.baseUrl);
-      final isHttps = baseUri.scheme == 'https';
+      final isHttps = baseUri.scheme == 'https' || ApiClient.baseUrl.startsWith('https://');
       final wsScheme = isHttps ? 'wss' : 'ws';
       final wsHost = baseUri.host;
-      final wsPort = baseUri.hasPort ? ':${baseUri.port}' : '';
+      final int port = baseUri.hasPort ? baseUri.port : 0;
+      final wsPort = (port > 0 && port != 80 && port != 443) ? ':$port' : '';
       final wsUri = Uri.parse(
         '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/$matchId?token=${Uri.encodeComponent(token)}',
       );
@@ -46,9 +47,18 @@ class ChatService {
       debugPrint('[WS_CONNECT] Connecting to secure match room: $matchId');
 
       // 3. Connect
-      _channel = IOWebSocketChannel.connect(wsUri);
+      _channel = IOWebSocketChannel.connect(
+        wsUri,
+        pingInterval: const Duration(seconds: 15),
+      );
       _subscription = _channel?.stream.listen(
-        onDataReceived,
+        (data) {
+          try {
+            onDataReceived(data);
+          } catch (e) {
+            debugPrint('[WS_DATA_ERROR] $e');
+          }
+        },
         onError: (err) {
           debugPrint('[WS_ERROR] $err');
           if (onError != null) onError(err);
@@ -57,6 +67,7 @@ class ChatService {
           debugPrint('[WS_CLOSED] Match room $matchId connection closed');
           if (onDone != null) onDone();
         },
+        cancelOnError: false,
       );
 
       return _channel;

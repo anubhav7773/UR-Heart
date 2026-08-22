@@ -108,7 +108,7 @@ class AppUpdateService {
               (apkUrl.startsWith('http://') || apkUrl.startsWith('https://'));
 
           final bool isManual = showNoUpdateToast;
-          final bool shouldShowDialog = hasUpdate && isValidApkUrl && (isForceUpdate || isManual);
+          final bool shouldShowDialog = hasUpdate && isValidApkUrl;
 
           if (shouldShowDialog && context.mounted) {
             _dialogShown = true;

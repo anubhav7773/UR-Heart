@@ -58,6 +58,69 @@ def decode_access_token(token: str) -> Optional[str]:
         return None
 
 
+async def resolve_user_id_from_raw_token(token: str) -> Optional[str]:
+    """
+    Validates a raw authentication token string (Firebase ID token, HS256 JWT, or UUID)
+    and resolves the database User UUID string.
+    """
+    if not token or not isinstance(token, str):
+        return None
+
+    cleaned_token = token.strip()
+    if cleaned_token.lower().startswith("bearer "):
+        cleaned_token = cleaned_token[7:].strip()
+
+    # 1. Local HS256 JWT decoding
+    user_id = decode_access_token(cleaned_token)
+    if user_id:
+        return user_id
+
+    # 2. Try Firebase ID Token Verification
+    try:
+        import firebase_admin
+        from firebase_admin import auth as firebase_auth
+
+        if firebase_admin._apps:
+            decoded_token = firebase_auth.verify_id_token(cleaned_token)
+            firebase_uid = decoded_token.get("uid") or decoded_token.get("sub")
+            email = decoded_token.get("email")
+            phone = decoded_token.get("phone_number")
+
+            if firebase_uid or email or phone:
+                async with AsyncSessionLocal() as db:
+                    conditions = []
+                    if email:
+                        conditions.append(User.email == email)
+                    if phone:
+                        conditions.append(User.phone_number == phone)
+                    if firebase_uid:
+                        conditions.append(User.clerk_id == firebase_uid)
+                        if len(firebase_uid) == 36:
+                            try:
+                                conditions.append(User.id == uuid.UUID(firebase_uid))
+                            except Exception:
+                                pass
+                    if conditions:
+                        from sqlalchemy import or_
+                        stmt = select(User).where(or_(*conditions))
+                        res = await db.execute(stmt)
+                        user = res.scalars().first()
+                        if user:
+                            return str(user.id)
+    except Exception:
+        pass
+
+    # 3. Direct UUID validation
+    try:
+        u = uuid.UUID(cleaned_token)
+        return str(u)
+    except Exception:
+        pass
+
+    return None
+
+
+
 async def get_current_user_id(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
     db: AsyncSession = Depends(get_db),

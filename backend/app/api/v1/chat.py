@@ -12,6 +12,7 @@ from app.core.database import get_db, AsyncSessionLocal
 from app.core.security import (
     get_current_user_id,
     decode_access_token,
+    resolve_user_id_from_raw_token,
     verify_conversation_access_raw,
     _active_conversations,
     register_conversation_participants,
@@ -202,8 +203,8 @@ async def chat_websocket_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # 2. Decode and verify JWT Token
-    extracted_user_id = decode_access_token(token)
+    # 2. Decode and verify Token (supports backend HS256 JWT, Firebase ID token, and raw UUID)
+    extracted_user_id = await resolve_user_id_from_raw_token(token)
     if not extracted_user_id:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
