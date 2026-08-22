@@ -18,6 +18,8 @@ from app.core.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Log environment secrets & health status sanity check
+    settings.log_sanity_check()
     # Auto-create all missing PostgreSQL/Supabase tables on server startup
     try:
         await init_db()

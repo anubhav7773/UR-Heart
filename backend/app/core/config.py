@@ -1,6 +1,9 @@
+import logging
 from typing import List, Optional
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -21,18 +24,38 @@ class Settings(BaseSettings):
     # Database & Supabase Integration
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/ruralheart",
-        validation_alias=AliasChoices("DATABASE_URL"),
+        validation_alias=AliasChoices("DATABASE_URL", "SUPABASE_DB_URL", "POSTGRES_URL"),
     )
-    SUPABASE_URL: Optional[str] = None
-    SUPABASE_KEY: Optional[str] = None
-    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
+    SUPABASE_DB_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_DB_URL", "DATABASE_URL"),
+    )
+    SUPABASE_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_URL", "SUPABASE_STORAGE_URL"),
+    )
+    SUPABASE_STORAGE_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_STORAGE_URL", "SUPABASE_URL"),
+    )
+    SUPABASE_KEY: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_KEY", "SUPABASE_ANON_KEY"),
+    )
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY"),
+    )
 
     # Firebase Authentication & Cloud Messaging (FCM)
     GOOGLE_CLOUD_PROJECT: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("GOOGLE_CLOUD_PROJECT", "FIREBASE_PROJECT_ID"),
     )
-    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_PROJECT_ID: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("FIREBASE_PROJECT_ID", "GOOGLE_CLOUD_PROJECT"),
+    )
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("FIREBASE_SERVICE_ACCOUNT_JSON", "FIREBASE_CREDENTIALS_JSON", "FIREBASE_CREDENTIALS"),
@@ -70,6 +93,26 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    def log_sanity_check(self):
+        """Validates critical production secrets and logs a sanitized status."""
+        db_status = "CONFIGURED" if (self.SUPABASE_DB_URL or ("postgresql" in self.DATABASE_URL and "localhost" not in self.DATABASE_URL)) else ("LOCAL/DEFAULT" if self.DATABASE_URL else "MISSING")
+        storage_status = "CONFIGURED" if (self.SUPABASE_STORAGE_URL or self.SUPABASE_URL) else "UNSET"
+        service_key_status = "SET" if self.SUPABASE_SERVICE_ROLE_KEY else "UNSET"
+        firebase_status = "CONFIGURED" if (self.FIREBASE_SERVICE_ACCOUNT_JSON or self.FIREBASE_PROJECT_ID or self.GOOGLE_CLOUD_PROJECT) else "DEVELOPMENT_MODE"
+
+        summary = (
+            "\n" + "=" * 60 + "\n"
+            f"🚀 [Startup Sanity] Project: {self.PROJECT_NAME} v{self.VERSION}\n"
+            f"🌍 [Startup Sanity] Environment: {self.ENVIRONMENT} (Debug: {self.DEBUG})\n"
+            f"🗄️  [Startup Sanity] SUPABASE_DB_URL: {db_status}\n"
+            f"☁️  [Startup Sanity] SUPABASE_STORAGE_URL: {storage_status}\n"
+            f"🔑 [Startup Sanity] SUPABASE_SERVICE_ROLE_KEY: {service_key_status}\n"
+            f"🔥 [Startup Sanity] FIREBASE_AUTH_FCM: {firebase_status}\n"
+            + "=" * 60
+        )
+        print(summary)
+        logger.info(summary)
 
 
 settings = Settings()

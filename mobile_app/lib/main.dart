@@ -103,6 +103,7 @@ void main() async {
     (options) {
       options.dsn = 'https://04973e1a72f04bf6d0cdb86f8dae89f5@o4511946639015936.ingest.us.sentry.io/4511946784636928';
       options.tracesSampleRate = 1.0;
+      // ignore: experimental_member_use
       options.profilesSampleRate = 1.0;
     },
     appRunner: () => runApp(const RuralHeartApp()),
