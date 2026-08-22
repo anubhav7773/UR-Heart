@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -19,19 +20,19 @@ class ChatService {
   /// Connect to secure match WebSocket with active JWT token handshake
   Future<WebSocketChannel?> connectToChatWebSocket({
     required String matchId,
-    required Function(dynamic data) onDataReceived,
-    Function(dynamic error)? onError,
-    VoidCallback? onDone,
+    required Function(dynamic) onDataReceived,
+    Function(dynamic)? onError,
+    Function()? onDone,
   }) async {
     try {
-      disconnect();
-
-      // 1. Get valid active JWT token
+      // 1. Retrieve authenticated JWT token
       final String? token = await StorageManager.instance.getAuthToken();
       if (token == null || token.isEmpty) {
         debugPrint('[WS_ERROR] Cannot connect to chat: No active session token found');
         return null;
       }
+
+      disconnect();
 
       // 2. Build secure WebSocket URI
       final baseUri = Uri.parse(ApiClient.baseUrl);
@@ -46,11 +47,13 @@ class ChatService {
 
       debugPrint('[WS_CONNECT] Connecting to secure match room: $matchId');
 
-      // 3. Connect
-      _channel = IOWebSocketChannel.connect(
-        wsUri,
-        pingInterval: const Duration(seconds: 15),
-      );
+      // 3. Connect via guarded WebSocket.connect
+      final ws = await WebSocket.connect(
+        wsUri.toString(),
+      ).timeout(const Duration(seconds: 5));
+      ws.pingInterval = const Duration(seconds: 15);
+
+      _channel = IOWebSocketChannel(ws);
       _subscription = _channel?.stream.listen(
         (data) {
           try {
@@ -60,14 +63,14 @@ class ChatService {
           }
         },
         onError: (err) {
-          debugPrint('[WS_ERROR] $err');
+          debugPrint('[WS_ERROR (handled)] $err');
           if (onError != null) onError(err);
         },
         onDone: () {
-          debugPrint('[WS_CLOSED] Match room $matchId connection closed');
+          debugPrint('[WS_CLOSED cleanly] Match room $matchId connection closed');
           if (onDone != null) onDone();
         },
-        cancelOnError: false,
+        cancelOnError: true,
       );
 
       return _channel;

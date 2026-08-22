@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1290,10 +1291,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final wsUrl =
           '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?token=${Uri.encodeComponent(token)}';
 
-      _wsChannel = IOWebSocketChannel.connect(
-        Uri.parse(wsUrl),
-        pingInterval: const Duration(seconds: 15),
-      );
+      final ws = await WebSocket.connect(
+        wsUrl,
+      ).timeout(const Duration(seconds: 5));
+      ws.pingInterval = const Duration(seconds: 15);
+
+      _wsChannel = IOWebSocketChannel(ws);
       _wsSubscription = _wsChannel?.stream.listen(
         (rawData) {
           _wsReconnectAttempts = 0;
@@ -1304,17 +1307,17 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         },
         onError: (err) {
-          if (kDebugMode) print('[Chat WS Error] $err');
+          if (kDebugMode) print('[Chat WS Stream Error (handled)] $err');
           _scheduleWsReconnect();
         },
         onDone: () {
-          if (kDebugMode) print('[Chat WS Closed]');
+          if (kDebugMode) print('[Chat WS Closed cleanly]');
           _scheduleWsReconnect();
         },
-        cancelOnError: false,
+        cancelOnError: true,
       );
     } catch (e) {
-      if (kDebugMode) print('[Chat WS Connect Error] $e');
+      if (kDebugMode) print('[Chat WS Connect Error (handled silently)] $e');
       _scheduleWsReconnect();
     } finally {
       _isConnectingWs = false;
