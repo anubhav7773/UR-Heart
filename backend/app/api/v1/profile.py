@@ -617,15 +617,23 @@ async def update_profile(
 
 @router.put("/presence")
 @router.post("/presence")
+@router.get("/presence")
 async def update_presence(
-    payload: dict,
+    payload: Optional[dict] = Body(default=None),
+    is_online: Optional[bool] = Query(default=None),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Updates the user's online status (is_online: bool) and last_seen timestamp in database.
+    Accepts PUT/POST with JSON payload or GET with optional query param / heartbeat ping.
     """
-    is_online = bool(payload.get("is_online", True))
+    online_val = True
+    if payload and isinstance(payload, dict) and "is_online" in payload:
+        online_val = bool(payload["is_online"])
+    elif is_online is not None:
+        online_val = bool(is_online)
+
     now_utc = datetime.now(timezone.utc)
 
     try:
@@ -634,7 +642,7 @@ async def update_presence(
         user_obj = user_res.scalars().first()
 
         if user_obj:
-            user_obj.is_online = is_online
+            user_obj.is_online = online_val
             user_obj.last_seen = now_utc
             await db.commit()
     except Exception:
@@ -642,8 +650,8 @@ async def update_presence(
 
     return APIResponse(
         success=True,
-        message=f"Presence updated to is_online={is_online}.",
-        data={"is_online": is_online, "last_seen": now_utc.isoformat()}
+        message=f"Presence updated to is_online={online_val}.",
+        data={"is_online": online_val, "last_seen": now_utc.isoformat()}
     )
 
 
