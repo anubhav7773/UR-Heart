@@ -12,8 +12,8 @@ async def test_get_app_version():
     assert json_data["success"] is True
     assert "data" in json_data
     data = json_data["data"]
-    assert data["latest_version"] == "1.1.0"
-    assert data["min_version"] == "1.0.0"
+    assert data["latest_version"] == "1.0.1"
+    assert data["min_required_version"] == "1.0.0"
     assert data["force_update"] is False
     assert data["is_force_update"] is False
-    assert "Location sync, security hardening" in data["release_notes"]
+    assert "https://github.com/anubhav7773/UR-Heart/releases/download/v1.0.1/UR-Heart-arm64-v8a.apk" in data["apk_url"]
