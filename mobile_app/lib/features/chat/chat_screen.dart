@@ -21,6 +21,8 @@ import 'message_bubble.dart';
 import 'widgets/safe_bridge_paywall_sheet.dart';
 import 'widgets/meetup_spots_sheet.dart';
 import 'widgets/meetup_actions_sheet.dart';
+import 'widgets/active_matches_tray.dart';
+import 'widgets/conversation_list_tile.dart';
 
 class ChatMessage {
   final String id;
@@ -682,16 +684,16 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         children: [
-                          // 1. New Matches Horizontal Section
+                          // 1. Top Active Matches Tray Section
                           if (newMatches.isNotEmpty) ...[
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                               child: Row(
                                 children: [
                                   const Text(
-                                    'New Matches',
+                                    'Active Matches',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: AppTheme.text_primary,
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.2,
@@ -702,18 +704,18 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryColor
-                                          .withValues(alpha: 0.2),
+                                      color: AppTheme.accent_primary
+                                          .withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(
-                                        color: AppTheme.primaryColor
+                                        color: AppTheme.accent_primary
                                             .withValues(alpha: 0.4),
                                       ),
                                     ),
                                     child: Text(
                                       '${newMatches.length}',
                                       style: const TextStyle(
-                                        color: AppTheme.primaryColor,
+                                        color: AppTheme.accent_primary,
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -722,154 +724,27 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                 ],
                               ),
                             ),
-                            SizedBox(
-                              height: 104,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                                itemCount: newMatches.length,
-                                itemBuilder: (context, index) {
-                                  final match = newMatches[index];
-                                  final firstName =
-                                      match.partnerName.split(' ').first;
-                                  return GestureDetector(
-                                    onTap: () => _openChat(match),
-                                    child: Container(
-                                      width: 76,
-                                      margin: const EdgeInsets.symmetric(
-                                          horizontal: 4),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Stack(
-                                            children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(2.5),
-                                                decoration: const BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  gradient: LinearGradient(
-                                                    colors: [
-                                                      Color(0xFFE91E63),
-                                                      Color(0xFFFF5252),
-                                                      Color(0xFFFF9800),
-                                                    ],
-                                                    begin: Alignment.topLeft,
-                                                    end: Alignment.bottomRight,
-                                                  ),
-                                                ),
-                                                child: CircleAvatar(
-                                                  radius: 28,
-                                                  backgroundColor:
-                                                      Colors.grey[900],
-                                                  backgroundImage: match
-                                                          .partnerAvatar
-                                                          .isNotEmpty
-                                                      ? CachedNetworkImageProvider(
-                                                          match.partnerAvatar)
-                                                      : null,
-                                                  child: match.partnerAvatar
-                                                          .isEmpty
-                                                      ? const Icon(Icons.person,
-                                                          color: Colors.white70,
-                                                          size: 28)
-                                                      : null,
-                                                ),
-                                              ),
-                                              if (match.isOnline)
-                                                Positioned(
-                                                  right: 2,
-                                                  bottom: 2,
-                                                  child: Container(
-                                                    width: 12,
-                                                    height: 12,
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.greenAccent,
-                                                      shape: BoxShape.circle,
-                                                      border: Border.all(
-                                                        color: AppTheme
-                                                            .backgroundColor,
-                                                        width: 2,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              if (match.unreadCount > 0)
-                                                Positioned(
-                                                  top: 0,
-                                                  right: 0,
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.all(4),
-                                                    decoration:
-                                                        const BoxDecoration(
-                                                      color:
-                                                          AppTheme.primaryColor,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: Text(
-                                                      '${match.unreadCount}',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  firstName,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  textAlign: TextAlign.center,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (match.isVerified) ...[
-                                                const SizedBox(width: 2),
-                                                const Icon(Icons.verified,
-                                                    size: 12,
-                                                    color: AppTheme.verifiedBlue),
-                                              ],
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                            ActiveMatchesTray(
+                              matches: newMatches,
+                              onMatchTap: _openChat,
                             ),
                             const Divider(
-                                color: AppTheme.cardBorderColor,
-                                height: 16,
-                                indent: 16,
-                                endIndent: 16),
+                              color: AppTheme.border_subtle,
+                              height: 24,
+                              thickness: 1,
+                              indent: 16,
+                              endIndent: 16,
+                            ),
                           ],
 
                           // 2. Active Conversations Header
                           if (newMatches.isNotEmpty || activeConvs.isNotEmpty)
                             const Padding(
-                              padding: EdgeInsets.fromLTRB(16, 6, 16, 4),
+                              padding: EdgeInsets.fromLTRB(16, 6, 16, 6),
                               child: Text(
                                 'Conversations',
                                 style: TextStyle(
-                                  color: AppTheme.mutedTextColor,
+                                  color: AppTheme.text_secondary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 0.5,
@@ -886,14 +761,14 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.chat_bubble_outline,
-                                        size: 36, color: AppTheme.mutedTextColor),
+                                    Icon(Icons.chat_bubble_outline_rounded,
+                                        size: 36, color: AppTheme.text_tertiary),
                                     SizedBox(height: 12),
                                     Text(
                                       'Tap a match above to send your first message',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: AppTheme.mutedTextColor,
+                                        color: AppTheme.text_secondary,
                                         fontSize: 14,
                                         fontStyle: FontStyle.italic,
                                       ),
@@ -903,180 +778,21 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                               ),
                             ),
 
-                          // 4. Vertical Active Conversations List
-                          ...activeConvs.map((conv) {
-                            final String matchName = conv.partnerName;
-                            final String avatarUrl = conv.partnerAvatar;
-                            final String lastMsg = (conv.lastMessage != null &&
-                                    conv.lastMessage!.isNotEmpty)
-                                ? conv.lastMessage!
-                                : 'Matched! Say hello';
-                            final int unreadCount = conv.unreadCount;
-                            final bool isOnline = conv.isOnline;
-                            final bool lastMsgIsMe = conv.lastMessageIsMe;
-                            final String? lastMsgStatus =
-                                conv.lastMessageStatus;
-
-                            // Parse last_message_time for relative display
-                            String timeLabel = '';
-                            if (conv.lastMessageTime != null &&
-                                conv.lastMessageTime!.isNotEmpty) {
-                              try {
-                                final dt =
-                                    DateTime.parse(conv.lastMessageTime!)
-                                        .toLocal();
-                                final now = DateTime.now();
-                                final diff = now.difference(dt);
-                                if (diff.inMinutes < 1) {
-                                  timeLabel = 'now';
-                                } else if (diff.inMinutes < 60) {
-                                  timeLabel = '${diff.inMinutes}m';
-                                } else if (diff.inHours < 24) {
-                                  timeLabel = '${diff.inHours}h';
-                                } else if (diff.inDays == 1) {
-                                  timeLabel = 'Yesterday';
-                                } else if (diff.inDays < 7) {
-                                  timeLabel = '${diff.inDays}d';
-                                } else {
-                                  timeLabel = '${dt.day}/${dt.month}';
-                                }
-                              } catch (_) {}
-                            }
-
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 4),
-                              onTap: () => _openChat(conv),
-                              leading: Stack(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 26,
-                                    backgroundColor: AppTheme.surfaceColor,
-                                    backgroundImage: avatarUrl.isNotEmpty
-                                        ? CachedNetworkImageProvider(
-                                            avatarUrl,
-                                            maxHeight: 120,
-                                            maxWidth: 120,
-                                          )
-                                        : null,
-                                    child: avatarUrl.isEmpty
-                                        ? const Icon(Icons.person,
-                                            color: AppTheme.mutedTextColor)
-                                        : null,
-                                  ),
-                                  Positioned(
-                                    right: 0,
-                                    bottom: 0,
-                                    child: Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: isOnline
-                                            ? Colors.greenAccent
-                                            : Colors.grey,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                            color: AppTheme.backgroundColor,
-                                            width: 2),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                          // 4. Vertical Active Conversations List with 72dp Indent Divider
+                          for (int i = 0; i < activeConvs.length; i++) ...[
+                            ConversationListTile(
+                              conversation: activeConvs[i],
+                              onTap: () => _openChat(activeConvs[i]),
+                            ),
+                            if (i < activeConvs.length - 1)
+                              const Divider(
+                                color: AppTheme.border_subtle,
+                                height: 1,
+                                thickness: 1,
+                                indent: 72,
+                                endIndent: 16,
                               ),
-                              title: Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      matchName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16),
-                                    ),
-                                  ),
-                                  if (conv.isVerified) ...[
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.verified,
-                                        size: 14, color: AppTheme.verifiedBlue),
-                                  ],
-                                ],
-                              ),
-                              subtitle: Row(
-                                children: [
-                                  if (lastMsgIsMe &&
-                                      lastMsgStatus != null) ...[
-                                    Icon(
-                                      (lastMsgStatus == 'read')
-                                          ? Icons.done_all
-                                          : (lastMsgStatus == 'delivered')
-                                              ? Icons.done_all
-                                              : Icons.done,
-                                      size: 14,
-                                      color: (lastMsgStatus == 'read')
-                                          ? AppTheme.verifiedBlue
-                                          : Colors.grey,
-                                    ),
-                                    const SizedBox(width: 3),
-                                  ],
-                                  Expanded(
-                                    child: Text(
-                                      lastMsg,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: unreadCount > 0
-                                            ? Colors.white
-                                            : Colors.white70,
-                                        fontSize: 13,
-                                        fontWeight: unreadCount > 0
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  if (timeLabel.isNotEmpty)
-                                    Text(
-                                      timeLabel,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: unreadCount > 0
-                                            ? AppTheme.primaryColor
-                                            : AppTheme.mutedTextColor,
-                                      ),
-                                    ),
-                                  if (unreadCount > 0) ...[
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.primaryColor,
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        unreadCount > 99
-                                            ? '99+'
-                                            : '$unreadCount',
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            );
-                          }),
+                          ],
                         ],
                       ),
       ),
@@ -3022,6 +2738,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   )
                 : ListView.builder(
                     controller: _scrollController,
+                    // ignore: deprecated_member_use
                     cacheExtent: 500,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     itemCount: _messages.length,

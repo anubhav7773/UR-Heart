@@ -5,7 +5,6 @@ import '../../core/security/storage_manager.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/security_service.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/app_logo.dart';
 import '../auth/auth_screen.dart';
 import '../home/home_screen.dart';
 import '../profile/onboarding_screen.dart';
@@ -18,36 +17,58 @@ class AnimatedSplashScreen extends StatefulWidget {
 }
 
 class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+    with TickerProviderStateMixin {
+  late AnimationController _entranceController;
+  late AnimationController _breathingController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  late Animation<double> _breathingAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    _controller = AnimationController(
+    // 1. Entrance Animations
+    _entranceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+      CurvedAnimation(parent: _entranceController, curve: Curves.elasticOut),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.2, 1.0, curve: Curves.easeIn)),
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.2, 1.0, curve: Curves.easeIn),
+      ),
     );
 
-    _controller.forward();
+    // 2. Ambient Breathing Animation (2-second periodic easeInOut cycle)
+    _breathingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    _breathingAnimation = Tween<double>(begin: 2.0, end: 6.0).animate(
+      CurvedAnimation(
+        parent: _breathingController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _entranceController.forward();
+    _breathingController.repeat(reverse: true);
+
     WindowSecurityService.syncFromStorage();
     _checkAuthStateAndNavigate();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _entranceController.dispose();
+    _breathingController.dispose();
     super.dispose();
   }
 
@@ -121,7 +142,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.surface_root,
       body: Stack(
         children: [
           // Background Gradient Glow
@@ -132,7 +153,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                   center: Alignment.center,
                   radius: 0.8,
                   colors: [
-                    Color(0x33E91E63),
+                    Color(0x22FF3366),
                     Colors.transparent,
                   ],
                 ),
@@ -144,21 +165,52 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Animated Pulsing Heart Icon
+                // Animated Pulsing Heart Icon with Breathing Ambient Glow
                 ScaleTransition(
                   scale: _scaleAnimation,
-                  child: const AppLogo(size: 100, showGlow: true),
+                  child: AnimatedBuilder(
+                    animation: _breathingAnimation,
+                    builder: (context, child) {
+                      return Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFFFF3366),
+                              Color(0xFFE02856),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0x55FF3366),
+                              blurRadius: 32.0,
+                              spreadRadius: _breathingAnimation.value,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.favorite_rounded,
+                          color: Colors.white,
+                          size: 54,
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 32),
 
-                // Fade-in App Name & Tagline
+                // Fade-in App Name & Clean Single-Line Tagline
                 FadeTransition(
                   opacity: _fadeAnimation,
                   child: Column(
                     children: [
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0xFFE91E63), Color(0xFFFF4081)],
+                          colors: [Color(0xFFFF3366), Color(0xFFFF5E7E)],
                         ).createShader(bounds),
                         child: const Text(
                           'UR Heart',
@@ -170,23 +222,15 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       const Text(
-                        'Connect Hearts • Genuine Connections Across Rural & Urban',
+                        'Genuine Connections Across Bharat',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
+                          fontSize: 13,
+                          color: AppTheme.text_secondary,
                           letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Genuine Connections Across Rural & Bharat',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
@@ -196,29 +240,33 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             ),
           ),
 
-          // Bottom Loading Indicator
+          // Bottom Pinned Hardware Trust Watermark
           Positioned(
-            bottom: 48,
+            bottom: 24,
             left: 0,
             right: 0,
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: const Column(
-                children: [
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: AppTheme.primaryColor,
-                      strokeWidth: 2.5,
+            child: SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 13,
+                      color: AppTheme.text_tertiary,
                     ),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    'Secured by End-to-End Encryption',
-                    style: TextStyle(fontSize: 11, color: Colors.white38),
-                  ),
-                ],
+                    SizedBox(width: 6),
+                    Text(
+                      'Protected by Hardware-Level Privacy',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.text_tertiary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

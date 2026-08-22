@@ -10,6 +10,7 @@ import '../chat/chat_screen.dart';
 import '../profile/profile_view_dialog.dart';
 import '../subscription/subscription_sheet.dart';
 import 'native_ad_card_widget.dart';
+import 'widgets/radar_sweep_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/services/app_update_service.dart';
 import 'visitors_sheet.dart';
@@ -21,7 +22,10 @@ class FeedScreen extends StatefulWidget {
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class _FeedScreenState extends State<FeedScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   bool _isLoading = true;
   List<dynamic> _cards = [];
   int _currentIndex = 0;
@@ -950,6 +954,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: AppTheme.backgroundColor,
@@ -1352,79 +1357,108 @@ class _FeedScreenState extends State<FeedScreen> {
                   : Container()))
                     : Center(
                         child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                           child: Container(
-                            margin: const EdgeInsets.all(20),
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: AppTheme.cardBorderColor),
+                              color: AppTheme.surface_card,
+                              borderRadius: BorderRadius.circular(AppTheme.radius_lg),
+                              border: Border.all(color: AppTheme.border_subtle),
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(18),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.favorite_border_rounded, size: 44, color: AppTheme.primaryColor),
-                                ),
-                                const SizedBox(height: 16),
+                                // 1. Concentric Animated Radar Sweep Engine
+                                const RadarSweepWidget(size: 160),
+                                const SizedBox(height: 20),
+
+                                // 2. Header Typography
                                 const Text(
-                                  'No members nearby right now',
+                                  'Scanning Nearby Horizons...',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.text_primary,
+                                    letterSpacing: -0.2,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
+
+                                // 3. Subtitle Typography
                                 const Text(
                                   "You've seen all active profiles in your current radius. Earn more swipes or boost your visibility!",
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 13, color: AppTheme.mutedTextColor),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppTheme.text_secondary,
+                                    height: 1.4,
+                                  ),
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 24),
 
-                                // Action 1: Watch Rewarded Video for Free Swipes
+                                // 4. Card A (Ad Reward Swipes)
                                 Container(
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.35)),
+                                    color: AppTheme.surface_card,
+                                    borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                                    border: Border.all(color: AppTheme.status_online, width: 1),
                                   ),
                                   child: Material(
-                                    color: AppTheme.backgroundColor,
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: ListTile(
+                                    color: Colors.transparent,
+                                    child: InkWell(
                                       onTap: _isClaimingReward ? null : _claimRewardedSwipes,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                      leading: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.greenAccent.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.status_online.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: const Icon(
+                                                Icons.play_circle_filled_rounded,
+                                                color: AppTheme.status_online,
+                                                size: 24,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                _isClaimingReward ? 'Loading Video...' : 'Watch short video (+5 free swipes)',
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: AppTheme.text_secondary,
+                                              size: 20,
+                                            ),
+                                          ],
                                         ),
-                                        child: const Icon(Icons.play_circle_outline, color: Colors.greenAccent, size: 22),
                                       ),
-                                      title: Text(
-                                        _isClaimingReward ? 'Loading Video...' : 'Watch video (+5 free swipes)',
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                      ),
-                                      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 12),
 
-                                // Action 2: Super Boost (₹29) / VIP Pro
+                                // 5. Card B (Sachet Super Boost)
                                 Container(
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.35)),
+                                    color: AppTheme.surface_card,
+                                    borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                                    border: Border.all(color: AppTheme.accent_boost_gold, width: 1),
                                   ),
                                   child: Material(
-                                    color: AppTheme.backgroundColor,
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: ListTile(
+                                    color: Colors.transparent,
+                                    child: InkWell(
                                       onTap: () {
                                         showModalBottomSheet(
                                           context: context,
@@ -1433,30 +1467,52 @@ class _FeedScreenState extends State<FeedScreen> {
                                           builder: (_) => const SubscriptionSheet(),
                                         );
                                       },
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                      leading: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.secondaryColor.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.accent_boost_gold.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: const Icon(
+                                                Icons.bolt_rounded,
+                                                color: AppTheme.accent_boost_gold,
+                                                size: 24,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            const Expanded(
+                                              child: Text(
+                                                'Super Boost Profile (₹29)',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: AppTheme.text_secondary,
+                                              size: 20,
+                                            ),
+                                          ],
                                         ),
-                                        child: const Icon(Icons.bolt_outlined, color: AppTheme.secondaryColor, size: 22),
                                       ),
-                                      title: const Text(
-                                        'Super Boost Profile (₹29)',
-                                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                      ),
-                                      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedTextColor, size: 20),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 16),
 
-                                // Action 3: Refresh Feed
+                                // 6. Bottom Refresh Button
                                 TextButton.icon(
                                   onPressed: _loadFeed,
-                                  icon: const Icon(Icons.refresh_rounded, color: AppTheme.mutedTextColor, size: 18),
-                                  label: const Text('Refresh Discovery Feed', style: TextStyle(color: AppTheme.mutedTextColor, fontSize: 13)),
+                                  icon: const Icon(Icons.refresh_rounded, color: AppTheme.text_secondary, size: 18),
+                                  label: const Text('Refresh Discovery Feed', style: TextStyle(color: AppTheme.text_secondary, fontSize: 13)),
                                 ),
                               ],
                             ),
@@ -1466,93 +1522,95 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
 
-            // 4-Button Action Deck (Reject / Like / Super DM / Regular DM)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // 1. Reject (Cross)
-                  Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
-                      ],
+            // 4-Button Action Deck (Only shown when active card is present)
+            if (hasCards)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // 1. Reject (Cross)
+                    Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: FloatingActionButton(
+                        heroTag: 'btn_reject_deck',
+                        onPressed: () => _handleSwipeAction('reject'),
+                        backgroundColor: AppTheme.surfaceColor,
+                        shape: const CircleBorder(),
+                        child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 26),
+                      ),
                     ),
-                    child: FloatingActionButton(
-                      heroTag: 'btn_reject_deck',
-                      onPressed: () => _handleSwipeAction('reject'),
-                      backgroundColor: AppTheme.surfaceColor,
-                      shape: const CircleBorder(),
-                      child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 26),
-                    ),
-                  ),
 
-                  // 2. Like (Heart)
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
+                    // 2. Like (Heart)
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: FloatingActionButton.large(
+                        heroTag: 'btn_like_deck',
+                        onPressed: () => _handleSwipeAction('like'),
+                        backgroundColor: AppTheme.primaryColor,
+                        shape: const CircleBorder(),
+                        child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 38),
+                      ),
+                    ),
+
+                    // 3. Send Direct DM (₹49) Pass Button
+                    Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: FloatingActionButton(
+                        heroTag: 'btn_direct_dm_deck',
+                        onPressed: () => _handleDirectDmAction(targetUserId, firstName),
+                        backgroundColor: AppTheme.surfaceColor,
+                        shape: const CircleBorder(
+                          side: BorderSide(color: AppTheme.secondaryColor, width: 1.5),
                         ),
-                      ],
-                    ),
-                    child: FloatingActionButton.large(
-                      heroTag: 'btn_like_deck',
-                      onPressed: () => _handleSwipeAction('like'),
-                      backgroundColor: AppTheme.primaryColor,
-                      shape: const CircleBorder(),
-                      child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 38),
-                    ),
-                  ),
-
-                  // 3. Send Direct DM (₹49) Pass Button
-                  Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
-                      ],
-                    ),
-                    child: FloatingActionButton(
-                      heroTag: 'btn_direct_dm_deck',
-                      onPressed: () => _handleDirectDmAction(targetUserId, firstName),
-                      backgroundColor: AppTheme.surfaceColor,
-                      shape: const CircleBorder(
-                        side: BorderSide(color: AppTheme.secondaryColor, width: 1.5),
+                        child: const Icon(Icons.bolt_rounded, color: AppTheme.secondaryColor, size: 26),
                       ),
-                      child: const Icon(Icons.bolt_rounded, color: AppTheme.secondaryColor, size: 26),
                     ),
-                  ),
 
-                  // 4. DM (Direct Message)
-                  Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
-                      ],
-                    ),
-                    child: FloatingActionButton(
-                      heroTag: 'btn_dm_deck',
-                      onPressed: () => _handleSwipeAction('dm'),
-                      backgroundColor: AppTheme.surfaceColor,
-                      shape: const CircleBorder(
-                        side: BorderSide(color: AppTheme.cardBorderColor, width: 1),
+                    // 4. DM (Direct Message)
+                    Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                        ],
                       ),
-                      child: const Icon(Icons.send_rounded, color: AppTheme.mutedTextColor, size: 22),
+                      child: FloatingActionButton(
+                        heroTag: 'btn_dm_deck',
+                        onPressed: () => _handleSwipeAction('dm'),
+                        backgroundColor: AppTheme.surfaceColor,
+                        shape: const CircleBorder(
+                          side: BorderSide(color: AppTheme.cardBorderColor, width: 1),
+                        ),
+                        child: const Icon(Icons.send_rounded, color: AppTheme.mutedTextColor, size: 22),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 }
+

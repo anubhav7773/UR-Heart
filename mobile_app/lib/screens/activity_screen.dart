@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../core/network/api_client.dart';
 import '../core/theme/app_theme.dart';
@@ -99,16 +100,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
+        backgroundColor: AppTheme.surface_root,
         appBar: AppBar(
-          backgroundColor: AppTheme.backgroundColor,
+          backgroundColor: AppTheme.surface_root,
           elevation: 0,
           title: const Text('Activity & Swipes', style: TextStyle(fontWeight: FontWeight.bold)),
           bottom: TabBar(
-            indicatorColor: AppTheme.primaryColor,
+            indicatorColor: AppTheme.accent_primary,
             indicatorWeight: 3,
-            labelColor: AppTheme.primaryColor,
-            unselectedLabelColor: AppTheme.mutedTextColor,
+            labelColor: AppTheme.accent_primary,
+            unselectedLabelColor: AppTheme.text_secondary,
             labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             tabs: [
               Tab(
@@ -146,21 +147,21 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ),
         body: RefreshIndicator(
           onRefresh: _fetchActivityData,
-          color: AppTheme.primaryColor,
+          color: AppTheme.accent_primary,
           child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
+              ? const Center(child: CircularProgressIndicator(color: AppTheme.accent_primary))
               : _errorMessage != null
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                          const Icon(Icons.error_outline, color: AppTheme.status_destructive, size: 48),
                           const SizedBox(height: 12),
-                          Text(_errorMessage!, style: const TextStyle(color: Colors.white70)),
+                          Text(_errorMessage!, style: const TextStyle(color: AppTheme.text_secondary)),
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: _fetchActivityData,
-                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent_primary),
                             child: const Text('Retry', style: TextStyle(color: Colors.white)),
                           ),
                         ],
@@ -191,16 +192,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.72,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
+        childAspectRatio: 0.69,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: _matches.length,
       itemBuilder: (context, index) {
         final matchItem = _matches[index];
         final matchId = matchItem['match_id']?.toString() ?? '';
         final user = matchItem['user'] as Map<String, dynamic>? ?? {};
-        final name = user['full_name'] ?? 'User';
+        final name = user['full_name'] ?? user['first_name'] ?? 'User';
         final age = user['age'];
         final photos = user['photos'] as List<dynamic>? ?? [];
         final photoUrl = photos.isNotEmpty ? photos.first.toString() : '';
@@ -208,9 +209,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         return Container(
           decoration: BoxDecoration(
-            color: AppTheme.surfaceColor,
+            color: AppTheme.surface_card,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.cardBorderColor),
+            border: Border.all(color: AppTheme.border_subtle),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -221,18 +222,67 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
+                      // Candidate Photo
                       photoUrl.isNotEmpty
-                          ? Image.network(
-                              photoUrl,
+                          ? CachedNetworkImage(
+                              imageUrl: photoUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.person, size: 50, color: AppTheme.mutedTextColor)),
+                              memCacheWidth: 350,
+                              memCacheHeight: 450,
+                              placeholder: (_, __) => Container(
+                                color: AppTheme.surface_interactive,
+                                child: const Center(
+                                  child: CircularProgressIndicator(color: AppTheme.accent_primary, strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                color: AppTheme.surface_interactive,
+                                child: const Center(child: Icon(Icons.person, size: 50, color: AppTheme.text_tertiary)),
+                              ),
                             )
-                          : const Center(child: Icon(Icons.person, size: 50, color: AppTheme.mutedTextColor)),
+                          : Container(
+                              color: AppTheme.surface_interactive,
+                              child: const Center(child: Icon(Icons.person, size: 50, color: AppTheme.text_tertiary)),
+                            ),
+
+                      // Bottom Dark Gradient Overlay for High Contrast
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0.4, 1.0],
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.85),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Top-Right Glassmorphic Verified Shield
                       if (isVerified)
-                        const Positioned(
+                        Positioned(
                           top: 8,
                           right: 8,
-                          child: Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 20),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0x8C000000),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.accent_verified_blue.withValues(alpha: 0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.verified_rounded,
+                              color: AppTheme.accent_verified_blue,
+                              size: 16,
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -243,24 +293,49 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 child: Column(
                   children: [
                     Text(
-                      age != null ? '$name, $age' : name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      age != null ? '$name, $age' : '$name',
+                      style: const TextStyle(
+                        color: AppTheme.text_primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
-                    SizedBox(
+                    Container(
                       width: double.infinity,
-                      height: 34,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _openChatScreen(matchId, user),
-                        icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                        label: const Text('Message', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      height: 36,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF3366), Color(0xFFFF5E7E)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _openChatScreen(matchId, user),
+                          borderRadius: BorderRadius.circular(10),
+                          child: const Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Message',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -291,7 +366,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       itemBuilder: (context, index) {
         final item = items[index];
         final user = item['user'] as Map<String, dynamic>? ?? {};
-        final name = user['full_name'] ?? 'User';
+        final name = user['full_name'] ?? user['first_name'] ?? 'User';
         final age = user['age'];
         final area = user['area_name'] ?? '';
         final photos = user['photos'] as List<dynamic>? ?? [];
@@ -302,19 +377,35 @@ class _ActivityScreenState extends State<ActivityScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceColor,
+            color: AppTheme.surface_card,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.cardBorderColor),
+            border: Border.all(color: AppTheme.border_subtle),
           ),
           child: Row(
             children: [
               GestureDetector(
                 onTap: () => _openProfileDialog(user),
-                child: CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppTheme.backgroundColor,
-                  backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                  child: photoUrl.isEmpty ? const Icon(Icons.person, color: AppTheme.mutedTextColor) : null,
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: ClipOval(
+                    child: photoUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: photoUrl,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 112,
+                            memCacheHeight: 112,
+                            placeholder: (_, __) => Container(color: AppTheme.surface_interactive),
+                            errorWidget: (_, __, ___) => Container(
+                              color: AppTheme.surface_interactive,
+                              child: const Icon(Icons.person, color: AppTheme.text_tertiary),
+                            ),
+                          )
+                        : Container(
+                            color: AppTheme.surface_interactive,
+                            child: const Icon(Icons.person, color: AppTheme.text_tertiary),
+                          ),
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -324,19 +415,27 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          age != null ? '$name, $age' : name,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        Flexible(
+                          child: Text(
+                            age != null ? '$name, $age' : '$name',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppTheme.text_primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                         ),
                         if (isVerified) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 16),
+                          const Icon(Icons.verified, color: AppTheme.accent_verified_blue, size: 16),
                         ],
                       ],
                     ),
                     if (area.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text(area, style: const TextStyle(color: AppTheme.mutedTextColor, fontSize: 12)),
+                      Text(area, style: const TextStyle(color: AppTheme.text_secondary, fontSize: 12)),
                     ],
                   ],
                 ),
@@ -344,8 +443,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
               OutlinedButton(
                 onPressed: () => _openProfileDialog(user),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isLiked ? AppTheme.primaryColor : AppTheme.mutedTextColor,
-                  side: BorderSide(color: isLiked ? AppTheme.primaryColor : AppTheme.cardBorderColor),
+                  foregroundColor: isLiked ? AppTheme.accent_primary : AppTheme.text_secondary,
+                  side: BorderSide(color: isLiked ? AppTheme.accent_primary : AppTheme.border_subtle),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 ),
@@ -368,21 +467,25 @@ class _ActivityScreenState extends State<ActivityScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
+                color: AppTheme.surface_card,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.cardBorderColor),
+                border: Border.all(color: AppTheme.border_subtle),
               ),
-              child: Icon(icon, size: 44, color: AppTheme.mutedTextColor),
+              child: Icon(icon, size: 44, color: AppTheme.text_tertiary),
             ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: AppTheme.text_primary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: const TextStyle(color: AppTheme.mutedTextColor, fontSize: 13),
+              style: const TextStyle(color: AppTheme.text_secondary, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],

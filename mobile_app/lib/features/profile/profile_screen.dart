@@ -73,30 +73,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceColor,
+        backgroundColor: AppTheme.surface_card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppTheme.cardBorderColor),
+          side: const BorderSide(color: AppTheme.border_subtle),
         ),
         title: const Row(
           children: [
-            Icon(Icons.logout_rounded, color: AppTheme.primaryColor),
+            Icon(Icons.logout_rounded, color: AppTheme.accent_primary),
             SizedBox(width: 10),
             Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
         content: const Text(
           'Are you sure you want to logout from UR Heart?',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: AppTheme.text_secondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.mutedTextColor)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.text_secondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent_primary),
             child: const Text('Logout', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -128,7 +128,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
-              backgroundColor: AppTheme.surfaceColor,
+              backgroundColor: AppTheme.surface_card,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: const BorderSide(color: Color(0x33FF4D67), width: 1),
@@ -138,12 +138,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withValues(alpha: 0.15),
+                      color: AppTheme.status_destructive.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
                       Icons.delete_forever_rounded,
-                      color: Colors.redAccent,
+                      color: AppTheme.status_destructive,
                       size: 24,
                     ),
                   ),
@@ -163,7 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               content: const Text(
                 'All your profile details, matches, photos, and messages will be permanently removed. This action cannot be undone.',
                 style: TextStyle(
-                  color: AppTheme.mutedTextColor,
+                  color: AppTheme.text_secondary,
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -173,7 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 OutlinedButton(
                   onPressed: isDeleting ? null : () => Navigator.pop(dialogContext),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppTheme.cardBorderColor),
+                    side: const BorderSide(color: AppTheme.border_subtle),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
@@ -194,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Navigator.pop(dialogContext);
                               }
 
-                              // 1. Clear local cache, JWT access/refresh tokens, SharedPreferences & SecureStorage
+                              // 1. Clear local cache & tokens
                               await AppAuthProvider.instance.purgeSession();
 
                               // 2. Sign out of Firebase Auth
@@ -204,18 +204,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                               if (!context.mounted) return;
 
-                              // 3. Navigate back to Auth screen and clear navigation history
+                              // 3. Navigate back to Auth screen
                               Navigator.pushAndRemoveUntil(
                                 context,
                                 MaterialPageRoute(builder: (context) => const AuthScreen()),
                                 (route) => false,
                               );
 
-                              // 4. Show success snackbar
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('Your account has been permanently deleted.'),
-                                  backgroundColor: Colors.redAccent,
+                                  backgroundColor: AppTheme.status_destructive,
                                   duration: Duration(seconds: 4),
                                 ),
                               );
@@ -225,7 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(res.data?['message'] ?? 'Failed to delete account. Please try again.'),
-                                    backgroundColor: Colors.redAccent,
+                                    backgroundColor: AppTheme.status_destructive,
                                   ),
                                 );
                               }
@@ -236,14 +235,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('Network error during account deletion. Please try again.'),
-                                  backgroundColor: Colors.redAccent,
+                                  backgroundColor: AppTheme.status_destructive,
                                 ),
                               );
                             }
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
+                    backgroundColor: AppTheme.status_destructive,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                   ),
@@ -290,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surfaceColor,
+      backgroundColor: AppTheme.surface_card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -317,7 +316,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: AppTheme.mutedTextColor),
+                          icon: const Icon(Icons.close, color: AppTheme.text_secondary),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -328,9 +327,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Full Name',
-                        labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
+                        labelStyle: const TextStyle(color: AppTheme.text_secondary),
                         filled: true,
-                        fillColor: AppTheme.backgroundColor,
+                        fillColor: AppTheme.surface_interactive,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -341,9 +340,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Bio',
-                        labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
+                        labelStyle: const TextStyle(color: AppTheme.text_secondary),
                         filled: true,
-                        fillColor: AppTheme.backgroundColor,
+                        fillColor: AppTheme.surface_interactive,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -356,9 +355,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
                               labelText: 'Area / Landmark',
-                              labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
+                              labelStyle: const TextStyle(color: AppTheme.text_secondary),
                               filled: true,
-                              fillColor: AppTheme.backgroundColor,
+                              fillColor: AppTheme.surface_interactive,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
@@ -371,9 +370,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
                               labelText: 'PIN Code',
-                              labelStyle: const TextStyle(color: AppTheme.mutedTextColor),
+                              labelStyle: const TextStyle(color: AppTheme.text_secondary),
                               filled: true,
-                              fillColor: AppTheme.backgroundColor,
+                              fillColor: AppTheme.surface_interactive,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
@@ -392,19 +391,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ChoiceChip(
                           label: const Text('Casual Conversations'),
                           selected: currentIntent == 'casual',
-                          selectedColor: AppTheme.primaryColor,
+                          selectedColor: AppTheme.accent_primary,
                           onSelected: (sel) => setModalState(() => currentIntent = 'casual'),
                         ),
                         ChoiceChip(
                           label: const Text('Serious Marriage'),
                           selected: currentIntent == 'serious',
-                          selectedColor: AppTheme.primaryColor,
+                          selectedColor: AppTheme.accent_primary,
                           onSelected: (sel) => setModalState(() => currentIntent = 'serious'),
                         ),
                         ChoiceChip(
                           label: const Text('Friendship'),
                           selected: currentIntent == 'friendship',
-                          selectedColor: AppTheme.primaryColor,
+                          selectedColor: AppTheme.accent_primary,
                           onSelected: (sel) => setModalState(() => currentIntent = 'friendship'),
                         ),
                       ],
@@ -431,7 +430,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
+                        backgroundColor: AppTheme.accent_primary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -475,7 +474,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: AppTheme.status_destructive,
                 content: Text(
                   "⚠️ Photo me phone number, Insta ID, ya text likhna mana hai. Kripya apni real photo upload karein.",
                 ),
@@ -490,7 +489,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final String? uploadedUrl = await _profileService.uploadProfilePhoto(imageFile);
 
         if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
-          // Force evict Flutter NetworkImage memory & live image caches
           PaintingBinding.instance.imageCache.clear();
           PaintingBinding.instance.imageCache.clearLiveImages();
 
@@ -534,7 +532,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(res?['message'] ?? 'Selfie video uploaded! Verification status is now PENDING review.'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppTheme.status_online,
             ),
           );
         }
@@ -544,7 +542,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Video verification notice: ${e.toString()}'),
-            backgroundColor: Colors.amber[800],
+            backgroundColor: AppTheme.accent_boost_gold,
           ),
         );
       }
@@ -559,26 +557,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.verifiedBlue.withValues(alpha: 0.10),
+          color: AppTheme.surface_card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.verifiedBlue.withValues(alpha: 0.35)),
+          border: Border.all(color: AppTheme.accent_verified_blue.withValues(alpha: 0.5)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.verified_user_outlined, color: AppTheme.verifiedBlue, size: 28),
-            SizedBox(width: 12),
+            Icon(Icons.verified_user_rounded, color: AppTheme.accent_verified_blue, size: 28),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Profile Verified',
-                    style: TextStyle(fontSize: 14, color: AppTheme.verifiedBlue, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 14, color: AppTheme.accent_verified_blue, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 2),
                   Text(
                     'Your identity & selfie video are approved with the Blue Badge.',
-                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                    style: TextStyle(fontSize: 12, color: AppTheme.text_secondary),
                   ),
                 ],
               ),
@@ -591,26 +589,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.secondaryColor.withValues(alpha: 0.10),
+          color: AppTheme.surface_card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.35)),
+          border: Border.all(color: AppTheme.accent_boost_gold.withValues(alpha: 0.5)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.hourglass_top_outlined, color: AppTheme.secondaryColor, size: 28),
-            SizedBox(width: 12),
+            Icon(Icons.hourglass_top_rounded, color: AppTheme.accent_boost_gold, size: 28),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Verification Under Review',
-                    style: TextStyle(fontSize: 14, color: AppTheme.secondaryColor, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 14, color: AppTheme.accent_boost_gold, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 2),
                   Text(
                     'Your selfie video has been submitted. Moderation review takes up to 24h.',
-                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                    style: TextStyle(fontSize: 12, color: AppTheme.text_secondary),
                   ),
                 ],
               ),
@@ -623,28 +621,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.redAccent.withValues(alpha: 0.10),
+          color: AppTheme.surface_card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+          border: Border.all(color: AppTheme.status_destructive.withValues(alpha: 0.5)),
         ),
         child: Column(
           children: [
             const Row(
               children: [
-                Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 28),
-                SizedBox(width: 12),
+                Icon(Icons.error_outline_rounded, color: AppTheme.status_destructive, size: 28),
+                SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Verification Rejected',
-                        style: TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 14, color: AppTheme.status_destructive, fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 2),
                       Text(
                         'Your selfie video did not pass clarity guidelines. Please record again.',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                        style: TextStyle(fontSize: 12, color: AppTheme.text_secondary),
                       ),
                     ],
                   ),
@@ -659,7 +657,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.videocam_outlined, size: 18),
                 label: const Text('Record Selfie Video Again'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
+                  backgroundColor: AppTheme.accent_primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -674,9 +672,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceColor,
+          color: AppTheme.surface_card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.cardBorderColor),
+          border: Border.all(color: AppTheme.border_subtle),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,10 +684,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.verifiedBlue.withValues(alpha: 0.12),
+                    color: AppTheme.accent_verified_blue.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.verified_outlined, color: AppTheme.verifiedBlue, size: 22),
+                  child: const Icon(Icons.verified_outlined, color: AppTheme.accent_verified_blue, size: 22),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
@@ -703,7 +701,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 8),
             const Text(
               'Record a quick 5-second selfie video to earn the blue checkmark badge & get 3x more matches.',
-              style: TextStyle(fontSize: 12, color: AppTheme.mutedTextColor),
+              style: TextStyle(fontSize: 12, color: AppTheme.text_secondary),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -713,7 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.videocam_outlined, size: 18),
                 label: const Text('Verify Now (5-Sec Selfie)'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
+                  backgroundColor: AppTheme.accent_primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -734,45 +732,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Color? titleColor,
     Widget? trailing,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.cardBorderColor, width: 1),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: iconColor, size: 22),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: titleColor ?? Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(
-            color: AppTheme.mutedTextColor,
-            fontSize: 12,
-          ),
-        ),
-        trailing: trailing ??
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppTheme.mutedTextColor,
-              size: 22,
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: titleColor ?? AppTheme.text_primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppTheme.text_secondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              trailing ??
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.text_tertiary,
+                    size: 22,
+                  ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -781,8 +790,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.primaryColor)),
+        backgroundColor: AppTheme.surface_root,
+        body: Center(child: CircularProgressIndicator(color: AppTheme.accent_primary)),
       );
     }
 
@@ -798,9 +807,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String verificationStatus = (_profileData?['verification_status'] ?? 'UNVERIFIED').toString().toUpperCase();
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.surface_root,
       appBar: AppBar(
-        backgroundColor: AppTheme.backgroundColor,
+        backgroundColor: AppTheme.surface_root,
         elevation: 0,
         title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
@@ -810,7 +819,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _showEditProfileSheet,
           ),
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            icon: const Icon(Icons.logout_rounded, color: AppTheme.status_destructive),
             tooltip: 'Logout',
             onPressed: _handleLogout,
           ),
@@ -819,18 +828,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 10),
-            // Profile Main Avatar Card with Cache-Busting Network Image
+            const SizedBox(height: 12),
+            // Header & Avatar Unit (96dp avatar in 3dp gradient ring)
             Center(
               child: Stack(
+                alignment: Alignment.center,
                 children: [
                   Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
+                    width: 104,
+                    height: 104,
+                    decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.primaryColor, width: 3),
-                      color: AppTheme.surfaceColor,
+                      gradient: LinearGradient(
+                        colors: [AppTheme.accent_primary, AppTheme.accent_boost_gold],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.surface_card,
                     ),
                     child: ClipOval(
                       child: mainPhoto.isNotEmpty
@@ -838,22 +859,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               imageUrl: _getCacheBusterUrl(mainPhoto),
                               key: UniqueKey(),
                               fit: BoxFit.cover,
-                              width: 130,
-                              height: 130,
-                              memCacheWidth: 260,
-                              memCacheHeight: 260,
-                              maxWidthDiskCache: 600,
-                              maxHeightDiskCache: 600,
+                              width: 96,
+                              height: 96,
+                              memCacheWidth: 200,
+                              memCacheHeight: 200,
                               placeholder: (context, url) => Container(
-                                color: AppTheme.surfaceColor,
+                                color: AppTheme.surface_card,
                                 child: const Center(
-                                  child: CircularProgressIndicator(color: AppTheme.primaryColor, strokeWidth: 2),
+                                  child: CircularProgressIndicator(color: AppTheme.accent_primary, strokeWidth: 2),
                                 ),
                               ),
                               errorWidget: (context, error, stackTrace) =>
-                                   const Icon(Icons.person, size: 70, color: AppTheme.mutedTextColor),
+                                  const Icon(Icons.person, size: 50, color: AppTheme.text_tertiary),
                             )
-                          : const Icon(Icons.person, size: 70, color: AppTheme.mutedTextColor),
+                          : const Icon(Icons.person, size: 50, color: AppTheme.text_tertiary),
                     ),
                   ),
                   Positioned(
@@ -862,21 +881,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: GestureDetector(
                       onTap: _uploadNewPhoto,
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(6),
                         decoration: const BoxDecoration(
-                          color: AppTheme.primaryColor,
+                          color: AppTheme.accent_primary,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 20),
+                        child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            // User Name & Verified Badge (Only if verified)
+            // User Name & Location / Verified Tag
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -886,13 +905,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 if (isVerified) ...[
                   const SizedBox(width: 6),
-                  const Icon(Icons.verified, color: AppTheme.verifiedBlue, size: 20),
+                  const Icon(Icons.verified_rounded, color: AppTheme.accent_verified_blue, size: 20),
                 ],
               ],
             ),
             const SizedBox(height: 6),
 
-            // Active Now Status Badge
+            // Active Presence & Area Tag
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -900,7 +919,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 8,
                   height: 8,
                   decoration: const BoxDecoration(
-                    color: Colors.greenAccent,
+                    color: AppTheme.status_online,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -909,7 +928,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Active Now',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.greenAccent,
+                    color: AppTheme.status_online,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -918,14 +937,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   '•  $areaName',
                   style: const TextStyle(
                     fontSize: 13,
-                    color: AppTheme.mutedTextColor,
+                    color: AppTheme.text_secondary,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
 
-            // Active Super Boost Countdown Badge
+            // Active Boost Badge
             if (_isBoosted && _boostBadgeText != null)
               Container(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -952,51 +971,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-            // Location Chip
+            const SizedBox(height: 8),
+
+            // Feature Banner 1: Monetization & VIP Passes Hub
+            _buildManagePassesTile(context, _activePasses),
+            const SizedBox(height: 12),
+
+            // Feature Banner 2: Video Verification Status Card
+            _buildVerificationCard(isVerified, verificationStatus),
+            const SizedBox(height: 16),
+
+            // Structured Photos Gallery Grid (3-Column Square Tiles)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.cardBorderColor),
+                color: AppTheme.surface_card,
+                borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                border: Border.all(color: AppTheme.border_subtle),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.location_on_outlined, size: 14, color: AppTheme.secondaryColor),
-                  const SizedBox(width: 4),
-                  Text(areaName, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Photos (${photos.length}/6)',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      if (photos.length < 6)
+                        GestureDetector(
+                          onTap: _uploadNewPhoto,
+                          child: const Row(
+                            children: [
+                              Icon(Icons.add_photo_alternate_outlined, color: AppTheme.accent_primary, size: 16),
+                              SizedBox(width: 4),
+                              Text('Add', style: TextStyle(color: AppTheme.accent_primary, fontSize: 13, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 1.0,
+                    ),
+                    itemCount: (photos.length < 6) ? photos.length + 1 : photos.length,
+                    itemBuilder: (context, index) {
+                      if (index < photos.length) {
+                        final pUrl = photos[index] as String;
+                        return Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border_subtle),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: _getCacheBusterUrl(pUrl),
+                              key: UniqueKey(),
+                              fit: BoxFit.cover,
+                              memCacheWidth: 200,
+                              memCacheHeight: 200,
+                              maxWidthDiskCache: 400,
+                              maxHeightDiskCache: 400,
+                              placeholder: (context, url) => Container(
+                                color: AppTheme.surface_interactive,
+                                child: const Center(
+                                  child: CircularProgressIndicator(color: AppTheme.accent_primary, strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (context, error, stackTrace) => Container(
+                                color: AppTheme.surface_interactive,
+                                child: const Icon(Icons.broken_image_outlined, color: AppTheme.text_tertiary),
+                              ),
+                            ),
+                          ),
+                        );
+                      } else {
+                        // Dashed / Stroke + Add Photo action slot
+                        return GestureDetector(
+                          onTap: _uploadNewPhoto,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface_interactive,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.border_subtle,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_rounded, color: AppTheme.accent_primary, size: 28),
+                                SizedBox(height: 2),
+                                Text(
+                                  '+ Photo',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.accent_primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
 
-            // Monetization & VIP Passes Hub Tile
-            _buildManagePassesTile(context, _activePasses),
-            const SizedBox(height: 14),
-
-            // Video Verification Status Card
-            _buildVerificationCard(isVerified, verificationStatus),
-            const SizedBox(height: 14),
-
-            // Intent Goal Badge Card
+            // Intent Goal Card
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.cardBorderColor),
+                color: AppTheme.surface_card,
+                borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                border: Border.all(color: AppTheme.border_subtle),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                      color: AppTheme.accent_primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.favorite_outline, color: AppTheme.primaryColor, size: 22),
+                    child: const Icon(Icons.favorite_outline, color: AppTheme.accent_primary, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1005,7 +1119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         const Text(
                           'Relationship Goal',
-                          style: TextStyle(fontSize: 12, color: AppTheme.mutedTextColor, fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 12, color: AppTheme.text_secondary, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -1024,73 +1138,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Profile Details Section
+            // About Me Card
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.cardBorderColor),
+                color: AppTheme.surface_card,
+                borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                border: Border.all(color: AppTheme.border_subtle),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'About Me',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     bio,
-                    style: const TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
+                    style: const TextStyle(fontSize: 13, color: AppTheme.text_secondary, height: 1.4),
                   ),
-                  const Divider(color: AppTheme.cardBorderColor, height: 28),
+                  const Divider(color: AppTheme.border_subtle, height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Gender', style: TextStyle(color: AppTheme.mutedTextColor)),
+                      const Text('Gender', style: TextStyle(color: AppTheme.text_secondary)),
                       Text(gender, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Verification Status', style: TextStyle(color: AppTheme.mutedTextColor)),
-                      Row(
-                        children: [
-                          Icon(
-                            isVerified ? Icons.verified : Icons.shield_outlined,
-                            color: isVerified ? AppTheme.verifiedBlue : Colors.greenAccent,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isVerified ? 'Verified Member' : 'Standard Member',
-                            style: TextStyle(
-                              color: isVerified ? AppTheme.verifiedBlue : Colors.greenAccent,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // Quick Settings Action Cards
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+            // Unified Settings Grouping Card
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.surface_card,
+                borderRadius: BorderRadius.circular(AppTheme.radius_md),
+                border: Border.all(color: AppTheme.border_subtle),
+              ),
               child: Column(
                 children: [
                   if ((_profileData?['email'] ?? FirebaseAuth.instance.currentUser?.email ?? '').toString().toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com' || _profileData?['is_admin'] == true) ...[
                     _buildActionTile(
                       icon: Icons.admin_panel_settings_outlined,
-                      iconColor: AppTheme.secondaryColor,
+                      iconColor: AppTheme.accent_boost_gold,
                       title: 'Admin Verification Panel',
                       subtitle: 'Review and approve pending selfie videos',
                       onTap: () {
@@ -1100,10 +1196,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       },
                     ),
+                    const Divider(color: AppTheme.border_subtle, height: 1),
                   ],
                   _buildActionTile(
                     icon: Icons.badge_outlined,
-                    iconColor: AppTheme.verifiedBlue,
+                    iconColor: AppTheme.accent_verified_blue,
                     title: 'Edit Profile & Verification',
                     subtitle: 'Manage bio, photos, and video verification',
                     onTap: () async {
@@ -1116,9 +1213,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       }
                     },
                   ),
+                  const Divider(color: AppTheme.border_subtle, height: 1),
                   _buildActionTile(
                     icon: Icons.block_outlined,
-                    iconColor: Colors.redAccent,
+                    iconColor: AppTheme.status_destructive,
                     title: 'Blocked Users',
                     subtitle: 'View and unblock restricted profiles',
                     onTap: () {
@@ -1128,9 +1226,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     },
                   ),
+                  const Divider(color: AppTheme.border_subtle, height: 1),
                   _buildActionTile(
                     icon: Icons.mail_outline_rounded,
-                    iconColor: AppTheme.secondaryColor,
+                    iconColor: AppTheme.accent_boost_gold,
                     title: 'Enhancement & Feedback',
                     subtitle: 'Send feedback and suggestions directly',
                     onTap: () {
@@ -1138,19 +1237,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       sendFeedbackEmail(userId: userId?.toString());
                     },
                   ),
+                  const Divider(color: AppTheme.border_subtle, height: 1),
                   _buildActionTile(
                     icon: Icons.system_update_alt_rounded,
-                    iconColor: Colors.greenAccent,
+                    iconColor: AppTheme.status_online,
                     title: 'Check for App Updates',
                     subtitle: 'Download latest direct APK updates instantly',
                     onTap: () {
                       AppUpdateService.instance.checkForUpdate(context, showNoUpdateToast: true);
                     },
                   ),
+                  const Divider(color: AppTheme.border_subtle, height: 1),
                   _buildActionTile(
                     icon: Icons.delete_forever_rounded,
-                    iconColor: Colors.redAccent,
-                    titleColor: Colors.redAccent,
+                    iconColor: AppTheme.status_destructive,
+                    titleColor: AppTheme.status_destructive,
                     title: 'Delete Account',
                     subtitle: 'Permanently erase your profile, photos, and chat history',
                     onTap: () => _showDeleteAccountDialog(context),
@@ -1158,68 +1259,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Photos Grid Gallery
-            if (photos.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Photos (${photos.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                    IconButton(
-                      icon: const Icon(Icons.add_a_photo_outlined, color: AppTheme.primaryColor, size: 22),
-                      onPressed: _uploadNewPhoto,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 120,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: photos.length,
-                  itemBuilder: (context, index) {
-                    final pUrl = photos[index] as String;
-                    return Container(
-                      width: 100,
-                      margin: const EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: AppTheme.surfaceColor,
-                        border: Border.all(color: AppTheme.cardBorderColor),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: CachedNetworkImage(
-                          imageUrl: _getCacheBusterUrl(pUrl),
-                          key: UniqueKey(),
-                          fit: BoxFit.cover,
-                          memCacheWidth: 200,
-                          memCacheHeight: 200,
-                          maxWidthDiskCache: 400,
-                          maxHeightDiskCache: 400,
-                          placeholder: (context, url) => Container(
-                            color: AppTheme.surfaceColor,
-                            child: const Center(
-                              child: CircularProgressIndicator(color: AppTheme.primaryColor, strokeWidth: 2),
-                            ),
-                          ),
-                          errorWidget: (context, error, stackTrace) => Container(
-                            color: AppTheme.surfaceColor,
-                            child: const Icon(Icons.broken_image_outlined, color: AppTheme.mutedTextColor),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 30),
-            ],
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -1236,7 +1276,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildManagePassesTile(BuildContext context, Map<String, dynamic>? activePasses) {
-    // Count active passes
     int activeCount = 0;
     if (activePasses != null) {
       final now = DateTime.now().toUtc();
@@ -1253,18 +1292,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2A1625), Color(0xFF1E1E2E)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFF3366).withValues(alpha: 0.35)),
+        color: AppTheme.surface_card,
+        borderRadius: BorderRadius.circular(AppTheme.radius_md),
+        border: Border.all(color: AppTheme.accent_primary.withValues(alpha: 0.35)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF3366).withValues(alpha: 0.12),
+            color: AppTheme.accent_primary.withValues(alpha: 0.10),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1275,28 +1310,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF3366).withValues(alpha: 0.2),
+            color: AppTheme.accent_primary.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.workspace_premium, color: Color(0xFFFF3366), size: 24),
+          child: const Icon(Icons.workspace_premium, color: AppTheme.accent_primary, size: 24),
         ),
         title: const Text(
           'Monetization & VIP Passes',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
         ),
         subtitle: Text(
           activeCount > 0 ? '$activeCount Active Pass${activeCount > 1 ? "es" : ""}' : 'Boost, Direct DM & VIP Pro',
           style: TextStyle(
-            color: activeCount > 0 ? const Color(0xFF4ADE80) : Colors.white60,
-            fontSize: 13,
+            color: activeCount > 0 ? AppTheme.status_online : AppTheme.text_secondary,
+            fontSize: 12,
             fontWeight: activeCount > 0 ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+        trailing: const Icon(Icons.arrow_forward_ios, color: AppTheme.text_tertiary, size: 14),
         onTap: () {
           _openManageSubscriptionsSheet(context);
         },
