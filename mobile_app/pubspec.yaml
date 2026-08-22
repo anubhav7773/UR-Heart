@@ -1,7 +1,7 @@
 name: ruralheart_mobile
 description: "Project RuralHeart - Cross-Platform Dating Application for Rural & Urban India"
 publish_to: 'none'
-version: 1.0.1+2003
+version: 1.0.2+2004
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

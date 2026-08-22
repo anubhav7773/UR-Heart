@@ -1263,7 +1263,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _connectWebSocket() async {
-    if (_isDisposed || _isConnectingWs) return;
+    if (_isDisposed || _isConnectingWs || widget.matchId.isEmpty) return;
     _isConnectingWs = true;
     _wsReconnectTimer?.cancel();
 
@@ -1277,47 +1277,50 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final token = await StorageManager.instance.getAuthToken();
       if (token == null || token.isEmpty) {
-        if (kDebugMode) print('[Chat WS Warning] No active session token found');
+        if (kDebugMode) print('[WS] No active session token found');
         _isConnectingWs = false;
         return;
       }
 
-      final baseUri = Uri.parse(ApiClient.baseUrl);
-      final isHttps = baseUri.scheme == 'https' || ApiClient.baseUrl.startsWith('https://');
-      final wsScheme = isHttps ? 'wss' : 'ws';
-      final wsHost = baseUri.host;
-      final int port = baseUri.hasPort ? baseUri.port : 0;
-      final wsPort = (port > 0 && port != 80 && port != 443) ? ':$port' : '';
-      final wsUrl =
-          '$wsScheme://$wsHost$wsPort/api/v1/chat/ws/${widget.matchId}?token=${Uri.encodeComponent(token)}';
+      String baseWsUrl = ApiClient.baseUrl
+          .replaceFirst('https://', 'wss://')
+          .replaceFirst('http://', 'ws://')
+          .replaceAll(':0', '');
 
-      final ws = await WebSocket.connect(
-        wsUrl,
-      ).timeout(const Duration(seconds: 5));
-      ws.pingInterval = const Duration(seconds: 15);
+      final wsUri = Uri.parse('$baseWsUrl/chat/ws/${widget.matchId}?token=${Uri.encodeComponent(token)}');
 
-      _wsChannel = IOWebSocketChannel(ws);
+      final rawSocket = await WebSocket.connect(wsUri.toString())
+          .timeout(const Duration(seconds: 6));
+
+      if (_isDisposed || !mounted) {
+        rawSocket.close();
+        return;
+      }
+
+      _wsChannel = IOWebSocketChannel(rawSocket);
       _wsSubscription = _wsChannel?.stream.listen(
         (rawData) {
-          _wsReconnectAttempts = 0;
-          try {
-            _handleIncomingWebSocketData(rawData);
-          } catch (e) {
-            if (kDebugMode) print('[Chat WS Data Error] $e');
+          if (!_isDisposed && mounted) {
+            _wsReconnectAttempts = 0;
+            try {
+              _handleIncomingWebSocketData(rawData);
+            } catch (e) {
+              if (kDebugMode) print('[WS] Handled data error: $e');
+            }
           }
         },
-        onError: (err) {
-          if (kDebugMode) print('[Chat WS Stream Error (handled)] $err');
+        onError: (error) {
+          if (kDebugMode) print('[WS] Handled stream error: $error');
           _scheduleWsReconnect();
         },
         onDone: () {
-          if (kDebugMode) print('[Chat WS Closed cleanly]');
+          if (kDebugMode) print('[WS] Connection closed cleanly.');
           _scheduleWsReconnect();
         },
         cancelOnError: true,
       );
-    } catch (e) {
-      if (kDebugMode) print('[Chat WS Connect Error (handled silently)] $e');
+    } catch (error) {
+      if (kDebugMode) print('[WS] Handled connection failure silently: $error');
       _scheduleWsReconnect();
     } finally {
       _isConnectingWs = false;
