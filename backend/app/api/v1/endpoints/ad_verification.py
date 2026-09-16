@@ -3,13 +3,13 @@ import urllib.parse
 import hmac
 import hashlib
 import base64
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update
+from sqlalchemy import update, select
 from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes
@@ -19,7 +19,10 @@ from app.core.database import get_db
 from app.core.rate_limiter import limiter
 from app.models.domain.ad_transaction import ProcessedAdTransaction
 from app.models.domain.user import User
+from app.models.domain.match import Match
+from app.models.domain.whatsapp_token import WhatsAppRevealToken
 from app.services.whatsapp_service import process_whatsapp_ad_completion
+from app.api.dependencies import get_current_user_id
 
 router = APIRouter()
 
@@ -235,3 +238,70 @@ async def verify_ad_reward_callback(
 
     await db.commit()
     return {"status": "success"}
+
+@router.get("/whatsapp-progress/{match_id}", status_code=status.HTTP_200_OK)
+async def get_whatsapp_reveal_progress(
+    match_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Retrieves mutual WhatsApp 3-ad progress for the match."""
+    stmt = (
+        select(WhatsAppRevealToken, Match)
+        .join(Match, Match.id == WhatsAppRevealToken.match_id)
+        .where(WhatsAppRevealToken.match_id == match_id)
+    )
+    result = await db.execute(stmt)
+    row = result.first()
+    if not row:
+        return {
+            "match_id": str(match_id),
+            "user_ads_watched": 0,
+            "match_ads_watched": 0,
+            "is_unlocked": False
+        }
+
+    token_rec, match_rec = row
+    is_user1 = match_rec.user1_id == current_user_id
+    user_ads = token_rec.user1_ads_count if is_user1 else token_rec.user2_ads_count
+    match_ads = token_rec.user2_ads_count if is_user1 else token_rec.user1_ads_count
+
+    return {
+        "match_id": str(match_id),
+        "user_ads_watched": user_ads,
+        "match_ads_watched": match_ads,
+        "is_unlocked": token_rec.is_unlocked,
+        "ephemeral_token": token_rec.ephemeral_token if token_rec.is_unlocked else None
+    }
+
+@router.post("/complete-ad", status_code=status.HTTP_200_OK)
+async def complete_ad_reward(
+    payload: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Client ad completion fallback endpoint."""
+    ad_type = payload.get("ad_type", "whatsapp_reveal")
+    target_id = payload.get("target_id")
+
+    if ad_type == "whatsapp_reveal" and target_id:
+        try:
+            match_uuid = UUID(target_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid match target_id UUID")
+
+        await process_whatsapp_ad_completion(current_user_id, match_uuid, db)
+        await db.commit()
+        return {"status": "success", "reward": "whatsapp_reveal_progress_updated"}
+
+    elif ad_type == "direct_dm_reward":
+        await db.execute(
+            update(User)
+            .where(User.id == current_user_id)
+            .values(reward_balance=User.reward_balance + 3)
+        )
+        await db.commit()
+        return {"status": "success", "reward": "3_direct_dms_granted"}
+
+    return {"status": "ok"}
+

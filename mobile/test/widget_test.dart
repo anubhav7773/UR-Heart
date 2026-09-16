@@ -1,13 +1,22 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ur_heart/main.dart';
-import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
+import 'package:ur_heart/features/chat/presentation/whatsapp_reveal_sheet.dart';
 
 void main() {
-  testWidgets('URHeartApp startup smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const URHeartApp());
+  testWidgets('WhatsAppRevealSheet render test', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: WhatsAppRevealSheet(
+            userAdsWatched: 2,
+            matchAdsWatched: 1,
+          ),
+        ),
+      ),
+    );
 
-    // Verify OnboardingScreen loads
-    expect(find.byType(OnboardingScreen), findsOneWidget);
+    // Verify WhatsAppRevealSheet renders correctly with progress badges
+    expect(find.text('2 of 3 Watched'), findsOneWidget);
+    expect(find.text('1 of 3 Watched'), findsOneWidget);
   });
 }

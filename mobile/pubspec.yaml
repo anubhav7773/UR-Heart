@@ -36,6 +36,7 @@ dependencies:
   uuid: ^4.3.3
 
   # Media Processing & Optimization
+  image: ^4.1.7
   flutter_image_compress: ^2.1.8
   blurhash_dart: ^1.1.1
   image_picker: ^1.0.7

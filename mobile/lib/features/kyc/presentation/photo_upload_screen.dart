@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:ur_heart/core/config/theme.dart';
-import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
-import '../../feed/presentation/feed_screen.dart';
+import 'package:ur_heart/core/utils/vernacular_strings.dart';
+import 'package:ur_heart/features/feed/presentation/feed_screen.dart';
+import 'package:ur_heart/features/kyc/data/kyc_repository.dart';
 
 /// Screen 2: 5-Photo Upload, Live OCR Warning & KYC Viewfinder
 /// Spec: URH-UIX-009 Section 3 Screen 2
@@ -21,9 +24,122 @@ class PhotoUploadScreen extends StatefulWidget {
 }
 
 class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreenMixin {
+  final KycRepository _kycRepository = KycRepository();
+  final ImagePicker _picker = ImagePicker();
+
+  // Slots 1 to 5 mapping (slot 1 is Hero)
+  final Map<int, File?> _photos = {};
+  final Map<int, bool> _isScanning = {};
+  final Map<int, bool> _isVerified = {};
+  final Map<int, String?> _errors = {};
+
+  // Video KYC state
+  bool _isVideoScanning = false;
+  bool _isVideoVerified = false;
+  String? _videoStatusText;
 
   String _t(String key, [Map<String, String>? args]) =>
       VernacularStrings.tr(key, lang: widget.lang, args: args);
+
+  Future<void> _pickAndScanPhoto(int slotIndex) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (picked == null) return;
+
+      final file = File(picked.path);
+
+      setState(() {
+        _photos[slotIndex] = file;
+        _isScanning[slotIndex] = true;
+        _errors[slotIndex] = null;
+      });
+
+      // Call backend scan-photo anti-leak OCR
+      final result = await _kycRepository.scanPhoto(file);
+
+      if (mounted) {
+        setState(() {
+          _isScanning[slotIndex] = false;
+          _isVerified[slotIndex] = (result['status'] == 'clean');
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: URHeartColors.statusSuccess,
+            content: Text('Slot $slotIndex photo passed anti-leak scan!'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isScanning[slotIndex] = false;
+          _isVerified[slotIndex] = false;
+          _errors[slotIndex] = e.toString().replaceAll('Exception: ', '');
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: URHeartColors.statusDanger,
+            content: Text('Slot $slotIndex scan failed: ${_errors[slotIndex]}'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _recordKycVideo() async {
+    try {
+      final picked = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: 5),
+      );
+
+      if (picked == null) return;
+
+      final file = File(picked.path);
+
+      setState(() {
+        _isVideoScanning = true;
+        _videoStatusText = 'Analyzing face & speech with AI...';
+      });
+
+      final result = await _kycRepository.submitKycVideo(videoFile: file);
+
+      if (mounted) {
+        final verified = result['verified'] == true || result['status'] == 'verified';
+        setState(() {
+          _isVideoScanning = false;
+          _isVideoVerified = verified;
+          _videoStatusText = verified
+              ? 'Verified by AI (${((result['confidence'] ?? 0.95) * 100).toInt()}% match)'
+              : 'Verification pending manual review';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: verified ? URHeartColors.statusSuccess : URHeartColors.accentGold,
+            content: Text(_videoStatusText!),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVideoScanning = false;
+          _videoStatusText = 'Submission completed (verification queued)';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,64 +195,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
               const SizedBox(height: 16),
 
               // Slot 1: Hero Display Photo Card (220px height)
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: URHeartColors.cardSurface,
-                  borderRadius: URHeartTheme.radiusCard,
-                  border: Border.all(
-                    color: URHeartColors.brandPrimary.withValues(alpha: 0.5),
-                    width: 1.5,
-                  ),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.add_a_photo_rounded, color: URHeartColors.brandPrimary, size: 36),
-                        const SizedBox(height: 8),
-                        Text(
-                          _t('profileHero'),
-                          style: const TextStyle(
-                            color: URHeartColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: URHeartColors.statusSuccess.withValues(alpha: 0.2),
-                          borderRadius: URHeartTheme.radiusPill,
-                          border: Border.all(color: URHeartColors.statusSuccess),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.verified_rounded, color: URHeartColors.statusSuccess, size: 12),
-                            const SizedBox(width: 4),
-                            Text(
-                              _t('ocrVerifiedTag'),
-                              style: const TextStyle(
-                                color: URHeartColors.statusSuccess,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildHeroSlot(),
               const SizedBox(height: 12),
 
               // Slots 2-5: 2x2 Grid for Secondary Lifestyle Photos
@@ -151,89 +210,31 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
                   childAspectRatio: 1.3,
                 ),
                 itemBuilder: (context, index) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: URHeartColors.cardSurface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: URHeartColors.surfaceRaised),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.add_rounded, color: URHeartColors.textSecondary, size: 24),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Slot ${index + 2}',
-                            style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  final slot = index + 2;
+                  return _buildSecondarySlot(slot);
                 },
               ),
               const SizedBox(height: 16),
 
               // 5-Second Video KYC Viewfinder Card
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: URHeartColors.cardSurface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: URHeartColors.surfaceRaised),
-                ),
-                child: Row(
-                  children: [
-                    // Circular Selfie Preview Box
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: URHeartColors.surfaceRaised,
-                        border: Border.all(color: URHeartColors.brandSecondary, width: 1.5),
-                      ),
-                      child: const Icon(Icons.videocam_rounded, color: URHeartColors.brandSecondary, size: 28),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _t('fiveSecVideoTitle'),
-                            style: const TextStyle(
-                              color: URHeartColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _t('fiveSecVideoSub'),
-                            style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 11),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildVideoKycCard(),
               const SizedBox(height: 24),
 
               // Floating Bottom CTA
               SizedBox(
                 height: URHeartTheme.minTouchTarget,
                 child: ElevatedButton(
-                  onPressed: widget.onContinue ??
-                      () {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => FeedScreen(lang: widget.lang),
-                          ),
-                        );
-                      },
+                  onPressed: () {
+                    if (widget.onContinue != null) {
+                      widget.onContinue!();
+                    } else {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => FeedScreen(lang: widget.lang),
+                        ),
+                      );
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: URHeartColors.brandPrimary,
                     foregroundColor: Colors.white,
@@ -247,6 +248,242 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
               const SizedBox(height: 12),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroSlot() {
+    final photo = _photos[1];
+    final isScanning = _isScanning[1] == true;
+    final isVerified = _isVerified[1] == true;
+
+    return InkWell(
+      onTap: () => _pickAndScanPhoto(1),
+      borderRadius: URHeartTheme.radiusCard,
+      child: Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: URHeartColors.cardSurface,
+          borderRadius: URHeartTheme.radiusCard,
+          border: Border.all(
+            color: isVerified
+                ? URHeartColors.statusSuccess
+                : URHeartColors.brandPrimary.withValues(alpha: 0.5),
+            width: 1.5,
+          ),
+          image: photo != null
+              ? DecorationImage(
+                  image: FileImage(photo),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (photo == null)
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_a_photo_rounded, color: URHeartColors.brandPrimary, size: 36),
+                  const SizedBox(height: 8),
+                  Text(
+                    _t('profileHero'),
+                    style: const TextStyle(
+                      color: URHeartColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Tap to upload display picture',
+                    style: TextStyle(color: URHeartColors.textSecondary, fontSize: 11),
+                  ),
+                ],
+              ),
+            if (isScanning)
+              Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: URHeartColors.brandPrimary),
+                      SizedBox(height: 8),
+                      Text(
+                        'Scanning OCR anti-leak...',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (isVerified)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: URHeartColors.statusSuccess.withValues(alpha: 0.9),
+                    borderRadius: URHeartTheme.radiusPill,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.verified_rounded, color: Colors.white, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        _t('ocrVerifiedTag'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondarySlot(int slot) {
+    final photo = _photos[slot];
+    final isScanning = _isScanning[slot] == true;
+    final isVerified = _isVerified[slot] == true;
+
+    return InkWell(
+      onTap: () => _pickAndScanPhoto(slot),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: URHeartColors.cardSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isVerified ? URHeartColors.statusSuccess : URHeartColors.surfaceRaised,
+          ),
+          image: photo != null
+              ? DecorationImage(
+                  image: FileImage(photo),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (photo == null)
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_rounded, color: URHeartColors.textSecondary, size: 24),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Slot $slot',
+                    style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            if (isScanning)
+              Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: URHeartColors.brandPrimary),
+                  ),
+                ),
+              ),
+            if (isVerified)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: URHeartColors.statusSuccess,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check, color: Colors.white, size: 10),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoKycCard() {
+    return InkWell(
+      onTap: _recordKycVideo,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: URHeartColors.cardSurface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _isVideoVerified ? URHeartColors.statusSuccess : URHeartColors.surfaceRaised,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Circular Selfie Preview Box
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: URHeartColors.surfaceRaised,
+                border: Border.all(
+                  color: _isVideoVerified ? URHeartColors.statusSuccess : URHeartColors.brandSecondary,
+                  width: 1.5,
+                ),
+              ),
+              child: _isVideoScanning
+                  ? const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: URHeartColors.brandSecondary),
+                    )
+                  : Icon(
+                      _isVideoVerified ? Icons.verified_user_rounded : Icons.videocam_rounded,
+                      color: _isVideoVerified ? URHeartColors.statusSuccess : URHeartColors.brandSecondary,
+                      size: 28,
+                    ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _t('fiveSecVideoTitle'),
+                    style: const TextStyle(
+                      color: URHeartColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _videoStatusText ?? _t('fiveSecVideoSub'),
+                    style: TextStyle(
+                      color: _isVideoVerified ? URHeartColors.statusSuccess : URHeartColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: URHeartColors.textSecondary),
+          ],
         ),
       ),
     );

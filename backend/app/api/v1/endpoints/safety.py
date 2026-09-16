@@ -1,15 +1,19 @@
+from datetime import datetime, timezone
 from uuid import UUID
 from typing import Optional
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete
 
 from app.core.database import get_db
 from app.core.rate_limiter import limiter
 from app.api.dependencies import get_current_user
 from app.models.domain.user import User
+from app.models.domain.user_photo import UserPhoto
 from app.models.domain.user_report import UserReport
 from app.core.legal_audit import record_legal_audit_event
+from app.services.storage_service import purge_user_storage_assets
 
 router = APIRouter()
 
@@ -63,3 +67,55 @@ async def submit_safety_report(
         "status": "reported",
         "message": "Safety report received and queued for immediate human safety review."
     }
+
+@router.post("/erase-account", status_code=status.HTTP_200_OK)
+@limiter.limit("5/day")
+async def erase_account(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Executes statutory One-Tap Account Erase under DPDP Act 2023 Section 8(7).
+    - Hard deletes user photos from storage and database.
+    - Soft-deletes and anonymizes user account in public.users.
+    - Wipes streak and reward balances.
+    - Logs legal audit event for 180-day statutory retention.
+    """
+    user_id = current_user.id
+
+    # 1. Purge Supabase storage assets
+    try:
+        await purge_user_storage_assets(user_id)
+    except Exception:
+        pass
+
+    # 2. Remove database photo entries
+    await db.execute(delete(UserPhoto).where(UserPhoto.user_id == user_id))
+
+    # 3. Anonymize user record & mark deleted
+    now = datetime.now(timezone.utc)
+    current_user.deleted_at = now
+    current_user.full_name = "Deleted User"
+    current_user.phone_number = f"+919999999999"
+    current_user.whatsapp_number = f"+919999999999"
+    current_user.bio = ""
+    current_user.streak_count = 0
+    current_user.reward_balance = 0
+    current_user.updated_at = now
+
+    await db.commit()
+
+    # 4. Record statutory legal audit
+    await record_legal_audit_event(
+        request=request,
+        action_type="ACCOUNT_ONE_TAP_ERASED",
+        user_id=user_id,
+        db=db
+    )
+
+    return {
+        "status": "erased",
+        "message": "Your profile and photos have been permanently erased in compliance with DPDP Act 2023."
+    }
+

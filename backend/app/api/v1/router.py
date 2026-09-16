@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import moderation, health, kyc, ad_verification, auth, chat, user, safety
+from app.api.v1.endpoints import moderation, health, kyc, ad_verification, auth, chat, user, safety, feed
 
 api_router = APIRouter()
 
@@ -12,6 +12,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(chat.router, prefix="/chat", tags=["Chat"])
 api_router.include_router(user.router, prefix="/users", tags=["Users"])
 api_router.include_router(safety.router, prefix="/safety", tags=["Safety"])
+api_router.include_router(feed.router, prefix="/feed", tags=["Discovery Feed"])
 
 
 

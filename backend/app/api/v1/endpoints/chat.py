@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, desc, or_
 
 from app.core.database import get_db, async_session_factory
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, verify_firebase_token
 from app.services.chat_manager import manager
 from app.services.chat_sanitizer import sanitize_chat_message
 from app.models.domain.message import Message
@@ -99,6 +99,21 @@ async def handle_chat_websocket(websocket: WebSocket, token: Optional[str]):
         return
 
     user_id_str = decode_access_token(token)
+    if not user_id_str:
+        # Fallback: check if token is valid Firebase ID token
+        try:
+            fb_auth = verify_firebase_token(token)
+            fb_uid = fb_auth.get("uid")
+            if fb_uid:
+                async with async_session_factory() as db:
+                    stmt = select(User.id).where(User.firebase_uid == fb_uid)
+                    res = await db.execute(stmt)
+                    uid_val = res.scalar_one_or_none()
+                    if uid_val:
+                        user_id_str = str(uid_val)
+        except Exception:
+            pass
+
     if not user_id_str:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return

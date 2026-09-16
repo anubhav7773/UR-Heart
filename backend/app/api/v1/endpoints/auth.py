@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
 from app.core.database import get_db
-from app.core.security import verify_firebase_token
+from app.core.security import verify_firebase_token, create_internal_token
 from app.core.legal_audit import record_legal_audit_event
 from app.core.rate_limiter import limiter
 from app.core.sanitizer import sanitize_user_html, strip_null_bytes
@@ -209,6 +209,9 @@ async def session_sync(
                 "reward_balance": 0
             }
         }
+
+    # 5b. Attach Internal JWT Token for WebSockets and protected operations
+    response_payload["token"] = create_internal_token(user_id)
 
     # 6. Record Statutory CERT-In 180-day Audit Event
     await record_legal_audit_event(

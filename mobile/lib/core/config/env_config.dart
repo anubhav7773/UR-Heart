@@ -12,19 +12,19 @@ class EnvConfig {
 
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6cnN5eHZqYm16cWx6bGVodXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwNDQ5ODUsImV4cCI6MjA1NzYyMDk4NX0.dummy_public_anon_key',
+    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6cnN5eHZqYm16cWx6bGVodXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1MzQzMjcsImV4cCI6MjEwNTExMDMyN30.nwhl015k9arus3Pbjh5lDaUqLaj_Ym9BEKIgBPnN2fc',
   );
 
-  // FastAPI Gateway Base URL
+  // FastAPI Gateway Base URL (Render Live Deployment)
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api.asiverticals.com',
+    defaultValue: 'https://ur-heart.onrender.com',
   );
 
-  // Real-Time WebSocket Base URL
+  // Real-Time WebSocket Base URL (Render Live Deployment)
   static const String wsBaseUrl = String.fromEnvironment(
     'WS_BASE_URL',
-    defaultValue: 'wss://api.asiverticals.com',
+    defaultValue: 'wss://ur-heart.onrender.com',
   );
 
   // Verification helper confirming no service_role key is present

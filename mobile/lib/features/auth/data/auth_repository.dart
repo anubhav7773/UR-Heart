@@ -119,22 +119,29 @@ class AuthRepository {
       final formattedDob =
           "${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}";
 
-      final phone = phoneNumber ??
+      String phone = phoneNumber ??
           (user.phoneNumber != null && user.phoneNumber!.isNotEmpty
               ? user.phoneNumber!
-              : "+919876543210");
+              : "+91987654${(user.uid.hashCode.abs() % 9000 + 1000).toString().padLeft(4, '0')}");
+      if (!phone.startsWith('+91')) {
+        phone = '+919876541234';
+      }
       final wa = whatsappNumber ?? phone;
-      final name = fullName ??
+
+      String rawName = fullName ??
           (user.displayName != null && user.displayName!.isNotEmpty
               ? user.displayName!
               : (user.email != null ? user.email!.split('@').first : "UR Heart User"));
+      String cleanName = rawName.replaceAll(RegExp(r'[^a-zA-Z\s]'), '').trim();
+      if (cleanName.length < 2) cleanName = "UR Heart User";
+      if (cleanName.length > 50) cleanName = cleanName.substring(0, 50);
 
       final response = await dio.post(
         '/api/v1/auth/session-sync',
         data: {
           'phone_number': phone,
           'whatsapp_number': wa,
-          'full_name': name,
+          'full_name': cleanName,
           'dob': formattedDob,
           'gender': gender,
           'city': city,

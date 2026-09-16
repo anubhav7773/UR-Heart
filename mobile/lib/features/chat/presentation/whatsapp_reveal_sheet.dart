@@ -39,7 +39,7 @@ class WhatsAppRevealSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: URHeartColors.textMuted.withOpacity(0.5),
+                color: URHeartColors.textMuted.withValues(alpha: 0.5),
                 borderRadius: URHeartTheme.radiusPill,
               ),
             ),
@@ -165,7 +165,7 @@ class WhatsAppRevealSheet extends StatelessWidget {
                   borderRadius: URHeartTheme.radiusPill,
                   boxShadow: [
                     BoxShadow(
-                      color: URHeartColors.statusSuccess.withOpacity(0.3),
+                      color: URHeartColors.statusSuccess.withValues(alpha: 0.3),
                       blurRadius: 10,
                       spreadRadius: 2,
                     ),
@@ -210,7 +210,7 @@ class WhatsAppRevealSheet extends StatelessWidget {
     required bool isCurrent,
     required String label,
   }) {
-    Color bg = isDone ? URHeartColors.statusSuccess : (isCurrent ? URHeartColors.accentGold.withOpacity(0.2) : Colors.transparent);
+    Color bg = isDone ? URHeartColors.statusSuccess : (isCurrent ? URHeartColors.accentGold.withValues(alpha: 0.2) : Colors.transparent);
     Color border = isDone ? URHeartColors.statusSuccess : (isCurrent ? URHeartColors.accentGold : URHeartColors.textMuted);
     Color textColor = isDone ? Colors.black87 : (isCurrent ? URHeartColors.accentGold : URHeartColors.textMuted);
 
