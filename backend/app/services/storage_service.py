@@ -11,7 +11,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 MAX_PHOTO_SIZE_BYTES = 150 * 1024  # 150 KB limit per Security Check 16
-MAX_KYC_VIDEO_SIZE_BYTES = 2500000  # 2.5 MB limit
+MAX_KYC_VIDEO_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit (accommodates 3-5s smartphone video)
 
 DISALLOWED_EXTENSIONS = {
     ".php", ".py", ".sh", ".exe", ".js", ".html", ".htm", ".bat", ".cmd",
@@ -74,7 +74,7 @@ def validate_kyc_video_file(file_bytes: bytes, filename: str = "") -> None:
     if len(file_bytes) > MAX_KYC_VIDEO_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Video size ({len(file_bytes)} bytes) exceeds 2.5MB limit."
+            detail=f"Video size ({len(file_bytes)} bytes) exceeds 10MB limit."
         )
 
     if len(file_bytes) < 12:

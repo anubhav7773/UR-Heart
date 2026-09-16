@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
-import '../../feed/presentation/feed_screen.dart';
+import '../../home/presentation/main_shell_screen.dart';
 import '../../kyc/presentation/photo_upload_screen.dart';
 import '../data/auth_repository.dart';
 
@@ -103,7 +103,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   onContinue: () {
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
-                        builder: (_) => FeedScreen(lang: widget.lang),
+                        builder: (_) => MainShellScreen(lang: widget.lang),
                       ),
                     );
                   },
@@ -458,7 +458,7 @@ class _EmailAuthBottomSheetState extends State<_EmailAuthBottomSheet> {
                 onContinue: () {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                      builder: (_) => FeedScreen(lang: widget.lang),
+                      builder: (_) => MainShellScreen(lang: widget.lang),
                     ),
                   );
                 },

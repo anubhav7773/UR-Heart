@@ -23,6 +23,7 @@ class KycRepository {
 
       final response = await _client.post(
         '/api/v1/moderation/scan-photo',
+        queryParameters: {'require_face': true},
         data: formData,
       );
 

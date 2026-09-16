@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, desc, or_
 
+from app.core.config import settings
 from app.core.database import get_db, async_session_factory
 from app.core.security import decode_access_token, verify_firebase_token
 from app.services.chat_manager import manager
@@ -15,7 +16,8 @@ from app.services.chat_sanitizer import sanitize_chat_message
 from app.models.domain.message import Message
 from app.models.domain.match import Match
 from app.models.domain.user import User
-from app.api.dependencies import get_current_user_id
+from app.models.domain.user_photo import UserPhoto
+from app.api.dependencies import get_current_user_id, get_current_user
 
 router = APIRouter()
 
@@ -29,6 +31,85 @@ class MessageHistoryResponse(BaseModel):
     encrypted_text: str
     status: str
     created_at: datetime
+
+
+class MatchPartnerResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    match_id: UUID
+    partner_id: UUID
+    partner_name: str
+    partner_photo_url: str
+    partner_city: str
+    partner_bio: str
+    whatsapp_unlocked: bool
+    last_message: Optional[str] = None
+    created_at: datetime
+
+
+# ------------------------------------------------------------------------------
+# REST: User Matches Endpoint
+# ------------------------------------------------------------------------------
+@router.get("/matches", response_model=List[MatchPartnerResponse])
+async def get_user_matches(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns all active matches for the authenticated user with partner profile details.
+    """
+    match_stmt = (
+        select(Match)
+        .where(
+            Match.is_active == True,
+            or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id)
+        )
+        .order_by(desc(Match.created_at))
+    )
+    res = await db.execute(match_stmt)
+    matches = res.scalars().all()
+
+    result: List[MatchPartnerResponse] = []
+    for m in matches:
+        partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+        partner_res = await db.execute(select(User).where(User.id == partner_id))
+        partner = partner_res.scalar_one_or_none()
+        if not partner:
+            continue
+
+        photo_res = await db.execute(
+            select(UserPhoto)
+            .where(UserPhoto.user_id == partner.id)
+            .order_by(UserPhoto.slot_index.asc())
+            .limit(1)
+        )
+        photo = photo_res.scalar_one_or_none()
+        photo_url = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500"
+        if photo and photo.photo_storage_path:
+            p = photo.photo_storage_path
+            photo_url = p if p.startswith("http") else f"{settings.SUPABASE_URL}/storage/v1/object/public/user-photos/{p}"
+
+        last_msg_res = await db.execute(
+            select(Message)
+            .where(Message.match_id == m.id)
+            .order_by(desc(Message.id))
+            .limit(1)
+        )
+        last_msg = last_msg_res.scalar_one_or_none()
+
+        result.append(MatchPartnerResponse(
+            match_id=m.id,
+            partner_id=partner.id,
+            partner_name=partner.full_name,
+            partner_photo_url=photo_url,
+            partner_city=partner.city,
+            partner_bio=partner.bio or "Hey there! We matched on UR-Heart.",
+            whatsapp_unlocked=m.whatsapp_unlocked,
+            last_message=last_msg.encrypted_text if last_msg else None,
+            created_at=m.created_at,
+        ))
+
+    return result
 
 
 # ------------------------------------------------------------------------------

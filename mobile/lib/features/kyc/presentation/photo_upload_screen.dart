@@ -116,7 +116,8 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
     try {
       final picked = await _picker.pickVideo(
         source: ImageSource.camera,
-        maxDuration: const Duration(seconds: 5),
+        preferredCameraDevice: CameraDevice.front,
+        maxDuration: const Duration(seconds: 4),
       );
 
       if (picked == null) return;
@@ -131,7 +132,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
       final result = await _kycRepository.submitKycVideo(videoFile: file);
 
       if (mounted) {
-        final verified = result['verified'] == true || result['status'] == 'verified';
+        final verified = result['verified'] == true || result['status'] == 'auto_verified' || result['status'] == 'verified';
         setState(() {
           _isVideoScanning = false;
           _isVideoVerified = verified;
@@ -149,10 +150,19 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
       }
     } catch (e) {
       if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         setState(() {
           _isVideoScanning = false;
-          _videoStatusText = 'Submission completed (verification queued)';
+          _videoStatusText = 'Video upload: $cleanError';
         });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: URHeartColors.statusDanger,
+            content: Text('Video verification: $cleanError'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }

@@ -62,10 +62,55 @@ def scan_qr_codes(image_np: np.ndarray) -> bool:
         pass
     return False
 
-def inspect_extracted_text(text: str) -> None:
+def detect_human_face(image_np: np.ndarray) -> bool:
     """
-    Evaluates extracted OCR text against contact leak and social handle regexes.
-    Raises HTTPException(422) upon finding prohibited contact info.
+    Validates that the photo contains at least one detectable human face using OpenCV Haar Cascade.
+    Rejects banners, flyers, posters, and objects without human faces.
+    """
+    try:
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        face_cascade = cv2.CascadeClassifier(cascade_path)
+        gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY) if len(image_np.shape) == 3 else image_np
+        faces = face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.15,
+            minNeighbors=3,
+            minSize=(40, 40)
+        )
+        return len(faces) >= 1
+    except Exception:
+        return False
+
+def detect_dense_text_or_banner(image_np: np.ndarray) -> bool:
+    """
+    Detects banner text and poster layouts using OpenCV edge and morphological analysis.
+    Identifies high-contrast horizontal text blocks characteristic of banners/posters.
+    """
+    try:
+        gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY) if len(image_np.shape) == 3 else image_np
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
+        gradient = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, kernel)
+        _, thresh = cv2.threshold(gradient, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
+        connected = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, close_kernel)
+
+        contours, _ = cv2.findContours(connected, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        text_box_count = 0
+        for c in contours:
+            x, y, w, h = cv2.boundingRect(c)
+            aspect_ratio = w / float(h) if h > 0 else 0
+            if 1.5 < aspect_ratio < 12 and w > 40 and 10 < h < 100:
+                text_box_count += 1
+
+        return text_box_count >= 3
+    except Exception:
+        return False
+
+def inspect_extracted_text(text: str, has_face: bool = True) -> None:
+    """
+    Evaluates extracted OCR text against contact leak, social handles, and banner text.
+    Raises HTTPException(422) upon finding prohibited contact info or banner overlays.
     """
     cleaned_text = text.strip()
     if not cleaned_text:
@@ -89,9 +134,17 @@ def inspect_extracted_text(text: str) -> None:
             detail="Photo rejected: Social media handles (@, IG, WA, Snap, Tele) detected on image."
         )
 
-async def validate_uploaded_photo(file: UploadFile) -> None:
+    # 3. Evaluation: Banner / Flyer text without a human face
+    if not has_face and len(cleaned_text) > 15:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Photo rejected: Text banners and posters are not permitted. Please upload a real photo."
+        )
+
+async def validate_uploaded_photo(file: UploadFile, require_face: bool = False) -> None:
     """
-    Validates uploaded photo for embedded text, phone numbers, social handles, or QR codes.
+    Validates uploaded photo for embedded text, phone numbers, social handles, QR codes,
+    and ensures human face presence when required.
     Raises HTTP 422 if any violation is identified.
     """
     contents = await file.read()
@@ -117,17 +170,33 @@ async def validate_uploaded_photo(file: UploadFile) -> None:
             detail="Photo rejected: QR codes or barcodes are strictly prohibited in profile photos."
         )
 
-    # OPTIMIZATION 2: Image Preprocessing and Binarization (~25ms)
+    has_face = detect_human_face(image)
+
+    # OPTIMIZATION 2: Human Face Enforcement for Profile Photos
+    if require_face and not has_face:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Photo rejected: No valid human face detected. Please upload a clear photo of yourself."
+        )
+
+    # OPTIMIZATION 3: Banner/Poster Layout Detection (no face + dense text blocks)
+    if not has_face and detect_dense_text_or_banner(image):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Photo rejected: Text banners, posters, and flyers are not allowed as profile photos."
+        )
+
+    # OPTIMIZATION 4: Image Preprocessing and Binarization (~25ms)
     processed = preprocess_image_for_ocr(image)
 
-    # OPTIMIZATION 3: Tesseract OCR Execution (~180ms)
+    # OPTIMIZATION 5: Tesseract OCR Execution (~180ms)
     try:
         extracted_text = pytesseract.image_to_string(processed, config=TESSERACT_FAST_CONFIG)
     except pytesseract.TesseractNotFoundError:
         # If tesseract binary is not on host path, log or fall back gracefully
         extracted_text = ""
-    except Exception as e:
+    except Exception:
         extracted_text = ""
 
-    # OPTIMIZATION 4: Regex Evaluation against policy rules
-    inspect_extracted_text(extracted_text)
+    # OPTIMIZATION 6: Regex and Text Density Evaluation
+    inspect_extracted_text(extracted_text, has_face=has_face)

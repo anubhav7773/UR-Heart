@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
-import 'package:ur_heart/features/feed/presentation/feed_screen.dart';
+import 'package:ur_heart/features/home/presentation/main_shell_screen.dart';
 import 'package:ur_heart/features/kyc/presentation/photo_upload_screen.dart';
 
 void main() async {
@@ -43,7 +43,7 @@ class URHeartApp extends StatelessWidget {
             return PhotoUploadScreen(
               onContinue: () {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const FeedScreen()),
+                  MaterialPageRoute(builder: (_) => const MainShellScreen()),
                 );
               },
             );
@@ -56,7 +56,7 @@ class URHeartApp extends StatelessWidget {
                   builder: (_) => PhotoUploadScreen(
                     onContinue: () {
                       Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const FeedScreen()),
+                        MaterialPageRoute(builder: (_) => const MainShellScreen()),
                       );
                     },
                   ),

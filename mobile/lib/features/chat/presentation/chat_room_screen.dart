@@ -71,6 +71,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
 
     _initWebSocket();
     _fetchWhatsAppProgress();
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    try {
+      final history = await _chatRepository.getHistory(widget.matchId);
+      if (mounted && history.isNotEmpty) {
+        setState(() {
+          _messages.clear();
+          _messages.addAll(history);
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint("Chat history load notice: $e");
+    }
   }
 
   void _initWebSocket() {
