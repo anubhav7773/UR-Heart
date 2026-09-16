@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, Query
+from fastapi import FastAPI, WebSocket, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.rate_limiter import limiter, custom_rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.api.v1.router import api_router
+from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.chat import handle_chat_websocket
 
 app = FastAPI(
@@ -52,6 +53,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount Health and Keep-Alive router directly at root level for UptimeRobot / Ping monitors
+app.include_router(health_router, tags=["Health & Keep-Alive"])
+
 # Mount API v1 router
 app.include_router(api_router, prefix="/api/v1")
 
@@ -60,10 +64,13 @@ async def root_websocket_chat(websocket: WebSocket, token: Optional[str] = Query
     await handle_chat_websocket(websocket, token)
 
 @app.get("/", tags=["Root"])
-async def root():
+@app.head("/", tags=["Root"])
+@limiter.exempt
+async def root(request: Request):
     return {
         "app": "UR-Heart",
         "entity": "ASI Verticals",
         "version": "1.0.0-PROD",
         "status": "online"
     }
+
