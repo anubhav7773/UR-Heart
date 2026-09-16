@@ -7,6 +7,7 @@ class VernacularStrings {
     'en': {
       'btnGoogleAuth': 'Continue with Google',
       'btnPhoneAuth': 'Use Phone Number / मोबाइल नंबर से लॉगिन',
+      'btnEmailAuth': 'Continue with Email & Password / ईमेल और पासवर्ड से लॉगिन',
       'ageGateNotice': 'Strictly 18+ years only',
       'ageGateSubtext': 'Neutral date of birth selection required',
       'feedAdCounter': 'Ad in {x} swipes',
@@ -37,6 +38,7 @@ class VernacularStrings {
     'hi': {
       'btnGoogleAuth': 'गूगल से आगे बढ़ें',
       'btnPhoneAuth': 'मोबाइल नंबर से लॉगिन करें',
+      'btnEmailAuth': 'ईमेल और पासवर्ड से लॉगिन करें',
       'ageGateNotice': 'केवल 18+ वर्ष के लिए',
       'ageGateSubtext': 'अपनी वास्तविक जन्मतिथि चुनें',
       'feedAdCounter': '{x} स्वाइप बाद विज्ञापन',
