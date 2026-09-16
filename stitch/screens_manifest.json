@@ -146,5 +146,19 @@
       "code_mime": "text/markdown",
       "code_bytes": 9570
     }
+  },
+  {
+    "id": "5ef36f3a0fb74f4ca74388bc17dc4d80",
+    "name": "projects/11309395978596418917/screens/5ef36f3a0fb74f4ca74388bc17dc4d80",
+    "title": "7. Premium Mobile App Icon (Skeuomorphic & Glassmorphic Diya Heart)",
+    "folder": "screens/07_premium_mobile_app_icon",
+    "width": "1024",
+    "height": "1024",
+    "deviceType": "MOBILE",
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 49409
+    }
   }
 ]
