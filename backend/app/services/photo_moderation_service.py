@@ -83,34 +83,39 @@ def detect_human_face(image_np: np.ndarray) -> bool:
 
 def detect_dense_text_or_banner(image_np: np.ndarray) -> bool:
     """
-    Detects banner text and poster layouts using OpenCV edge and morphological analysis.
-    Identifies high-contrast horizontal text blocks characteristic of banners/posters.
+    Detects embedded text, usernames, slogans, AI-generated typography,
+    banner text, or watermarks using morphological gradient analysis.
+    Zero-tolerance: rejects images with text overlays regardless of face presence.
     """
     try:
         gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY) if len(image_np.shape) == 3 else image_np
+        h, w = gray.shape
+
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
         gradient = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, kernel)
-        _, thresh = cv2.threshold(gradient, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        _, thresh = cv2.threshold(gradient, 35, 255, cv2.THRESH_BINARY)
 
-        close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
+        close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 3))
         connected = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, close_kernel)
 
         contours, _ = cv2.findContours(connected, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         text_box_count = 0
         for c in contours:
-            x, y, w, h = cv2.boundingRect(c)
-            aspect_ratio = w / float(h) if h > 0 else 0
-            if 1.5 < aspect_ratio < 12 and w > 40 and 10 < h < 100:
+            x, y, bw, bh = cv2.boundingRect(c)
+            aspect_ratio = bw / float(bh) if bh > 0 else 0
+            area = cv2.contourArea(c)
+            if 1.2 < aspect_ratio < 15 and 20 < bw < w * 0.85 and 8 < bh < 120 and area > 80:
                 text_box_count += 1
 
-        return text_box_count >= 3
+        # Strict zero-text: 2 or more horizontal text blocks indicates text overlay, banner, or typography
+        return text_box_count >= 2
     except Exception:
         return False
 
-def inspect_extracted_text(text: str, has_face: bool = True) -> None:
+def inspect_extracted_text(text: str) -> None:
     """
-    Evaluates extracted OCR text against contact leak, social handles, and banner text.
-    Raises HTTPException(422) upon finding prohibited contact info or banner overlays.
+    Evaluates extracted OCR text against contact leak, social handles, and general text.
+    Raises HTTPException(422) upon finding prohibited contact info or text overlays.
     """
     cleaned_text = text.strip()
     if not cleaned_text:
@@ -134,17 +139,20 @@ def inspect_extracted_text(text: str, has_face: bool = True) -> None:
             detail="Photo rejected: Social media handles (@, IG, WA, Snap, Tele) detected on image."
         )
 
-    # 3. Evaluation: Banner / Flyer text without a human face
-    if not has_face and len(cleaned_text) > 15:
+    # 3. Strict Zero-Text: Any significant embedded text (> 5 alphanumeric chars)
+    if len(condensed_text) >= 6:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Photo rejected: Text banners and posters are not permitted. Please upload a real photo."
+            detail="Photo rejected: Text overlay or watermark detected. Profile photos must be clean portraits."
         )
 
 async def validate_uploaded_photo(file: UploadFile, require_face: bool = False) -> None:
     """
-    Validates uploaded photo for embedded text, phone numbers, social handles, QR codes,
-    and ensures human face presence when required.
+    Strictly validates uploaded photo:
+    - Zero-tolerance for QR codes and barcodes.
+    - Zero-tolerance for text overlays, usernames, AI typography, watermarks (even if face is present).
+    - Mandatory clear, unobstructed human face when require_face is True.
+    - Rejects synthetic digital graphics and posters.
     Raises HTTP 422 if any violation is identified.
     """
     contents = await file.read()
@@ -163,40 +171,40 @@ async def validate_uploaded_photo(file: UploadFile, require_face: bool = False) 
             detail="Corrupted or invalid image file."
         )
 
-    # OPTIMIZATION 1: Early-exit QR Code detection (< 15ms)
+    # CHECK 1: Early-exit QR Code detection (< 15ms)
     if scan_qr_codes(image):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Photo rejected: QR codes or barcodes are strictly prohibited in profile photos."
         )
 
+    # CHECK 2: Strict Zero-Text Overlay & Typography Detection
+    # Rejects ANY image with text overlays, handles, usernames, slogans, or AI typography
+    if detect_dense_text_or_banner(image):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Photo rejected: Text, username, or graphic overlay detected. Profile photos must be 100% clean camera photos."
+        )
+
     has_face = detect_human_face(image)
 
-    # OPTIMIZATION 2: Human Face Enforcement for Profile Photos
+    # CHECK 3: Human Face Enforcement for Profile Photos
     if require_face and not has_face:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Photo rejected: No valid human face detected. Please upload a clear photo of yourself."
         )
 
-    # OPTIMIZATION 3: Banner/Poster Layout Detection (no face + dense text blocks)
-    if not has_face and detect_dense_text_or_banner(image):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Photo rejected: Text banners, posters, and flyers are not allowed as profile photos."
-        )
-
-    # OPTIMIZATION 4: Image Preprocessing and Binarization (~25ms)
+    # CHECK 4: Image Preprocessing and Binarization (~25ms)
     processed = preprocess_image_for_ocr(image)
 
-    # OPTIMIZATION 5: Tesseract OCR Execution (~180ms)
+    # CHECK 5: Tesseract OCR Execution (~180ms)
     try:
         extracted_text = pytesseract.image_to_string(processed, config=TESSERACT_FAST_CONFIG)
     except pytesseract.TesseractNotFoundError:
-        # If tesseract binary is not on host path, log or fall back gracefully
         extracted_text = ""
     except Exception:
         extracted_text = ""
 
-    # OPTIMIZATION 6: Regex and Text Density Evaluation
-    inspect_extracted_text(extracted_text, has_face=has_face)
+    # CHECK 6: Regex and Zero-Text Density Evaluation
+    inspect_extracted_text(extracted_text)

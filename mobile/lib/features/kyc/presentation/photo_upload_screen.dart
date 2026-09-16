@@ -43,12 +43,96 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
       VernacularStrings.tr(key, lang: widget.lang, args: args);
 
   Future<void> _pickAndScanPhoto(int slotIndex) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: URHeartColors.cardSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: URHeartColors.surfaceRaised,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Upload Real Profile Photo',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Zero-tolerance AI & Anti-Leak Policy: Must be a 100% clean photo with no text, usernames, watermarks, or filters.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: URHeartColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: URHeartColors.brandPrimary.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: URHeartColors.brandPrimary),
+                ),
+                title: const Text(
+                  'Take Live Camera Photo (Recommended)',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Guarantees authentic camera capture',
+                  style: TextStyle(color: URHeartColors.brandSecondary, fontSize: 11),
+                ),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: URHeartColors.surfaceRaised,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Colors.white70),
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Must be unedited raw camera photo',
+                  style: TextStyle(color: URHeartColors.textMuted, fontSize: 11),
+                ),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     try {
       final picked = await _picker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 75,
+        preferredCameraDevice: CameraDevice.front,
       );
 
       if (picked == null) return;
@@ -196,22 +280,23 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
               Container(
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
-                  color: URHeartColors.statusDanger.withValues(alpha: 0.12),
+                  color: URHeartColors.brandPrimary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: URHeartColors.statusDanger, width: 1.2),
+                  border: Border.all(color: URHeartColors.brandPrimary, width: 1.2),
                 ),
-                child: Row(
+                child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: URHeartColors.statusDanger, size: 24),
-                    const SizedBox(width: 10),
+                    Icon(Icons.shield_rounded, color: URHeartColors.brandPrimary, size: 24),
+                    SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        _t('antiLeakNotice'),
-                        style: const TextStyle(
+                        '🛡️ Zero-Tolerance AI & Anti-Leak AI: Only 100% clean, raw camera photos showing your clear, unobstructed face are accepted. AI-generated text, Instagram/WhatsApp handles, watermarks, and heavy filters will be rejected automatically.',
+                        style: TextStyle(
                           color: URHeartColors.textPrimary,
-                          fontSize: 12.5,
+                          fontSize: 12,
                           height: 1.35,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
