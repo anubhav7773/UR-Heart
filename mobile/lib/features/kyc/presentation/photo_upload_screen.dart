@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
+import '../../feed/presentation/feed_screen.dart';
 
 /// Screen 2: 5-Photo Upload, Live OCR Warning & KYC Viewfinder
 /// Spec: URH-UIX-009 Section 3 Screen 2
@@ -53,7 +54,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
               Container(
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
-                  color: URHeartColors.statusDanger.withOpacity(0.12),
+                  color: URHeartColors.statusDanger.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: URHeartColors.statusDanger, width: 1.2),
                 ),
@@ -84,7 +85,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
                   color: URHeartColors.cardSurface,
                   borderRadius: URHeartTheme.radiusCard,
                   border: Border.all(
-                    color: URHeartColors.brandPrimary.withOpacity(0.5),
+                    color: URHeartColors.brandPrimary.withValues(alpha: 0.5),
                     width: 1.5,
                   ),
                 ),
@@ -112,7 +113,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: URHeartColors.statusSuccess.withOpacity(0.2),
+                          color: URHeartColors.statusSuccess.withValues(alpha: 0.2),
                           borderRadius: URHeartTheme.radiusPill,
                           border: Border.all(color: URHeartColors.statusSuccess),
                         ),
@@ -225,7 +226,14 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
               SizedBox(
                 height: URHeartTheme.minTouchTarget,
                 child: ElevatedButton(
-                  onPressed: widget.onContinue,
+                  onPressed: widget.onContinue ??
+                      () {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => FeedScreen(lang: widget.lang),
+                          ),
+                        );
+                      },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: URHeartColors.brandPrimary,
                     foregroundColor: Colors.white,

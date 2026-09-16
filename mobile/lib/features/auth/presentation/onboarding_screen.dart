@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
+import '../../feed/presentation/feed_screen.dart';
+import '../../kyc/presentation/photo_upload_screen.dart';
 import '../data/auth_repository.dart';
 
 /// Screen 1: Splash, Google One-Tap & Neutral Age-Gate Screen
@@ -91,7 +93,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               backgroundColor: URHeartColors.statusSuccess,
             ),
           );
-          widget.onGoogleAuthSuccess?.call();
+          if (widget.onGoogleAuthSuccess != null) {
+            widget.onGoogleAuthSuccess!();
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => PhotoUploadScreen(
+                  lang: widget.lang,
+                  onContinue: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => FeedScreen(lang: widget.lang),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -429,7 +448,24 @@ class _EmailAuthBottomSheetState extends State<_EmailAuthBottomSheet> {
             backgroundColor: URHeartColors.statusSuccess,
           ),
         );
-        widget.onSuccess?.call();
+        if (widget.onSuccess != null) {
+          widget.onSuccess!();
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => PhotoUploadScreen(
+                lang: widget.lang,
+                onContinue: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => FeedScreen(lang: widget.lang),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
