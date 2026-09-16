@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
+import 'package:ur_heart/core/utils/image_compressor.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/features/feed/presentation/feed_screen.dart';
 import 'package:ur_heart/features/kyc/data/kyc_repository.dart';
@@ -47,21 +48,36 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
         source: ImageSource.gallery,
         maxWidth: 1024,
         maxHeight: 1024,
-        imageQuality: 80,
+        imageQuality: 75,
       );
 
       if (picked == null) return;
 
-      final file = File(picked.path);
+      final rawFile = File(picked.path);
+
+      // Client-side compression to WebP to guarantee small payload
+      File uploadFile = rawFile;
+      try {
+        final processed = await ImageOptimizer.processPhoto(rawFile);
+        if (processed != null) {
+          final tempDir = Directory.systemTemp;
+          final compressedFile = File(
+            '${tempDir.path}/slot_${slotIndex}_${DateTime.now().millisecondsSinceEpoch}.webp',
+          );
+          uploadFile = await compressedFile.writeAsBytes(processed.compressedBytes);
+        }
+      } catch (e) {
+        debugPrint('Image compression fallback to raw file: $e');
+      }
 
       setState(() {
-        _photos[slotIndex] = file;
+        _photos[slotIndex] = uploadFile;
         _isScanning[slotIndex] = true;
         _errors[slotIndex] = null;
       });
 
       // Call backend scan-photo anti-leak OCR
-      final result = await _kycRepository.scanPhoto(file);
+      final result = await _kycRepository.scanPhoto(uploadFile);
 
       if (mounted) {
         setState(() {
