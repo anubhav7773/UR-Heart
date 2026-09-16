@@ -1,4 +1,4 @@
-package com.urheart.ur_heart
+package com.urheart.app
 
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -25,4 +25,3 @@ class MainActivity : FlutterActivity() {
         }
     }
 }
-
