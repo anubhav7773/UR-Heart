@@ -1,0 +1,377 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "project_metadata": {
+        "project_name": "UR-Heart",
+        "full_form": "Urban and Rural Heart",
+        "parent_entity": "ASI Verticals",
+        "version": "1.0.0-PROD",
+        "specification_directory": ".docs",
+        "execution_mode": "autonomous_pipeline_strict",
+        "target_platforms": [
+            "Render_Web_Service",
+            "Supabase_PostgreSQL_MCP",
+            "Flutter_Android_Client"
+        ],
+        "cost_ceiling_usd": 0.00
+    },
+    "global_environment_variables": {
+        "SUPABASE_URL": "${SUPABASE_URL}",
+        "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}",
+        "FIREBASE_PROJECT_ID": "${FIREBASE_PROJECT_ID}",
+        "FIREBASE_CLIENT_EMAIL": "${FIREBASE_CLIENT_EMAIL}",
+        "FIREBASE_PRIVATE_KEY": "${FIREBASE_PRIVATE_KEY}",
+        "ADMOB_APP_ID": "ca-app-pub-3940256099942544~3347511713",
+        "APPLOVIN_SDK_KEY": "${APPLOVIN_SDK_KEY}",
+        "ENVIRONMENT": "production"
+    },
+    "pipeline_goals": [
+        {
+            "goal_id": "GOAL_01_SCAFFOLDING",
+            "title": "Repository Scaffolding & Environment Setup",
+            "source_spec": ".docs/06_INFRA_RENDER_CLOUDFLARE_SPEC.md",
+            "description": "Initialize dual-workspace directory structure for FastAPI backend and Flutter client. Setup Dockerfile, render.yaml, requirements.txt, and pubspec.yaml.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "create_directory_tree",
+                    "paths": [
+                        "backend/app/api/v1/endpoints",
+                        "backend/app/core",
+                        "backend/app/models/domain",
+                        "backend/app/models/schemas",
+                        "backend/app/services",
+                        "backend/tests",
+                        "mobile/lib/core/config",
+                        "mobile/lib/core/network",
+                        "mobile/lib/core/security",
+                        "mobile/lib/core/utils",
+                        "mobile/lib/features/auth",
+                        "mobile/lib/features/feed",
+                        "mobile/lib/features/chat",
+                        "mobile/lib/features/ads",
+                        "mobile/lib/features/kyc",
+                        "mobile/lib/features/profile",
+                        "mobile/test"
+                    ]
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "backend/requirements.txt",
+                    "source_reference": "URH-INF-006 Section 5"
+                },
+                {
+                    "step": 3,
+                    "action": "write_file",
+                    "target_file": "backend/Dockerfile",
+                    "source_reference": "URH-INF-006 Section 3"
+                },
+                {
+                    "step": 4,
+                    "action": "write_file",
+                    "target_file": "backend/render.yaml",
+                    "source_reference": "URH-INF-006 Section 4"
+                },
+                {
+                    "step": 5,
+                    "action": "write_file",
+                    "target_file": "mobile/pubspec.yaml",
+                    "source_reference": "URH-MOB-008 Section 2"
+                }
+            ],
+            "verification_command": "cd backend && python -m pip install -r requirements.txt --dry-run",
+            "success_criteria": "Directory tree scaffolded and dependency manifests validated with zero resolution conflicts."
+        },
+        {
+            "goal_id": "GOAL_02_SUPABASE_DDL_RLS",
+            "title": "Deploy Database Schema, Indexes & Row Level Security via MCP",
+            "source_spec": ".docs/05_DATABASE_SCHEMA_RLS_SPEC.md",
+            "description": "Execute complete consolidated SQL DDL on Supabase via MCP tool. Verify table creations, foreign keys, partial indexes, RLS policies, and automated purge functions.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "execute_supabase_sql",
+                    "script": ".docs/05_DATABASE_SCHEMA_RLS_SPEC.md Section 2 (Tables 1 through 10)"
+                },
+                {
+                    "step": 2,
+                    "action": "execute_supabase_sql",
+                    "script": ".docs/05_DATABASE_SCHEMA_RLS_SPEC.md Section 3 (Security Helper Functions)"
+                },
+                {
+                    "step": 3,
+                    "action": "execute_supabase_sql",
+                    "script": ".docs/05_DATABASE_SCHEMA_RLS_SPEC.md Section 4 (RLS Policies on all 10 tables)"
+                },
+                {
+                    "step": 4,
+                    "action": "execute_supabase_sql",
+                    "script": ".docs/05_DATABASE_SCHEMA_RLS_SPEC.md Section 5 (execute_storage_retention_purge routine)"
+                }
+            ],
+            "verification_command": "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('users', 'user_photos', 'swipes', 'matches', 'messages', 'whatsapp_reveal_tokens', 'processed_ad_transactions', 'blocked_users', 'user_reports', 'underage_quarantine', 'legal_audit_logs', 'consent_records', 'grievance_tickets');",
+            "success_criteria": "Query returns exactly 13 active relations in public schema with RLS enforced."
+        },
+        {
+            "goal_id": "GOAL_03_BACKEND_SECURITY_SERVICES",
+            "title": "Implement Anti-Leak Engine (Photo OCR & Chat NLP Sanitizer)",
+            "source_spec": ".docs/07_SECURITY_ANTI_CIRCUMVENTION.md",
+            "description": "Write photo_moderation_service.py and chat_sanitizer.py. Build automated unit test suite asserting 100% interception of Indian mobile numbers, Hindi/English word numbers, leetspeak, and QR codes.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "write_file",
+                    "target_file": "backend/app/services/photo_moderation_service.py",
+                    "source_reference": "URH-SEC-007 Section 2.2"
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "backend/app/services/chat_sanitizer.py",
+                    "source_reference": "URH-SEC-007 Section 3.2"
+                },
+                {
+                    "step": 3,
+                    "action": "write_file",
+                    "target_file": "backend/tests/test_security_filters.py",
+                    "source_reference": "URH-SEC-007 Section 7"
+                }
+            ],
+            "verification_command": "cd backend && pytest tests/test_security_filters.py -v",
+            "success_criteria": "All unit tests pass; zero false positives on natural conversation and 100% rejection on forbidden patterns."
+        },
+        {
+            "goal_id": "GOAL_04_AUTH_SESSION_SYNC",
+            "title": "Implement Firebase Auth Verification & 'Zero on Delete' Sync",
+            "source_spec": ".docs/01_PRD_MASTER_REQUIREMENTS.md",
+            "description": "Build POST /api/v1/auth/session-sync endpoint. Decode Firebase JWT, verify X-Installation-UUID against public.users.last_installation_uuid. Trigger streak & reward balance wipe if UUID mismatch occurs.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "write_file",
+                    "target_file": "backend/app/core/security.py",
+                    "implementation": "Firebase Admin SDK token verification & JWT extraction."
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "backend/app/api/v1/endpoints/auth.py",
+                    "implementation": "POST /api/v1/auth/session-sync logic with atomic streak/reward reset on reinstallation."
+                }
+            ],
+            "verification_command": "cd backend && pytest tests/test_auth_sync.py -v",
+            "success_criteria": "Session sync resets streak_count=0 and reward_balance=0 when incoming UUID differs from stored UUID."
+        },
+        {
+            "goal_id": "GOAL_05_AD_MEDIATION_SSV_ENGINE",
+            "title": "Implement AdMob SSV Cryptography & WhatsApp 6-Ad State Machine",
+            "source_spec": ".docs/04_AD_MEDIATION_SSV_SPEC.md",
+            "description": "Build GET /api/v1/ads/verify-reward. Verify Google ECDSA signatures, enforce idempotency via public.processed_ad_transactions, and implement the dual-completion WhatsApp reveal state machine.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "write_file",
+                    "target_file": "backend/app/api/v1/endpoints/ad_verification.py",
+                    "source_reference": "URH-MON-004 Section 5.1"
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "backend/app/services/whatsapp_service.py",
+                    "source_reference": "URH-MON-004 Section 5.2"
+                },
+                {
+                    "step": 3,
+                    "action": "write_file",
+                    "target_file": "backend/tests/test_ad_ssv.py",
+                    "implementation": "Simulate mock ECDSA callbacks and assert state machine progression."
+                }
+            ],
+            "verification_command": "cd backend && pytest tests/test_ad_ssv.py -v",
+            "success_criteria": "Duplicate callbacks return duplicate_ignored; dual completion (3 ads each) generates 24h ephemeral unlock token."
+        },
+        {
+            "goal_id": "GOAL_06_LEGAL_SAFETY_ENDPOINTS",
+            "title": "Implement DPDP Consent, UGC Safety & Statutory Grievance Redressal",
+            "source_spec": ".docs/02_LEGAL_DPDP_SAFE_HARBOR_SPEC.md",
+            "description": "Build endpoints for in-app user blocking, UGC reporting, underage device quarantine, CERT-In 180-day audit logging, and Rule 3(2) statutory grievance filing.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "write_file",
+                    "target_file": "backend/app/core/legal_audit.py",
+                    "source_reference": "URH-LEG-002 Section 8.1"
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "backend/app/api/v1/endpoints/safety.py",
+                    "source_reference": "URH-STR-003 Section 6"
+                },
+                {
+                    "step": 3,
+                    "action": "write_file",
+                    "target_file": "backend/app/api/v1/endpoints/grievance.py",
+                    "source_reference": "URH-LEG-002 Section 8.2"
+                }
+            ],
+            "verification_command": "cd backend && pytest tests/test_safety_compliance.py -v",
+            "success_criteria": "Blocking user deactivates match instantly; reporting NCII triggers urgent 24h SLA flag; under-18 devices are quarantined for 180 days."
+        },
+        {
+            "goal_id": "GOAL_07_WEBSOCKET_CHAT_GATEWAY",
+            "title": "Implement Memory-Optimized WebSocket Chat Gateway",
+            "source_spec": ".docs/07_SECURITY_ANTI_CIRCUMVENTION.md",
+            "description": "Build /ws/chat WebSocket endpoint with connection pooling, message status tracking (sent, delivered, read), and pre-broadcast anti-leak interception.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "write_file",
+                    "target_file": "backend/app/services/chat_manager.py",
+                    "implementation": "Lightweight ConnectionManager holding dictionary of user_id -> WebSocket."
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "backend/app/api/v1/endpoints/chat.py",
+                    "source_reference": "URH-SEC-007 Section 5.1"
+                }
+            ],
+            "verification_command": "cd backend && pytest tests/test_websocket_chat.py -v",
+            "success_criteria": "WebSocket drops forbidden messages with code 422 alert and delivers safe messages with status 'delivered'."
+        },
+        {
+            "goal_id": "GOAL_08_FLUTTER_CORE_SECURITY",
+            "title": "Scaffold Flutter Client Core, Hardware Privacy & Sandbox Persistence",
+            "source_spec": ".docs/08_MOBILE_FLUTTER_SYSTEM_SPEC.md",
+            "description": "Implement Flutter theme tokens, Dio network client with X-Installation-UUID injection, FLAG_SECURE window manager mixin, and client WebP image compressor.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/core/config/theme.dart",
+                    "source_reference": "URH-UIX-009 Section 2.1 (Dark Romantic Palette)"
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/core/security/installation_service.dart",
+                    "source_reference": "URH-MOB-008 Section 3.1"
+                },
+                {
+                    "step": 3,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/core/security/secure_screen_mixin.dart",
+                    "source_reference": "URH-MOB-008 Section 4.1"
+                },
+                {
+                    "step": 4,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/core/utils/image_compressor.dart",
+                    "source_reference": "URH-MOB-008 Section 5.1"
+                },
+                {
+                    "step": 5,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/core/network/api_client.dart",
+                    "source_reference": "URH-MOB-008 Section 3.2"
+                }
+            ],
+            "verification_command": "cd mobile && flutter analyze lib/core",
+            "success_criteria": "Core security and networking modules analyze cleanly with zero lint errors or warnings."
+        },
+        {
+            "goal_id": "GOAL_09_FLUTTER_ADS_AND_SCREENS",
+            "title": "Implement Flutter Ad Mediation Buffer & Stitch UI Screens",
+            "source_spec": ".docs/09_STITCH_UIUX_DESIGN_TOKENS.md",
+            "description": "Build AdManager background preload queue and implement all 6 core UI screens matching Google Stitch specifications and bilingual vernacular tokens.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/features/ads/services/ad_manager.dart",
+                    "source_reference": "URH-MOB-008 Section 6.1"
+                },
+                {
+                    "step": 2,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/core/utils/vernacular_strings.dart",
+                    "source_reference": "URH-MOB-008 Section 8"
+                },
+                {
+                    "step": 3,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/features/auth/presentation/onboarding_screen.dart",
+                    "source_reference": "URH-UIX-009 Screen 1 (Splash & Age-Gate)"
+                },
+                {
+                    "step": 4,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/features/kyc/presentation/photo_upload_screen.dart",
+                    "source_reference": "URH-UIX-009 Screen 2 (5-Photo & KYC Viewfinder)"
+                },
+                {
+                    "step": 5,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/features/feed/presentation/feed_screen.dart",
+                    "source_reference": "URH-UIX-009 Screen 3 (Feed & Ad Countdown HUD)"
+                },
+                {
+                    "step": 6,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/features/chat/presentation/chat_room_screen.dart",
+                    "source_reference": "URH-UIX-009 Screen 4 (Chat & Anti-Leak Red Banner)"
+                },
+                {
+                    "step": 7,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/features/chat/presentation/whatsapp_reveal_sheet.dart",
+                    "source_reference": "URH-UIX-009 Screen 5 (3-Ad Checkpoint Modal)"
+                },
+                {
+                    "step": 8,
+                    "action": "write_file",
+                    "target_file": "mobile/lib/features/profile/presentation/profile_vault_screen.dart",
+                    "source_reference": "URH-UIX-009 Screen 6 (Streak Vault & 1-Tap Erase)"
+                }
+            ],
+            "verification_command": "cd mobile && flutter analyze lib/features",
+            "success_criteria": "All Flutter UI widgets compile with zero structural errors and integrate VernacularStrings."
+        },
+        {
+            "goal_id": "GOAL_10_END_TO_END_VALIDATION",
+            "title": "Comprehensive Integration Testing, Health Checks & Release Build",
+            "source_spec": ".docs/01_PRD_MASTER_REQUIREMENTS.md",
+            "description": "Execute end-to-end integration test suite, verify health check endpoint memory footprint (<512MB), validate app-ads.txt format, and compile Android release bundle.",
+            "tasks": [
+                {
+                    "step": 1,
+                    "action": "run_test_suite",
+                    "command": "cd backend && pytest tests/ -v --durations=5"
+                },
+                {
+                    "step": 2,
+                    "action": "verify_endpoint",
+                    "endpoint": "http://localhost:8000/api/v1/health",
+                    "expected_json": {
+                        "status": "operational",
+                        "database": "healthy"
+                    }
+                },
+                {
+                    "step": 3,
+                    "action": "verify_ads_txt",
+                    "file": "asiverticals.com/app-ads.txt",
+                    "source_reference": "URH-MON-004 Section 7"
+                },
+                {
+                    "step": 4,
+                    "action": "build_mobile_release",
+                    "command": "cd mobile && flutter build appbundle --release --no-tree-shake-icons"
+                }
+            ],
+            "verification_command": "test -f mobile/build/app/outputs/bundle/release/app-release.aab",
+            "success_criteria": "All backend tests pass, memory footprint remains <160MB idle, and signed Android app bundle (.aab) is successfully compiled."
+        }
+    ]
+}

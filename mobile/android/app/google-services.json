@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "440372810801",
+    "project_id": "ur-heart-6087d",
+    "storage_bucket": "ur-heart-6087d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:440372810801:android:f18ca9911725566bd2b110",
+        "android_client_info": {
+          "package_name": "com.urheart.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "440372810801-ak3ri6sd4pb5iuthvicl3ji7mfurdbei.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.urheart.app",
+            "certificate_hash": "3768ef4785de6fef035392128ffd8ed4d261a4da"
+          }
+        },
+        {
+          "client_id": "440372810801-sj6ns951m5rubhk4pfjotlemuou664qi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD04xC3kI93pvj7F1bVqYFRyyNIsgZRI5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "440372810801-sj6ns951m5rubhk4pfjotlemuou664qi.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

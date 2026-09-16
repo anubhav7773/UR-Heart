@@ -1,0 +1,60 @@
+name: ur_heart
+description: "100% Free Ad-Funded Dating for Urban and Rural India by ASI Verticals"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management & DI
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Network & Real-Time
+  dio: ^5.4.1
+  web_socket_channel: ^2.4.5
+
+  # Authentication (Zero-Card Spark Tier)
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.8
+  google_sign_in: ^6.2.1
+
+  # Database & Storage (Supabase MCP integration)
+  supabase_flutter: ^2.3.4
+
+  # Ads Monetization (Google AdMob Mediation)
+  google_mobile_ads: ^5.0.0
+
+  # Security & Device Sandbox
+  flutter_windowmanager: ^0.2.0
+  shared_preferences: ^2.2.2
+  uuid: ^4.3.3
+
+  # Media Processing & Optimization
+  flutter_image_compress: ^2.1.8
+  blurhash_dart: ^1.1.1
+  image_picker: ^1.0.7
+  camera: ^0.10.5+9
+
+  # UI Polish & Vernacular
+  cached_network_image: ^3.3.1
+  flutter_blurhash: ^0.8.2
+  intl: '>=0.19.0 <0.21.0'
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.8
+  riverpod_generator: ^2.3.9
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

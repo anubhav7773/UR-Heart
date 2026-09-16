@@ -1,0 +1,150 @@
+[
+  {
+    "id": "0d87e52749864aed90ae5583c3b7e9a6",
+    "name": "projects/11309395978596418917/screens/0d87e52749864aed90ae5583c3b7e9a6",
+    "title": "UR-Heart Glowing Logo",
+    "folder": "screens/00_ur_heart_glowing_logo",
+    "width": "120",
+    "height": "120",
+    "deviceType": null,
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 30718,
+      "code": "logo.svg",
+      "code_mime": "image/svg+xml",
+      "code_bytes": 1371
+    }
+  },
+  {
+    "id": "de3e0fa8f8774ceba14384ee248f5bac",
+    "name": "projects/11309395978596418917/screens/de3e0fa8f8774ceba14384ee248f5bac",
+    "title": "1. Splash & Age-Gate Authentication",
+    "folder": "screens/01_splash_and_age_gate",
+    "width": "780",
+    "height": "1816",
+    "deviceType": "MOBILE",
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 66116,
+      "code": "screen.html",
+      "code_mime": "text/html",
+      "code_bytes": 17341
+    }
+  },
+  {
+    "id": "7208aab7a2124dfc8d005e5a6c76e7c7",
+    "name": "projects/11309395978596418917/screens/7208aab7a2124dfc8d005e5a6c76e7c7",
+    "title": "2. Photo Upload & Video KYC Flow",
+    "folder": "screens/02_photo_upload_and_video_kyc",
+    "width": "1186",
+    "height": "2582",
+    "deviceType": "MOBILE",
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 89075,
+      "code": "screen.html",
+      "code_mime": "text/html",
+      "code_bytes": 20618
+    }
+  },
+  {
+    "id": "8a3bfd414f3e4deeb3b43d25d9224b28",
+    "name": "projects/11309395978596418917/screens/8a3bfd414f3e4deeb3b43d25d9224b28",
+    "title": "3. Discovery Swipe Feed & Rewarded DM",
+    "folder": "screens/03_discovery_swipe_feed",
+    "width": "780",
+    "height": "1768",
+    "deviceType": "MOBILE",
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 106649,
+      "code": "screen.html",
+      "code_mime": "text/html",
+      "code_bytes": 21048
+    }
+  },
+  {
+    "id": "4ebd11335b9e4ee28ad5ee25e7856f95",
+    "name": "projects/11309395978596418917/screens/4ebd11335b9e4ee28ad5ee25e7856f95",
+    "title": "4. Protected Chat with Anti-Leak Filter",
+    "folder": "screens/04_protected_chat_anti_leak",
+    "width": "1064",
+    "height": "2524",
+    "deviceType": "MOBILE",
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 62507,
+      "code": "screen.html",
+      "code_mime": "text/html",
+      "code_bytes": 23953
+    }
+  },
+  {
+    "id": "52154f11c64e4db78774ddb3b5915017",
+    "name": "projects/11309395978596418917/screens/52154f11c64e4db78774ddb3b5915017",
+    "title": "5. Mutual WhatsApp 3-Ad Reveal Modal",
+    "folder": "screens/05_mutual_whatsapp_reveal_modal",
+    "width": "780",
+    "height": "2138",
+    "deviceType": "MOBILE",
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 70552,
+      "code": "screen.html",
+      "code_mime": "text/html",
+      "code_bytes": 21451
+    }
+  },
+  {
+    "id": "c49c1e85830e4bfe94bba7a28762428b",
+    "name": "projects/11309395978596418917/screens/c49c1e85830e4bfe94bba7a28762428b",
+    "title": "6. Profile, Streak Vault & One-Tap Erase",
+    "folder": "screens/06_profile_streak_vault_erase",
+    "width": "780",
+    "height": "2658",
+    "deviceType": "MOBILE",
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "screenshot.png",
+      "screenshot_bytes": 59468,
+      "code": "screen.html",
+      "code_mime": "text/html",
+      "code_bytes": 25083
+    }
+  },
+  {
+    "id": "7eaf5fd554b543b9bab2e7ecf65bc287",
+    "name": "projects/11309395978596418917/screens/7eaf5fd554b543b9bab2e7ecf65bc287",
+    "title": "Close-up profile portrait of a confident friendly Indian woman in her early 20s from Lucknow with warm natural smile, subtle traditional earrings with modern casual attire, soft cinematic evening lighting, dark background, authentic natural look.",
+    "folder": "screens/assets_lucknow_woman_portrait",
+    "width": "1024",
+    "height": "1024",
+    "deviceType": null,
+    "files": {
+      "metadata": "screen.json",
+      "screenshot": "portrait.png",
+      "screenshot_bytes": 48585
+    }
+  },
+  {
+    "id": "5c9fc2bfa1314cae90f7f9af45da5221",
+    "name": "projects/11309395978596418917/screens/5c9fc2bfa1314cae90f7f9af45da5221",
+    "title": "UR-Heart Product Requirement Document (PRD)",
+    "folder": "screens/spec_prd_stitch_document",
+    "width": "0",
+    "height": "0",
+    "deviceType": "DESKTOP",
+    "files": {
+      "metadata": "screen.json",
+      "code": "spec.md",
+      "code_mime": "text/markdown",
+      "code_bytes": 9570
+    }
+  }
+]

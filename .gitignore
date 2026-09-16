@@ -1,0 +1,76 @@
+# ==============================================================================
+# UR-Heart Root Git Ignore Specification
+# ==============================================================================
+
+# Environment & Secrets Isolation
+*.env
+*.env.*
+!.env.example
+serviceAccountKey.json
+firebase-adminsdk*.json
+*.pem
+*.key
+*.jks
+*.keystore
+
+# Android / iOS Release Binaries
+*.aab
+*.apk
+*.ipa
+*.app
+
+# Temporary Media and KYC Purge Folders
+downloads/
+kyc_temp/
+scratch/
+temp/
+
+# Python Cache & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+!mobile/lib/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/mobile/build/
+/mobile/.dart_tool/
+
+# IDE & OS Artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

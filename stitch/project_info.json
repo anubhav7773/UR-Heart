@@ -1,0 +1,239 @@
+{
+  "name": "projects/11309395978596418917",
+  "title": "UR-Heart UI Design System",
+  "visibility": "PRIVATE",
+  "createTime": "2026-09-16T07:22:17.176771Z",
+  "updateTime": "2026-09-16T07:25:48.893062Z",
+  "projectType": "TEXT_TO_UI_PRO",
+  "thumbnailScreenshot": {
+    "name": "projects/11309395978596418917/screens/74add8d46b3885d838e972607aca4a2be3c7db561b0b86e9eb6b154428024ecc/fileEntries/screenshot",
+    "downloadUrl": "https://lh3.googleusercontent.com/aida/AEtjO1WLAC1GMKbdmOj3mxrdfp6wuXLNIscU9KBY-oI_yGhLxLcB7zKinWZ5jDwnPV9g-D-txk_LXqZx3T4OtHvc4JvB4KfZImtihPDugeZPq6PChaTw-m_jtcghqNjdMX0DfwnrgdgObUsL_FRvyBxqdvJBbptOZYRoj15A7thoh9yLMHAEZtiVLhvp3Wsv31bm8U_JmLL7Frac8W7buYzDF3LXyXDZDFElZIho_rWkWPVt26bi6eNMXQxIiUA"
+  },
+  "origin": "STITCH",
+  "deviceType": "MOBILE",
+  "designTheme": {
+    "colorMode": "DARK",
+    "font": "INTER",
+    "roundness": "ROUND_FULL",
+    "customColor": "#ff2e63",
+    "headlineFont": "INTER",
+    "bodyFont": "INTER",
+    "labelFont": "INTER",
+    "namedColors": {
+      "on_secondary_fixed": "#00201f",
+      "primary": "#ffb2ba",
+      "background": "#13131a",
+      "tertiary_fixed": "#ffdf9b",
+      "on_surface": "#e4e1eb",
+      "tertiary_container": "#b28b26",
+      "surface_container": "#1f1f26",
+      "on_error": "#690005",
+      "on_error_container": "#ffdad6",
+      "error_container": "#93000a",
+      "secondary_fixed": "#50f9f6",
+      "on_primary": "#67001f",
+      "inverse_surface": "#e4e1eb",
+      "on_secondary_container": "#005857",
+      "surface": "#13131a",
+      "primary_fixed_dim": "#ffb2ba",
+      "on_primary_fixed_variant": "#910030",
+      "surface_tint": "#ffb2ba",
+      "secondary_fixed_dim": "#18ddd9",
+      "on_surface_variant": "#e5bdc0",
+      "on_background": "#e4e1eb",
+      "tertiary": "#edc157",
+      "outline_variant": "#5c3f42",
+      "surface_container_low": "#1b1b22",
+      "on_tertiary": "#3f2e00",
+      "primary_container": "#ff4f72",
+      "error": "#ffb4ab",
+      "on_primary_fixed": "#400010",
+      "tertiary_fixed_dim": "#edc157",
+      "outline": "#ac888a",
+      "on_primary_container": "#5b001a",
+      "surface_container_high": "#292931",
+      "surface_container_highest": "#34343c",
+      "secondary_container": "#00d7d4",
+      "inverse_primary": "#bd0041",
+      "on_tertiary_fixed": "#251a00",
+      "inverse_on_surface": "#303037",
+      "on_tertiary_container": "#372700",
+      "surface_dim": "#13131a",
+      "on_tertiary_fixed_variant": "#5b4300",
+      "surface_container_lowest": "#0d0e14",
+      "secondary": "#47f4f0",
+      "surface_bright": "#393840",
+      "primary_fixed": "#ffd9dc",
+      "on_secondary_fixed_variant": "#00504e",
+      "surface_variant": "#34343c",
+      "on_secondary": "#003736"
+    },
+    "designMd": "---\nname: Desi Romantic Neo-Affordance\ncolors:\n  surface: '#13131a'\n  surface-dim: '#13131a'\n  surface-bright: '#393840'\n  surface-container-lowest: '#0d0e14'\n  surface-container-low: '#1b1b22'\n  surface-container: '#1f1f26'\n  surface-container-high: '#292931'\n  surface-container-highest: '#34343c'\n  on-surface: '#e4e1eb'\n  on-surface-variant: '#e5bdc0'\n  inverse-surface: '#e4e1eb'\n  inverse-on-surface: '#303037'\n  outline: '#ac888a'\n  outline-variant: '#5c3f42'\n  surface-tint: '#ffb2ba'\n  primary: '#ffb2ba'\n  on-primary: '#67001f'\n  primary-container: '#ff4f72'\n  on-primary-container: '#5b001a'\n  inverse-primary: '#bd0041'\n  secondary: '#47f4f0'\n  on-secondary: '#003736'\n  secondary-container: '#00d7d4'\n  on-secondary-container: '#005857'\n  tertiary: '#edc157'\n  on-tertiary: '#3f2e00'\n  tertiary-container: '#b28b26'\n  on-tertiary-container: '#372700'\n  error: '#ffb4ab'\n  on-error: '#690005'\n  error-container: '#93000a'\n  on-error-container: '#ffdad6'\n  primary-fixed: '#ffd9dc'\n  primary-fixed-dim: '#ffb2ba'\n  on-primary-fixed: '#400010'\n  on-primary-fixed-variant: '#910030'\n  secondary-fixed: '#50f9f6'\n  secondary-fixed-dim: '#18ddd9'\n  on-secondary-fixed: '#00201f'\n  on-secondary-fixed-variant: '#00504e'\n  tertiary-fixed: '#ffdf9b'\n  tertiary-fixed-dim: '#edc157'\n  on-tertiary-fixed: '#251a00'\n  on-tertiary-fixed-variant: '#5b4300'\n  background: '#13131a'\n  on-background: '#e4e1eb'\n  surface-variant: '#34343c'\ntypography:\n  display-lg:\n    fontFamily: Inter\n    fontSize: 40px\n    fontWeight: '800'\n    lineHeight: 48px\n    letterSpacing: -0.02em\n  display-lg-mobile:\n    fontFamily: Inter\n    fontSize: 32px\n    fontWeight: '800'\n    lineHeight: 40px\n    letterSpacing: -0.01em\n  headline-lg:\n    fontFamily: Inter\n    fontSize: 28px\n    fontWeight: '700'\n    lineHeight: 36px\n  headline-md:\n    fontFamily: Inter\n    fontSize: 24px\n    fontWeight: '700'\n    lineHeight: 32px\n  headline-sm:\n    fontFamily: Inter\n    fontSize: 20px\n    fontWeight: '600'\n    lineHeight: 28px\n  body-lg:\n    fontFamily: Inter\n    fontSize: 18px\n    fontWeight: '400'\n    lineHeight: 28px\n  body-md:\n    fontFamily: Inter\n    fontSize: 16px\n    fontWeight: '400'\n    lineHeight: 24px\n  body-sm:\n    fontFamily: Inter\n    fontSize: 14px\n    fontWeight: '400'\n    lineHeight: 20px\n  label-lg:\n    fontFamily: Inter\n    fontSize: 16px\n    fontWeight: '600'\n    lineHeight: 24px\n    letterSpacing: 0.01em\n  label-md:\n    fontFamily: Inter\n    fontSize: 13px\n    fontWeight: '600'\n    lineHeight: 18px\n    letterSpacing: 0.02em\n  label-sm:\n    fontFamily: Inter\n    fontSize: 11px\n    fontWeight: '700'\n    lineHeight: 16px\n    letterSpacing: 0.04em\nrounded:\n  sm: 0.5rem\n  DEFAULT: 1rem\n  md: 1.5rem\n  lg: 2rem\n  xl: 3rem\n  full: 9999px\nspacing:\n  gutter: 1rem\n  margin: 1rem\n  space-xs: 0.25rem\n  space-sm: 0.5rem\n  space-md: 1rem\n  space-lg: 1.5rem\n  space-xl: 2rem\n---\n\n## Brand & Style\n\nThis design system expresses a \"Desi-Modern Romanticism\" engineered for young adults (ages 18\u201332) navigating courtship, matrimony, and modern romance across Tier-2 and Tier-3 Indian cities. The visual language bridges emotional warmth with ironclad digital trust, acknowledging unique cultural imperatives around privacy, family discretion, and digital literacy.\n\nThe aesthetic fuses deep-night romance with vibrant, cyber-infused festive undertones:\n- **Atmospheric Warmth meets Cyber Nightlife:** Contrast-rich dark surfaces evoke late-night terrace conversations, accented by high-voltage festival tones (crimson and electric turquoise) that signal passion and vibrancy without appearing westernized or impersonal.\n- **High Affordance & Explicit Touch States:** Mitigates UX anxiety for first-time or cautious digital daters. Interactive zones never rely on subtle gestures alone; cards, badges, and action paths use bold tactile metaphors, visible boundaries, and generous padding.\n- **Privacy as a Core Emotional Pillar:** Cultural contexts in emerging Indian metros demand visible reassurance. UI surfaces deliberately integrate \"Shield & Trust\" cues\u2014watermarked profile layers, dynamic screenshots-disabled markers, and secure verification seals\u2014treated as primary status badges rather than background utilities.\n\n## Colors\n\nThe palette is tuned for high performance across a wide gamut of displays, ranging from budget IPS LCDs prone to backbleed to rich high-contrast AMOLED screens common in mid-tier smartphones.\n\n### Surface Tiers\n- **Canvas Base (`#0A0A0D`):** Deep near-black background preserving battery life on AMOLED while providing limitless contrast depth.\n- **Surface Card (`#16161D`):** The primary interaction plane for swipeable profiles, chat containers, and feed modules.\n- **Surface Raised (`#22222C`):** Higher elevation token for bottom sheets, quick replies, verification modals, and floating menu items.\n- **Surface Border / Ghost Stroke (`#2E2E3C`):** 1px structural definition on dark surfaces to ensure crisp contrast on lower-end LCD panels.\n\n### Brand & Accents\n- **Primary Electric Crimson (`#FF2E63`):** High-passion callouts, primary matching actions, super-likes, and primary CTAs.\n- **Secondary Cyber Turquoise (`#08D9D6`):** Discovery filters, active audio/video calling states, and mutual-interest indicators.\n- **Accent Marigold Gold (`#FFD166`):** Gamified ad reward tokens, VIP badges, streaks, and auspicious horoscope affinity tags.\n\n### Feedback & Privacy States\n- **Status Danger (`#FF334B`):** Block, report, revoke access, and immediate disconnect actions.\n- **Status Success (`#06D6A0`):** ID-verified profile badges, match confirmations, and secure vault locks.\n- **Privacy Seal Tint (`rgba(8, 217, 214, 0.12)`): Translucent overlay used behind sensitive photo previews and discreet mode toggles.\n\n### Typography Contrast\n- **Text Primary (`#FFFFFF`):** Uncompromised legibility for bios, names, and CTAs.\n- **Text Secondary (`#A0A0B2`):** Informational subtitles, timestamps, distances, and secondary prompts.\n- **Text Muted (`#636375`):** Placeholders, disabled counters, and micro-captions.\n\n## Typography\n\nThe typography system uses Inter as the Latin reference, paired at the layout engine level with Devanagari script system fonts (such as Hind or Noto Sans Devanagari) to maintain bilingual equilibrium.\n\n### Script Integration Rules\n- **Line Heights for Indic Scripts:** Devanagari glyphs with top shirorekha lines and low matras require 10\u201315% more vertical clearance than Latin forms. Line heights are explicitly padded across all body tokens (`body-lg` at 28px, `body-md` at 24px) to avoid diacritic clipping.\n- **Hierarchy Stacking:** Profile headers place the prospective match's name in `headline-lg` or `headline-md`, accompanied by bilingual localized subtitles (e.g., profession, hometown) in `body-sm`.\n- **Labels & Badging:** Privacy indicators and verification marks utilize `label-sm` with upper-case tracking to maintain crisp rendering at compact screen boundaries.\n\n## Layout & Spacing\n\nThe layout is built for mobile ergonomics, optimizing for one-handed operation on tall modern aspect ratios (19.5:9 and 20:9).\n\n### Grid and Canvas Metrics\n- **Mobile Handset Canvas (Default):** Fluid single-column layout with fixed outer margins of `margin` (16px) and interior card gutters of `gutter` (16px).\n- **Thumb Zone Anchor:** High-frequency actions (Pass, Like, Super-Like, Rewind, Chat trigger) are pinned within the bottom 25% screen container, floating over the canvas with explicit clearance from navigation bars.\n- **Safe Boundary System:** Bottom sheets and full-screen modals enforce an additional 16px bottom padding to account for on-screen gesture bars and varied Android hardware wrappers.\n- **Component Breathing Space:** Cards enforce internal padding of `space-lg` (24px) on key data sections, dropping to `space-md` (16px) inside compact sub-listings to sustain information density without visual crowding.\n\n## Elevation & Depth\n\nThis system avoids soft, indistinct western neumorphism in favor of **Tonal Layering with Luminescent Accents and Hard Boundary Lines**, engineered to render reliably across low-cost hardware.\n\n### Depth Hierarchy\n1. **Level 0 (Canvas Base - `#0A0A0D`):** Background layer hosting full-bleed profile imagery and media backdrops.\n2. **Level 1 (Surface Card - `#16161D`):** Main interactive profile cards, message threads, and feed items. Elevated using a 1px border stroke of `#2E2E3C` rather than pure blur shadows.\n3. **Level 2 (Surface Raised - `#22222C`):** Overlays, sheets, floating pill action docks, and toast notifications. Employs an ambient, directional rim shadow: `0px 8px 24px rgba(0, 0, 0, 0.65)` complemented by a soft top stroke of `rgba(255, 255, 255, 0.08)`.\n4. **Level 3 (Interactive Glowing Elements):** Action buttons (Electric Crimson and Cyber Turquoise) emit a directional ambient halo: `0px 4px 16px rgba(255, 46, 99, 0.35)` or `0px 4px 16px rgba(8, 217, 214, 0.35)` to signal active clickability.\n\n### Privacy Veil Blur\nWhen a profile activates anti-stalking or screenshot protection, underlying photos use a hardware-accelerated CSS/native blur (`backdrop-filter: blur(20px)`) topped with a recurring diagonal pattern and an explicit lock icon overlay.\n\n## Shapes\n\nThe shape vocabulary prioritizes ultra-smooth, organic contours that reinforce intimacy, comfort, and tactile satisfaction.\n\n### Corner Radii Architecture\n- **Interactive Buttons & Badges (Pill - 999px):** All actionable buttons, interest tags, micro-tokens, and status chips apply a fully rounded pill form.\n- **Profile Cards & Media Holders (24px):** Feed items, swiping photo canvases, and profile cards utilize a 24px radius, softening the presentation of full-screen photography.\n- **Modals & Action Sheets (28px):** Bottom pull-up sheets and confirmation dialogs introduce a top-corner radius of 28px, visually embracing the user's thumb gestures.\n- **Gamified Ad Badges & Reward Hubs (16px):** Compact rectangular modules with controlled rounded corners distinguish reward tokens and mini-quizzes from human discovery cards.\n\n## Components\n\n### Buttons & Interactive Controls\n- **Touch Target Threshold:** All interactive controls enforce an absolute minimum touch zone of **48 \u00d7 48dp**, regardless of visual icon size.\n- **Primary Action (Pill Shape, Height 52px):** Solid `#FF2E63` fill with bold white typography (`label-lg`), subtle top-edge highlight, and glowing shadow on hover/press.\n- **Secondary Action (Pill Shape, Height 52px):** Outline variant with 2px stroke in `#08D9D6`, transparent background, and `#08D9D6` text. Pressing activates a 15% turquoise fill.\n- **Icon Action Buttons (Floating Circle, 56 \u00d7 56px):** Elevated surface `#22222C` with high-contrast centered SVG glyphs for Rewind (Gold), Pass (Danger), and Match (Primary).\n\n### Privacy Reassurance Badges\n- **FLAG_SECURE Indicator:** Visual chip affixed to sensitive screen tops: deep `#16161D` fill, 1px border `#06D6A0`, displaying a verified shield icon with label \"Screenshots Blocked / \u0938\u094d\u0915\u094d\u0930\u0940\u0928\u0936\u0949\u091f \u0938\u0941\u0930\u0915\u094d\u0937\u093f\u0924\".\n- **Discreet Family Mode:** Floating indicator showing an eye-slash glyph with immediate tap-to-minimize affordance.\n\n### Gamified Ad Reward Tokens\n- **Reward Credit Module:** Pill container with `#FFD166` border and warm gold gradient fill (`rgba(255, 209, 102, 0.12)`). Houses a coin icon, bold point balance (`label-md`), and a pulsing \"Watch & Unlock\" trigger with explicit progress counters.\n\n### Chips & Interest Tags\n- **Selection Chips:** Height 36px, radius 999px. Unselected state uses `#16161D` with `#A0A0B2` text. Selected state switches to `#22222C` with a 1.5px `#FF2E63` border and white text.\n\n### Form Inputs & Text Fields\n- **Container Specs:** Height 56px, radius 16px, background `#16161D`, border 1.5px `#2E2E3C`.\n- **Focus State:** Border shifts dynamically to `#08D9D6` with a soft outer glow; floating label transitions in `#08D9D6`.\n- **Input Aids:** Large text entry (16px minimum to avoid iOS/Android automatic viewport zooming) accompanied by clear bilingual helper strings.\n\n### Cards & Discovery Containers\n- **Main Swiping Card:** 24px border radius, anchored image container with a bottom-to-top gradient (`linear-gradient(180deg, transparent 60%, rgba(10, 10, 13, 0.95) 100%)`) ensuring all white headline text over photos exceeds WCAG AAA contrast ratios.",
+    "colorVariant": "FIDELITY",
+    "overridePrimaryColor": "#ff2e63",
+    "overrideSecondaryColor": "#08d9d6",
+    "overrideTertiaryColor": "#ffd166",
+    "overrideNeutralColor": "#16161d",
+    "spacingScale": 2,
+    "typography": {
+      "label-md": {
+        "fontFamily": "Inter",
+        "fontSize": "13px",
+        "fontWeight": "600",
+        "lineHeight": "18px",
+        "letterSpacing": "0.02em"
+      },
+      "headline-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "20px",
+        "fontWeight": "600",
+        "lineHeight": "28px"
+      },
+      "body-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "18px",
+        "fontWeight": "400",
+        "lineHeight": "28px"
+      },
+      "label-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "11px",
+        "fontWeight": "700",
+        "lineHeight": "16px",
+        "letterSpacing": "0.04em"
+      },
+      "headline-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "28px",
+        "fontWeight": "700",
+        "lineHeight": "36px"
+      },
+      "body-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "20px"
+      },
+      "label-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "lineHeight": "24px",
+        "letterSpacing": "0.01em"
+      },
+      "display-lg-mobile": {
+        "fontFamily": "Inter",
+        "fontSize": "32px",
+        "fontWeight": "800",
+        "lineHeight": "40px",
+        "letterSpacing": "-0.01em"
+      },
+      "body-md": {
+        "fontFamily": "Inter",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "lineHeight": "24px"
+      },
+      "headline-md": {
+        "fontFamily": "Inter",
+        "fontSize": "24px",
+        "fontWeight": "700",
+        "lineHeight": "32px"
+      },
+      "display-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "40px",
+        "fontWeight": "800",
+        "lineHeight": "48px",
+        "letterSpacing": "-0.02em"
+      }
+    },
+    "spacing": {
+      "space-sm": "0.5rem",
+      "space-lg": "1.5rem",
+      "gutter": "1rem",
+      "space-xs": "0.25rem",
+      "margin": "1rem",
+      "space-xl": "2rem",
+      "space-md": "1rem"
+    },
+    "headlineFontFamily": "Inter",
+    "bodyFontFamily": "Inter",
+    "labelFontFamily": "Inter"
+  },
+  "screenInstances": [
+    {
+      "id": "0d87e52749864aed90ae5583c3b7e9a6",
+      "sourceScreen": "projects/11309395978596418917/screens/0d87e52749864aed90ae5583c3b7e9a6",
+      "x": 1024,
+      "width": 120,
+      "height": 128
+    },
+    {
+      "id": "4ebd11335b9e4ee28ad5ee25e7856f95",
+      "sourceScreen": "projects/11309395978596418917/screens/4ebd11335b9e4ee28ad5ee25e7856f95",
+      "x": 3538,
+      "width": 390,
+      "height": 1261
+    },
+    {
+      "id": "52154f11c64e4db78774ddb3b5915017",
+      "sourceScreen": "projects/11309395978596418917/screens/52154f11c64e4db78774ddb3b5915017",
+      "x": 4446,
+      "width": 390,
+      "height": 1069
+    },
+    {
+      "id": "5c9fc2bfa1314cae90f7f9af45da5221",
+      "sourceScreen": "projects/11309395978596418917/screens/5c9fc2bfa1314cae90f7f9af45da5221",
+      "y": 1585,
+      "width": 600,
+      "height": 600
+    },
+    {
+      "id": "7208aab7a2124dfc8d005e5a6c76e7c7",
+      "sourceScreen": "projects/11309395978596418917/screens/7208aab7a2124dfc8d005e5a6c76e7c7",
+      "x": 2176,
+      "width": 390,
+      "height": 1290
+    },
+    {
+      "id": "7eaf5fd554b543b9bab2e7ecf65bc287",
+      "sourceScreen": "projects/11309395978596418917/screens/7eaf5fd554b543b9bab2e7ecf65bc287",
+      "x": 1600,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "id": "8a3bfd414f3e4deeb3b43d25d9224b28",
+      "sourceScreen": "projects/11309395978596418917/screens/8a3bfd414f3e4deeb3b43d25d9224b28",
+      "x": 3084,
+      "width": 390,
+      "height": 808
+    },
+    {
+      "id": "assets_5b646fbc1eb74493b811a9bcccd9c028",
+      "width": 960,
+      "height": 540,
+      "sourceAsset": "assets/5b646fbc1eb74493b811a9bcccd9c028",
+      "type": "DESIGN_SYSTEM_INSTANCE"
+    },
+    {
+      "id": "c49c1e85830e4bfe94bba7a28762428b",
+      "sourceScreen": "projects/11309395978596418917/screens/c49c1e85830e4bfe94bba7a28762428b",
+      "x": 3992,
+      "width": 390,
+      "height": 1329
+    },
+    {
+      "id": "de3e0fa8f8774ceba14384ee248f5bac",
+      "sourceScreen": "projects/11309395978596418917/screens/de3e0fa8f8774ceba14384ee248f5bac",
+      "x": 2630,
+      "width": 390,
+      "height": 925
+    }
+  ],
+  "metadata": {
+    "userRole": "OWNER"
+  }
+}

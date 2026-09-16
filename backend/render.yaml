@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: ur-heart-api
+    env: docker
+    plan: free
+    region: singapore # Closest low-latency region for Indian users
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ADMOB_APP_ID
+        sync: false
+      - key: APPLOVIN_SDK_KEY
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://asiverticals.com,http://localhost:3000"
