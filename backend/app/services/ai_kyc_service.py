@@ -26,7 +26,9 @@ def verify_face_in_video(video_path: str) -> bool:
         if not cap.isOpened():
             return False
 
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        bundled_cascade = os.path.join(base_dir, "assets", "haarcascade_frontalface_default.xml")
+        cascade_path = bundled_cascade if os.path.exists(bundled_cascade) else (getattr(cv2.data, "haarcascades", "") + "haarcascade_frontalface_default.xml")
         face_cascade = cv2.CascadeClassifier(cascade_path)
         
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))

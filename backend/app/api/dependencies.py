@@ -71,8 +71,9 @@ async def get_current_user(
             gender="other",
             city="Lucknow",
             bio="UR-Heart Explorer",
-            installation_uuid=UUID(x_installation_uuid.strip()) if x_installation_uuid else None,
-            is_verified=True,
+            last_installation_uuid=x_installation_uuid.strip() if x_installation_uuid else None,
+            kyc_status=True,
+            kyc_state="verified",
             is_banned=False,
         )
         db.add(user)

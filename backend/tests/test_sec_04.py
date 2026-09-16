@@ -47,13 +47,13 @@ def test_upload_executable_extension_rejected():
 
 def test_upload_oversized_photo_rejected_413():
     """
-    Uploading a photo > 150 KB (e.g. 2 MB) must trigger HTTP 413 Payload Too Large.
+    Uploading a photo > 10 MB (e.g. 12 MB) must trigger HTTP 413 Payload Too Large.
     """
-    oversized_bytes = b"\xff\xd8\xff" + (b"\x00" * (2 * 1024 * 1024))  # 2MB with JPEG header
+    oversized_bytes = b"\xff\xd8\xff" + (b"\x00" * (12 * 1024 * 1024))  # 12MB with JPEG header
     with pytest.raises(Exception) as exc:
         validate_photo_file(oversized_bytes, filename="large_profile.jpg")
     assert exc.value.status_code == 413
-    assert "exceeds 150 KB" in exc.value.detail
+    assert "exceeds 10 MB" in exc.value.detail
 
 
 def test_upload_invalid_magic_bytes_rejected():
@@ -70,13 +70,13 @@ def test_upload_invalid_magic_bytes_rejected():
 
 def test_upload_oversized_kyc_video_rejected_413():
     """
-    Uploading a KYC video > 2.5 MB must trigger HTTP 413 Payload Too Large.
+    Uploading a KYC video > 10 MB must trigger HTTP 413 Payload Too Large.
     """
-    oversized_video = b"\x00\x00\x00\x18ftypmp42" + (b"\x00" * 3000000)  # 3 MB MP4
+    oversized_video = b"\x00\x00\x00\x18ftypmp42" + (b"\x00" * (12 * 1024 * 1024))  # 12 MB MP4
     with pytest.raises(Exception) as exc:
         validate_kyc_video_file(oversized_video, filename="video.mp4")
     assert exc.value.status_code == 413
-    assert "exceeds 2.5MB" in exc.value.detail
+    assert "exceeds 10MB" in exc.value.detail
 
 
 # ==============================================================================

@@ -10,7 +10,7 @@ except ImportError:
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-MAX_PHOTO_SIZE_BYTES = 150 * 1024  # 150 KB limit per Security Check 16
+MAX_PHOTO_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit (accommodates high-res smartphone camera photos)
 MAX_KYC_VIDEO_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit (accommodates 3-5s smartphone video)
 
 DISALLOWED_EXTENSIONS = {
@@ -22,7 +22,7 @@ def validate_photo_file(file_bytes: bytes, filename: str = "") -> None:
     """
     Security Check 16: Restrict File Uploads & Magic Bytes Inspection for Photos.
     - Rejects executable and script extensions.
-    - Enforces <= 150 KB size ceiling (raises HTTP 413).
+    - Enforces <= 10 MB size ceiling (raises HTTP 413).
     - Inspects binary magic bytes for WebP, JPEG, PNG.
     """
     if filename:
@@ -36,7 +36,7 @@ def validate_photo_file(file_bytes: bytes, filename: str = "") -> None:
     if len(file_bytes) > MAX_PHOTO_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Photo size ({len(file_bytes)} bytes) exceeds 150 KB limit."
+            detail=f"Photo size ({len(file_bytes)} bytes) exceeds 10 MB limit."
         )
 
     if len(file_bytes) < 12:

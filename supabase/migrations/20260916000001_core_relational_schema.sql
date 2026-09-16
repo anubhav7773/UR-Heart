@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     streak_count INT2 NOT NULL DEFAULT 0 CHECK (streak_count >= 0),
     reward_balance INT4 NOT NULL DEFAULT 0 CHECK (reward_balance >= 0),
     kyc_status BOOLEAN NOT NULL DEFAULT FALSE,
-    kyc_state kyc_review_state NOT NULL DEFAULT 'pending_ai',
+    kyc_state VARCHAR(30) NOT NULL DEFAULT 'pending_ai' CHECK (kyc_state IN ('pending_ai', 'verified', 'pending_manual_review', 'rejected')),
     kyc_ai_confidence NUMERIC(3, 2) DEFAULT NULL,
     kyc_transcript TEXT DEFAULT NULL,
     kyc_failure_reason TEXT DEFAULT NULL,
