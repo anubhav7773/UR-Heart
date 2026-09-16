@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_windowmanager/flutter_windowmanager.dart';
+import 'package:flutter/services.dart';
 
 /// Hardware Display Privacy Mixin (FLAG_SECURE)
 /// Enforces hardware-level protection on sensitive routes (Feed, Chat, Photo Upload).
 /// Disables screenshots, screen recording, and app-switcher background previews.
 mixin SecureScreenMixin<T extends StatefulWidget> on State<T> {
+  static const MethodChannel _securityChannel = MethodChannel('com.urheart.app/security');
+
   @override
   void initState() {
     super.initState();
@@ -19,7 +21,7 @@ mixin SecureScreenMixin<T extends StatefulWidget> on State<T> {
 
   Future<void> _enableScreenSecurity() async {
     try {
-      await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+      await _securityChannel.invokeMethod('enableSecure');
     } catch (e) {
       debugPrint('FLAG_SECURE enablement error: $e');
     }
@@ -27,9 +29,10 @@ mixin SecureScreenMixin<T extends StatefulWidget> on State<T> {
 
   Future<void> _disableScreenSecurity() async {
     try {
-      await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
+      await _securityChannel.invokeMethod('disableSecure');
     } catch (e) {
       debugPrint('FLAG_SECURE removal error: $e');
     }
   }
 }
+

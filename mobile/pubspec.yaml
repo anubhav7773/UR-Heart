@@ -32,7 +32,6 @@ dependencies:
   google_mobile_ads: ^5.0.0
 
   # Security & Device Sandbox
-  flutter_windowmanager: ^0.2.0
   shared_preferences: ^2.2.2
   uuid: ^4.3.3
 
