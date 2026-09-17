@@ -7,12 +7,16 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import get_db
 
+from app.core.rate_limiter import limiter
+
 client = TestClient(app)
 
 DUMMY_VIDEO_BYTES = b"FAKE_MP4_VIDEO_HEADER_DATA_1234567890"
 
 @pytest.fixture(autouse=True)
 def mock_db_dependency():
+    app.state.limiter.enabled = False
+    limiter.enabled = False
     dummy_user = MagicMock()
     dummy_user.id = uuid4()
     dummy_user.full_name = "Aman Gupta"
@@ -148,3 +152,40 @@ def test_temporary_files_wiped_after_execution():
 
     assert not os.path.exists(video_path), f"Temp video file was not cleaned up: {video_path}"
     assert not os.path.exists(audio_path), f"Temp audio file was not cleaned up: {audio_path}"
+
+# ==============================================================================
+# TEST CASE 5: Submit Video Without user_id (Resolves via Auth / Auto-Provision)
+# ==============================================================================
+def test_kyc_submit_without_user_id_succeeds():
+    """
+    Verifies that calling /submit-video without a user_id form parameter
+    (standard mobile app flow) succeeds and does not throw 400 account missing error.
+    """
+    headers = {
+        "X-Consent-DPDP": "true",
+        "Authorization": "Bearer mock_user_token"
+    }
+    files = {"file": ("kyc_clip.mp4", DUMMY_VIDEO_BYTES, "video/mp4")}
+    data = {
+        "user_name": "Aman Gupta",
+        "user_city": "Lucknow"
+    }
+
+    with patch("app.services.ai_kyc_service.verify_face_in_video", return_value=True), \
+         patch("app.services.ai_kyc_service.extract_audio_track", return_value=True), \
+         patch("app.services.ai_kyc_service.transcribe_audio_groq", new_callable=AsyncMock) as mock_whisper, \
+         patch("app.services.ai_kyc_service.evaluate_semantic_match_groq", new_callable=AsyncMock) as mock_llama, \
+         patch("app.services.ai_kyc_service.purge_user_storage_assets", new_callable=AsyncMock):
+
+        mock_whisper.return_value = "Mera naam Aman Gupta hai aur main Lucknow se hoon"
+        mock_llama.return_value = {
+            "name_match": True,
+            "city_match": True,
+            "confidence": 0.92
+        }
+
+        response = client.post("/api/v1/kyc/submit-video", headers=headers, files=files, data=data)
+
+    assert response.status_code == 200, response.text
+    res_data = response.json()
+    assert res_data["status"] in ("auto_verified", "queued_for_admin_review")

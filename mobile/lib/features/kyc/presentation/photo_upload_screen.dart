@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:ur_heart/core/config/theme.dart';
@@ -214,21 +215,35 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
         _videoStatusText = 'Analyzing face & speech with AI...';
       });
 
-      final result = await _kycRepository.submitKycVideo(videoFile: file);
+      String? userName;
+      try {
+        userName = FirebaseAuth.instance.currentUser?.displayName;
+      } catch (_) {}
+
+      final result = await _kycRepository.submitKycVideo(
+        videoFile: file,
+        userName: userName,
+      );
 
       if (mounted) {
-        final verified = result['verified'] == true || result['status'] == 'auto_verified' || result['status'] == 'verified';
+        final bool isAccepted = result['verified'] == true ||
+            result['status'] == 'auto_verified' ||
+            result['status'] == 'verified' ||
+            result['status'] == 'queued_for_admin_review';
+
+        final bool isAutoApproved = result['status'] == 'auto_verified' || result['status'] == 'verified' || result['verified'] == true;
+
         setState(() {
           _isVideoScanning = false;
-          _isVideoVerified = verified;
-          _videoStatusText = verified
+          _isVideoVerified = isAccepted;
+          _videoStatusText = isAutoApproved
               ? 'Verified by AI (${((result['confidence'] ?? 0.95) * 100).toInt()}% match)'
-              : 'Verification pending manual review';
+              : 'KYC Submitted (Queued for admin review)';
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: verified ? URHeartColors.statusSuccess : URHeartColors.accentGold,
+            backgroundColor: isAutoApproved ? URHeartColors.statusSuccess : URHeartColors.accentGold,
             content: Text(_videoStatusText!),
           ),
         );
