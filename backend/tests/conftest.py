@@ -50,3 +50,38 @@ async def auth_headers(test_user):
     app.dependency_overrides[get_current_user] = lambda: test_user
     yield {"Authorization": "Bearer mock_valid_test_token"}
     app.dependency_overrides.pop(get_current_user, None)
+
+@pytest_asyncio.fixture
+async def regular_user_token(test_user):
+    app.dependency_overrides[get_current_user] = lambda: test_user
+    yield "mock_regular_user_token"
+    app.dependency_overrides.pop(get_current_user, None)
+
+@pytest_asyncio.fixture
+async def admin_token():
+    admin = User(
+        id=uuid4(),
+        firebase_uid=str(uuid4()),
+        phone_number=f"+9198{str(uuid4().int)[:8]}",
+        whatsapp_number=f"+9198{str(uuid4().int)[:8]}",
+        full_name="Master Admin",
+        dob=date(1995, 1, 1),
+        gender="male",
+        city="Lucknow",
+        bio="ASI Verticals Master Admin",
+        is_super_admin=True,
+        is_banned=False,
+    )
+    async with async_session_factory() as session:
+        session.add(admin)
+        await session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    yield "mock_admin_token"
+    app.dependency_overrides.pop(get_current_user, None)
+
+    async with async_session_factory() as session:
+        db_admin = await session.get(User, admin.id)
+        if db_admin:
+            await session.delete(db_admin)
+            await session.commit()

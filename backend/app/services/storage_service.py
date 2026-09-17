@@ -37,6 +37,8 @@ if supabase_storage_client is None:
             return []
         def create_signed_upload_url(self, path: str):
             return {"signedUrl": f"https://mock-storage.supabase.co/user-photos/{path}", "url": f"https://mock-storage.supabase.co/user-photos/{path}"}
+        def create_signed_url(self, path: str, expires_in: int = 600):
+            return {"signedURL": f"https://mock-storage.supabase.co/kyc-temp/{path}?token=mock_signed_url", "signedUrl": f"https://mock-storage.supabase.co/kyc-temp/{path}?token=mock_signed_url"}
 
     class _DummyStorage:
         def __init__(self):

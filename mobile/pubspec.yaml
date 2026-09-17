@@ -43,6 +43,7 @@ dependencies:
   blurhash_dart: ^1.1.1
   image_picker: ^1.0.7
   camera: ^0.10.5+9
+  video_player: ^2.8.2
 
   # Geolocation & Privacy Geocoding
   geolocator: ^11.0.0

@@ -4,6 +4,7 @@ import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
+import '../../admin/presentation/admin_kyc_dashboard.dart';
 
 /// Screen 6: Profile, Streak Vault & One-Tap Account Erase Center
 /// Spec: URH-UIX-009 Section 3 Screen 6
@@ -124,6 +125,8 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
     final userCity = _profile?.city ?? 'Lucknow, UP';
     final streak = _profile?.streakCount ?? 14;
     final rewardTokens = _profile?.rewardBalance ?? 9;
+    final User? firebaseUser = FirebaseAuth.instance.currentUser;
+    final bool isMasterAdmin = firebaseUser?.email?.toLowerCase() == 'kshtriyaanubhav9120@gmail.com';
 
     return Scaffold(
       backgroundColor: URHeartColors.canvasBackground,
@@ -329,6 +332,61 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+
+                    // Render Super Admin banner if master admin
+                    if (isMasterAdmin) ...[
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const AdminKycDashboardScreen()),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22222C),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFFFD166), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD166).withValues(alpha: 0.15),
+                                blurRadius: 16,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            children: [
+                              Text("👑", style: TextStyle(fontSize: 22)),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Super Admin KYC Hub",
+                                      style: TextStyle(
+                                        color: Color(0xFFFFD166),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      "Manual override portal & pending queue",
+                                      style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.arrow_forward_ios, color: Color(0xFFFFD166), size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Account & Safety Settings List
                     Container(
