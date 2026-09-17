@@ -1,15 +1,25 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update, select
+from sqlalchemy import text, update, select
 
 from app.core.database import get_db
 from app.api.dependencies import get_current_user
 from app.models.domain.user import User
-from app.models.schemas.user import UserProfileUpdateRequest, UserProfileResponse
+from app.models.schemas.user import (
+    UserProfileUpdateRequest,
+    UserProfileResponse,
+    UserProfileSetupRequest,
+    DiscoveryProfileResponse,
+)
+from app.core.legal_audit import record_legal_audit_event
 
 router = APIRouter()
 
+# 1. Profile Retrieval Endpoint
 @router.get("/profile", response_model=UserProfileResponse, status_code=status.HTTP_200_OK)
 async def get_profile(
     current_user: User = Depends(get_current_user)
@@ -20,6 +30,7 @@ async def get_profile(
     """
     return current_user
 
+# 2. Profile Update Endpoint
 @router.patch("/profile", response_model=UserProfileResponse, status_code=status.HTTP_200_OK)
 async def update_profile(
     payload: UserProfileUpdateRequest,
@@ -36,10 +47,8 @@ async def update_profile(
     if not update_data:
         return current_user
 
-    # Add updated_at timestamp
     update_data["updated_at"] = datetime.now(timezone.utc)
 
-    # 100% Parameterized SQLAlchemy 2.0 ORM update
     stmt = (
         update(User)
         .where(User.id == current_user.id)
@@ -49,7 +58,86 @@ async def update_profile(
     await db.execute(stmt)
     await db.commit()
 
-    # Refresh and return updated record
     res = await db.execute(select(User).where(User.id == current_user.id))
     updated_user = res.scalar_one()
     return updated_user
+
+# 3. Profile Setup Endpoint (Sub-Task A.4)
+@router.post("/profile-setup", status_code=status.HTTP_200_OK)
+async def setup_user_profile(
+    payload: UserProfileSetupRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Saves user name, WhatsApp (+91), inclusive gender, and private GPS coordinates.
+    Exact GPS coordinates are secured and never exposed to other clients.
+    """
+    stmt = (
+        update(User)
+        .where(User.id == current_user.id)
+        .values(
+            full_name=payload.full_name,
+            whatsapp_number=payload.whatsapp_number,
+            gender=payload.gender,
+            city=payload.city,
+            bio=payload.bio or "",
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            detected_locality=payload.detected_locality
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    # Log Profile Setup in statutory audit trail
+    await record_legal_audit_event(
+        request=request,
+        action_type="USER_PROFILE_SETUP",
+        user_id=current_user.id,
+        db=db
+    )
+
+    return {
+        "status": "success",
+        "message": "Profile initialized successfully. Proceed to media KYC."
+    }
+
+# 4. Discovery Feed Endpoint with Relative Distance Badge (Sub-Task A.4)
+@router.get("/feed", response_model=List[DiscoveryProfileResponse])
+async def get_feed(
+    lat: float = Query(..., ge=-90.0, le=90.0, description="Caller's current GPS Latitude"),
+    lon: float = Query(..., ge=-180.0, le=180.0, description="Caller's current GPS Longitude"),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetches discovery feed ordered by proximity using the database spatial function.
+    Returns relative distance badges (e.g. 'Nearby 12 km') without leaking exact coordinates.
+    """
+    sql = text("""
+        SELECT * FROM public.get_discovery_feed(
+            :current_user_id,
+            :lat,
+            :lon,
+            :limit,
+            :offset
+        )
+    """)
+    
+    result = await db.execute(
+        sql,
+        {
+            "current_user_id": current_user.id,
+            "lat": lat,
+            "lon": lon,
+            "limit": limit,
+            "offset": offset
+        }
+    )
+    rows = result.mappings().all()
+
+    return [DiscoveryProfileResponse.from_row(dict(row)) for row in rows]

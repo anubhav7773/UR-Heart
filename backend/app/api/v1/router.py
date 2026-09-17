@@ -11,6 +11,7 @@ api_router.include_router(ad_verification.router, prefix="/ads", tags=["Ad Verif
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(chat.router, prefix="/chat", tags=["Chat"])
 api_router.include_router(user.router, prefix="/users", tags=["Users"])
+api_router.include_router(user.router, prefix="/user", tags=["User"])
 api_router.include_router(safety.router, prefix="/safety", tags=["Safety"])
 api_router.include_router(feed.router, prefix="/feed", tags=["Discovery Feed"])
 

@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
+from app.core.config import settings
 
-DATABASE_URL = os.getenv(
+DATABASE_URL = settings.DATABASE_URL or os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
 )
@@ -38,16 +39,18 @@ if "supabase.com" in DATABASE_URL or "supabase.co" in DATABASE_URL or "pooler" i
 
 Base = declarative_base()
 
-# Initialize engine with safe pool limits for Render 512MB RAM
+from sqlalchemy.pool import NullPool
+
+# Initialize engine: Use NullPool with Supabase transaction pooler to prevent cross-loop connection issues
 try:
-    engine = create_async_engine(
-        DATABASE_URL,
-        echo=False,
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-        connect_args=connect_args,
-    )
+    is_pooler = "pooler" in DATABASE_URL or "supabase" in DATABASE_URL
+    engine_kwargs = {"echo": False, "connect_args": connect_args}
+    if is_pooler:
+        engine_kwargs["poolclass"] = NullPool
+    else:
+        engine_kwargs.update({"pool_size": 5, "max_overflow": 10, "pool_pre_ping": True})
+
+    engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 except Exception:
     # Fallback to in-memory sqlite for mock/test environments
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)

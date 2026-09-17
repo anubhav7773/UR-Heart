@@ -1,6 +1,7 @@
 from datetime import date, datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Literal, Any
 from uuid import UUID
+import re
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from app.core.sanitizer import sanitize_user_html, strip_null_bytes
 
@@ -72,3 +73,90 @@ class UserDiscoveryProfileResponse(BaseModel):
     photos: List[PhotoDTO] = Field(default_factory=list)
     streak_tier: str = "Bronze"
 
+# ==============================================================================
+# GEOSPATIAL & DISCOVERY SCHEMAS (SUB-TASK A.3)
+# ==============================================================================
+
+# 1. Profile Setup Request Payload
+class UserProfileSetupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str = Field(..., min_length=2, max_length=50, description="Legal full name")
+    whatsapp_number: str = Field(..., description="Indian WhatsApp Number in E.164 format")
+    gender: Literal["male", "female", "lgbtq+"]
+    city: str = Field(..., min_length=2, max_length=50)
+    bio: Optional[str] = Field(default="", max_length=250)
+    
+    # Internal GPS Coordinates (Captured client-side from GPS)
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    detected_locality: Optional[str] = Field(None, max_length=100)
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        clean_name = v.strip()
+        if not re.match(r"^[a-zA-Z\s.'-]+$", clean_name):
+            raise ValueError("Name can only contain alphabetic characters, spaces, dots, and hyphens.")
+        return clean_name
+
+    @field_validator("whatsapp_number")
+    @classmethod
+    def validate_whatsapp(cls, v: str) -> str:
+        clean = re.sub(r"[\s\-()]", "", v)
+        if not re.match(r"^\+91[6-9]\d{9}$", clean):
+            raise ValueError("WhatsApp number must be a valid 10-digit Indian number prefixed with +91.")
+        return clean
+
+# 2. Public Photo DTO
+class ProfilePhotoDTO(BaseModel):
+    slot_index: int
+    photo_storage_path: str
+    blur_hash: str
+
+# 3. Discovery Feed Card Response (Coordinates are strictly excluded)
+class DiscoveryProfileResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    user_id: UUID
+    full_name: str
+    city: str
+    detected_locality: Optional[str] = None
+    distance_km: Optional[int] = None
+    distance_badge: str = "Nearby"
+    gender: str
+    bio: str
+    streak_count: int
+    photos: List[ProfilePhotoDTO] = []
+
+    @classmethod
+    def from_row(cls, row: dict) -> "DiscoveryProfileResponse":
+        dist = row.get("distance_km")
+        if dist is not None:
+            if dist < 1:
+                badge = "Nearby < 1 km"
+            else:
+                badge = f"Nearby {dist} km"
+        else:
+            badge = "Location Unavailable"
+
+        raw_photos = row.get("photos") or []
+        parsed_photos = []
+        for p in raw_photos:
+            if isinstance(p, dict):
+                parsed_photos.append(ProfilePhotoDTO(**p))
+            elif isinstance(p, ProfilePhotoDTO):
+                parsed_photos.append(p)
+
+        return cls(
+            user_id=row["user_id"],
+            full_name=row["full_name"],
+            city=row["city"],
+            detected_locality=row.get("detected_locality"),
+            distance_km=dist,
+            distance_badge=badge,
+            gender=row["gender"],
+            bio=row.get("bio") or "",
+            streak_count=row.get("streak_count", 0),
+            photos=parsed_photos
+        )
