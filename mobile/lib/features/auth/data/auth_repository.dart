@@ -7,11 +7,34 @@ import '../../../core/network/api_client.dart';
 /// Authentication Repository handling Firebase Auth (Google & Email/Password)
 /// and FastAPI backend session synchronization.
 class AuthRepository {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth? _customAuth;
+
+  AuthRepository({FirebaseAuth? auth}) : _customAuth = auth;
+
+  FirebaseAuth get _auth {
+    if (_customAuth != null) return _customAuth!;
+    try {
+      return FirebaseAuth.instance;
+    } catch (_) {
+      throw StateError('Firebase not initialized');
+    }
+  }
 
   FirebaseAuth get auth => _auth;
-  User? get currentUser => _auth.currentUser;
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  User? get currentUser {
+    try {
+      return _auth.currentUser;
+    } catch (_) {
+      return null;
+    }
+  }
+  Stream<User?> get authStateChanges {
+    try {
+      return _auth.authStateChanges();
+    } catch (_) {
+      return const Stream.empty();
+    }
+  }
 
   /// Sign In with Google
   Future<UserCredential?> signInWithGoogle() async {

@@ -6,6 +6,7 @@ import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/core/utils/image_compressor.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/features/feed/presentation/feed_screen.dart';
+import 'package:ur_heart/features/home/presentation/main_shell_screen.dart';
 import 'package:ur_heart/features/kyc/data/kyc_repository.dart';
 
 /// Screen 2: 5-Photo Upload, Live OCR Warning & KYC Viewfinder
@@ -253,25 +254,33 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: URHeartColors.canvasBackground,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Upload 5 Profile Photos / फ़ोटो',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              _t('stepTwoOfThree'),
-              style: const TextStyle(fontSize: 12, color: URHeartColors.textSecondary),
-            ),
-          ],
+    final bool hasHeroPhoto = _photos[1] != null;
+    final int secondaryPhotoCount = [2, 3, 4, 5].where((s) => _photos[s] != null).length;
+    final bool hasMinPhotos = hasHeroPhoto && secondaryPhotoCount >= 2;
+    final bool isReadyToExplore = hasMinPhotos && _isVideoVerified;
+
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: URHeartColors.canvasBackground,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Upload 5 Profile Photos / फ़ोटो',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                _t('stepTwoOfThree'),
+                style: const TextStyle(fontSize: 12, color: URHeartColors.textSecondary),
+              ),
+            ],
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
+        body: SafeArea(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -335,34 +344,60 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
               SizedBox(
                 height: URHeartTheme.minTouchTarget,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (widget.onContinue != null) {
-                      widget.onContinue!();
-                    } else {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => FeedScreen(lang: widget.lang),
-                        ),
-                      );
-                    }
-                  },
+                  onPressed: isReadyToExplore
+                      ? () {
+                          if (widget.onContinue != null) {
+                            widget.onContinue!();
+                          } else {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (_) => MainShellScreen(lang: widget.lang),
+                              ),
+                              (route) => false,
+                            );
+                          }
+                        }
+                      : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: URHeartColors.brandPrimary,
+                    backgroundColor: isReadyToExplore
+                        ? URHeartColors.brandPrimary
+                        : const Color(0xFF22222C),
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF22222C),
+                    disabledForegroundColor: const Color(0xFF636375),
                   ),
                   child: Text(
-                    _t('verifyContinue'),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    isReadyToExplore
+                        ? _t('verifyContinue')
+                        : 'Complete Photos & Video KYC to Unlock',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
+              if (!isReadyToExplore) ...[
+                const SizedBox(height: 8),
+                Text(
+                  !hasHeroPhoto
+                      ? '⚠️ Step 1: Please upload Slot 1 Hero Photo.'
+                      : (secondaryPhotoCount < 2
+                          ? '⚠️ Step 2: Please upload at least 2 lifestyle photos ($secondaryPhotoCount/2 uploaded).'
+                          : '⚠️ Step 3: Please record 5-second video KYC above.'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFFFFD166),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildHeroSlot() {
     final photo = _photos[1];

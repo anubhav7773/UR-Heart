@@ -116,8 +116,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
       if (mounted) {
         // Navigate forward to 5-Photo Upload & Video KYC Screen
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const PhotoUploadScreen()),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -144,20 +145,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     const Color textPrimary = Color(0xFFFFFFFF);
     const Color textSecondary = Color(0xFFA0A0B2);
 
-    return Scaffold(
-      backgroundColor: canvasBg,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
         backgroundColor: canvasBg,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "Complete Profile / प्रोफ़ाइल भरें",
-          style: TextStyle(color: textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+        appBar: AppBar(
+          backgroundColor: canvasBg,
+          elevation: 0,
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+          title: const Text(
+            "Complete Profile / प्रोफ़ाइल भरें",
+            style: TextStyle(color: textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Form(
             key: _formKey,
             child: Column(
@@ -393,8 +397,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildGenderChip(String value, String labelEn, String labelHi) {
     final bool isSelected = _selectedGender == value;

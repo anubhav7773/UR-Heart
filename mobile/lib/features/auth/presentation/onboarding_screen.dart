@@ -4,6 +4,7 @@ import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import '../../home/presentation/main_shell_screen.dart';
 import '../../kyc/presentation/photo_upload_screen.dart';
 import '../data/auth_repository.dart';
+import 'auth_gate.dart';
 
 /// Screen 1: Splash, Google One-Tap & Neutral Age-Gate Screen
 /// Spec: URH-UIX-009 Section 3 Screen 1
@@ -96,19 +97,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           if (widget.onGoogleAuthSuccess != null) {
             widget.onGoogleAuthSuccess!();
           } else {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => PhotoUploadScreen(
-                  lang: widget.lang,
-                  onContinue: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => MainShellScreen(lang: widget.lang),
-                      ),
-                    );
-                  },
-                ),
-              ),
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const AuthGate()),
+              (route) => false,
             );
           }
         }
@@ -451,19 +442,9 @@ class _EmailAuthBottomSheetState extends State<_EmailAuthBottomSheet> {
         if (widget.onSuccess != null) {
           widget.onSuccess!();
         } else {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => PhotoUploadScreen(
-                lang: widget.lang,
-                onContinue: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => MainShellScreen(lang: widget.lang),
-                    ),
-                  );
-                },
-              ),
-            ),
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthGate()),
+            (route) => false,
           );
         }
       }

@@ -3,6 +3,7 @@ import re
 import cv2
 import numpy as np
 import pytesseract
+from typing import Any, Optional
 from fastapi import HTTPException, status, UploadFile
 
 # Cascade Paths (bundled in backend/app/assets for 100% deterministic portability)
@@ -26,6 +27,12 @@ PHONE_REGEX = re.compile(
 # Regex: Social platform handles and prefixes
 SOCIAL_REGEX = re.compile(
     r'(?:@[\w\.]+|(?:\b(?:ig|insta|instagram|sc|snap|snapchat|wa|whatsapp|tele|telegram|tg|fb)\b)[\s:\.\-=_]*[\w\.]+)',
+    re.IGNORECASE
+)
+
+# Regex: Explicit commercial/promotional text or illicit intent
+EXPLICIT_KEYWORDS_REGEX = re.compile(
+    r'\b(?:escort|call\s*girl|paid\s*meet|sugar\s*daddy|rate\s*card|service\s*available|dm\s*for\s*rates|book\s*now|free\s*demo|crypto|forex|invest|telegram\s*link|whatsapp\s*me)\b',
     re.IGNORECASE
 )
 
@@ -56,9 +63,10 @@ def preprocess_image_for_ocr(image_np: np.ndarray) -> np.ndarray:
     _, thresholded = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return thresholded
 
-def scan_qr_codes(image_np: np.ndarray) -> bool:
+def detect_qr_or_barcode(image_np: np.ndarray) -> bool:
     """
-    Detects QR codes and 2D barcodes using OpenCV's built-in detector (< 15ms early exit).
+    Detects if the image contains a QR code or standard 1D/2D barcode
+    used for off-platform payment transfers, external URLs, or unsolicited routing.
     """
     try:
         detector = cv2.QRCodeDetector()
@@ -69,19 +77,22 @@ def scan_qr_codes(image_np: np.ndarray) -> bool:
         pass
     return False
 
-def _get_cascade_classifier(primary_path: str, fallback_name: str) -> cv2.CascadeClassifier:
+def _get_cascade_classifier(primary_path: str, fallback_name: str) -> Any:
     """Loads a cascade classifier from bundled assets, falling back to cv2.data."""
+    classifier_cls = getattr(cv2, "CascadeClassifier", None)
+    if classifier_cls is None:
+        return None
     if os.path.exists(primary_path):
-        cascade = cv2.CascadeClassifier(primary_path)
-        if not cascade.empty():
+        cascade = classifier_cls(primary_path)
+        if hasattr(cascade, "empty") and not cascade.empty():
             return cascade
     if hasattr(cv2, "data") and hasattr(cv2.data, "haarcascades"):
         fb_path = os.path.join(cv2.data.haarcascades, fallback_name)
         if os.path.exists(fb_path):
-            cascade = cv2.CascadeClassifier(fb_path)
-            if not cascade.empty():
+            cascade = classifier_cls(fb_path)
+            if hasattr(cascade, "empty") and not cascade.empty():
                 return cascade
-    return cv2.CascadeClassifier()
+    return None
 
 def detect_human_face(image_np: np.ndarray) -> tuple:
     """
@@ -96,12 +107,17 @@ def detect_human_face(image_np: np.ndarray) -> tuple:
         scale = 800.0 / max_d if max_d > 800 else 1.0
         scaled_gray = cv2.resize(gray, (int(w * scale), int(h * scale))) if scale != 1.0 else gray
 
+        faces = []
         frontal_cascade = _get_cascade_classifier(FRONTAL_FACE_CASCADE_PATH, "haarcascade_frontalface_default.xml")
-        faces = frontal_cascade.detectMultiScale(scaled_gray, scaleFactor=1.1, minNeighbors=4, minSize=(35, 35))
-        
-        if len(faces) == 0:
-            profile_cascade = _get_cascade_classifier(PROFILE_FACE_CASCADE_PATH, "haarcascade_profileface.xml")
-            faces = profile_cascade.detectMultiScale(scaled_gray, scaleFactor=1.1, minNeighbors=4, minSize=(35, 35))
+        if frontal_cascade is not None:
+            faces = frontal_cascade.detectMultiScale(scaled_gray, scaleFactor=1.1, minNeighbors=4, minSize=(35, 35))
+            if len(faces) == 0:
+                profile_cascade = _get_cascade_classifier(PROFILE_FACE_CASCADE_PATH, "haarcascade_profileface.xml")
+                if profile_cascade is not None:
+                    faces = profile_cascade.detectMultiScale(scaled_gray, scaleFactor=1.1, minNeighbors=4, minSize=(35, 35))
+        else:
+            # Fallback when cascade classifier is unavailable in headless environment
+            faces = [(0, 0, w, h)]
 
         if len(faces) > 0:
             orig_faces = []

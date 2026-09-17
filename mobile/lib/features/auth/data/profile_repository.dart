@@ -49,4 +49,30 @@ class ProfileRepository {
       throw Exception(response.data["detail"] ?? "Failed to save profile.");
     }
   }
+
+  Future<Map<String, dynamic>?> fetchUserProfile() async {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return null;
+
+    final String? idToken = await currentUser.getIdToken();
+    try {
+      final response = await _dio.get(
+        "/api/v1/users/me",
+        options: Options(
+          headers: {
+            "Authorization": "Bearer $idToken",
+          },
+        ),
+      );
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        return Map<String, dynamic>.from(response.data);
+      }
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
+  }
 }

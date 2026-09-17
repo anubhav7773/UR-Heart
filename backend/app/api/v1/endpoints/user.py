@@ -4,11 +4,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, update, select
+from sqlalchemy import text, update, select, func
 
 from app.core.database import get_db
 from app.api.dependencies import get_current_user
 from app.models.domain.user import User
+from app.models.domain.user_photo import UserPhoto
 from app.models.schemas.user import (
     UserProfileUpdateRequest,
     UserProfileResponse,
@@ -20,15 +21,23 @@ from app.core.legal_audit import record_legal_audit_event
 router = APIRouter()
 
 # 1. Profile Retrieval Endpoint
+@router.get("/me", response_model=UserProfileResponse, status_code=status.HTTP_200_OK)
 @router.get("/profile", response_model=UserProfileResponse, status_code=status.HTTP_200_OK)
 async def get_profile(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Returns the authenticated user's profile.
+    Returns the authenticated user's profile with photo count.
     Extracts identity strictly from verified server-side JWT (prevents IDOR).
     """
-    return current_user
+    photo_stmt = select(func.count(UserPhoto.id)).where(UserPhoto.user_id == current_user.id)
+    photo_res = await db.execute(photo_stmt)
+    photo_count = photo_res.scalar_one() or 0
+
+    resp = UserProfileResponse.model_validate(current_user)
+    resp.photo_count = photo_count
+    return resp
 
 # 2. Profile Update Endpoint
 @router.patch("/profile", response_model=UserProfileResponse, status_code=status.HTTP_200_OK)
