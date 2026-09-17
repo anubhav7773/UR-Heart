@@ -6,11 +6,16 @@ import cv2
 import httpx
 from uuid import UUID
 from typing import Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update
+from sqlalchemy import select, update, and_
 from app.models.domain.user import User
 from app.models.domain.kyc_queue import KycReviewQueue
-from app.services.storage_service import purge_user_storage_assets
+from app.services.storage_service import (
+    purge_user_storage_assets,
+    purge_kyc_video_from_storage,
+    upload_kyc_video_to_storage
+)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
@@ -143,6 +148,129 @@ async def evaluate_semantic_match_groq(
         pass
     return {"name_match": False, "city_match": False, "confidence": 0.0}
 
+async def handle_ai_verification_outcome(
+    user_id: UUID,
+    user_name: str,
+    user_city: str,
+    video_storage_path: str,
+    confidence_score: float,
+    transcript: str,
+    has_valid_face: bool,
+    semantic_pass: bool,
+    db: AsyncSession
+) -> dict:
+    """
+    Evaluates AI verification score and immediately triggers DPDP storage purge on approval.
+    """
+    # Auto-Verification Pass Rule (Score >= 0.80 and single face detected)
+    if has_valid_face and semantic_pass and confidence_score >= 0.80:
+        # 1. Update user record to verified
+        if db:
+            await db.execute(
+                update(User)
+                .where(User.id == user_id)
+                .values(
+                    kyc_status=True,
+                    kyc_state="verified",
+                    kyc_ai_confidence=confidence_score,
+                    kyc_transcript=transcript,
+                    kyc_verified_at=datetime.now(timezone.utc)
+                )
+            )
+            await db.commit()
+
+        # 2. IMMEDIATE PURGE: Satisfies DPDP data minimization
+        await purge_kyc_video_from_storage(
+            storage_path=video_storage_path,
+            user_id=user_id,
+            db=db
+        )
+        # Also clean up any lingering storage assets
+        await purge_user_storage_assets(user_id)
+
+        return {
+            "status": "auto_verified",
+            "confidence": confidence_score,
+            "video_purged": True,
+            "transcript": transcript,
+            "has_valid_face": True
+        }
+
+    else:
+        # Fallback to Admin Review Queue
+        flags = []
+        if not has_valid_face:
+            flags.append("face_detection_failed")
+        if not semantic_pass:
+            flags.append("transcript_mismatch")
+        if confidence_score < 0.80:
+            flags.append("low_confidence_score")
+
+        if db:
+            queue_entry = KycReviewQueue(
+                user_id=user_id,
+                video_storage_path=video_storage_path,
+                registered_name=user_name,
+                registered_city=user_city,
+                extracted_transcript=transcript,
+                ai_confidence_score=confidence_score,
+                ai_flags=flags,
+                status="unreviewed"
+            )
+            db.add(queue_entry)
+
+            await db.execute(
+                update(User)
+                .where(User.id == user_id)
+                .values(
+                    kyc_state="pending_manual_review",
+                    kyc_ai_confidence=confidence_score,
+                    kyc_transcript=transcript
+                )
+            )
+            await db.commit()
+
+        return {
+            "status": "queued_for_admin_review",
+            "assigned_admin": ADMIN_EMAIL,
+            "confidence": confidence_score,
+            "ai_flags": flags,
+            "video_purged": False,
+            "transcript": transcript,
+            "has_valid_face": has_valid_face
+        }
+
+async def purge_expired_unreviewed_kyc_videos(db: AsyncSession) -> int:
+    """
+    CRON ROUTINE (Runs every 24 hours):
+    Finds and permanently purges any unreviewed video in kyc-temp older than 48 hours.
+    """
+    threshold_time = datetime.now(timezone.utc) - timedelta(hours=48)
+    
+    stmt = (
+        select(KycReviewQueue)
+        .where(
+            and_(
+                KycReviewQueue.created_at < threshold_time,
+                KycReviewQueue.video_storage_path != "PURGED"
+            )
+        )
+    )
+    result = await db.execute(stmt)
+    stale_items = result.scalars().all()
+
+    purged_count = 0
+    for item in stale_items:
+        purged = await purge_kyc_video_from_storage(
+            storage_path=item.video_storage_path,
+            user_id=item.user_id,
+            db=db
+        )
+        if purged:
+            purged_count += 1
+
+    return purged_count
+
 async def process_video_kyc(
     user_id: UUID,
     file_bytes: bytes,
@@ -181,67 +309,19 @@ async def process_video_kyc(
         name_match = semantic_res.get("name_match", False)
         semantic_pass = name_match or (confidence_score >= 0.75)
 
-        # 5. Routing Decision
-        # Auto-Approval Criteria: has_valid_face AND (name_match OR confidence >= 0.75) AND confidence >= 0.80
-        if has_valid_face and semantic_pass and confidence_score >= 0.80:
-            if db:
-                await db.execute(
-                    update(User)
-                    .where(User.id == user_id)
-                    .values(
-                        kyc_status=True,
-                        kyc_state="verified",
-                        kyc_ai_confidence=confidence_score,
-                        kyc_transcript=transcript
-                    )
-                )
-                await db.commit()
-
-            # Immediately purge raw video to satisfy Section 8(7) DPDP Act 2023
-            await purge_user_storage_assets(user_id)
-            return {
-                "status": "auto_verified",
-                "confidence": confidence_score,
-                "transcript": transcript,
-                "has_valid_face": True
-            }
-        else:
-            # Fallback to Admin Manual Review Queue
-            ai_flags = []
-            if not has_valid_face:
-                ai_flags.append("face_detection_failed")
-            if not semantic_pass:
-                ai_flags.append("transcript_mismatch")
-
-            if db:
-                queue_item = KycReviewQueue(
-                    user_id=user_id,
-                    video_storage_path=f"kyc-temp/{user_id}_kyc.mp4",
-                    registered_name=user_name,
-                    registered_city=user_city,
-                    extracted_transcript=transcript,
-                    ai_confidence_score=confidence_score,
-                    ai_flags=ai_flags,
-                    status="unreviewed"
-                )
-                db.add(queue_item)
-                await db.execute(
-                    update(User)
-                    .where(User.id == user_id)
-                    .values(
-                        kyc_state="pending_manual_review",
-                        kyc_ai_confidence=confidence_score,
-                        kyc_transcript=transcript
-                    )
-                )
-                await db.commit()
-
-            return {
-                "status": "queued_for_admin_review",
-                "assigned_admin": ADMIN_EMAIL,
-                "confidence": confidence_score,
-                "ai_flags": ai_flags
-            }
+        # 5. Routing Decision via handle_ai_verification_outcome
+        video_storage_path = f"{user_id}/kyc_selfie_{int(datetime.now(timezone.utc).timestamp())}.mp4"
+        return await handle_ai_verification_outcome(
+            user_id=user_id,
+            user_name=user_name,
+            user_city=user_city,
+            video_storage_path=video_storage_path,
+            confidence_score=confidence_score,
+            transcript=transcript,
+            has_valid_face=has_valid_face,
+            semantic_pass=semantic_pass,
+            db=db
+        )
 
     finally:
         # Guarantee strict cleanup of local temp files
