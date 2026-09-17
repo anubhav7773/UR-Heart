@@ -1,3 +1,4 @@
+import math
 from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -23,6 +24,18 @@ from app.models.schemas.feed import (
 
 router = APIRouter()
 
+def calculate_haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> int:
+    """Calculates Haversine distance in km between two GPS coordinate pairs."""
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return max(1, round(R * c))
+
 DEFAULT_INTERESTS_MAP = {
     "lucknow": ["Chai Lover", "Bollywood", "Urdu Poetry", "Foodie"],
     "gorakhpur": ["Bhojpuri Music", "Cricket", "Travel", "Street Food"],
@@ -35,6 +48,8 @@ DEFAULT_INTERESTS_MAP = {
 async def get_discovery_feed(
     limit: int = Query(20, ge=1, le=50),
     city: Optional[str] = Query(None),
+    lat: Optional[float] = Query(None, ge=-90.0, le=90.0, description="Caller's current GPS Latitude"),
+    lon: Optional[float] = Query(None, ge=-180.0, le=180.0, description="Caller's current GPS Longitude"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -76,9 +91,25 @@ async def get_discovery_feed(
     candidates: List[CandidateProfile] = []
     today = date.today()
 
+    caller_lat = lat if lat is not None else (float(current_user.latitude) if current_user.latitude is not None else None)
+    caller_lon = lon if lon is not None else (float(current_user.longitude) if current_user.longitude is not None else None)
+
     for user in candidate_users:
         # Calculate Age
         age = (today - user.dob).days // 365 if user.dob else 22
+
+        # Coarse Geolocation Proximity (Zero GPS Leakage: never returns raw lat/lon)
+        if (
+            caller_lat is not None
+            and caller_lon is not None
+            and user.latitude is not None
+            and user.longitude is not None
+        ):
+            dist_km = calculate_haversine_km(caller_lat, caller_lon, float(user.latitude), float(user.longitude))
+            badge = "Nearby < 1 km" if dist_km < 1 else f"Nearby {dist_km} km"
+        else:
+            dist_km = 5
+            badge = "Nearby 5 km"
 
         # Fetch Photos for Candidate
         photos_query = (
@@ -130,6 +161,8 @@ async def get_discovery_feed(
                 kyc_status=user.kyc_status,
                 interests=interests,
                 photos=photo_list,
+                distance_km=dist_km,
+                distance_badge=badge,
             )
         )
 
@@ -186,6 +219,12 @@ async def record_swipe(
         )
         db.add(new_swipe)
 
+    remaining_tokens = current_user.reward_balance
+    if payload.swipe_type == "direct_dm" and current_user.reward_balance > 0:
+        current_user.reward_balance -= 1
+        remaining_tokens = current_user.reward_balance
+        db.add(current_user)
+
     await db.commit()
 
     # 3. Check for Mutual Match on like / direct_dm
@@ -225,19 +264,25 @@ async def record_swipe(
                     status="success",
                     is_match=True,
                     match_id=new_match.id,
-                    message="Congratulations! It's a mutual match!"
+                    message="Congratulations! It's a mutual match!",
+                    whatsapp_unlocked=False,
+                    remaining_dm_tokens=remaining_tokens,
                 )
             else:
                 return SwipeResponse(
                     status="success",
                     is_match=True,
                     match_id=existing_match.id,
-                    message="Already matched!"
+                    message="Already matched!",
+                    whatsapp_unlocked=False,
+                    remaining_dm_tokens=remaining_tokens,
                 )
 
     return SwipeResponse(
         status="success",
         is_match=False,
         match_id=None,
-        message="Swipe recorded successfully."
+        message="Swipe recorded successfully.",
+        whatsapp_unlocked=False,
+        remaining_dm_tokens=remaining_tokens,
     )

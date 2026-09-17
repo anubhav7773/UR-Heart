@@ -31,6 +31,7 @@ class CandidateProfileModel {
   final String city;
   final String bio;
   final int distanceKm;
+  final String distanceBadge;
   final bool kycStatus;
   final int streakCount;
   final List<String> interests;
@@ -44,6 +45,7 @@ class CandidateProfileModel {
     required this.city,
     required this.bio,
     required this.distanceKm,
+    this.distanceBadge = 'Nearby 5 km',
     required this.kycStatus,
     required this.streakCount,
     required this.interests,
@@ -69,6 +71,7 @@ class CandidateProfileModel {
       city: json['city'] as String? ?? 'City',
       bio: json['bio'] as String? ?? '',
       distanceKm: json['distance_km'] as int? ?? 5,
+      distanceBadge: json['distance_badge'] as String? ?? 'Nearby 5 km',
       kycStatus: json['kyc_status'] as bool? ?? false,
       streakCount: json['streak_count'] as int? ?? 0,
       interests: rawInterests.map((e) => e.toString()).toList(),
@@ -114,12 +117,22 @@ class FeedRepository {
   FeedRepository({Dio? client})
       : _client = client ?? createApiClient(baseUrl: EnvConfig.apiBaseUrl);
 
-  /// Fetch candidate cards from backend GET /api/v1/feed
-  Future<List<CandidateProfileModel>> getCandidates({int limit = 20}) async {
+  /// Fetch candidate cards from backend GET /api/v1/feed with optional coordinates and city
+  Future<List<CandidateProfileModel>> getCandidates({
+    int limit = 20,
+    double? lat,
+    double? lon,
+    String? city,
+  }) async {
     try {
+      final queryParams = <String, dynamic>{'limit': limit};
+      if (lat != null) queryParams['lat'] = lat;
+      if (lon != null) queryParams['lon'] = lon;
+      if (city != null && city.isNotEmpty) queryParams['city'] = city;
+
       final response = await _client.get(
         '/api/v1/feed',
-        queryParameters: {'limit': limit},
+        queryParameters: queryParams,
       );
 
       if (response.statusCode == 200 && response.data != null) {

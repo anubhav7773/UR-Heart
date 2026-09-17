@@ -89,6 +89,8 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
     final candidate = _candidates[_currentIndex];
     setState(() {
       _isProcessingSwipe = true;
+      _currentIndex++;
+      _swipesUntilAd = (_swipesUntilAd > 1) ? _swipesUntilAd - 1 : 4;
     });
 
     try {
@@ -97,14 +99,11 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
         swipeType: swipeType,
       );
 
-      if (result.remainingDmTokens != null) {
-        _dmTokens = result.remainingDmTokens!;
-      }
-
       if (mounted) {
         setState(() {
-          _currentIndex++;
-          _swipesUntilAd = (_swipesUntilAd > 1) ? _swipesUntilAd - 1 : 4;
+          if (result.remainingDmTokens != null) {
+            _dmTokens = result.remainingDmTokens!;
+          }
           _isProcessingSwipe = false;
         });
 
@@ -115,10 +114,35 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _currentIndex++;
           _isProcessingSwipe = false;
         });
       }
+    }
+  }
+
+  Future<void> _handleSwipeDismissed(String swipeType, CandidateProfileModel candidate) async {
+    setState(() {
+      _currentIndex++;
+      _swipesUntilAd = (_swipesUntilAd > 1) ? _swipesUntilAd - 1 : 4;
+    });
+
+    try {
+      final result = await _feedRepository.submitSwipe(
+        targetUserId: candidate.id,
+        swipeType: swipeType,
+      );
+
+      if (result.remainingDmTokens != null && mounted) {
+        setState(() {
+          _dmTokens = result.remainingDmTokens!;
+        });
+      }
+
+      if (mounted && result.isMatch) {
+        _showMatchDialog(candidate, result.matchId);
+      }
+    } catch (e) {
+      debugPrint('Feed swipe error: $e');
     }
   }
 
@@ -438,152 +462,183 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: URHeartColors.cardSurface,
-          borderRadius: URHeartTheme.radiusCardLarge,
-          border: Border.all(color: URHeartColors.surfaceRaised),
+      child: Dismissible(
+        key: ValueKey('feed_candidate_${candidate.id}_$_currentIndex'),
+        direction: DismissDirection.horizontal,
+        onDismissed: (direction) {
+          if (direction == DismissDirection.startToEnd) {
+            // Swiped Right -> Like
+            _handleSwipeDismissed('like', candidate);
+          } else {
+            // Swiped Left -> Pass
+            _handleSwipeDismissed('pass', candidate);
+          }
+        },
+        background: Container(
+          decoration: BoxDecoration(
+            color: URHeartColors.brandPrimary.withValues(alpha: 0.25),
+            borderRadius: URHeartTheme.radiusCardLarge,
+          ),
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 32),
+          child: const Icon(Icons.favorite_rounded, color: URHeartColors.brandPrimary, size: 56),
         ),
-        child: ClipRRect(
-          borderRadius: URHeartTheme.radiusCardLarge,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Photo background
-              if (primaryPhoto.isNotEmpty)
-                CachedNetworkImage(
-                  imageUrl: primaryPhoto,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: URHeartColors.surfaceRaised,
-                    child: const Center(
-                      child: CircularProgressIndicator(color: URHeartColors.brandPrimary),
+        secondaryBackground: Container(
+          decoration: BoxDecoration(
+            color: URHeartColors.statusDanger.withValues(alpha: 0.25),
+            borderRadius: URHeartTheme.radiusCardLarge,
+          ),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 32),
+          child: const Icon(Icons.close_rounded, color: URHeartColors.statusDanger, size: 56),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: URHeartColors.cardSurface,
+            borderRadius: URHeartTheme.radiusCardLarge,
+            border: Border.all(color: URHeartColors.surfaceRaised),
+          ),
+          child: ClipRRect(
+            borderRadius: URHeartTheme.radiusCardLarge,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Photo background
+                if (primaryPhoto.isNotEmpty)
+                  CachedNetworkImage(
+                    imageUrl: primaryPhoto,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: URHeartColors.surfaceRaised,
+                      child: const Center(
+                        child: CircularProgressIndicator(color: URHeartColors.brandPrimary),
+                      ),
                     ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
+                    errorWidget: (context, url, error) => Container(
+                      color: URHeartColors.surfaceRaised,
+                      child: const Center(
+                        child: Icon(Icons.person_rounded, size: 100, color: URHeartColors.textMuted),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
                     color: URHeartColors.surfaceRaised,
                     child: const Center(
                       child: Icon(Icons.person_rounded, size: 100, color: URHeartColors.textMuted),
                     ),
                   ),
-                )
-              else
-                Container(
-                  color: URHeartColors.surfaceRaised,
-                  child: const Center(
-                    child: Icon(Icons.person_rounded, size: 100, color: URHeartColors.textMuted),
-                  ),
-                ),
 
-              // Frosted Privacy Pill (Top Left)
-              Positioned(
-                top: 14,
-                left: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: URHeartTheme.radiusPill,
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: Text(
-                    _t('screenshotBlocked'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                // Frosted Privacy Pill (Top Left)
+                Positioned(
+                  top: 14,
+                  left: 14,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: URHeartTheme.radiusPill,
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Text(
+                      _t('screenshotBlocked'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              // City Pill (Top Right)
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: URHeartTheme.radiusPill,
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.location_on_rounded, color: URHeartColors.brandSecondary, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${candidate.city} (${candidate.distanceKm} km)',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                // Coarse Proximity Pill (Top Right - Zero GPS Leakage)
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: URHeartTheme.radiusPill,
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_on_rounded, color: URHeartColors.brandSecondary, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${candidate.city} • ${candidate.distanceBadge}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Profile Details Overlay (Bottom)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.85),
-                        Colors.black,
                       ],
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            '${candidate.fullName}, ${candidate.age}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (candidate.kycStatus) ...[
-                            const SizedBox(width: 6),
-                            const Icon(Icons.verified_rounded, color: URHeartColors.brandSecondary, size: 18),
-                          ],
+                ),
+
+                // Profile Details Overlay (Bottom)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.85),
+                          Colors.black,
                         ],
                       ),
-                      if (candidate.bio.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          candidate.bio,
-                          style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 13),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              '${candidate.fullName}, ${candidate.age}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (candidate.kycStatus) ...[
+                              const SizedBox(width: 6),
+                              const Icon(Icons.verified_rounded, color: URHeartColors.brandSecondary, size: 18),
+                            ],
+                          ],
                         ),
+                        if (candidate.bio.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            candidate.bio,
+                            style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 13),
+                          ),
+                        ],
+                        if (candidate.interests.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: candidate.interests.map((tag) => _buildChip(tag)).toList(),
+                          ),
+                        ],
                       ],
-                      if (candidate.interests.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: candidate.interests.map((tag) => _buildChip(tag)).toList(),
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

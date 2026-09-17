@@ -20,6 +20,8 @@ class CandidateProfile(BaseModel):
     kyc_status: bool = False
     interests: List[str] = Field(default_factory=list)
     photos: List[CandidatePhoto] = Field(default_factory=list)
+    distance_km: int = 5
+    distance_badge: str = "Nearby 5 km"
 
 class FeedResponse(BaseModel):
     candidates: List[CandidateProfile]
@@ -34,3 +36,5 @@ class SwipeResponse(BaseModel):
     is_match: bool
     match_id: Optional[UUID] = None
     message: str
+    whatsapp_unlocked: bool = False
+    remaining_dm_tokens: Optional[int] = None
