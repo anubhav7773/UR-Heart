@@ -1,7 +1,7 @@
 import os
 import tempfile
 from uuid import uuid4
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -11,17 +11,27 @@ client = TestClient(app)
 
 DUMMY_VIDEO_BYTES = b"FAKE_MP4_VIDEO_HEADER_DATA_1234567890"
 
-# Mock Database Dependency for isolated unit testing
-async def override_get_db():
+@pytest.fixture(autouse=True)
+def mock_db_dependency():
+    dummy_user = MagicMock()
+    dummy_user.id = uuid4()
+    dummy_user.full_name = "Aman Gupta"
+    dummy_user.city = "Lucknow"
+    dummy_user.kyc_status = False
+
     mock_session = AsyncMock()
-    result_mock = AsyncMock()
-    result_mock.scalar_one_or_none = lambda: None
+    result_mock = MagicMock()
+    result_mock.scalar_one_or_none.return_value = dummy_user
     mock_session.execute.return_value = result_mock
     mock_session.commit.return_value = None
     mock_session.add = lambda x: None
-    yield mock_session
 
-app.dependency_overrides[get_db] = override_get_db
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
 
 # ==============================================================================
 # TEST CASE 1: Auto-Approval Success Branch

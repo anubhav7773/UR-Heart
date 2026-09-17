@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Any
 from uuid import UUID
@@ -7,6 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.security import verify_firebase_token, create_internal_token
@@ -25,7 +29,7 @@ class SessionSyncRequest(BaseModel):
     whatsapp_number: str = Field(..., pattern=r"^\+91[6-9]\d{9}$", description="WhatsApp phone number")
     full_name: str = Field(..., min_length=2, max_length=50, pattern=r"^[a-zA-Z\s]+$")
     dob: date = Field(..., description="Date of birth YYYY-MM-DD")
-    gender: str = Field(..., pattern=r"^(male|female|lgbtq\+|other)$", description="male, female, lgbtq+, or other")
+    gender: Optional[str] = Field("other", pattern=r"^(male|female|lgbtq\+|other)$", description="male, female, lgbtq+, or other")
     city: str = Field(..., min_length=2, max_length=50)
     bio: Optional[str] = Field("", max_length=250)
     android_id: Optional[str] = Field("", max_length=100)
@@ -138,11 +142,15 @@ async def session_sync(
                 detail="Account has been suspended for safety violations."
             )
 
-        caller_email = token_data.get("email")
+        caller_email = (token_data.get("email") or "").strip().lower()
         if caller_email == "kshtriyaanubhav9120@gmail.com" and not user.is_super_admin:
             user.is_super_admin = True
-            await db.commit()
-            await db.refresh(user)
+            try:
+                await db.commit()
+                await db.refresh(user)
+            except IntegrityError as ie:
+                await db.rollback()
+                logger.error(f"[AUTH_SESSION_SYNC] IntegrityError promoting super admin: {ie}")
 
         # Check Installation UUID
         if user.last_installation_uuid != x_installation_uuid:
@@ -151,8 +159,16 @@ async def session_sync(
             user.reward_balance = 0
             user.last_installation_uuid = x_installation_uuid
             user.updated_at = now
-            await db.commit()
-            await db.refresh(user)
+            try:
+                await db.commit()
+                await db.refresh(user)
+            except IntegrityError as ie:
+                await db.rollback()
+                logger.error(f"[AUTH_SESSION_SYNC] IntegrityError on reinstall wipe: {ie}")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Database integrity conflict during reinstall sync."
+                )
 
             action_type = "AUTH_REINSTALL_SYNC_WIPE"
             response_payload = {
@@ -184,15 +200,17 @@ async def session_sync(
             }
     else:
         # CASE C: New User Registration
-        caller_email = token_data.get("email")
+        caller_email = (token_data.get("email") or "").strip().lower()
         is_master = (caller_email == "kshtriyaanubhav9120@gmail.com")
+        valid_gender = payload.gender if payload.gender in ("male", "female", "lgbtq+", "other") else "other"
+
         new_user = User(
             firebase_uid=firebase_uid,
             phone_number=payload.phone_number,
             whatsapp_number=payload.whatsapp_number,
             full_name=payload.full_name,
             dob=payload.dob,
-            gender=payload.gender,
+            gender=valid_gender,
             city=payload.city,
             bio=payload.bio or "",
             streak_count=1,
@@ -201,8 +219,24 @@ async def session_sync(
             last_installation_uuid=x_installation_uuid
         )
         db.add(new_user)
-        await db.commit()
-        await db.refresh(new_user)
+        try:
+            await db.commit()
+            await db.refresh(new_user)
+        except IntegrityError as ie:
+            await db.rollback()
+            orig = getattr(ie, "orig", None)
+            diag = getattr(orig, "diag", None)
+            column_name = getattr(diag, "column_name", None) if diag else None
+            constraint_name = getattr(diag, "constraint_name", None) if diag else None
+            detail_msg = getattr(diag, "message_detail", str(ie)) if diag else str(ie)
+            logger.error(
+                f"[AUTH_SESSION_SYNC] IntegrityError inserting user {firebase_uid}: "
+                f"constraint={constraint_name}, column={column_name}, detail={detail_msg}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Database constraint violation on registration: {detail_msg}"
+            )
 
         user_id = new_user.id
         action_type = "AUTH_REGISTER"

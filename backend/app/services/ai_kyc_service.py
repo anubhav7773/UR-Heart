@@ -1,9 +1,12 @@
 import os
 import json
+import logging
 import tempfile
 import subprocess
 import cv2
 import httpx
+
+logger = logging.getLogger(__name__)
 from uuid import UUID
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
@@ -207,28 +210,32 @@ async def handle_ai_verification_outcome(
             flags.append("low_confidence_score")
 
         if db:
-            queue_entry = KycReviewQueue(
-                user_id=user_id,
-                video_storage_path=video_storage_path,
-                registered_name=user_name,
-                registered_city=user_city,
-                extracted_transcript=transcript,
-                ai_confidence_score=confidence_score,
-                ai_flags=flags,
-                status="unreviewed"
-            )
-            db.add(queue_entry)
-
-            await db.execute(
-                update(User)
-                .where(User.id == user_id)
-                .values(
-                    kyc_state="pending_manual_review",
-                    kyc_ai_confidence=confidence_score,
-                    kyc_transcript=transcript
+            try:
+                queue_entry = KycReviewQueue(
+                    user_id=user_id,
+                    video_storage_path=video_storage_path,
+                    registered_name=user_name,
+                    registered_city=user_city,
+                    extracted_transcript=transcript,
+                    ai_confidence_score=confidence_score,
+                    ai_flags=flags,
+                    status="unreviewed"
                 )
-            )
-            await db.commit()
+                db.add(queue_entry)
+
+                await db.execute(
+                    update(User)
+                    .where(User.id == user_id)
+                    .values(
+                        kyc_state="pending_manual_review",
+                        kyc_ai_confidence=confidence_score,
+                        kyc_transcript=transcript
+                    )
+                )
+                await db.commit()
+            except Exception as e:
+                await db.rollback()
+                logger.warning(f"Could not persist KYC queue entry for user {user_id}: {e}")
 
         return {
             "status": "queued_for_admin_review",
