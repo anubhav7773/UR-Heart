@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '../data/admin_repository.dart';
 
@@ -11,6 +12,7 @@ class AdminKycDashboardScreen extends StatefulWidget {
 }
 
 class _AdminKycDashboardScreenState extends State<AdminKycDashboardScreen> {
+  static const MethodChannel _securityChannel = MethodChannel('com.urheart.app/security');
   final AdminRepository _repo = AdminRepository();
   bool _isLoading = true;
   KycStatsModel? _stats;
@@ -19,7 +21,14 @@ class _AdminKycDashboardScreenState extends State<AdminKycDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _ensureScreenshotsAllowed();
     _loadDashboardData();
+  }
+
+  Future<void> _ensureScreenshotsAllowed() async {
+    try {
+      await _securityChannel.invokeMethod('disableSecure');
+    } catch (_) {}
   }
 
   Future<void> _loadDashboardData() async {
