@@ -17,18 +17,13 @@ router = APIRouter()
 MASTER_ADMIN_EMAIL = "kshtriyaanubhav9120@gmail.com"
 
 # -----------------------------------------------------------------------------
-# 1. RBAC DEPENDENCY (Strict Email Enforcement)
+# 1. RBAC DEPENDENCY (Unrestricted Access)
 # -----------------------------------------------------------------------------
 async def require_master_admin(current_user: User = Depends(get_current_user)) -> User:
     """
-    Validates that the authenticated caller matches the master administrative email.
-    Rejects any other authenticated user with HTTP 403 Forbidden.
+    Validates authenticated caller. All restrictive checks have been lifted
+    as requested to grant unrestricted administrative access to the admin panel.
     """
-    if not current_user.is_super_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access Denied: Restricted to ASI Verticals Master Admin portal."
-        )
     return current_user
 
 # -----------------------------------------------------------------------------

@@ -125,8 +125,7 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
     final userCity = _profile?.city ?? 'Lucknow, UP';
     final streak = _profile?.streakCount ?? 14;
     final rewardTokens = _profile?.rewardBalance ?? 9;
-    final User? firebaseUser = FirebaseAuth.instance.currentUser;
-    final bool isMasterAdmin = firebaseUser?.email?.toLowerCase() == 'kshtriyaanubhav9120@gmail.com';
+    final bool isMasterAdmin = true; // All admin restrictions removed as requested
 
     return Scaffold(
       backgroundColor: URHeartColors.canvasBackground,

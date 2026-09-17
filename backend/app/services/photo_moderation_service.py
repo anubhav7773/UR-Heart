@@ -36,6 +36,18 @@ EXPLICIT_KEYWORDS_REGEX = re.compile(
     re.IGNORECASE
 )
 
+# Regex: Web URLs and domain names
+URL_REGEX = re.compile(
+    r'(?:https?://|www\.)[^\s/$.?#].[^\s]*|\b[a-zA-Z0-9.-]+\.(?:com|in|org|net|me|xyz|io|co|ai)\b',
+    re.IGNORECASE
+)
+
+# Regex: UPI payment handles
+UPI_REGEX = re.compile(
+    r'\b[\w.\-]+@(okhdfcbank|okaxis|oksbi|okicici|paytm|ybl|ibl|upi)\b',
+    re.IGNORECASE
+)
+
 def preprocess_image_for_ocr(image_np: np.ndarray) -> np.ndarray:
     """
     Downscales and applies binary thresholding to isolate text overlays.
@@ -63,19 +75,24 @@ def preprocess_image_for_ocr(image_np: np.ndarray) -> np.ndarray:
     _, thresholded = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return thresholded
 
-def detect_qr_or_barcode(image_np: np.ndarray) -> bool:
+def scan_qr_codes(image_np: np.ndarray) -> bool:
     """
-    Detects if the image contains a QR code or standard 1D/2D barcode
-    used for off-platform payment transfers, external URLs, or unsolicited routing.
+    Detects QR codes and 2D barcodes using OpenCV's QRCodeDetector.
+    Only flags an image as containing a QR code if valid data was successfully decoded.
+    Candidate bounding boxes without decoded data (often caused by striped clothing,
+    fences, brick joints, or background patterns) are safely ignored.
     """
     try:
         detector = cv2.QRCodeDetector()
         data, bbox, _ = detector.detectAndDecode(image_np)
-        if data or (bbox is not None and len(bbox) > 0):
+        if data and len(data.strip()) > 0:
             return True
     except Exception:
         pass
     return False
+
+# Backward compatibility alias
+detect_qr_or_barcode = scan_qr_codes
 
 def _get_cascade_classifier(primary_path: str, fallback_name: str) -> Any:
     """Loads a cascade classifier from bundled assets, falling back to cv2.data."""
@@ -130,33 +147,20 @@ def detect_human_face(image_np: np.ndarray) -> tuple:
 
 def detect_dense_text_or_banner(image_np: np.ndarray, face_boxes: list = None) -> bool:
     """
-    Detects embedded text, usernames, slogans, AI-generated typography,
-    banner text, or watermarks using morphological gradient analysis.
-    Masks out detected face bounding boxes so facial features (eyes, eyebrows, lips)
-    are never misclassified as text overlays.
+    Detects document, poster, or flyer layouts using edge analysis.
+    Only applies when no face is present. Real human camera photos are never
+    falsely flagged due to clothing stripes, brick patterns, or architectural backgrounds.
     """
     try:
+        has_face = face_boxes is not None and len(face_boxes) > 0
+        if has_face:
+            return False
+
         gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY) if len(image_np.shape) == 3 else image_np
         h, w = gray.shape
 
-        # If faces are present, mask them out with 20% padding around each face
-        mask = np.ones((h, w), dtype=np.uint8) * 255
-        has_face = False
-        if face_boxes and len(face_boxes) > 0:
-            has_face = True
-            for (fx, fy, fw, fh) in face_boxes:
-                pad_x = int(fw * 0.20)
-                pad_y = int(fh * 0.25)
-                x1 = max(0, fx - pad_x)
-                y1 = max(0, fy - pad_y)
-                x2 = min(w, fx + fw + pad_x)
-                y2 = min(h, fy + fh + pad_y)
-                cv2.rectangle(mask, (x1, y1), (x2, y2), 0, -1)
-
-        gray_masked = cv2.bitwise_and(gray, gray, mask=mask)
-
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
-        gradient = cv2.morphologyEx(gray_masked, cv2.MORPH_GRADIENT, kernel)
+        gradient = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, kernel)
         _, thresh = cv2.threshold(gradient, 35, 255, cv2.THRESH_BINARY)
 
         close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 3))
@@ -168,19 +172,18 @@ def detect_dense_text_or_banner(image_np: np.ndarray, face_boxes: list = None) -
             x, y, bw, bh = cv2.boundingRect(c)
             aspect_ratio = bw / float(bh) if bh > 0 else 0
             area = cv2.contourArea(c)
-            if 1.2 < aspect_ratio < 15 and 20 < bw < w * 0.85 and 8 < bh < 120 and area > 80:
+            if 1.5 < aspect_ratio < 15 and 25 < bw < w * 0.85 and 10 < bh < 120 and area > 120:
                 text_box_count += 1
 
-        # Documents, flyers, banners, and typography overlays create 5+ dense horizontal blocks
-        threshold = 5 if has_face else 5
-        return text_box_count >= threshold
+        # High threshold specifically for text-dense documents and posters
+        return text_box_count >= 12
     except Exception:
         return False
 
 def inspect_extracted_text(text: str) -> None:
     """
-    Evaluates extracted OCR text against contact leak, social handles, and general text.
-    Raises HTTPException(422) upon finding prohibited contact info or text overlays.
+    Evaluates extracted OCR text against contact leak, social handles, URLs, UPIs, and commercial keywords.
+    Raises HTTPException(422) upon finding prohibited contact info or commercial overlays.
     """
     cleaned_text = text.strip()
     if not cleaned_text:
@@ -189,8 +192,6 @@ def inspect_extracted_text(text: str) -> None:
     # Normalize whitespace for regex evaluation
     normalized_text = re.sub(r'\s+', ' ', cleaned_text)
     condensed_text = re.sub(r'[^a-zA-Z0-9]', '', cleaned_text).lower()
-    # Unicode word characters (covers English, Hindi Devanagari, and all scripts)
-    unicode_chars = re.sub(r'[\s\W_]', '', cleaned_text)
 
     # 1. Evaluation: Indian Phone Number Detection
     if PHONE_REGEX.search(normalized_text) or PHONE_REGEX.search(condensed_text):
@@ -206,11 +207,32 @@ def inspect_extracted_text(text: str) -> None:
             detail="Photo rejected: Social media handles (@, IG, WA, Snap, Tele) detected on image."
         )
 
-    # 3. Strict Zero-Text: Any significant embedded text (> 5 alphanumeric or Devanagari chars)
-    if len(unicode_chars) >= 5:
+    # 3. Evaluation: Web URLs / Links
+    if URL_REGEX.search(normalized_text):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Photo rejected: Text overlay or watermark detected. Profile photos must be clean portraits."
+            detail="Photo rejected: Website or web link detected on image."
+        )
+
+    # 4. Evaluation: UPI Payment Handles
+    if UPI_REGEX.search(normalized_text):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Photo rejected: Payment or UPI handle detected on image."
+        )
+
+    # 5. Evaluation: Explicit / Commercial Solicitation Keywords
+    if EXPLICIT_KEYWORDS_REGEX.search(normalized_text):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Photo rejected: Commercial or solicitation keywords detected on image."
+        )
+
+    # 6. Large Text Block Overlay (e.g. flyers, memes, screenshots with dense typography)
+    if len(condensed_text) >= 45:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Photo rejected: Text overlay or document detected. Profile photos must be clean portraits."
         )
 
 async def validate_uploaded_photo(file: UploadFile, require_face: bool = False) -> None:
