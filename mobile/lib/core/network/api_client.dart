@@ -1,16 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import '../config/env_config.dart';
 import '../security/installation_service.dart';
 
 /// Creates configured Dio client with automated authentication and sandbox headers.
 Dio createApiClient({
-  required String baseUrl,
+  String? baseUrl,
   VoidCallback? onUnauthorized,
   VoidCallback? onForbidden,
 }) {
   final dio = Dio(BaseOptions(
-    baseUrl: baseUrl,
+    baseUrl: baseUrl ?? EnvConfig.apiBaseUrl,
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 15),
     headers: {'Content-Type': 'application/json'},
