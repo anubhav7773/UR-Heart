@@ -83,7 +83,7 @@ class UserProfileSetupRequest(BaseModel):
 
     full_name: str = Field(..., min_length=2, max_length=50, description="Legal full name")
     whatsapp_number: str = Field(..., description="Indian WhatsApp Number in E.164 format")
-    gender: Literal["male", "female", "lgbtq+"]
+    gender: Literal["male", "female", "lgbtq+", "other"]
     city: str = Field(..., min_length=2, max_length=50)
     bio: Optional[str] = Field(default="", max_length=250)
     

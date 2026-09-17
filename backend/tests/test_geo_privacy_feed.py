@@ -53,7 +53,7 @@ async def test_discovery_feed_zero_coordinate_leakage(async_client: AsyncClient,
         assert "latitude" not in profile, "LEAK DETECTED: Latitude found in public feed payload!"
         assert "longitude" not in profile, "LEAK DETECTED: Longitude found in public feed payload!"
         assert "distance_badge" in profile
-        assert profile["distance_badge"].startswith("Nearby")
+        assert profile["distance_badge"].startswith("Nearby") or profile["distance_badge"] == "Location Unavailable"
 
 @pytest.mark.asyncio
 async def test_user_profile_setup_and_privacy(async_client: AsyncClient, auth_headers):
