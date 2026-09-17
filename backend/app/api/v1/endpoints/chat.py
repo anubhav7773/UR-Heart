@@ -84,7 +84,7 @@ async def get_user_matches(
             .limit(1)
         )
         photo = photo_res.scalar_one_or_none()
-        photo_url = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500"
+        photo_url = ""
         if photo and photo.photo_storage_path:
             p = photo.photo_storage_path
             photo_url = p if p.startswith("http") else f"{settings.SUPABASE_URL}/storage/v1/object/public/user-photos/{p}"
@@ -116,6 +116,7 @@ async def get_user_matches(
 # REST: Chat History Endpoint
 # ------------------------------------------------------------------------------
 @router.get("/history/{match_id}", response_model=List[MessageHistoryResponse])
+@router.get("/{match_id}/messages", response_model=List[MessageHistoryResponse])
 async def get_chat_history(
     match_id: UUID,
     limit: int = Query(50, ge=1, le=100),

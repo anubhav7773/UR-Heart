@@ -121,10 +121,27 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userName = _profile?.fullName ?? FirebaseAuth.instance.currentUser?.displayName ?? 'Aman Gupta';
-    final userCity = _profile?.city ?? 'Lucknow, UP';
-    final streak = _profile?.streakCount ?? 14;
-    final rewardTokens = _profile?.rewardBalance ?? 9;
+    final userName = (_profile?.fullName.isNotEmpty == true)
+        ? _profile!.fullName
+        : (FirebaseAuth.instance.currentUser?.displayName?.isNotEmpty == true
+            ? FirebaseAuth.instance.currentUser!.displayName!
+            : 'UR-Heart User');
+    final userCity = (_profile?.city.isNotEmpty == true) ? _profile!.city : 'City Not Set';
+    final streak = _profile?.streakCount ?? 0;
+    final rewardTokens = _profile?.rewardBalance ?? 0;
+    final int adsSupported = (rewardTokens * 3);
+
+    String tierText;
+    if (streak >= 14) {
+      tierText = 'Level 3: Gold Flame 🔥';
+    } else if (streak >= 7) {
+      tierText = 'Level 2: Silver Spark ✨';
+    } else if (streak >= 1) {
+      tierText = 'Level 1: Bronze Spark ⚡';
+    } else {
+      tierText = 'New Spark 🌱';
+    }
+
     const bool isMasterAdmin = true; // All admin restrictions removed as requested
 
     return Scaffold(
@@ -199,14 +216,14 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                               borderRadius: URHeartTheme.radiusPill,
                               border: Border.all(color: URHeartColors.accentGold),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.local_fire_department_rounded, color: URHeartColors.accentGold, size: 16),
-                                SizedBox(width: 4),
+                                const Icon(Icons.local_fire_department_rounded, color: URHeartColors.accentGold, size: 16),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'Level 2: Silver Spark 🔥',
-                                  style: TextStyle(
+                                  tierText,
+                                  style: const TextStyle(
                                     color: URHeartColors.accentGold,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -294,9 +311,9 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                                         style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 11),
                                       ),
                                       const SizedBox(height: 6),
-                                      const Text(
-                                        '42 Views',
-                                        style: TextStyle(
+                                      Text(
+                                        '$adsSupported Views',
+                                        style: const TextStyle(
                                           color: URHeartColors.statusSuccess,
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,

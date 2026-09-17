@@ -12,17 +12,17 @@ import 'package:ur_heart/features/chat/presentation/whatsapp_reveal_sheet.dart';
 /// Screen 4: Production Protected Chat Room with Anti-Leak Rejection State & Real WebSocket
 class ChatRoomScreen extends StatefulWidget {
   final String lang;
-  final String matchId;
-  final String participantName;
-  final String participantId;
+  final String? matchId;
+  final String? participantName;
+  final String? participantId;
   final VoidCallback? onUnlockWhatsAppTap;
 
   const ChatRoomScreen({
     super.key,
     this.lang = 'en',
-    this.matchId = 'd0000000-0000-0000-0000-000000000001',
-    this.participantName = 'Priya Sharma',
-    this.participantId = 'd2222222-2222-2222-2222-222222222222',
+    this.matchId,
+    this.participantName,
+    this.participantId,
     this.onUnlockWhatsAppTap,
   });
 
@@ -57,26 +57,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
     _currentUserId = FirebaseAuth.instance.currentUser?.uid;
     _chatRepository = ChatRepository();
 
-    // Default seed welcome conversation
-    _messages.add(
-      ChatMessageModel(
-        id: 'msg_1',
-        matchId: widget.matchId,
-        senderId: widget.participantId,
-        content: 'Namaste! Great to connect with you on UR-Heart. How was your day?',
-        status: 'delivered',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
-      ),
-    );
-
-    _initWebSocket();
-    _fetchWhatsAppProgress();
-    _fetchHistory();
+    if (widget.matchId != null && widget.matchId!.isNotEmpty) {
+      _initWebSocket();
+      _fetchWhatsAppProgress();
+      _fetchHistory();
+    }
   }
 
   Future<void> _fetchHistory() async {
+    final mId = widget.matchId;
+    if (mId == null || mId.isEmpty) return;
     try {
-      final history = await _chatRepository.getHistory(widget.matchId);
+      final history = await _chatRepository.getHistory(mId);
       if (mounted && history.isNotEmpty) {
         setState(() {
           _messages.clear();
@@ -112,9 +104,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
   }
 
   Future<void> _fetchWhatsAppProgress() async {
+    final mId = widget.matchId;
+    if (mId == null || mId.isEmpty) return;
     try {
       final dio = createApiClient(baseUrl: EnvConfig.apiBaseUrl);
-      final res = await dio.get('/api/v1/ads/whatsapp-progress/${widget.matchId}');
+      final res = await dio.get('/api/v1/ads/whatsapp-progress/$mId');
       if (mounted && res.statusCode == 200 && res.data != null) {
         setState(() {
           _userAdsWatched = res.data['user_ads_watched'] as int? ?? 0;
@@ -126,13 +120,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
   }
 
   Future<void> _onWatchAd() async {
+    final mId = widget.matchId;
+    if (mId == null || mId.isEmpty) return;
     try {
       final dio = createApiClient(baseUrl: EnvConfig.apiBaseUrl);
       final res = await dio.post(
         '/api/v1/ads/complete-ad',
         data: {
           'ad_type': 'whatsapp_reveal',
-          'target_id': widget.matchId,
+          'target_id': mId,
         },
       );
 
@@ -161,6 +157,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
   }
 
   void _handleSendMessage() {
+    final targetMatchId = widget.matchId;
+    final targetRecipientId = widget.participantId;
+    if (targetMatchId == null || targetRecipientId == null) return;
+
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
@@ -175,7 +175,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
         _messages.add(
           ChatMessageModel(
             id: UniqueKey().toString(),
-            matchId: widget.matchId,
+            matchId: targetMatchId,
             senderId: _currentUserId ?? 'me',
             content: text,
             status: 'blocked',
@@ -191,8 +191,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
 
     // Normal safe message send over real WebSocket
     _chatRepository.sendMessage(
-      matchId: widget.matchId,
-      recipientId: widget.participantId,
+      matchId: targetMatchId,
+      recipientId: targetRecipientId,
       content: text,
     );
 
@@ -202,7 +202,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
       _messages.add(
         ChatMessageModel(
           id: UniqueKey().toString(),
-          matchId: widget.matchId,
+          matchId: targetMatchId,
           senderId: _currentUserId ?? 'me',
           content: text,
           status: 'sent',
@@ -234,6 +234,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
       isScrollControlled: true,
       builder: (ctx) => WhatsAppRevealSheet(
         lang: widget.lang,
+        matchPartnerName: widget.participantName ?? 'Match',
         userAdsWatched: _userAdsWatched,
         matchAdsWatched: _matchAdsWatched,
         onWatchAdTap: () {
@@ -256,6 +257,56 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
 
   @override
   Widget build(BuildContext context) {
+    if (widget.matchId == null || widget.matchId!.isEmpty) {
+      return Scaffold(
+        backgroundColor: URHeartColors.canvasBackground,
+        appBar: AppBar(
+          title: const Text('Direct Chat'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: URHeartColors.cardSurface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: URHeartColors.surfaceRaised),
+                  ),
+                  child: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 48,
+                    color: URHeartColors.brandSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'No Conversation Selected',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Select a matched profile from the Matches tab to begin real-time encrypted messaging.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: URHeartColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: URHeartColors.canvasBackground,
       appBar: AppBar(
@@ -290,7 +341,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.participantName,
+                    widget.participantName ?? 'Match Partner',
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                   Text(
@@ -322,14 +373,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    _isWhatsAppUnlocked ? Icons.lock_open_rounded : Icons.chat_rounded,
-                    size: 14,
-                    color: _isWhatsAppUnlocked ? URHeartColors.statusSuccess : URHeartColors.accentGold,
-                  ),
+                  Text(_isWhatsAppUnlocked ? '🟢' : '💬', style: const TextStyle(fontSize: 12)),
                   const SizedBox(width: 4),
                   Text(
-                    _isWhatsAppUnlocked ? 'WhatsApp Unlocked' : _t('waRevealButton'),
+                    _isWhatsAppUnlocked ? 'WA Unlocked' : 'Unlock WA',
                     style: TextStyle(
                       color: _isWhatsAppUnlocked ? URHeartColors.statusSuccess : URHeartColors.accentGold,
                       fontSize: 11,
@@ -348,26 +395,57 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
           children: [
             // Chat Bubble Stream
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  final isMe = msg.senderId == (_currentUserId ?? 'me');
+              child: _messages.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.mark_chat_read_outlined,
+                            size: 48,
+                            color: URHeartColors.brandSecondary.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No messages yet',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Break the ice! Say hello to your match.',
+                            style: TextStyle(
+                              color: URHeartColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = _messages[index];
+                        final isMe = msg.senderId == (_currentUserId ?? 'me');
 
-                  if (msg.isBlocked) {
-                    return _buildBlockedBubble(msg);
-                  }
+                        if (msg.isBlocked) {
+                          return _buildBlockedBubble(msg);
+                        }
 
-                  return _buildBubble(
-                    text: msg.content,
-                    timestamp: '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}',
-                    isMe: isMe,
-                    isDelivered: msg.status == 'delivered',
-                  );
-                },
-              ),
+                        return _buildBubble(
+                          text: msg.content,
+                          timestamp:
+                              '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}',
+                          isMe: isMe,
+                          isDelivered: msg.status == 'delivered',
+                        );
+                      },
+                    ),
             ),
 
             // High-Alert Bottom Red Banner (Gatekeeper Alert)

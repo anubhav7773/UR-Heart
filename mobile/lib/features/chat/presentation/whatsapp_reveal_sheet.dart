@@ -6,15 +6,17 @@ import 'package:ur_heart/core/utils/vernacular_strings.dart';
 /// Spec: URH-UIX-009 Section 3 Screen 5
 class WhatsAppRevealSheet extends StatelessWidget {
   final String lang;
-  final int userAdsWatched; // e.g. 2
-  final int matchAdsWatched; // e.g. 1
+  final String matchPartnerName;
+  final int userAdsWatched;
+  final int matchAdsWatched;
   final VoidCallback? onWatchAdTap;
 
   const WhatsAppRevealSheet({
     super.key,
     this.lang = 'en',
-    this.userAdsWatched = 2,
-    this.matchAdsWatched = 1,
+    this.matchPartnerName = 'Match',
+    this.userAdsWatched = 0,
+    this.matchAdsWatched = 0,
     this.onWatchAdTap,
   });
 
@@ -118,9 +120,9 @@ class WhatsAppRevealSheet extends StatelessWidget {
                 Expanded(
                   child: Column(
                     children: [
-                      const Text(
-                        'Rahul',
-                        style: TextStyle(
+                      Text(
+                        matchPartnerName,
+                        style: const TextStyle(
                           color: URHeartColors.textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,

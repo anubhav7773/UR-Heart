@@ -55,42 +55,14 @@ class MatchesRepository {
       final response = await _client.get('/api/v1/chat/matches');
       if (response.statusCode == 200 && response.data is List) {
         final list = response.data as List<dynamic>;
-        final matches = list
+        return list
             .map((item) => MatchItemModel.fromJson(item as Map<String, dynamic>))
             .toList();
-        if (matches.isNotEmpty) return matches;
       }
-      return _getSeedDemoMatches();
+      return [];
     } catch (e) {
       debugPrint('MatchesRepository.getMatches error: $e');
-      return _getSeedDemoMatches();
+      return [];
     }
-  }
-
-  List<MatchItemModel> _getSeedDemoMatches() {
-    return [
-      MatchItemModel(
-        matchId: 'd0000000-0000-0000-0000-000000000001',
-        partnerId: 'd2222222-2222-2222-2222-222222222222',
-        partnerName: 'Priya Sharma',
-        partnerPhotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
-        partnerCity: 'Lucknow',
-        partnerBio: 'Chai lover & Kathak dancer. Let\'s explore Hazratganj!',
-        whatsappUnlocked: false,
-        lastMessage: 'Hey! Loved your profile ✨',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
-      ),
-      MatchItemModel(
-        matchId: 'd0000000-0000-0000-0000-000000000002',
-        partnerId: 'd3333333-3333-3333-3333-333333333333',
-        partnerName: 'Ananya Verma',
-        partnerPhotoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500',
-        partnerCity: 'Gorakhpur',
-        partnerBio: 'Architect & traveler. Always searching for good filter coffee.',
-        whatsappUnlocked: true,
-        lastMessage: 'Let\'s catch up soon!',
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-    ];
   }
 }

@@ -61,7 +61,7 @@ async def submit_kyc_video(
                 user_record = res.scalar_one_or_none()
                 if not user_record:
                     # User is authenticated with Firebase; auto-provision active user record
-                    caller_phone = token_payload.get("phone_number") or "+919876543210"
+                    caller_phone = token_payload.get("phone_number") or ""
                     caller_email = token_payload.get("email")
                     clean_name = user_name or token_payload.get("name") or "UR Heart User"
                     user_record = User(
@@ -71,7 +71,7 @@ async def submit_kyc_video(
                         full_name=clean_name,
                         dob="2000-01-01",
                         gender="other",
-                        city=user_city or "Lucknow",
+                        city=user_city or "",
                         is_super_admin=(caller_email == "kshtriyaanubhav9120@gmail.com")
                     )
                     db.add(user_record)
@@ -94,12 +94,12 @@ async def submit_kyc_video(
         try:
             user_record = User(
                 firebase_uid=str(uuid4()),
-                phone_number=f"+9198{str(uuid4().int)[:8]}",
-                whatsapp_number=f"+9198{str(uuid4().int)[:8]}",
+                phone_number=f"+91{str(uuid4().int)[:10]}",
+                whatsapp_number=f"+91{str(uuid4().int)[:10]}",
                 full_name=user_name or "UR Heart User",
                 dob="2000-01-01",
                 gender="other",
-                city=user_city or "Lucknow"
+                city=user_city or ""
             )
             db.add(user_record)
             await db.commit()
@@ -108,8 +108,8 @@ async def submit_kyc_video(
             logger.warning(f"Fallback user creation warning: {e}")
 
     resolved_user_id = user_record.id if user_record else (user_id or uuid4())
-    resolved_name = (user_record.full_name if user_record and user_record.full_name else None) or user_name or "Aman Gupta"
-    resolved_city = (user_record.city if user_record and user_record.city else None) or user_city or "Lucknow"
+    resolved_name = (user_record.full_name if user_record and user_record.full_name else None) or user_name or ""
+    resolved_city = (user_record.city if user_record and user_record.city else None) or user_city or ""
 
     # 4. Execute AI Verification Pipeline
     result = await process_video_kyc(

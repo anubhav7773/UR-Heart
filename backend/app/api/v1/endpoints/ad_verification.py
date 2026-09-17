@@ -266,12 +266,19 @@ async def get_whatsapp_reveal_progress(
     user_ads = token_rec.user1_ads_count if is_user1 else token_rec.user2_ads_count
     match_ads = token_rec.user2_ads_count if is_user1 else token_rec.user1_ads_count
 
+    partner_whatsapp = None
+    if token_rec.is_unlocked:
+        partner_id = match_rec.user2_id if is_user1 else match_rec.user1_id
+        partner_res = await db.execute(select(User.whatsapp_number).where(User.id == partner_id))
+        partner_whatsapp = partner_res.scalar_one_or_none()
+
     return {
         "match_id": str(match_id),
         "user_ads_watched": user_ads,
         "match_ads_watched": match_ads,
         "is_unlocked": token_rec.is_unlocked,
-        "ephemeral_token": token_rec.ephemeral_token if token_rec.is_unlocked else None
+        "ephemeral_token": token_rec.ephemeral_token if token_rec.is_unlocked else None,
+        "partner_whatsapp": partner_whatsapp,
     }
 
 @router.post("/complete-ad", status_code=status.HTTP_200_OK)

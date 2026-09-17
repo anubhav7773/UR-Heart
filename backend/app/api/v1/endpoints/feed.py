@@ -104,17 +104,15 @@ async def get_discovery_feed(
                 )
             )
 
-        # Fallback profile photo if none uploaded yet
         if not photo_list:
-            gender_seed = "girl" if user.gender == "female" else "boy"
-            fallback_url = f"https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80" if user.gender == "female" else "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=80"
             photo_list.append(
                 CandidatePhoto(
                     slot_index=1,
-                    photo_url=fallback_url,
-                    blur_hash="LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+                    photo_url=f"{settings.SUPABASE_URL}/storage/v1/object/public/user-photos/default_avatar.png",
+                    blur_hash="",
                 )
             )
+
 
         # Determine interest chips
         city_key = (user.city or "").lower()

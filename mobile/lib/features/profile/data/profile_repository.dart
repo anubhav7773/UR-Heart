@@ -29,7 +29,7 @@ class UserProfileData {
       id: json['id']?.toString() ?? '',
       fullName: json['full_name'] as String? ?? 'User',
       phoneNumber: json['phone_number'] as String? ?? '',
-      city: json['city'] as String? ?? 'Lucknow',
+      city: json['city'] as String? ?? '',
       bio: json['bio'] as String? ?? '',
       streakCount: json['streak_count'] as int? ?? 0,
       rewardBalance: json['reward_balance'] as int? ?? 0,

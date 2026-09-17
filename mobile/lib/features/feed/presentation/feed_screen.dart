@@ -5,6 +5,7 @@ import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
 import 'package:ur_heart/features/feed/data/feed_repository.dart';
+import 'package:ur_heart/features/profile/data/profile_repository.dart';
 
 /// Screen 3: Production Discovery Swipe Feed with Real Candidate Profiles & Live Swiping
 class FeedScreen extends StatefulWidget {
@@ -27,14 +28,15 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
   final FeedRepository _feedRepository = FeedRepository();
+  final ProfileRepository _profileRepository = ProfileRepository();
 
   List<CandidateProfileModel> _candidates = [];
   int _currentIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;
   int _swipesUntilAd = 4;
-  int _dmTokens = 12;
-  final int _streakCount = 7;
+  int _dmTokens = 0;
+  int _streakCount = 0;
   bool _isProcessingSwipe = false;
 
   String _t(String key, [Map<String, String>? args]) =>
@@ -53,11 +55,21 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
     });
 
     try {
-      final candidates = await _feedRepository.getCandidates();
+      final results = await Future.wait([
+        _feedRepository.getCandidates(),
+        _profileRepository.getProfile(),
+      ]);
+      final candidates = results[0] as List<CandidateProfileModel>;
+      final profile = results[1] as UserProfileData?;
+
       if (mounted) {
         setState(() {
           _candidates = candidates;
           _currentIndex = 0;
+          if (profile != null) {
+            _streakCount = profile.streakCount;
+            _dmTokens = profile.rewardBalance;
+          }
           _isLoading = false;
         });
       }
@@ -150,7 +162,12 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
                   Navigator.of(ctx).pop();
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => ChatRoomScreen(lang: widget.lang),
+                      builder: (_) => ChatRoomScreen(
+                        lang: widget.lang,
+                        matchId: matchId,
+                        participantName: candidate.fullName,
+                        participantId: candidate.id,
+                      ),
                     ),
                   );
                 },

@@ -96,7 +96,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
                   label: 'Matches',
                   icon: Icons.favorite_rounded,
                   activeColor: URHeartColors.brandPrimary,
-                  badgeText: '2',
                 ),
                 _buildNavItem(
                   index: 2,

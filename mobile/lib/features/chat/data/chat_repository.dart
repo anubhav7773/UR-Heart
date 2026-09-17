@@ -119,7 +119,7 @@ class ChatRepository {
   Future<List<ChatMessageModel>> getHistory(String matchId, {int limit = 50}) async {
     try {
       final response = await _client.get(
-        '/api/v1/chat/$matchId/messages',
+        '/api/v1/chat/history/$matchId',
         queryParameters: {'limit': limit},
       );
 

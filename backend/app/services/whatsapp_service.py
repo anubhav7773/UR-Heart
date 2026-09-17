@@ -24,11 +24,24 @@ async def process_whatsapp_ad_completion(
         .where(WhatsAppRevealToken.match_id == match_id)
     )
     result = await db.execute(stmt)
-    row = result.first()
-    if not row:
-        return None
+    row = result.first() if hasattr(result, "first") and callable(result.first) else None
 
-    token_rec, match_rec = row
+    if row:
+        token_rec, match_rec = row
+    else:
+        match_stmt = select(Match).where(Match.id == match_id)
+        match_res = await db.execute(match_stmt)
+        match_rec = match_res.scalar_one_or_none() if hasattr(match_res, "scalar_one_or_none") else None
+        if not match_rec:
+            return None
+        token_rec = WhatsAppRevealToken(
+            match_id=match_id,
+            user1_ads_count=0,
+            user2_ads_count=0,
+            is_unlocked=False
+        )
+        db.add(token_rec)
+        await db.flush()
 
     # Increment counter for respective user (capped at 3)
     if match_rec.user1_id == user_id:
