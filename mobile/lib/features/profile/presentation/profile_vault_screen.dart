@@ -125,7 +125,7 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
     final userCity = _profile?.city ?? 'Lucknow, UP';
     final streak = _profile?.streakCount ?? 14;
     final rewardTokens = _profile?.rewardBalance ?? 9;
-    final bool isMasterAdmin = true; // All admin restrictions removed as requested
+    const bool isMasterAdmin = true; // All admin restrictions removed as requested
 
     return Scaffold(
       backgroundColor: URHeartColors.canvasBackground,

@@ -153,8 +153,8 @@ def validate_kyc_video_file(file_bytes: bytes, filename: str = "") -> None:
             detail="File too small to be a valid video container."
         )
 
-    # Magic bytes check: MP4 ftyp box or test fixture pattern
-    is_mp4 = file_bytes[4:8] == b"ftyp" or b"ftyp" in file_bytes[:32] or b"FAKE_MP4" in file_bytes[:32]
+    # Magic bytes check: MP4 container must contain 'ftyp' box
+    is_mp4 = file_bytes[4:8] == b"ftyp" or b"ftyp" in file_bytes[:32]
     if not is_mp4:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

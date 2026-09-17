@@ -25,6 +25,10 @@ class KycRepository {
         '/api/v1/moderation/scan-photo',
         queryParameters: {'require_face': true},
         data: formData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 45),
+          receiveTimeout: const Duration(seconds: 45),
+        ),
       );
 
       return response.data as Map<String, dynamic>;
@@ -58,6 +62,8 @@ class KycRepository {
         '/api/v1/kyc/submit-video',
         data: formData,
         options: Options(
+          sendTimeout: const Duration(seconds: 90),
+          receiveTimeout: const Duration(seconds: 120),
           headers: {
             'X-Consent-DPDP': 'true',
           },

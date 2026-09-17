@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
-import '../../home/presentation/main_shell_screen.dart';
-import '../../kyc/presentation/photo_upload_screen.dart';
 import '../data/auth_repository.dart';
 import 'auth_gate.dart';
 

@@ -12,8 +12,9 @@ Dio createApiClient({
 }) {
   final dio = Dio(BaseOptions(
     baseUrl: baseUrl ?? EnvConfig.apiBaseUrl,
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 15),
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 90),
+    sendTimeout: const Duration(seconds: 90),
     headers: {'Content-Type': 'application/json'},
   ));
 

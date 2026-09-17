@@ -6,7 +6,6 @@ import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/core/utils/image_compressor.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
-import 'package:ur_heart/features/feed/presentation/feed_screen.dart';
 import 'package:ur_heart/features/home/presentation/main_shell_screen.dart';
 import 'package:ur_heart/features/kyc/data/kyc_repository.dart';
 

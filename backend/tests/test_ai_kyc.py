@@ -11,7 +11,8 @@ from app.core.rate_limiter import limiter
 
 client = TestClient(app)
 
-DUMMY_VIDEO_BYTES = b"FAKE_MP4_VIDEO_HEADER_DATA_1234567890"
+VALID_MP4_BYTES = b"\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41" + b"\x00" * 100
+DUMMY_VIDEO_BYTES = VALID_MP4_BYTES
 
 @pytest.fixture(autouse=True)
 def mock_db_dependency():
@@ -36,6 +37,8 @@ def mock_db_dependency():
     app.dependency_overrides[get_db] = override_get_db
     yield
     app.dependency_overrides.pop(get_db, None)
+    app.state.limiter.enabled = True
+    limiter.enabled = True
 
 # ==============================================================================
 # TEST CASE 1: Auto-Approval Success Branch

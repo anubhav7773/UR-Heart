@@ -76,17 +76,20 @@ def test_valid_signature_reward_crediting():
     async def override_get_db():
         yield mock_session
 
-    app.dependency_overrides[get_db] = override_get_db
+    try:
+        app.dependency_overrides[get_db] = override_get_db
 
-    with patch.object(ad_verification, "KEY_CACHE", {TEST_KEY_ID: TEST_PUBLIC_PEM}):
-        response = client.get(f"/api/v1/ads/verify-reward?{query_string}")
+        with patch.object(ad_verification, "KEY_CACHE", {TEST_KEY_ID: TEST_PUBLIC_PEM}):
+            response = client.get(f"/api/v1/ads/verify-reward?{query_string}")
 
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert data["status"] == "success"
-    assert data["reward"] == "3_direct_dms_granted"
-    assert mock_session.commit.called
-    assert mock_session.add.called
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["reward"] == "3_direct_dms_granted"
+        assert mock_session.commit.called
+        assert mock_session.add.called
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 # ==============================================================================
 # TEST SUITE 2: Replay Attack Resistance (Idempotency)
@@ -118,17 +121,20 @@ def test_replay_attack_resistance():
     async def override_get_db():
         yield mock_session
 
-    app.dependency_overrides[get_db] = override_get_db
+    try:
+        app.dependency_overrides[get_db] = override_get_db
 
-    with patch.object(ad_verification, "KEY_CACHE", {TEST_KEY_ID: TEST_PUBLIC_PEM}):
-        response = client.get(f"/api/v1/ads/verify-reward?{query_string}")
+        with patch.object(ad_verification, "KEY_CACHE", {TEST_KEY_ID: TEST_PUBLIC_PEM}):
+            response = client.get(f"/api/v1/ads/verify-reward?{query_string}")
 
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert data["status"] == "duplicate_ignored"
-    assert data["transaction_id"] == tx_id
-    assert mock_session.rollback.called
-    assert not mock_session.commit.called
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["status"] == "duplicate_ignored"
+        assert data["transaction_id"] == tx_id
+        assert mock_session.rollback.called
+        assert not mock_session.commit.called
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 # ==============================================================================
 # TEST SUITE 3: WhatsApp Dual Progression & 6-Ad Unlock Test

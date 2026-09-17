@@ -12,7 +12,7 @@ class AuthRepository {
   AuthRepository({FirebaseAuth? auth}) : _customAuth = auth;
 
   FirebaseAuth get _auth {
-    if (_customAuth != null) return _customAuth!;
+    if (_customAuth != null) return _customAuth;
     try {
       return FirebaseAuth.instance;
     } catch (_) {

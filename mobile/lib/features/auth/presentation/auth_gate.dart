@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/features/auth/data/profile_repository.dart';
 import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
 import 'package:ur_heart/features/auth/presentation/profile_setup_screen.dart';

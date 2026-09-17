@@ -4,7 +4,6 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_compress/video_compress.dart';
 import 'package:blurhash_dart/blurhash_dart.dart' as bh;
 import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
 
 class PhotoCompressionResult {
   final Uint8List bytes;
@@ -59,14 +58,14 @@ class MediaCompressor {
     // Step 2: Enforce strict 100 KB ceiling with secondary optimization pass if necessary
     Uint8List finalBytes = compressedBytes;
     if (finalBytes.lengthInBytes > 100 * 1024) {
-      final Uint8List? fallbackBytes = await FlutterImageCompress.compressWithList(
+      final fallbackBytes = await FlutterImageCompress.compressWithList(
         finalBytes,
         minWidth: 900,
         minHeight: 1125,
         quality: 55,
         format: CompressFormat.webp,
       );
-      if (fallbackBytes != null && fallbackBytes.isNotEmpty) {
+      if (fallbackBytes.isNotEmpty) {
         finalBytes = fallbackBytes;
       }
     }
