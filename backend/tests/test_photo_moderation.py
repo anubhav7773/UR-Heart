@@ -137,3 +137,34 @@ def test_preprocessing_and_benchmark():
 
     assert max(processed.shape[:2]) <= 800
     assert elapsed_ms < 100.0, f"Preprocessing took {elapsed_ms}ms, target is < 100ms"
+
+# ==============================================================================
+# TEST CATEGORY 6: Document / Certificate / Poster Interception
+# ==============================================================================
+def test_document_table_grid_interception():
+    """Documents and certificates with table grids must be rejected with HTTP 422."""
+    img = np.full((600, 600, 3), 255, dtype=np.uint8)
+    # Draw horizontal and vertical grid lines
+    for y in range(50, 550, 40):
+        cv2.line(img, (50, y), (550, y), (0, 0, 0), 2)
+    for x in range(50, 550, 60):
+        cv2.line(img, (x, 50), (x, 500), (0, 0, 0), 2)
+    _, buffer = cv2.imencode('.jpg', img)
+
+    files = {"file": ("document_form.jpg", buffer.tobytes(), "image/jpeg")}
+    response = client.post("/api/v1/moderation/scan-photo", files=files)
+    assert response.status_code == 422
+    assert "table grid" in response.json()["detail"].lower() or "document" in response.json()["detail"].lower()
+
+def test_camera_watermark_frame_interception():
+    """Photos inside thick camera watermark / letterbox borders must be rejected."""
+    img = np.full((600, 600, 3), 200, dtype=np.uint8)
+    # Draw black outer border around entire image
+    cv2.rectangle(img, (0, 0), (600, 600), (5, 5, 5), 40)
+    _, buffer = cv2.imencode('.jpg', img)
+
+    files = {"file": ("watermark_border.jpg", buffer.tobytes(), "image/jpeg")}
+    response = client.post("/api/v1/moderation/scan-photo", files=files)
+    assert response.status_code == 422
+    assert "watermark frame" in response.json()["detail"].lower() or "letterbox" in response.json()["detail"].lower()
+

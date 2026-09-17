@@ -145,40 +145,79 @@ def detect_human_face(image_np: np.ndarray) -> tuple:
     except Exception:
         return False, []
 
-def detect_dense_text_or_banner(image_np: np.ndarray, face_boxes: list = None) -> bool:
+def detect_dense_text_or_banner_with_reason(image_np: np.ndarray, face_boxes: list = None) -> tuple[bool, str]:
     """
-    Detects document, poster, or flyer layouts using edge analysis.
-    Only applies when no face is present. Real human camera photos are never
-    falsely flagged due to clothing stripes, brick patterns, or architectural backgrounds.
+    Detects document forms, certificates, posters, flyers, or text overlays.
+    Uses multi-stage computer vision heuristics:
+    1. Camera watermark frames / letterbox scan borders (Nothing phone, timestamp/specs borders).
+    2. Document / Certificate table grid lines (forms, certificates, receipts, ID cards).
+    3. Horizontal typography / text banner detection (masks out human faces so genuine portraits are never flagged).
     """
     try:
-        has_face = face_boxes is not None and len(face_boxes) > 0
-        if has_face:
-            return False
-
         gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY) if len(image_np.shape) == 3 else image_np
         h, w = gray.shape
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
+        # 1. Camera watermark frame / dark letterbox borders
+        pad_w = max(4, int(w * 0.04))
+        pad_h = max(4, int(h * 0.04))
+        border_mask = np.zeros((h, w), dtype=np.uint8)
+        border_mask[:pad_h, :] = 1
+        border_mask[-pad_h:, :] = 1
+        border_mask[:, :pad_w] = 1
+        border_mask[:, -pad_w:] = 1
+        border_pixels = gray[border_mask == 1]
+        black_border_pct = float(np.mean(border_pixels < 25))
+        if black_border_pct >= 0.35:
+            return True, f"Camera watermark frame or letterbox border detected ({black_border_pct:.1%})"
+
+        # 2. Document / Certificate Table Grid Lines (Forms, Certificates, Receipts, ID cards)
+        bin_img = cv2.adaptiveThreshold(~gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 15, -2)
+        h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(10, int(w * 0.12)), 1))
+        h_lines = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, h_kernel)
+        v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(10, int(h * 0.12))))
+        v_lines = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, v_kernel)
+        grid = cv2.add(h_lines, v_lines)
+        grid_px = int(cv2.countNonZero(grid))
+        if grid_px >= 18000:
+            return True, f"Document or certificate table grid detected ({grid_px} grid pixels)"
+
+        # 3. Horizontal typography / text banner detection (with face masking)
+        face_mask = np.ones((h, w), dtype=np.uint8)
+        if face_boxes is not None and len(face_boxes) > 0:
+            for (fx, fy, fw, fh) in face_boxes:
+                y1 = max(0, fy - int(fh * 0.15))
+                y2 = min(h, fy + int(fh * 1.15))
+                x1 = max(0, fx - int(fw * 0.15))
+                x2 = min(w, fx + int(fw * 1.15))
+                face_mask[y1:y2, x1:x2] = 0
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 3))
         gradient = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, kernel)
-        _, thresh = cv2.threshold(gradient, 35, 255, cv2.THRESH_BINARY)
-
-        close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 3))
+        gradient = cv2.bitwise_and(gradient, gradient, mask=face_mask)
+        _, thresh = cv2.threshold(gradient, 40, 255, cv2.THRESH_BINARY)
+        close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
         connected = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, close_kernel)
-
         contours, _ = cv2.findContours(connected, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        text_box_count = 0
+
+        text_blocks = 0
         for c in contours:
             x, y, bw, bh = cv2.boundingRect(c)
-            aspect_ratio = bw / float(bh) if bh > 0 else 0
+            ar = bw / float(bh) if bh > 0 else 0
             area = cv2.contourArea(c)
-            if 1.5 < aspect_ratio < 15 and 25 < bw < w * 0.85 and 10 < bh < 120 and area > 120:
-                text_box_count += 1
+            if 1.8 < ar < 15 and 30 < bw < w * 0.7 and 10 < bh < 80 and area > 150:
+                text_blocks += 1
 
-        # High threshold specifically for text-dense documents and posters
-        return text_box_count >= 12
+        if text_blocks >= 3:
+            return True, f"Text overlay or typography slogans detected ({text_blocks} text blocks)"
+
+        return False, "Clean camera portrait"
     except Exception:
-        return False
+        return False, "Analysis skipped"
+
+def detect_dense_text_or_banner(image_np: np.ndarray, face_boxes: list = None) -> bool:
+    """Boolean wrapper for backward compatibility and fast boolean checks."""
+    flagged, _ = detect_dense_text_or_banner_with_reason(image_np, face_boxes=face_boxes)
+    return flagged
 
 def inspect_extracted_text(text: str) -> None:
     """
@@ -192,6 +231,7 @@ def inspect_extracted_text(text: str) -> None:
     # Normalize whitespace for regex evaluation
     normalized_text = re.sub(r'\s+', ' ', cleaned_text)
     condensed_text = re.sub(r'[^a-zA-Z0-9]', '', cleaned_text).lower()
+    unicode_chars = re.sub(r'[\s\W_]', '', cleaned_text)
 
     # 1. Evaluation: Indian Phone Number Detection
     if PHONE_REGEX.search(normalized_text) or PHONE_REGEX.search(condensed_text):
@@ -228,8 +268,8 @@ def inspect_extracted_text(text: str) -> None:
             detail="Photo rejected: Commercial or solicitation keywords detected on image."
         )
 
-    # 6. Large Text Block Overlay (e.g. flyers, memes, screenshots with dense typography)
-    if len(condensed_text) >= 45:
+    # 6. Large Text Block Overlay (e.g. flyers, memes, screenshots with dense typography, Hindi/English)
+    if len(condensed_text) >= 40 or len(unicode_chars) >= 30:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Photo rejected: Text overlay or document detected. Profile photos must be clean portraits."
@@ -292,9 +332,10 @@ async def validate_uploaded_photo(file: UploadFile, require_face: bool = False) 
     # CHECK 5: OCR Regex and Contact/Overlay Inspection
     inspect_extracted_text(extracted_text)
 
-    # CHECK 6: Strict Zero-Text Overlay & Typography / Banner Detection (with face masking)
-    if detect_dense_text_or_banner(image, face_boxes=face_boxes):
+    # CHECK 6: Strict Zero-Text Overlay & Typography / Banner / Document Detection
+    is_violation, violation_reason = detect_dense_text_or_banner_with_reason(image, face_boxes=face_boxes)
+    if is_violation:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Photo rejected: Text, username, or graphic overlay detected. Profile photos must be 100% clean camera photos."
+            detail=f"Photo rejected: {violation_reason}. Profile photos must be clean camera photos."
         )
