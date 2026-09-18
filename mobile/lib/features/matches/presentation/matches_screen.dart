@@ -1,11 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_blurhash/flutter_blurhash.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ur_heart/core/config/theme.dart';
+import 'package:ur_heart/core/network/api_client.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
 import 'package:ur_heart/features/matches/data/matches_repository.dart';
+import 'package:ur_heart/features/ads/services/ad_manager.dart';
 
-/// Screen: Matches & Active Conversations
+/// Dual-Tab Screen: Connected Matches & "Second Chance" Missed Connections Tray
 class MatchesScreen extends StatefulWidget {
   final String lang;
   final VoidCallback? onExploreTap;
@@ -20,26 +25,240 @@ class MatchesScreen extends StatefulWidget {
   State<MatchesScreen> createState() => _MatchesScreenState();
 }
 
-class _MatchesScreenState extends State<MatchesScreen> with SecureScreenMixin {
+class _MatchesScreenState extends State<MatchesScreen>
+    with SingleTickerProviderStateMixin, SecureScreenMixin {
+  late TabController _tabController;
   final MatchesRepository _repo = MatchesRepository();
   List<MatchItemModel> _matches = [];
-  bool _isLoading = true;
+  bool _isLoadingMatches = true;
+
+  bool _isLoadingMissed = false;
+  List<Map<String, dynamic>> _missedProfiles = [];
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadMatches();
+    _fetchMissedConnections();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMatches() async {
-    setState(() => _isLoading = true);
-    final list = await _repo.getMatches();
-    if (mounted) {
-      setState(() {
-        _matches = list;
-        _isLoading = false;
-      });
+    setState(() => _isLoadingMatches = true);
+    try {
+      final list = await _repo.getMatches();
+      if (mounted) {
+        setState(() {
+          _matches = list;
+          _isLoadingMatches = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingMatches = false);
     }
+  }
+
+  Future<void> _fetchMissedConnections() async {
+    setState(() => _isLoadingMissed = true);
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = createApiClient();
+      final response = await dio.get(
+        '/api/v1/swipes/missed',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode == 200) {
+        if (mounted) {
+          setState(() {
+            _missedProfiles = List<Map<String, dynamic>>.from(response.data);
+          });
+        }
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoadingMissed = false);
+    }
+  }
+
+  Future<void> _executeUnlock(Map<String, dynamic> profile) async {
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = createApiClient();
+      final res = await dio.post(
+        '/api/v1/swipes/missed/${profile['user_id']}/unlock-view',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          profile['is_unlocked_for_view'] = true;
+          profile['bio'] = res.data['bio'];
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("✓ Full profile unlocked for 24 hours!"),
+              backgroundColor: Color(0xFF06D6A0),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to unlock: $e"),
+            backgroundColor: const Color(0xFFFF334B),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleUnlockProfile(Map<String, dynamic> profile) async {
+    // Show 5-10s Interstitial Ad
+    final bool shown = AdManager.instance.showInterstitialAd(
+      onDismissed: () => _executeUnlock(profile),
+    );
+    if (!shown) {
+      // In dev/test when real ad is not preloaded, allow unlock directly
+      await _executeUnlock(profile);
+    }
+  }
+
+  Future<void> _executeSendDm(Map<String, dynamic> profile, String text) async {
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = createApiClient();
+      await dio.post(
+        '/api/v1/swipes/missed/${profile['user_id']}/send-dm',
+        data: {"message": text},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✓ Message sent directly!"),
+            backgroundColor: Color(0xFF06D6A0),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Send failed: ${e.toString().replaceAll('Exception: ', '')}"),
+            backgroundColor: const Color(0xFFFF334B),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDirectDmModal(Map<String, dynamic> profile) {
+    final TextEditingController msgController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF16161D),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.flash_on, color: Color(0xFFFFD166), size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  "Direct DM to ${profile['full_name']}",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Watch 1 Rewarded Ad (30s) to send an instant direct message without matching (Max 3/day).",
+              style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: msgController,
+              maxLines: 3,
+              maxLength: 250,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "Write a respectful message...",
+                hintStyle: const TextStyle(color: Color(0xFF636375)),
+                filled: true,
+                fillColor: const Color(0xFF22222C),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF2E63),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  final text = msgController.text.trim();
+                  if (text.isEmpty) return;
+                  Navigator.pop(ctx);
+
+                  final userId = FirebaseAuth.instance.currentUser?.uid ?? "user_default";
+
+                  // Trigger Rewarded Video Ad
+                  final bool shown = AdManager.instance.showRewardedAd(
+                    userId: userId,
+                    adType: "second_chance_dm",
+                    targetId: profile['user_id'],
+                    onRewardGranted: () => _executeSendDm(profile, text),
+                  );
+
+                  if (!shown) {
+                    // In dev/test when real ad is not preloaded, allow sending directly
+                    _executeSendDm(profile, text);
+                  }
+                },
+                child: const Text(
+                  "Watch Ad & Send Direct DM",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   void _openChat(MatchItemModel match) {
@@ -57,366 +276,265 @@ class _MatchesScreenState extends State<MatchesScreen> with SecureScreenMixin {
 
   @override
   Widget build(BuildContext context) {
+    const Color canvasBg = Color(0xFF0A0A0D);
+    const Color brandPrimary = Color(0xFFFF2E63);
+
     return Scaffold(
-      backgroundColor: URHeartColors.canvasBackground,
+      backgroundColor: canvasBg,
       appBar: AppBar(
-        backgroundColor: URHeartColors.cardSurface,
+        backgroundColor: canvasBg,
         elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [URHeartColors.brandPrimary, URHeartColors.accentGold],
-                ),
-              ),
-              child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Matches & Chats',
-                  style: TextStyle(
-                    color: URHeartColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '${_matches.length} Connected Profiles',
-                  style: const TextStyle(
-                    color: URHeartColors.brandSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+        title: const Text(
+          "Matches & Connections",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: brandPrimary,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: const Color(0xFFA0A0B2),
+          tabs: const [
+            Tab(text: "Connected (Matches)"),
+            Tab(text: "Second Chance (Missed)"),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: URHeartColors.textSecondary),
-            onPressed: _loadMatches,
-          ),
-        ],
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: URHeartColors.brandPrimary),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadMatches,
-              color: URHeartColors.brandPrimary,
-              child: _matches.isEmpty
-                  ? _buildEmptyState()
-                  : SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 16),
-                          // New Matches Section
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              children: [
-                                const Text('🔥', style: TextStyle(fontSize: 16)),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'New Mutual Matches',
-                                  style: TextStyle(
-                                    color: URHeartColors.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: URHeartColors.brandPrimary.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    '${_matches.length}',
-                                    style: const TextStyle(
-                                      color: URHeartColors.brandPrimary,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 105,
-                            child: ListView.separated(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _matches.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 14),
-                              itemBuilder: (context, index) {
-                                final match = _matches[index];
-                                return _buildNewMatchAvatar(match);
-                              },
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-                          // Conversations Section
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              children: [
-                                Text('💬', style: TextStyle(fontSize: 16)),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Direct Messages & Encrypted Chat',
-                                  style: TextStyle(
-                                    color: URHeartColors.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _matches.length,
-                            separatorBuilder: (_, __) => const Divider(
-                              color: URHeartColors.surfaceRaised,
-                              height: 1,
-                              indent: 76,
-                            ),
-                            itemBuilder: (context, index) {
-                              final match = _matches[index];
-                              return _buildConversationTile(match);
-                            },
-                          ),
-                          const SizedBox(height: 32),
-                        ],
-                      ),
-                    ),
-            ),
-    );
-  }
-
-  Widget _buildNewMatchAvatar(MatchItemModel match) {
-    return GestureDetector(
-      onTap: () => _openChat(match),
-      child: Column(
+      body: TabBarView(
+        controller: _tabController,
         children: [
-          Container(
-            padding: const EdgeInsets.all(2.5),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: <Color>[URHeartColors.brandPrimary, URHeartColors.brandSecondary],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: URHeartColors.brandPrimary.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: CircleAvatar(
-              radius: 32,
-              backgroundColor: URHeartColors.surfaceRaised,
-              backgroundImage: CachedNetworkImageProvider(match.partnerPhotoUrl),
-            ),
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            width: 72,
-            child: Text(
-              match.partnerName.split(' ').first,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: URHeartColors.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+          // TAB 1: Connected Matches
+          _buildConnectedMatchesTab(),
+
+          // TAB 2: Second Chance (Missed Profiles)
+          _buildSecondChanceTab(),
         ],
       ),
     );
   }
 
-  Widget _buildConversationTile(MatchItemModel match) {
-    final preview = match.lastMessage ?? 'Say hello! Tap to start conversation 👋';
-    return InkWell(
-      onTap: () => _openChat(match),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            // Avatar with online green dot
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: URHeartColors.surfaceRaised,
-                  backgroundImage: CachedNetworkImageProvider(match.partnerPhotoUrl),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 13,
-                    height: 13,
-                    decoration: BoxDecoration(
-                      color: URHeartColors.statusSuccess,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: URHeartColors.canvasBackground, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 14),
+  Widget _buildConnectedMatchesTab() {
+    if (_isLoadingMatches) {
+      return const Center(child: CircularProgressIndicator(color: URHeartColors.brandPrimary));
+    }
 
-            // Content
-            Expanded(
+    if (_matches.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.favorite_border, color: Color(0xFFFF2E63), size: 56),
+            const SizedBox(height: 12),
+            const Text(
+              "No Matches Yet",
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              "Swipe right on Discovery Feed to create mutual matches.",
+              style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 13),
+            ),
+            if (widget.onExploreTap != null) ...[
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: widget.onExploreTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: URHeartColors.brandPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                icon: const Icon(Icons.explore_rounded, color: Colors.white, size: 18),
+                label: const Text(
+                  "Explore Discovery Feed",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadMatches,
+      color: URHeartColors.brandPrimary,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _matches.length,
+        separatorBuilder: (_, __) => const Divider(
+          color: URHeartColors.surfaceRaised,
+          height: 1,
+          indent: 76,
+        ),
+        itemBuilder: (context, index) {
+          final match = _matches[index];
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+            leading: CircleAvatar(
+              radius: 28,
+              backgroundColor: URHeartColors.surfaceRaised,
+              backgroundImage: match.partnerPhotoUrl.isNotEmpty
+                  ? CachedNetworkImageProvider(match.partnerPhotoUrl)
+                  : null,
+              child: match.partnerPhotoUrl.isEmpty
+                  ? const Icon(Icons.person, color: Colors.grey)
+                  : null,
+            ),
+            title: Text(
+              match.partnerName,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            subtitle: Text(
+              match.lastMessage ?? "📍 ${match.partnerCity}",
+              style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFFFF2E63), size: 20),
+            onTap: () => _openChat(match),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSecondChanceTab() {
+    if (_isLoadingMissed) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFFF2E63)));
+    }
+
+    if (_missedProfiles.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _fetchMissedConnections,
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        match.partnerName,
-                        style: const TextStyle(
-                          color: URHeartColors.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.verified_rounded, color: URHeartColors.brandSecondary, size: 15),
-                      const Spacer(),
-                      Text(
-                        '${match.createdAt.hour.toString().padLeft(2, '0')}:${match.createdAt.minute.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                          color: URHeartColors.textMuted,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, color: URHeartColors.textMuted, size: 12),
-                      const SizedBox(width: 2),
-                      Text(
-                        match.partnerCity,
-                        style: const TextStyle(color: URHeartColors.textMuted, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
+                  Icon(Icons.history, color: Color(0xFFA0A0B2), size: 48),
+                  SizedBox(height: 12),
                   Text(
-                    preview,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: match.lastMessage != null ? URHeartColors.textPrimary : URHeartColors.textSecondary,
-                      fontSize: 13,
-                    ),
+                    "No Missed Profiles",
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 6),
-                  // WhatsApp Reveal Status Pill
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: match.whatsappUnlocked
-                              ? const Color(0xFF25D366).withValues(alpha: 0.15)
-                              : URHeartColors.surfaceRaised,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: match.whatsappUnlocked
-                                ? const Color(0xFF25D366).withValues(alpha: 0.4)
-                                : Colors.transparent,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              match.whatsappUnlocked ? '💬 WhatsApp Unlocked' : '🔒 3-Ad Reveal',
-                              style: TextStyle(
-                                color: match.whatsappUnlocked
-                                    ? const Color(0xFF25D366)
-                                    : URHeartColors.accentGold,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  SizedBox(height: 4),
+                  Text(
+                    "Profiles you pass on the feed will appear here for 14 days.",
+                    style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
                   ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.favorite_border_rounded, size: 64, color: URHeartColors.brandPrimary),
-            const SizedBox(height: 16),
-            const Text(
-              'No Matches Yet',
-              style: TextStyle(
-                color: URHeartColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+    return RefreshIndicator(
+      onRefresh: _fetchMissedConnections,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _missedProfiles.length,
+        itemBuilder: (ctx, idx) {
+          final p = _missedProfiles[idx];
+          final bool isUnlocked = p['is_unlocked_for_view'] == true;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16161D),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Swipe right on candidates in the Discovery Feed to create mutual matches and unlock private chat.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: URHeartColors.textSecondary, fontSize: 13),
+            child: Row(
+              children: [
+                // Profile Avatar Thumbnail
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 70,
+                    height: 85,
+                    child: p['photo_url'] != null
+                        ? CachedNetworkImage(
+                            imageUrl: p['photo_url'],
+                            fit: BoxFit.cover,
+                            placeholder: (ctx, url) => BlurHash(hash: p['blur_hash'] ?? "LEHLh[WB2yk8pyoJadR*.7kCMdnj"),
+                            errorWidget: (ctx, url, err) => Container(
+                              color: const Color(0xFF22222C),
+                              child: const Icon(Icons.person, color: Colors.grey),
+                            ),
+                          )
+                        : Container(
+                            color: const Color(0xFF22222C),
+                            child: const Icon(Icons.person, color: Colors.grey),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Details & Unlocked Bio
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p['full_name'] ?? "UR-Heart User",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "📍 ${p['locality'] ?? p['city'] ?? 'India'}",
+                        style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+
+                      if (isUnlocked && p['bio'] != null && (p['bio'] as String).isNotEmpty)
+                        Text(
+                          '"${p['bio']}"',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF08D9D6),
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      else
+                        TextButton.icon(
+                          onPressed: () => _handleUnlockProfile(p),
+                          icon: const Icon(Icons.lock_open, size: 14, color: Color(0xFFFFD166)),
+                          label: const Text(
+                            "Watch 10s Ad -> View Bio",
+                            style: TextStyle(color: Color(0xFFFFD166), fontSize: 11),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Direct DM Action Button
+                IconButton(
+                  icon: const Icon(Icons.send_rounded, color: Color(0xFFFF2E63)),
+                  tooltip: "Send Direct DM",
+                  onPressed: () => _showDirectDmModal(p),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: widget.onExploreTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: URHeartColors.brandPrimary,
-                shape: const RoundedRectangleBorder(borderRadius: URHeartTheme.radiusPill),
-              ),
-              icon: const Icon(Icons.explore_rounded, color: Colors.white),
-              label: const Text('Go to Discovery Feed', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
