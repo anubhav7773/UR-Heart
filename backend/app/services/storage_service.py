@@ -199,10 +199,10 @@ async def upload_kyc_video_to_storage(
     storage_path: str = ""
 ) -> str:
     """Uploads 5-second KYC video to private 'kyc-temp' bucket for ephemeral processing."""
-    if len(video_bytes) > 2621440:  # 2.5 MB
+    if len(video_bytes) > 10485760:  # 10 MB in bytes
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Video size exceeds statutory 2.5 MB ceiling."
+            detail="Video size exceeds statutory 10 MB ceiling."
         )
 
     if not validate_binary_magic_bytes(video_bytes, "video"):

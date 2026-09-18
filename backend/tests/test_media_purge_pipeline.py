@@ -47,9 +47,9 @@ async def test_photo_upload_size_limit_rejection():
 
 @pytest.mark.asyncio
 async def test_video_upload_size_limit_rejection():
-    """Assert videos exceeding 2.5 MB are rejected with HTTP 413."""
+    """Assert videos exceeding 10 MB are rejected with HTTP 413."""
     user_id = uuid4()
-    oversized_bytes = b"\x00\x00\x00\x20ftypisom" + b"\x00" * (2621440 + 1024)
+    oversized_bytes = b"\x00\x00\x00\x20ftypisom" + b"\x00" * (10485760 + 1024)
 
     with pytest.raises(HTTPException) as exc:
         await upload_kyc_video_to_storage(user_id, oversized_bytes)

@@ -272,71 +272,37 @@ class _CandidateReviewCard extends StatefulWidget {
 class _CandidateReviewCardState extends State<_CandidateReviewCard> {
   VideoPlayerController? _videoController;
   bool _isVideoInitialized = false;
-  bool _isLoading = true;
-  String? _errorMessage;
+  bool _hasVideoError = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeVideo();
+    _initPlayer();
   }
 
-  void _initializeVideo() {
-    final url = widget.candidate.videoPlaybackUrl.trim();
-    if (url.isEmpty) {
-      debugPrint('[_CandidateReviewCard] videoPlaybackUrl is empty for candidate ${widget.candidate.registeredName}');
-      setState(() {
-        _isLoading = false;
-        _errorMessage = "Video stream URL unavailable";
-      });
+  Future<void> _initPlayer() async {
+    final String url = widget.candidate.videoPlaybackUrl.trim();
+    if (url.isEmpty || !url.startsWith("http")) {
+      if (mounted) setState(() => _hasVideoError = true);
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
     try {
-      debugPrint('[_CandidateReviewCard] Initializing VideoPlayer for ${widget.candidate.registeredName}: $url');
       _videoController?.dispose();
       _videoController = VideoPlayerController.networkUrl(Uri.parse(url));
-
-      _videoController!
-          .initialize()
-          .timeout(
-            const Duration(seconds: 15),
-            onTimeout: () {
-              throw Exception("Video stream initialization timed out (15s)");
-            },
-          )
-          .then((_) {
-        if (mounted) {
-          debugPrint('[_CandidateReviewCard] Video initialized successfully for ${widget.candidate.registeredName}');
-          setState(() {
-            _isVideoInitialized = true;
-            _isLoading = false;
-          });
-          _videoController?.setLooping(true);
-          _videoController?.play();
-        }
-      }).catchError((error) {
-        debugPrint('[_CandidateReviewCard] VideoPlayerController initialization error: $error (URL: $url)');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _isVideoInitialized = false;
-            _errorMessage = "Failed to stream video: ${error.toString().replaceAll('Exception: ', '')}";
-          });
-        }
-      });
-    } catch (e) {
-      debugPrint('[_CandidateReviewCard] URI parse / controller create failed: $e');
+      await _videoController!.initialize();
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isVideoInitialized = true;
+          _hasVideoError = false;
+        });
+        _videoController?.setLooping(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasVideoError = true;
           _isVideoInitialized = false;
-          _errorMessage = "Invalid video playback stream: $e";
         });
       }
     }
@@ -356,183 +322,139 @@ class _CandidateReviewCardState extends State<_CandidateReviewCard> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cardSurface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min, // Prevents bottom overflow
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Name & City
+          // Header: Name, City & Confidence Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    candidate.registeredName,
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  Text("📍 ${candidate.registeredCity}", style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 13)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      candidate.registeredName,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text("📍 ${candidate.registeredCity}", style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12)),
+                  ],
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: candidate.confidenceScore >= 0.70
                       ? const Color(0xFF06D6A0).withValues(alpha: 0.2)
                       : const Color(0xFFFFD166).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  "AI Score: ${(candidate.confidenceScore * 100).toInt()}%",
+                  "AI: ${(candidate.confidenceScore * 100).toInt()}%",
                   style: TextStyle(
                     color: candidate.confidenceScore >= 0.70 ? const Color(0xFF06D6A0) : const Color(0xFFFFD166),
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // 5-Second Video Player Preview
-          if (_isVideoInitialized && _videoController != null && _videoController!.value.isInitialized)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: AspectRatio(
-                aspectRatio: _videoController!.value.aspectRatio > 0
-                    ? _videoController!.value.aspectRatio
-                    : (16 / 9),
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    VideoPlayer(_videoController!),
-                    VideoProgressIndicator(
-                      _videoController!,
-                      allowScrubbing: true,
-                      colors: const VideoProgressColors(
-                        playedColor: Color(0xFFFFD166),
-                        bufferedColor: Colors.white24,
-                        backgroundColor: Colors.black38,
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    ),
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _videoController!.value.isPlaying
-                                ? _videoController!.pause()
-                                : _videoController!.play();
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _videoController!.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                            size: 38,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (_errorMessage != null)
-            Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(color: surfaceRaised, borderRadius: BorderRadius.circular(14)),
-              padding: const EdgeInsets.all(16),
-              alignment: Alignment.center,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.videocam_off_outlined, color: Color(0xFFFF334B), size: 30),
-                  const SizedBox(height: 8),
-                  Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: _initializeVideo,
-                    borderRadius: BorderRadius.circular(8),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.refresh, size: 14, color: Color(0xFFFFD166)),
-                          SizedBox(width: 4),
-                          Text("Retry stream", style: TextStyle(color: Color(0xFFFFD166), fontSize: 12, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else if (_isLoading || !_isVideoInitialized)
-            Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(color: surfaceRaised, borderRadius: BorderRadius.circular(14)),
-              alignment: Alignment.center,
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(color: Color(0xFFFFD166), strokeWidth: 2.5),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    "Buffering video stream...",
-                    style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 12),
-
-          // Transcript & AI Flags
+          // Safe Video Player Frame
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: surfaceRaised, borderRadius: BorderRadius.circular(12)),
+            height: 160,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: surfaceRaised,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: _hasVideoError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.videocam_off_outlined, color: Color(0xFFFF334B), size: 28),
+                        const SizedBox(height: 6),
+                        const Text("Video unavailable or already purged", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12)),
+                        TextButton(
+                          onPressed: _initPlayer,
+                          child: const Text("Retry stream", style: TextStyle(color: Color(0xFF08D9D6), fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  )
+                : (_isVideoInitialized && _videoController != null)
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            AspectRatio(
+                              aspectRatio: (_videoController!.value.aspectRatio > 0)
+                                  ? _videoController!.value.aspectRatio
+                                  : (16 / 9),
+                              child: VideoPlayer(_videoController!),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _videoController!.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                size: 40,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _videoController!.value.isPlaying ? _videoController!.pause() : _videoController!.play();
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      )
+                    : const Center(
+                        child: CircularProgressIndicator(color: Color(0xFFFFD166), strokeWidth: 2),
+                      ),
+          ),
+          const SizedBox(height: 10),
+
+          // Transcript Box
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: surfaceRaised, borderRadius: BorderRadius.circular(10)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Spoken Audio Transcript:", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 11, fontWeight: FontWeight.bold)),
+                const Text("Spoken Audio Transcript:", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 10, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
                 Text(
                   '"${candidate.transcript}"',
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontStyle: FontStyle.italic),
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontStyle: FontStyle.italic),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (candidate.flags.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
                     children: candidate.flags.map((flag) {
-                      return Chip(
-                        label: Text(flag, style: const TextStyle(color: Color(0xFFFF334B), fontSize: 10)),
-                        backgroundColor: const Color(0xFFFF334B).withValues(alpha: 0.12),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF334B).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(flag, style: const TextStyle(color: Color(0xFFFF334B), fontSize: 10)),
                       );
                     }).toList(),
                   ),
@@ -540,9 +462,9 @@ class _CandidateReviewCardState extends State<_CandidateReviewCard> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Action Buttons: Reject vs Approve
+          // Action Buttons
           Row(
             children: [
               Expanded(
@@ -550,22 +472,22 @@ class _CandidateReviewCardState extends State<_CandidateReviewCard> {
                   onPressed: widget.onReject,
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFFF334B)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
-                  child: const Text("Reject / अस्वीकार", style: TextStyle(color: Color(0xFFFF334B), fontWeight: FontWeight.bold)),
+                  child: const Text("Reject / अस्वीकार", style: TextStyle(color: Color(0xFFFF334B), fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
                   onPressed: widget.onApprove,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF06D6A0),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
-                  child: const Text("Approve / स्वीकृत", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  child: const Text("Approve / स्वीकृत", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ),
             ],
