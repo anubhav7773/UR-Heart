@@ -3,6 +3,26 @@ import 'package:flutter/foundation.dart';
 import 'package:ur_heart/core/config/env_config.dart';
 import 'package:ur_heart/core/network/api_client.dart';
 
+class UserProfilePhoto {
+  final int slotIndex;
+  final String photoUrl;
+  final String blurHash;
+
+  UserProfilePhoto({
+    required this.slotIndex,
+    required this.photoUrl,
+    required this.blurHash,
+  });
+
+  factory UserProfilePhoto.fromJson(Map<String, dynamic> json) {
+    return UserProfilePhoto(
+      slotIndex: json['slot_index'] as int? ?? 1,
+      photoUrl: json['photo_url'] as String? ?? '',
+      blurHash: json['blur_hash'] as String? ?? '',
+    );
+  }
+}
+
 class UserProfileData {
   final String id;
   final String fullName;
@@ -12,6 +32,7 @@ class UserProfileData {
   final int streakCount;
   final int rewardBalance;
   final bool kycStatus;
+  final List<UserProfilePhoto> photos;
 
   UserProfileData({
     required this.id,
@@ -22,9 +43,11 @@ class UserProfileData {
     required this.streakCount,
     required this.rewardBalance,
     required this.kycStatus,
+    this.photos = const [],
   });
 
   factory UserProfileData.fromJson(Map<String, dynamic> json) {
+    final rawPhotos = json['photos'] as List<dynamic>? ?? [];
     return UserProfileData(
       id: json['id']?.toString() ?? '',
       fullName: json['full_name'] as String? ?? 'User',
@@ -34,6 +57,10 @@ class UserProfileData {
       streakCount: json['streak_count'] as int? ?? 0,
       rewardBalance: json['reward_balance'] as int? ?? 0,
       kycStatus: json['kyc_status'] as bool? ?? false,
+      photos: rawPhotos
+          .whereType<Map<String, dynamic>>()
+          .map((p) => UserProfilePhoto.fromJson(p))
+          .toList(),
     );
   }
 }

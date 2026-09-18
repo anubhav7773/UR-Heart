@@ -2,10 +2,11 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, File, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, update, select, func
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencies import get_current_user
 from app.models.domain.user import User
@@ -15,8 +16,10 @@ from app.models.schemas.user import (
     UserProfileResponse,
     UserProfileSetupRequest,
     DiscoveryProfileResponse,
+    ProfilePhotoItem,
 )
 from app.core.legal_audit import record_legal_audit_event
+from app.services.storage_service import validate_photo_file, upload_profile_photo_to_storage
 
 router = APIRouter()
 
@@ -28,15 +31,36 @@ async def get_profile(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Returns the authenticated user's profile with photo count.
+    Returns the authenticated user's profile with verified user photos ordered by slot.
     Extracts identity strictly from verified server-side JWT (prevents IDOR).
     """
-    photo_stmt = select(func.count(UserPhoto.id)).where(UserPhoto.user_id == current_user.id)
-    photo_res = await db.execute(photo_stmt)
-    photo_count = photo_res.scalar_one() or 0
+    stmt = (
+        select(UserPhoto)
+        .where(UserPhoto.user_id == current_user.id)
+        .order_by(UserPhoto.slot_index.asc())
+    )
+    result = await db.execute(stmt)
+    photos = result.scalars().all()
+
+    supabase_base = settings.SUPABASE_URL or "https://pzrsyxvjbmzqlzlehuxg.supabase.co"
+    photo_items = []
+    for p in photos:
+        path = p.photo_storage_path
+        if not path.startswith("http"):
+            photo_url = f"{supabase_base}/storage/v1/object/public/user-photos/{path}"
+        else:
+            photo_url = path
+        photo_items.append(
+            ProfilePhotoItem(
+                slot_index=p.slot_index,
+                photo_url=photo_url,
+                blur_hash=p.blur_hash or "",
+            )
+        )
 
     resp = UserProfileResponse.model_validate(current_user)
-    resp.photo_count = photo_count
+    resp.photo_count = len(photos)
+    resp.photos = photo_items
     return resp
 
 # 2. Profile Update Endpoint
@@ -169,4 +193,62 @@ async def update_device_token(
     current_user.fcm_token = payload.fcm_token
     await db.commit()
     return {"status": "success", "message": "Device token updated"}
+
+
+@router.post("/photos/upload", status_code=status.HTTP_200_OK)
+async def upload_user_photo(
+    slot_index: int = Form(..., ge=1, le=5),
+    file: UploadFile = File(...),
+    blur_hash: Optional[str] = Form(""),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Uploads compressed WebP photo to Supabase storage 'user-photos' bucket and persists
+    the record in Supabase public.user_photos table.
+    """
+    contents = await file.read()
+    validate_photo_file(contents, filename=file.filename or "")
+
+    # Upload to Supabase Storage bucket 'user-photos'
+    public_url = await upload_profile_photo_to_storage(
+        user_id=current_user.id,
+        slot_index=slot_index,
+        file_bytes=contents,
+        content_type=file.content_type or "image/webp"
+    )
+
+    # Persist or update record in public.user_photos
+    existing_stmt = select(UserPhoto).where(
+        UserPhoto.user_id == current_user.id,
+        UserPhoto.slot_index == slot_index
+    )
+    res = await db.execute(existing_stmt)
+    existing = res.scalars().first()
+
+    if existing:
+        existing.photo_storage_path = public_url
+        existing.blur_hash = blur_hash or ""
+        existing.ocr_verified = True
+        existing.created_at = datetime.now(timezone.utc)
+    else:
+        new_photo = UserPhoto(
+            user_id=current_user.id,
+            slot_index=slot_index,
+            photo_storage_path=public_url,
+            blur_hash=blur_hash or "",
+            ocr_verified=True,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(new_photo)
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "slot_index": slot_index,
+        "photo_url": public_url,
+        "blur_hash": blur_hash or ""
+    }
+
 

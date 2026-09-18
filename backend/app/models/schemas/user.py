@@ -32,6 +32,12 @@ class UserProfileUpdateRequest(BaseModel):
             return sanitize_user_html(v)
         return v
 
+class ProfilePhotoItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    slot_index: int
+    photo_url: str
+    blur_hash: Optional[str] = ""
+
 class UserProfileResponse(BaseModel):
     """
     Safe profile response schema.
@@ -53,6 +59,7 @@ class UserProfileResponse(BaseModel):
     kyc_status: Optional[bool] = False
     kyc_state: Optional[str] = "pending_ai"
     photo_count: Optional[int] = 0
+    photos: List[ProfilePhotoItem] = Field(default_factory=list)
     created_at: Optional[datetime] = None
 
 class PhotoDTO(BaseModel):

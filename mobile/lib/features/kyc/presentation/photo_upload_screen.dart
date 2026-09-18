@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +9,7 @@ import 'package:ur_heart/core/utils/image_compressor.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/features/home/presentation/main_shell_screen.dart';
 import 'package:ur_heart/features/kyc/data/kyc_repository.dart';
+import 'package:ur_heart/features/profile/data/profile_repository.dart';
 
 /// Screen 2: 5-Photo Upload, Live OCR Warning & KYC Viewfinder
 /// Spec: URH-UIX-009 Section 3 Screen 2
@@ -31,6 +33,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
 
   // Slots 1 to 5 mapping (slot 1 is Hero)
   final Map<int, File?> _photos = {};
+  final Map<int, String?> _networkPhotoUrls = {};
   final Map<int, bool> _isScanning = {};
   final Map<int, bool> _isVerified = {};
   final Map<int, String?> _errors = {};
@@ -39,6 +42,30 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
   bool _isVideoScanning = false;
   bool _isVideoVerified = false;
   String? _videoStatusText;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingPhotos();
+  }
+
+  Future<void> _loadExistingPhotos() async {
+    try {
+      final profile = await ProfileRepository().getProfile();
+      if (profile != null && profile.photos.isNotEmpty && mounted) {
+        setState(() {
+          for (final p in profile.photos) {
+            if (p.slotIndex >= 1 && p.slotIndex <= 5 && p.photoUrl.isNotEmpty) {
+              _networkPhotoUrls[p.slotIndex] = p.photoUrl;
+              _isVerified[p.slotIndex] = true;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error preloading photos in PhotoUploadScreen: $e');
+    }
+  }
 
   String _t(String key, [Map<String, String>? args]) =>
       VernacularStrings.tr(key, lang: widget.lang, args: args);
@@ -142,6 +169,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
 
       // Client-side compression to WebP to guarantee small payload
       File uploadFile = rawFile;
+      String currentBlurHash = '';
       try {
         final processed = await ImageOptimizer.processPhoto(rawFile);
         if (processed != null) {
@@ -150,6 +178,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
             '${tempDir.path}/slot_${slotIndex}_${DateTime.now().millisecondsSinceEpoch}.webp',
           );
           uploadFile = await compressedFile.writeAsBytes(processed.compressedBytes);
+          currentBlurHash = processed.blurHash;
         }
       } catch (e) {
         debugPrint('Image compression fallback to raw file: $e');
@@ -161,19 +190,32 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
         _errors[slotIndex] = null;
       });
 
-      // Call backend scan-photo anti-leak OCR
-      final result = await _kycRepository.scanPhoto(uploadFile);
+      // 1. Call backend scan-photo anti-leak OCR
+      final scanResult = await _kycRepository.scanPhoto(uploadFile);
+      if (scanResult['status'] != 'clean') {
+        throw Exception(scanResult['message'] ?? 'Photo failed anti-leak scan');
+      }
+
+      // 2. Upload compressed WebP photo to Supabase storage & persist to user_photos
+      final uploadResult = await _kycRepository.uploadPhoto(
+        photoFile: uploadFile,
+        slotIndex: slotIndex,
+        blurHash: currentBlurHash,
+      );
 
       if (mounted) {
         setState(() {
           _isScanning[slotIndex] = false;
-          _isVerified[slotIndex] = (result['status'] == 'clean');
+          _isVerified[slotIndex] = true;
+          if (uploadResult['photo_url'] != null) {
+            _networkPhotoUrls[slotIndex] = uploadResult['photo_url'] as String;
+          }
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: URHeartColors.statusSuccess,
-            content: Text('Slot $slotIndex photo passed anti-leak scan!'),
+            content: Text('Slot $slotIndex photo passed anti-leak scan & saved!'),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -268,8 +310,10 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
 
   @override
   Widget build(BuildContext context) {
-    final bool hasHeroPhoto = _photos[1] != null;
-    final int secondaryPhotoCount = [2, 3, 4, 5].where((s) => _photos[s] != null).length;
+    final bool hasHeroPhoto = _photos[1] != null || (_networkPhotoUrls[1]?.isNotEmpty == true);
+    final int secondaryPhotoCount = [2, 3, 4, 5]
+        .where((s) => _photos[s] != null || (_networkPhotoUrls[s]?.isNotEmpty == true))
+        .length;
     final bool hasMinPhotos = hasHeroPhoto && secondaryPhotoCount >= 2;
     final bool isReadyToExplore = hasMinPhotos && _isVideoVerified;
 
@@ -415,8 +459,17 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
 
   Widget _buildHeroSlot() {
     final photo = _photos[1];
+    final networkUrl = _networkPhotoUrls[1];
+    final bool hasPhoto = photo != null || (networkUrl != null && networkUrl.isNotEmpty);
     final isScanning = _isScanning[1] == true;
     final isVerified = _isVerified[1] == true;
+
+    ImageProvider? imageProvider;
+    if (photo != null) {
+      imageProvider = FileImage(photo);
+    } else if (networkUrl != null && networkUrl.isNotEmpty) {
+      imageProvider = CachedNetworkImageProvider(networkUrl);
+    }
 
     return InkWell(
       onTap: () => _pickAndScanPhoto(1),
@@ -432,9 +485,9 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
                 : URHeartColors.brandPrimary.withValues(alpha: 0.5),
             width: 1.5,
           ),
-          image: photo != null
+          image: imageProvider != null
               ? DecorationImage(
-                  image: FileImage(photo),
+                  image: imageProvider,
                   fit: BoxFit.cover,
                 )
               : null,
@@ -442,7 +495,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (photo == null)
+            if (!hasPhoto)
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -515,8 +568,17 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
 
   Widget _buildSecondarySlot(int slot) {
     final photo = _photos[slot];
+    final networkUrl = _networkPhotoUrls[slot];
+    final bool hasPhoto = photo != null || (networkUrl != null && networkUrl.isNotEmpty);
     final isScanning = _isScanning[slot] == true;
     final isVerified = _isVerified[slot] == true;
+
+    ImageProvider? imageProvider;
+    if (photo != null) {
+      imageProvider = FileImage(photo);
+    } else if (networkUrl != null && networkUrl.isNotEmpty) {
+      imageProvider = CachedNetworkImageProvider(networkUrl);
+    }
 
     return InkWell(
       onTap: () => _pickAndScanPhoto(slot),
@@ -528,9 +590,9 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
           border: Border.all(
             color: isVerified ? URHeartColors.statusSuccess : URHeartColors.surfaceRaised,
           ),
-          image: photo != null
+          image: imageProvider != null
               ? DecorationImage(
-                  image: FileImage(photo),
+                  image: imageProvider,
                   fit: BoxFit.cover,
                 )
               : null,
@@ -538,7 +600,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (photo == null)
+            if (!hasPhoto)
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

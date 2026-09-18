@@ -41,6 +41,42 @@ class KycRepository {
     }
   }
 
+  /// Uploads compressed WebP photo and persists in Supabase public.user_photos
+  Future<Map<String, dynamic>> uploadPhoto({
+    required File photoFile,
+    required int slotIndex,
+    String? blurHash,
+  }) async {
+    try {
+      final fileName = photoFile.path.split(Platform.pathSeparator).last;
+      final formData = FormData.fromMap({
+        'slot_index': slotIndex,
+        'file': await MultipartFile.fromFile(
+          photoFile.path,
+          filename: fileName,
+        ),
+        if (blurHash != null && blurHash.isNotEmpty) 'blur_hash': blurHash,
+      });
+
+      final response = await _client.post(
+        '/api/v1/user/photos/upload',
+        data: formData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 45),
+          receiveTimeout: const Duration(seconds: 45),
+        ),
+      );
+
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      debugPrint('KycRepository.uploadPhoto DioException: ${e.response?.data}');
+      if (e.response?.data is Map && e.response?.data['detail'] != null) {
+        throw Exception(e.response?.data['detail']);
+      }
+      throw Exception('Photo upload failed: ${e.message}');
+    }
+  }
+
   /// Submits 5-second video KYC to Groq AI verification pipeline
   Future<Map<String, dynamic>> submitKycVideo({
     required File videoFile,

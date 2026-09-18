@@ -1,8 +1,11 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
+import 'package:ur_heart/features/kyc/presentation/photo_upload_screen.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import '../../admin/presentation/admin_kyc_dashboard.dart';
 
@@ -11,11 +14,15 @@ import '../../admin/presentation/admin_kyc_dashboard.dart';
 class ProfileVaultScreen extends StatefulWidget {
   final String lang;
   final VoidCallback? onOneTapErase;
+  final ProfileRepository? repository;
+  final UserProfileData? initialProfile;
 
   const ProfileVaultScreen({
     super.key,
     this.lang = 'en',
     this.onOneTapErase,
+    this.repository,
+    this.initialProfile,
   });
 
   @override
@@ -23,9 +30,9 @@ class ProfileVaultScreen extends StatefulWidget {
 }
 
 class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
-  final ProfileRepository _profileRepo = ProfileRepository();
+  late final ProfileRepository _profileRepo = widget.repository ?? ProfileRepository();
   UserProfileData? _profile;
-  bool _isLoading = true;
+  late bool _isLoading = widget.initialProfile == null;
   bool _isErasing = false;
 
   String _t(String key, [Map<String, String>? args]) =>
@@ -34,7 +41,12 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    if (widget.initialProfile != null) {
+      _profile = widget.initialProfile;
+      _isLoading = false;
+    } else {
+      _loadProfile();
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -121,10 +133,15 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String? fallbackName;
+    try {
+      fallbackName = FirebaseAuth.instance.currentUser?.displayName;
+    } catch (_) {}
+
     final userName = (_profile?.fullName.isNotEmpty == true)
         ? _profile!.fullName
-        : (FirebaseAuth.instance.currentUser?.displayName?.isNotEmpty == true
-            ? FirebaseAuth.instance.currentUser!.displayName!
+        : (fallbackName?.isNotEmpty == true
+            ? fallbackName!
             : 'UR-Heart User');
     final userCity = (_profile?.city.isNotEmpty == true) ? _profile!.city : 'City Not Set';
     final streak = _profile?.streakCount ?? 0;
@@ -178,18 +195,38 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                                   border: Border.all(color: URHeartColors.accentGold, width: 2.5),
                                   color: URHeartColors.surfaceRaised,
                                 ),
-                                child: const Center(
-                                  child: Icon(Icons.person, size: 50, color: URHeartColors.textSecondary),
+                                child: ClipOval(
+                                  child: (_profile != null &&
+                                          _profile!.photos.isNotEmpty &&
+                                          _profile!.photos.first.photoUrl.isNotEmpty)
+                                      ? CachedNetworkImage(
+                                          imageUrl: _profile!.photos.first.photoUrl,
+                                          width: 90,
+                                          height: 90,
+                                          fit: BoxFit.cover,
+                                          placeholder: (ctx, url) => (_profile!.photos.first.blurHash.isNotEmpty)
+                                              ? BlurHash(hash: _profile!.photos.first.blurHash)
+                                              : Container(color: URHeartColors.surfaceRaised),
+                                          errorWidget: (ctx, url, err) => const Icon(
+                                            Icons.person,
+                                            size: 50,
+                                            color: Colors.grey,
+                                          ),
+                                        )
+                                      : const Center(
+                                          child: Icon(Icons.person, size: 50, color: URHeartColors.textSecondary),
+                                        ),
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: URHeartColors.brandSecondary,
-                                  shape: BoxShape.circle,
+                              if (_profile?.kycStatus == true)
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: URHeartColors.brandSecondary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check, color: Colors.black, size: 14),
                                 ),
-                                child: const Icon(Icons.check, color: Colors.black, size: 14),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -416,8 +453,13 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                           _buildSettingsTile(
                             icon: Icons.edit_rounded,
                             title: 'Edit Profile & 5 Photos',
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => PhotoUploadScreen(lang: widget.lang)),
+                              ).then((_) => _loadProfile());
+                            },
                           ),
+                          _buildFivePhotoPreviewGrid(),
                           const Divider(height: 1, color: URHeartColors.surfaceRaised),
                           _buildSettingsTile(
                             icon: Icons.gavel_rounded,
@@ -473,19 +515,156 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
     );
   }
 
+  Widget _buildFivePhotoPreviewGrid() {
+    final photos = _profile?.photos ?? [];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Photos & KYC Slots (${photos.length}/5)',
+                style: const TextStyle(
+                  color: URHeartColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => PhotoUploadScreen(lang: widget.lang)),
+                  ).then((_) => _loadProfile());
+                },
+                child: const Text(
+                  'Manage',
+                  style: TextStyle(
+                    color: URHeartColors.brandSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: List.generate(5, (index) {
+              final slotIndex = index + 1;
+              UserProfilePhoto? photo;
+              for (final p in photos) {
+                if (p.slotIndex == slotIndex) {
+                  photo = p;
+                  break;
+                }
+              }
+
+              final slotPhoto = photo;
+              final bool hasPhoto = slotPhoto != null && slotPhoto.photoUrl.isNotEmpty;
+
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: index == 4 ? 0 : 8.0),
+                  child: AspectRatio(
+                    aspectRatio: 0.8,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => PhotoUploadScreen(lang: widget.lang)),
+                        ).then((_) => _loadProfile());
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: URHeartColors.surfaceRaised,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: hasPhoto
+                                ? URHeartColors.brandPrimary.withValues(alpha: 0.8)
+                                : URHeartColors.surfaceRaised,
+                            width: hasPhoto ? 1.5 : 1.0,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (hasPhoto && slotPhoto != null)
+                              CachedNetworkImage(
+                                imageUrl: slotPhoto.photoUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (ctx, url) => slotPhoto.blurHash.isNotEmpty
+                                    ? BlurHash(hash: slotPhoto.blurHash)
+                                    : Container(color: URHeartColors.surfaceRaised),
+                                errorWidget: (ctx, url, err) => const Icon(
+                                  Icons.broken_image_rounded,
+                                  color: Colors.grey,
+                                  size: 16,
+                                ),
+                              )
+                            else
+                              const Center(
+                                child: Icon(
+                                  Icons.add_rounded,
+                                  color: URHeartColors.textMuted,
+                                  size: 20,
+                                ),
+                              ),
+                            Positioned(
+                              bottom: 2,
+                              left: 2,
+                              right: 2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  slotIndex == 1 ? 'Hero' : '#$slotIndex',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSettingsTile({
     required IconData icon,
     required String title,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: URHeartColors.textSecondary, size: 22),
-      title: Text(
-        title,
-        style: const TextStyle(color: URHeartColors.textPrimary, fontSize: 13.5),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Icon(icon, color: URHeartColors.textSecondary, size: 22),
+        title: Text(
+          title,
+          style: const TextStyle(color: URHeartColors.textPrimary, fontSize: 13.5),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, color: URHeartColors.textMuted, size: 20),
+        onTap: onTap,
       ),
-      trailing: const Icon(Icons.chevron_right_rounded, color: URHeartColors.textMuted, size: 20),
-      onTap: onTap,
     );
   }
 }
