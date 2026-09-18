@@ -8,6 +8,7 @@ import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
 import 'manage_photos_screen.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import '../../admin/presentation/admin_kyc_dashboard.dart';
+import '../../legal/presentation/grievance_hub_screen.dart';
 
 /// Screen 6: Profile, Streak Vault & One-Tap Account Erase Center
 /// Spec: URH-UIX-009 Section 3 Screen 6
@@ -464,7 +465,11 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                           _buildSettingsTile(
                             icon: Icons.gavel_rounded,
                             title: 'Grievance Redressal & Legal (ASI Verticals)',
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const GrievanceHubScreen()),
+                              );
+                            },
                           ),
                           const Divider(height: 1, color: URHeartColors.surfaceRaised),
                           _buildSettingsTile(
