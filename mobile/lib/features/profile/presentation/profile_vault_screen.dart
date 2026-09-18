@@ -5,7 +5,7 @@ import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
 import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
-import 'package:ur_heart/features/kyc/presentation/photo_upload_screen.dart';
+import 'manage_photos_screen.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import '../../admin/presentation/admin_kyc_dashboard.dart';
 
@@ -455,7 +455,7 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                             title: 'Edit Profile & 5 Photos',
                             onTap: () {
                               Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => PhotoUploadScreen(lang: widget.lang)),
+                                MaterialPageRoute(builder: (_) => const ManagePhotosScreen()),
                               ).then((_) => _loadProfile());
                             },
                           ),
@@ -537,7 +537,7 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
               InkWell(
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => PhotoUploadScreen(lang: widget.lang)),
+                    MaterialPageRoute(builder: (_) => const ManagePhotosScreen()),
                   ).then((_) => _loadProfile());
                 },
                 child: const Text(
@@ -574,7 +574,7 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                     child: InkWell(
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => PhotoUploadScreen(lang: widget.lang)),
+                          MaterialPageRoute(builder: (_) => const ManagePhotosScreen()),
                         ).then((_) => _loadProfile());
                       },
                       borderRadius: BorderRadius.circular(10),

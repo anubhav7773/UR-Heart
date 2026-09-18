@@ -19,7 +19,7 @@ from app.models.schemas.user import (
     ProfilePhotoItem,
 )
 from app.core.legal_audit import record_legal_audit_event
-from app.services.storage_service import validate_photo_file, upload_profile_photo_to_storage
+from app.services.storage_service import validate_photo_file, upload_profile_photo_to_storage, supabase_storage_client
 
 router = APIRouter()
 
@@ -250,5 +250,46 @@ async def upload_user_photo(
         "photo_url": public_url,
         "blur_hash": blur_hash or ""
     }
+
+
+@router.delete("/photos/{slot_index}", status_code=status.HTTP_200_OK)
+async def delete_user_photo(
+    slot_index: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Deletes a secondary photo from slots 2-5.
+    Slot 1 (Hero avatar) cannot be deleted directly; it can only be replaced.
+    """
+    if slot_index == 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Primary hero photo (Slot 1) cannot be deleted. You may replace it with a new photo."
+        )
+
+    stmt = select(UserPhoto).where(
+        UserPhoto.user_id == current_user.id,
+        UserPhoto.slot_index == slot_index
+    )
+    res = await db.execute(stmt)
+    photo = res.scalar_one_or_none()
+
+    if not photo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo slot is already empty.")
+
+    # Remove file from Supabase storage
+    try:
+        if supabase_storage_client:
+            storage_path = f"{current_user.id}/slot_{slot_index}.webp"
+            supabase_storage_client.storage.from_("user-photos").remove([storage_path, photo.photo_storage_path])
+    except Exception:
+        pass
+
+    await db.delete(photo)
+    await db.commit()
+
+    return {"status": "success", "message": f"Photo in slot {slot_index} deleted."}
+
 
 
