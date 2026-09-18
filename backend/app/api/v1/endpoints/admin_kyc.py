@@ -1,4 +1,5 @@
 import os
+import logging
 from uuid import UUID
 from datetime import datetime, timezone
 from typing import List, Optional, Literal
@@ -11,7 +12,9 @@ from app.core.database import get_db
 from app.api.dependencies import get_current_user
 from app.models.domain.user import User
 from app.models.domain.kyc_queue import KycReviewQueue
-from app.services.storage_service import purge_kyc_video_from_storage, supabase_storage_client
+from app.services.storage_service import purge_kyc_video_from_storage, supabase_storage_client, SUPABASE_URL
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 MASTER_ADMIN_EMAIL = "kshtriyaanubhav9120@gmail.com"
@@ -106,14 +109,24 @@ async def get_pending_kyc_queue(
         playback_url = ""
         if item.video_storage_path and item.video_storage_path != "PURGED":
             try:
-                # Generate 10-minute (600s) presigned ephemeral read URL from Supabase storage
+                # Generate 1-hour (3600s) presigned ephemeral read URL from Supabase storage
                 if supabase_storage_client:
                     res = supabase_storage_client.storage.from_("kyc-temp").create_signed_url(
                         path=item.video_storage_path,
-                        expires_in=600
+                        expires_in=3600
                     )
-                    playback_url = res.get("signedURL") or res.get("signedUrl") or ""
-            except Exception:
+                    signed_url = res.get("signedURL") or res.get("signedUrl") or ""
+                    if signed_url and not signed_url.startswith("http"):
+                        base_url = SUPABASE_URL.rstrip("/")
+                        if not signed_url.startswith("/"):
+                            signed_url = f"/{signed_url}"
+                        if not signed_url.startswith("/storage/v1"):
+                            signed_url = f"/storage/v1{signed_url}"
+                        signed_url = f"{base_url}{signed_url}"
+                    playback_url = signed_url
+                    logger.info(f"Generated 1h presigned URL for KYC item {item.id}: {playback_url[:80]}...")
+            except Exception as e:
+                logger.warning(f"Failed to generate signed URL for KYC item {item.id} path {item.video_storage_path}: {e}")
                 playback_url = ""
 
         queue_items.append(

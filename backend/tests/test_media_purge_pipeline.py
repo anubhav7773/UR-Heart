@@ -1,3 +1,4 @@
+import os
 import pytest
 from unittest.mock import patch, MagicMock
 from uuid import uuid4
@@ -69,7 +70,8 @@ async def test_auto_purge_on_ai_approval(db_session):
     db_session.add(user)
     await db_session.commit()
 
-    with patch("app.services.storage_service.supabase_storage_client.storage.from_") as mock_storage:
+    with patch.dict(os.environ, {"AUTO_PURGE_ON_AI_PASS": "true"}), \
+         patch("app.services.storage_service.supabase_storage_client.storage.from_") as mock_storage:
         mock_bucket = MagicMock()
         mock_storage.return_value = mock_bucket
 

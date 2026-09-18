@@ -593,7 +593,7 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            if (hasPhoto && slotPhoto != null)
+                            if (hasPhoto)
                               CachedNetworkImage(
                                 imageUrl: slotPhoto.photoUrl,
                                 fit: BoxFit.cover,

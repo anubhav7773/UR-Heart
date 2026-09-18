@@ -41,12 +41,12 @@ def mock_db_dependency():
     limiter.enabled = True
 
 # ==============================================================================
-# TEST CASE 1: Auto-Approval Success Branch
+# TEST CASE 1: Auto-Approval Success Branch (When Auto-Purge Flag is Enabled)
 # ==============================================================================
 def test_kyc_auto_approval_success():
     """
     Simulates video with valid human face, matching spoken transcript,
-    and high AI confidence score (>= 0.80).
+    and high AI confidence score (>= 0.80) when AUTO_PURGE_ON_AI_PASS is active.
     Asserts auto_verified status and storage purge invocation.
     """
     user_id = str(uuid4())
@@ -58,7 +58,8 @@ def test_kyc_auto_approval_success():
         "user_city": "Lucknow"
     }
 
-    with patch("app.services.ai_kyc_service.verify_face_in_video", return_value=True), \
+    with patch.dict(os.environ, {"AUTO_PURGE_ON_AI_PASS": "true"}), \
+         patch("app.services.ai_kyc_service.verify_face_in_video", return_value=True), \
          patch("app.services.ai_kyc_service.extract_audio_track", return_value=True), \
          patch("app.services.ai_kyc_service.transcribe_audio_groq", new_callable=AsyncMock) as mock_whisper, \
          patch("app.services.ai_kyc_service.evaluate_semantic_match_groq", new_callable=AsyncMock) as mock_llama, \
@@ -81,6 +82,46 @@ def test_kyc_auto_approval_success():
 
     # Assert Section 8(7) DPDP Act 2023 purge routine was triggered
     mock_purge.assert_awaited_once()
+
+# ==============================================================================
+# TEST CASE 1B: GOAL FIX-06 Default Mode: Retain in kyc-temp & Queue for Admin Hub
+# ==============================================================================
+def test_kyc_video_queued_for_admin_and_retained_in_kyc_temp():
+    """
+    GOAL FIX-06: Submitting video KYC uploads to kyc-temp/{user_id}/selfie.mp4,
+    does NOT auto-purge immediately, and queues into public.kyc_review_queue.
+    """
+    user_id = str(uuid4())
+    headers = {"X-Consent-DPDP": "true"}
+    files = {"file": ("kyc_clip.mp4", DUMMY_VIDEO_BYTES, "video/mp4")}
+    data = {
+        "user_id": user_id,
+        "user_name": "Anubhav Singh",
+        "user_city": "Ayodhya"
+    }
+
+    with patch("app.services.ai_kyc_service.verify_face_in_video", return_value=True), \
+         patch("app.services.ai_kyc_service.extract_audio_track", return_value=True), \
+         patch("app.services.ai_kyc_service.transcribe_audio_groq", new_callable=AsyncMock) as mock_whisper, \
+         patch("app.services.ai_kyc_service.evaluate_semantic_match_groq", new_callable=AsyncMock) as mock_llama:
+
+        mock_whisper.return_value = "Mera naam Anubhav Singh hai aur main Ayodhya se hoon"
+        mock_llama.return_value = {
+            "name_match": True,
+            "city_match": True,
+            "confidence": 0.95
+        }
+
+        response = client.post("/api/v1/kyc/submit-video", headers=headers, files=files, data=data)
+
+    assert response.status_code == 200, response.text
+    res_data = response.json()
+    assert res_data["status"] == "queued_for_admin_review"
+    assert res_data["video_purged"] is False
+    assert res_data["confidence"] == 0.95
+    assert res_data["has_valid_face"] is True
+    assert res_data["transcript"] == "Mera naam Anubhav Singh hai aur main Ayodhya se hoon"
+
 
 # ==============================================================================
 # TEST CASE 2: Mismatched Details -> Queue Fallback Branch

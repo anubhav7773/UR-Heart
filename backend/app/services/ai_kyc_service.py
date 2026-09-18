@@ -163,11 +163,23 @@ async def handle_ai_verification_outcome(
     db: AsyncSession
 ) -> dict:
     """
-    Evaluates AI verification score and immediately triggers DPDP storage purge on approval.
+    Evaluates AI verification score.
+    In accordance with GOAL FIX-06, videos submitted are retained in 'kyc-temp'
+    and queued into public.kyc_review_queue with status='unreviewed' for Master Admin review.
+    Purge occurs upon admin review decision or 48-hour expiration.
     """
-    # Auto-Verification Pass Rule (Score >= 0.80 and single face detected)
-    if has_valid_face and semantic_pass and confidence_score >= 0.80:
-        # 1. Update user record to verified
+    flags = []
+    if not has_valid_face:
+        flags.append("face_detection_failed")
+    if not semantic_pass:
+        flags.append("transcript_mismatch")
+    if confidence_score < 0.80:
+        flags.append("low_confidence_score")
+
+    auto_purge_enabled = os.getenv("AUTO_PURGE_ON_AI_PASS", "false").lower() == "true"
+
+    # Optional Auto-Verification Pass Rule when explicitly enabled by flag
+    if auto_purge_enabled and has_valid_face and semantic_pass and confidence_score >= 0.80:
         if db:
             await db.execute(
                 update(User)
@@ -182,13 +194,12 @@ async def handle_ai_verification_outcome(
             )
             await db.commit()
 
-        # 2. IMMEDIATE PURGE: Satisfies DPDP data minimization
+        # IMMEDIATE PURGE when auto-purge flag is active
         await purge_kyc_video_from_storage(
             storage_path=video_storage_path,
             user_id=user_id,
             db=db
         )
-        # Also clean up any lingering storage assets
         await purge_user_storage_assets(user_id)
 
         return {
@@ -200,15 +211,7 @@ async def handle_ai_verification_outcome(
         }
 
     else:
-        # Fallback to Admin Review Queue
-        flags = []
-        if not has_valid_face:
-            flags.append("face_detection_failed")
-        if not semantic_pass:
-            flags.append("transcript_mismatch")
-        if confidence_score < 0.80:
-            flags.append("low_confidence_score")
-
+        # Route to Admin Review Queue and retain video in kyc-temp for Master Admin
         if db:
             try:
                 queue_entry = KycReviewQueue(
@@ -283,7 +286,8 @@ async def process_video_kyc(
     file_bytes: bytes,
     user_name: str,
     user_city: str,
-    db: Optional[AsyncSession] = None
+    db: Optional[AsyncSession] = None,
+    video_storage_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Complete 5-Stage Video KYC Pipeline:
@@ -317,7 +321,9 @@ async def process_video_kyc(
         semantic_pass = name_match or (confidence_score >= 0.75)
 
         # 5. Routing Decision via handle_ai_verification_outcome
-        video_storage_path = f"{user_id}/kyc_selfie_{int(datetime.now(timezone.utc).timestamp())}.mp4"
+        if not video_storage_path:
+            video_storage_path = f"{user_id}/selfie.mp4"
+
         return await handle_ai_verification_outcome(
             user_id=user_id,
             user_name=user_name,

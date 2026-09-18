@@ -195,7 +195,8 @@ async def upload_profile_photo_to_storage(
 
 async def upload_kyc_video_to_storage(
     user_id: UUID,
-    video_bytes: bytes
+    video_bytes: bytes,
+    storage_path: str = ""
 ) -> str:
     """Uploads 5-second KYC video to private 'kyc-temp' bucket for ephemeral processing."""
     if len(video_bytes) > 2621440:  # 2.5 MB
@@ -210,7 +211,8 @@ async def upload_kyc_video_to_storage(
             detail="Invalid video payload. File signature must be a valid MP4 ftyp container."
         )
 
-    storage_path = f"{user_id}/kyc_selfie_{int(datetime.now(timezone.utc).timestamp())}.mp4"
+    if not storage_path:
+        storage_path = f"{user_id}/selfie.mp4"
     
     supabase_storage_client.storage.from_("kyc-temp").upload(
         path=storage_path,

@@ -272,18 +272,73 @@ class _CandidateReviewCard extends StatefulWidget {
 class _CandidateReviewCardState extends State<_CandidateReviewCard> {
   VideoPlayerController? _videoController;
   bool _isVideoInitialized = false;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    if (widget.candidate.videoPlaybackUrl.isNotEmpty) {
-      _videoController = VideoPlayerController.networkUrl(Uri.parse(widget.candidate.videoPlaybackUrl))
-        ..initialize().then((_) {
-          if (mounted) {
-            setState(() => _isVideoInitialized = true);
-            _videoController?.setLooping(true);
-          }
+    _initializeVideo();
+  }
+
+  void _initializeVideo() {
+    final url = widget.candidate.videoPlaybackUrl.trim();
+    if (url.isEmpty) {
+      debugPrint('[_CandidateReviewCard] videoPlaybackUrl is empty for candidate ${widget.candidate.registeredName}');
+      setState(() {
+        _isLoading = false;
+        _errorMessage = "Video stream URL unavailable";
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      debugPrint('[_CandidateReviewCard] Initializing VideoPlayer for ${widget.candidate.registeredName}: $url');
+      _videoController?.dispose();
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(url));
+
+      _videoController!
+          .initialize()
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception("Video stream initialization timed out (15s)");
+            },
+          )
+          .then((_) {
+        if (mounted) {
+          debugPrint('[_CandidateReviewCard] Video initialized successfully for ${widget.candidate.registeredName}');
+          setState(() {
+            _isVideoInitialized = true;
+            _isLoading = false;
+          });
+          _videoController?.setLooping(true);
+          _videoController?.play();
+        }
+      }).catchError((error) {
+        debugPrint('[_CandidateReviewCard] VideoPlayerController initialization error: $error (URL: $url)');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isVideoInitialized = false;
+            _errorMessage = "Failed to stream video: ${error.toString().replaceAll('Exception: ', '')}";
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('[_CandidateReviewCard] URI parse / controller create failed: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isVideoInitialized = false;
+          _errorMessage = "Invalid video playback stream: $e";
         });
+      }
     }
   }
 
@@ -346,43 +401,111 @@ class _CandidateReviewCardState extends State<_CandidateReviewCard> {
           const SizedBox(height: 12),
 
           // 5-Second Video Player Preview
-          if (_isVideoInitialized && _videoController != null)
+          if (_isVideoInitialized && _videoController != null && _videoController!.value.isInitialized)
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
               child: AspectRatio(
-                aspectRatio: _videoController!.value.aspectRatio,
+                aspectRatio: _videoController!.value.aspectRatio > 0
+                    ? _videoController!.value.aspectRatio
+                    : (16 / 9),
                 child: Stack(
                   alignment: Alignment.bottomCenter,
                   children: [
                     VideoPlayer(_videoController!),
-                    VideoProgressIndicator(_videoController!, allowScrubbing: true),
+                    VideoProgressIndicator(
+                      _videoController!,
+                      allowScrubbing: true,
+                      colors: const VideoProgressColors(
+                        playedColor: Color(0xFFFFD166),
+                        bufferedColor: Colors.white24,
+                        backgroundColor: Colors.black38,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    ),
                     Center(
-                      child: IconButton(
-                        icon: Icon(
-                          _videoController!.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
-                          size: 42,
-                          color: Colors.white70,
-                        ),
-                        onPressed: () {
+                      child: GestureDetector(
+                        onTap: () {
                           setState(() {
                             _videoController!.value.isPlaying
                                 ? _videoController!.pause()
                                 : _videoController!.play();
                           });
                         },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _videoController!.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            size: 38,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             )
-          else
+          else if (_errorMessage != null)
             Container(
-              height: 140,
+              height: 150,
+              width: double.infinity,
+              decoration: BoxDecoration(color: surfaceRaised, borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.all(16),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.videocam_off_outlined, color: Color(0xFFFF334B), size: 30),
+                  const SizedBox(height: 8),
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: _initializeVideo,
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh, size: 14, color: Color(0xFFFFD166)),
+                          SizedBox(width: 4),
+                          Text("Retry stream", style: TextStyle(color: Color(0xFFFFD166), fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (_isLoading || !_isVideoInitialized)
+            Container(
+              height: 150,
               width: double.infinity,
               decoration: BoxDecoration(color: surfaceRaised, borderRadius: BorderRadius.circular(14)),
               alignment: Alignment.center,
-              child: const Text("Loading video playback clip...", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12)),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CircularProgressIndicator(color: Color(0xFFFFD166), strokeWidth: 2.5),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Buffering video stream...",
+                    style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
             ),
 
           const SizedBox(height: 12),

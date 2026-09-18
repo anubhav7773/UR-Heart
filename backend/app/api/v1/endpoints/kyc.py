@@ -9,7 +9,7 @@ from app.core.rate_limiter import limiter
 from app.core.security import verify_firebase_token
 from app.models.domain.user import User
 from app.services.ai_kyc_service import process_video_kyc
-from app.services.storage_service import validate_kyc_video_file
+from app.services.storage_service import validate_kyc_video_file, supabase_storage_client
 
 logger = logging.getLogger(__name__)
 
@@ -111,13 +111,27 @@ async def submit_kyc_video(
     resolved_name = (user_record.full_name if user_record and user_record.full_name else None) or user_name or ""
     resolved_city = (user_record.city if user_record and user_record.city else None) or user_city or ""
 
-    # 4. Execute AI Verification Pipeline
+    # 4. Upload compressed MP4 to Supabase Storage bucket kyc-temp ({user_id}/selfie.mp4)
+    video_storage_path = f"{resolved_user_id}/selfie.mp4"
+    if supabase_storage_client:
+        try:
+            supabase_storage_client.storage.from_("kyc-temp").upload(
+                path=video_storage_path,
+                file=file_bytes,
+                file_options={"content-type": "video/mp4", "upsert": "true"}
+            )
+            logger.info(f"Successfully uploaded KYC video to kyc-temp/{video_storage_path}")
+        except Exception as e:
+            logger.warning(f"Failed to upload video to kyc-temp storage: {e}")
+
+    # 5. Execute AI Verification Pipeline & Enqueue into public.kyc_review_queue
     result = await process_video_kyc(
         user_id=resolved_user_id,
         file_bytes=file_bytes,
         user_name=resolved_name,
         user_city=resolved_city,
-        db=db
+        db=db,
+        video_storage_path=video_storage_path
     )
 
     return result
