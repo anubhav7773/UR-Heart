@@ -27,6 +27,20 @@ class EnvConfig {
     defaultValue: 'wss://ur-heart.onrender.com',
   );
 
+  // Google AdMob Configuration (Google verified test unit IDs by default)
+  static const String admobRewardedUnitId = String.fromEnvironment(
+    'ADMOB_REWARDED_UNIT_ID',
+    defaultValue: 'ca-app-pub-3940256099942544/5224354917',
+  );
+
+  static const String admobInterstitialUnitId = String.fromEnvironment(
+    'ADMOB_INTERSTITIAL_UNIT_ID',
+    defaultValue: 'ca-app-pub-3940256099942544/1033173712',
+  );
+
+  // Registered Developer Test Device IDs for AdMob anti-fraud compliance
+  static const List<String> admobTestDeviceIds = <String>[];
+
   // Verification helper confirming no service_role key is present
   static bool get isSecureClientConfig {
     return !supabaseAnonKey.contains('service_role');

@@ -32,14 +32,21 @@ GOOGLE_VERIFIER_KEYS_URL = os.getenv(
 )
 APPLOVIN_SDK_KEY = os.getenv("APPLOVIN_SDK_KEY", "UR_HEART_APPLOVIN_SECRET_KEY")
 
-# In-memory public key cache: {key_id: pem_string}
+# In-memory public key cache: {key_id: pem_string} with 24h TTL
 KEY_CACHE: Dict[str, str] = {}
+LAST_KEY_FETCH: float = 0.0
+KEY_CACHE_TTL_SECONDS: float = 86400.0  # 24 hours
 
 
 async def get_google_public_key(key_id: str) -> Optional[str]:
-    """Fetches and caches Google AdMob public ECDSA verification keys."""
-    global KEY_CACHE
-    if key_id in KEY_CACHE:
+    """Fetches and caches Google AdMob public ECDSA verification keys with TTL refresh."""
+    global KEY_CACHE, LAST_KEY_FETCH
+    import time
+
+    now = time.time()
+    cache_expired = (now - LAST_KEY_FETCH) > KEY_CACHE_TTL_SECONDS
+
+    if not cache_expired and key_id in KEY_CACHE:
         return KEY_CACHE[key_id]
 
     try:
@@ -50,9 +57,11 @@ async def get_google_public_key(key_id: str) -> Optional[str]:
                 keys = data.get("keys", [])
                 for k in keys:
                     KEY_CACHE[str(k.get("keyId"))] = k.get("pem")
+                LAST_KEY_FETCH = now
                 return KEY_CACHE.get(key_id)
     except Exception:
-        return None
+        # Fall back to existing cached key if fetch fails
+        return KEY_CACHE.get(key_id)
     return None
 
 def _decode_signature_bytes(signature_str: str) -> Optional[bytes]:
@@ -311,4 +320,16 @@ async def complete_ad_reward(
         return {"status": "success", "reward": "3_direct_dms_granted"}
 
     return {"status": "ok"}
+
+
+@router.get("/ssv-status", status_code=status.HTTP_200_OK)
+async def get_ssv_status():
+    """Returns AdMob SSV verification operational status and public key cache health."""
+    return {
+        "status": "online",
+        "ssv_engine": "admob_ecdsa_sha256",
+        "keys_cached": len(KEY_CACHE),
+        "keys_url": GOOGLE_VERIFIER_KEYS_URL,
+        "operational": True,
+    }
 

@@ -235,3 +235,20 @@ def test_tampered_signature_rejection():
 
     assert response.status_code == 400
     assert "Cryptographic verification failed" in response.json()["detail"]
+
+
+# ==============================================================================
+# TEST SUITE 5: SSV Health & Status Endpoint
+# ==============================================================================
+def test_ssv_status_endpoint():
+    """
+    Asserts GET /api/v1/ads/ssv-status returns online health status and engine info.
+    """
+    response = client.get("/api/v1/ads/ssv-status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "online"
+    assert data["ssv_engine"] == "admob_ecdsa_sha256"
+    assert data["operational"] is True
+    assert "keys_cached" in data
+    assert "keys_url" in data

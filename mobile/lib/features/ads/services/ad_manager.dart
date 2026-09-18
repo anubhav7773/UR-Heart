@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:ur_heart/core/config/env_config.dart';
 
 /// Multi-Network Ad Preload Buffer and SSV Custom Data Engine
 /// Implements dual-slot background preload buffer to eliminate ad loading latency.
@@ -13,9 +14,9 @@ class AdManager {
   bool _isRewardedLoading = false;
   bool _isInterstitialLoading = false;
 
-  // ASI Verticals Production Ad Unit IDs (Google test IDs for development)
-  final String rewardedUnitId = 'ca-app-pub-3940256099942544/5224354917';
-  final String interstitialUnitId = 'ca-app-pub-3940256099942544/1033173712';
+  // ASI Verticals Configurable Ad Unit IDs
+  String get rewardedUnitId => EnvConfig.admobRewardedUnitId;
+  String get interstitialUnitId => EnvConfig.admobInterstitialUnitId;
 
   bool get isRewardedAdReady => _preloadedRewardedAd != null;
   bool get isInterstitialAdReady => _preloadedInterstitialAd != null;
@@ -32,6 +33,11 @@ class AdManager {
   Future<void> initialize() async {
     try {
       await MobileAds.instance.initialize();
+      if (EnvConfig.admobTestDeviceIds.isNotEmpty) {
+        await MobileAds.instance.updateRequestConfiguration(
+          RequestConfiguration(testDeviceIds: EnvConfig.admobTestDeviceIds),
+        );
+      }
       preloadRewardedAd();
       preloadInterstitialAd();
     } catch (e) {
@@ -125,6 +131,32 @@ class AdManager {
         onRewardGranted();
       },
     );
+    return true;
+  }
+
+  /// Displays Interstitial Ad and buffers next interstitial video upon dismissal.
+  bool showInterstitialAd({VoidCallback? onDismissed}) {
+    if (_preloadedInterstitialAd == null) {
+      preloadInterstitialAd();
+      return false;
+    }
+
+    _preloadedInterstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _preloadedInterstitialAd = null;
+        preloadInterstitialAd();
+        onDismissed?.call();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _preloadedInterstitialAd = null;
+        preloadInterstitialAd();
+        onDismissed?.call();
+      },
+    );
+
+    _preloadedInterstitialAd!.show();
     return true;
   }
 }

@@ -90,5 +90,15 @@ void main() {
         isTrue,
       );
     });
+
+    test('AdManager provides valid default Google AdMob test unit IDs', () {
+      final adManager = AdManager.instance;
+      expect(adManager.rewardedUnitId, isNotEmpty);
+      expect(adManager.interstitialUnitId, isNotEmpty);
+      expect(adManager.rewardedUnitId, startsWith('ca-app-pub-'));
+      expect(adManager.interstitialUnitId, startsWith('ca-app-pub-'));
+      expect(adManager.isRewardedAdReady, isFalse);
+      expect(adManager.isInterstitialAdReady, isFalse);
+    });
   });
 }
