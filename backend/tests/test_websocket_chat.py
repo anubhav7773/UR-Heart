@@ -285,3 +285,115 @@ def test_chat_history_rest_endpoint():
     resp_s = client.get(f"/api/v1/chat/history/{match_id}")
     assert resp_s.status_code == 403
     assert "Not a participant" in resp_s.json()["detail"]
+
+    app.dependency_overrides.clear()
+
+
+# ==============================================================================
+# TEST 6: WhatsApp-Style Delivery & Read Receipt Lifecycle (Ticks)
+# ==============================================================================
+def test_delivery_and_read_receipt_lifecycle():
+    """
+    Verifies WebSocket events:
+    1. User A sends message -> gets 'message_sent'.
+    2. User B receives message -> sends 'delivery_ack' -> User A receives 'message_delivered'.
+    3. User B views chat -> sends 'read_receipt' -> User A receives 'messages_read'.
+    """
+    user_a_id = uuid4()
+    user_b_id = uuid4()
+    match_id = uuid4()
+
+    token_a = create_internal_token(user_a_id)
+    token_b = create_internal_token(user_b_id)
+
+    mock_match = Match(id=match_id, user1_id=user_a_id, user2_id=user_b_id, is_active=True)
+
+    class MockAsyncSession:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+        async def execute(self, stmt):
+            res_mock = MagicMock()
+            res_mock.scalar_one_or_none = lambda: mock_match
+            return res_mock
+        def add(self, obj):
+            if isinstance(obj, Message):
+                obj.id = 205
+                obj.created_at = datetime.now(timezone.utc)
+        async def commit(self):
+            pass
+        async def refresh(self, obj):
+            pass
+
+    with patch("app.api.v1.endpoints.chat.async_session_factory", return_value=MockAsyncSession()):
+        with client.websocket_connect(f"/ws/chat?token={token_a}") as ws_a:
+            with client.websocket_connect(f"/ws/chat?token={token_b}") as ws_b:
+                # 1. User A sends message
+                ws_a.send_text(json.dumps({
+                    "type": "message",
+                    "match_id": str(match_id),
+                    "recipient_id": str(user_b_id),
+                    "content": "Are we meeting tomorrow at Hazratganj?"
+                }))
+
+                ack_a = json.loads(ws_a.receive_text())
+                assert ack_a["event"] == "message_sent"
+                assert ack_a["msg_id"] == 205
+
+                inc_b = json.loads(ws_b.receive_text())
+                assert inc_b["event"] == "incoming_message"
+                assert inc_b["status"] == "delivered"
+
+                # 2. User B sends delivery_ack
+                ws_b.send_text(json.dumps({
+                    "type": "delivery_ack",
+                    "match_id": str(match_id),
+                    "msg_id": 205,
+                    "recipient_id": str(user_a_id)
+                }))
+
+                delivered_a = json.loads(ws_a.receive_text())
+                assert delivered_a["event"] == "message_delivered"
+                assert delivered_a["msg_id"] == 205
+
+                # 3. User B sends read_receipt (double blue tick trigger)
+                ws_b.send_text(json.dumps({
+                    "type": "read_receipt",
+                    "match_id": str(match_id),
+                    "recipient_id": str(user_a_id)
+                }))
+
+                read_a = json.loads(ws_a.receive_text())
+                assert read_a["event"] == "messages_read"
+                assert read_a["match_id"] == str(match_id)
+
+
+# ==============================================================================
+# TEST 7: FCM Device Token Registration
+# ==============================================================================
+def test_device_token_registration():
+    """Verifies that POST /api/v1/user/device-token stores device FCM token."""
+    from app.api.dependencies import get_current_user
+    mock_user = User(
+        id=uuid4(),
+        full_name="Aman Verma",
+        phone_number="+919876543210",
+        whatsapp_number="+919876543210",
+        city="Lucknow",
+        gender="male",
+        fcm_token=None,
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    mock_db = AsyncMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    payload = {"fcm_token": "fcm_test_device_token_abcdef1234567890"}
+    response = client.post("/api/v1/user/device-token", json=payload)
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert mock_user.fcm_token == "fcm_test_device_token_abcdef1234567890"
+
+    app.dependency_overrides.clear()
+

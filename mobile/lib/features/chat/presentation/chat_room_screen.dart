@@ -37,6 +37,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
 
   StreamSubscription? _msgSub;
   StreamSubscription? _leakSub;
+  StreamSubscription? _statusSub;
+  StreamSubscription? _typingSub;
+  bool _isPartnerTyping = false;
+  Timer? _typingDebounce;
 
   final List<ChatMessageModel> _messages = [];
   bool _hasAntiLeakViolation = false;
@@ -75,6 +79,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
           _messages.addAll(history);
         });
         _scrollToBottom();
+        final pId = widget.participantId;
+        if (pId != null) {
+          _chatRepository.sendReadReceipt(matchId: mId, recipientId: pId);
+        }
       }
     } catch (e) {
       debugPrint("Chat history load notice: $e");
@@ -90,6 +98,55 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
           _messages.add(msg);
         });
         _scrollToBottom();
+
+        final mId = widget.matchId;
+        final pId = widget.participantId;
+        if (mId != null && pId != null) {
+          _chatRepository.sendDeliveryAck(matchId: mId, msgId: msg.id, recipientId: pId);
+          _chatRepository.sendReadReceipt(matchId: mId, recipientId: pId);
+        }
+      }
+    });
+
+    _statusSub = _chatRepository.statusStream.listen((event) {
+      if (!mounted) return;
+      final type = event['type'] as String?;
+      if (type == 'read') {
+        setState(() {
+          for (int i = 0; i < _messages.length; i++) {
+            if (_messages[i].senderId == (_currentUserId ?? 'me')) {
+              _messages[i] = _messages[i].copyWith(status: 'read');
+            }
+          }
+        });
+      } else if (type == 'delivered') {
+        final msgId = event['msg_id']?.toString();
+        setState(() {
+          for (int i = 0; i < _messages.length; i++) {
+            if (_messages[i].id == msgId) {
+              _messages[i] = _messages[i].copyWith(status: 'delivered');
+            }
+          }
+        });
+      } else if (type == 'message_sent') {
+        final msgId = event['msg_id']?.toString();
+        final status = event['status']?.toString() ?? 'sent';
+        setState(() {
+          for (int i = _messages.length - 1; i >= 0; i--) {
+            if (_messages[i].senderId == (_currentUserId ?? 'me')) {
+              _messages[i] = _messages[i].copyWith(id: msgId, status: status);
+              break;
+            }
+          }
+        });
+      }
+    });
+
+    _typingSub = _chatRepository.typingStream.listen((isTyping) {
+      if (mounted) {
+        setState(() {
+          _isPartnerTyping = isTyping;
+        });
       }
     });
 
@@ -245,10 +302,30 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
     );
   }
 
+  void _onMessageTextChanged(String val) {
+    final mId = widget.matchId;
+    final pId = widget.participantId;
+    if (mId == null || pId == null) return;
+
+    if (_typingDebounce?.isActive ?? false) _typingDebounce!.cancel();
+
+    if (val.trim().isNotEmpty) {
+      _chatRepository.sendTyping(matchId: mId, recipientId: pId, isTyping: true);
+      _typingDebounce = Timer(const Duration(seconds: 2), () {
+        _chatRepository.sendTyping(matchId: mId, recipientId: pId, isTyping: false);
+      });
+    } else {
+      _chatRepository.sendTyping(matchId: mId, recipientId: pId, isTyping: false);
+    }
+  }
+
   @override
   void dispose() {
     _msgSub?.cancel();
     _leakSub?.cancel();
+    _statusSub?.cancel();
+    _typingSub?.cancel();
+    _typingDebounce?.cancel();
     _chatRepository.dispose();
     _messageController.dispose();
     _scrollController.dispose();
@@ -345,8 +422,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    _t('screenshotBlocked'),
-                    style: const TextStyle(fontSize: 10.5, color: URHeartColors.brandSecondary),
+                    _isPartnerTyping ? 'typing...' : _t('screenshotBlocked'),
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: _isPartnerTyping ? URHeartColors.accentGold : URHeartColors.brandSecondary,
+                      fontWeight: _isPartnerTyping ? FontWeight.bold : FontWeight.normal,
+                      fontStyle: _isPartnerTyping ? FontStyle.italic : FontStyle.normal,
+                    ),
                   ),
                 ],
               ),
@@ -428,9 +510,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length,
+                      itemCount: _messages.length + 1,
                       itemBuilder: (context, index) {
-                        final msg = _messages[index];
+                        if (index == 0) {
+                          return _buildE2eeBanner();
+                        }
+                        final msg = _messages[index - 1];
                         final isMe = msg.senderId == (_currentUserId ?? 'me');
 
                         if (msg.isBlocked) {
@@ -442,7 +527,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
                           timestamp:
                               '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}',
                           isMe: isMe,
-                          isDelivered: msg.status == 'delivered',
+                          status: msg.status,
                         );
                       },
                     ),
@@ -496,6 +581,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
                     child: TextField(
                       controller: _messageController,
                       style: const TextStyle(color: URHeartColors.textPrimary, fontSize: 14),
+                      onChanged: _onMessageTextChanged,
                       decoration: InputDecoration(
                         hintText: 'Type a message...',
                         focusedBorder: OutlineInputBorder(
@@ -536,11 +622,39 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
     );
   }
 
+  Widget _buildE2eeBanner() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: URHeartColors.surfaceRaised.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: URHeartColors.surfaceRaised),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_outline_rounded, size: 13, color: URHeartColors.accentGold),
+            SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Messages are end-to-end encrypted with AES-256.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: URHeartColors.textMuted, fontSize: 10.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBubble({
     required String text,
     required String timestamp,
     required bool isMe,
-    bool isDelivered = false,
+    required String status,
   }) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -580,11 +694,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
                 ),
                 if (isMe) ...[
                   const SizedBox(width: 4),
-                  Icon(
-                    isDelivered ? Icons.done_all_rounded : Icons.done_rounded,
-                    size: 12,
-                    color: isDelivered ? URHeartColors.brandSecondary : Colors.white70,
-                  ),
+                  _buildStatusTicks(status),
                 ],
               ],
             ),
@@ -592,6 +702,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
         ),
       ),
     );
+  }
+
+  Widget _buildStatusTicks(String status) {
+    if (status == 'read') {
+      // Double Blue Tick (Official WhatsApp blue)
+      return const Icon(
+        Icons.done_all_rounded,
+        size: 14,
+        color: Color(0xFF34B7F1),
+      );
+    } else if (status == 'delivered') {
+      // Double Grey Tick
+      return const Icon(
+        Icons.done_all_rounded,
+        size: 14,
+        color: Colors.white70,
+      );
+    } else {
+      // Single Grey Tick
+      return const Icon(
+        Icons.done_rounded,
+        size: 14,
+        color: Colors.white70,
+      );
+    }
   }
 
   Widget _buildBlockedBubble(ChatMessageModel msg) {

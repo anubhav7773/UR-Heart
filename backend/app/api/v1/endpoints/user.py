@@ -150,3 +150,23 @@ async def get_feed(
     rows = result.mappings().all()
 
     return [DiscoveryProfileResponse.from_row(dict(row)) for row in rows]
+
+
+from pydantic import BaseModel, Field
+
+class DeviceTokenRequest(BaseModel):
+    fcm_token: str = Field(..., min_length=10, max_length=255)
+
+@router.post("/device-token", status_code=status.HTTP_200_OK)
+async def update_device_token(
+    payload: DeviceTokenRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Registers or updates the user's FCM device token for WhatsApp-style push notifications.
+    """
+    current_user.fcm_token = payload.fcm_token
+    await db.commit()
+    return {"status": "success", "message": "Device token updated"}
+

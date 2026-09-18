@@ -46,6 +46,7 @@ class User(Base):
 
     # Security & Audit
     last_installation_uuid = Column(String(64), nullable=True)
+    fcm_token = Column(String(255), nullable=True)
     is_super_admin = Column(Boolean, default=False, nullable=False)
     is_banned = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)

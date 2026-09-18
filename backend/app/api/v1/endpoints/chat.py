@@ -13,6 +13,7 @@ from app.core.database import get_db, async_session_factory
 from app.core.security import decode_access_token, verify_firebase_token
 from app.services.chat_manager import manager
 from app.services.chat_sanitizer import sanitize_chat_message
+from app.services.push_notification_service import push_service
 from app.models.domain.message import Message
 from app.models.domain.match import Match
 from app.models.domain.user import User
@@ -270,6 +271,13 @@ async def handle_chat_websocket(websocket: WebSocket, token: Optional[str]):
                     is_recipient_online = recipient_id in manager.active_connections
                     initial_status = "delivered" if is_recipient_online else "sent"
 
+                    # Fetch sender full_name and recipient user for notifications
+                    sender_res = await db.execute(select(User.full_name).where(User.id == user_id))
+                    sender_name = sender_res.scalar_one_or_none() or "Your Match"
+
+                    rec_res = await db.execute(select(User).where(User.id == recipient_id))
+                    recipient_user = rec_res.scalar_one_or_none()
+
                     new_msg = Message(
                         match_id=match_id,
                         sender_id=user_id,
@@ -297,11 +305,48 @@ async def handle_chat_websocket(websocket: WebSocket, token: Optional[str]):
                         "match_id": str(match_id),
                         "sender_id": str(user_id),
                         "content": content,
+                        "status": "delivered",
                         "created_at": created_at_iso
                     }, recipient_id)
+                else:
+                    # Recipient is offline/background: dispatch WhatsApp-style push notification
+                    if recipient_user and recipient_user.fcm_token:
+                        await push_service.send_chat_notification(
+                            recipient_fcm_token=recipient_user.fcm_token,
+                            sender_name=sender_name,
+                            message_preview=content,
+                            match_id=match_id,
+                            sender_id=user_id,
+                        )
 
             # ==================================================================
-            # Event 2: Read Receipts
+            # Event 2: Delivery Acknowledgement (Sent -> Delivered)
+            # ==================================================================
+            elif event_type == "delivery_ack":
+                msg_id = payload.get("msg_id")
+                recipient_id_str = payload.get("recipient_id")
+                if msg_id:
+                    async with async_session_factory() as db:
+                        await db.execute(
+                            update(Message)
+                            .where(Message.id == msg_id, Message.status == "sent")
+                            .values(status="delivered")
+                        )
+                        await db.commit()
+
+                if recipient_id_str:
+                    try:
+                        rec_id = UUID(recipient_id_str)
+                        await manager.send_personal_message({
+                            "event": "message_delivered",
+                            "match_id": str(match_id),
+                            "msg_id": msg_id,
+                        }, rec_id)
+                    except Exception:
+                        pass
+
+            # ==================================================================
+            # Event 3: Read Receipts (Delivered -> Read: Double Blue Tick)
             # ==================================================================
             elif event_type == "read_receipt":
                 async with async_session_factory() as db:
@@ -323,13 +368,14 @@ async def handle_chat_websocket(websocket: WebSocket, token: Optional[str]):
                         rec_id = UUID(recipient_id_str)
                         await manager.send_personal_message({
                             "event": "messages_read",
-                            "match_id": str(match_id)
+                            "match_id": str(match_id),
+                            "reader_id": str(user_id)
                         }, rec_id)
                     except Exception:
                         pass
 
             # ==================================================================
-            # Event 3: Typing Indicators
+            # Event 4: Typing Indicators
             # ==================================================================
             elif event_type == "typing":
                 recipient_id_str = payload.get("recipient_id")
@@ -343,6 +389,7 @@ async def handle_chat_websocket(websocket: WebSocket, token: Optional[str]):
                             "is_typing": payload.get("is_typing", True)
                         }, rec_id)
                     except Exception:
+                        pass
                         pass
 
     except WebSocketDisconnect:
