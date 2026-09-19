@@ -4,7 +4,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete, select, update, and_
+from sqlalchemy import delete, select, update, and_, text, func
 
 from app.core.database import get_db
 from app.core.rate_limiter import limiter
@@ -237,3 +237,83 @@ async def erase_account(
         "status": "erased",
         "message": "Your profile and photos have been permanently erased in compliance with Section 11 DPDP Act 2023."
     }
+
+
+@router.post("/report-and-block", status_code=status.HTTP_200_OK)
+async def report_and_block_user(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    If a recipient reports an unsolicited direct DM, automatically suspend
+    the sender's direct DM capability immediately and log the report.
+    """
+    reported_user_id_str = payload.get("reported_user_id")
+    report_type = payload.get("report_type", "direct_dm_abuse")
+    message_snippet = payload.get("message_snippet", "")
+
+    if not reported_user_id_str:
+        raise HTTPException(status_code=400, detail="Missing reported_user_id.")
+
+    try:
+        reported_user_id = UUID(reported_user_id_str)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid reported_user_id format.")
+
+    # 1. Log safety report
+    await db.execute(
+        text("""
+            INSERT INTO public.user_safety_reports (reporter_id, reported_user_id, report_type, message_content_snapshot)
+            VALUES (:rep_id, :target_id, :rtype, :snap)
+        """),
+        {
+            "rep_id": current_user.id,
+            "target_id": reported_user_id,
+            "rtype": report_type,
+            "snap": message_snippet
+        }
+    )
+
+    # 2. Immediate Block Action: Auto-ban sender from Direct DMs
+    await db.execute(
+        update(User)
+        .where(User.id == reported_user_id)
+        .values(
+            is_dm_banned=True,
+            dm_banned_at=func.now()
+        )
+    )
+
+    # 3. Create mutual block to prevent further interactions
+    try:
+        await db.execute(
+            text("""
+                INSERT INTO public.blocks (blocker_id, blocked_id)
+                VALUES (:b1, :b2)
+                ON CONFLICT DO NOTHING
+            """),
+            {"b1": current_user.id, "b2": reported_user_id}
+        )
+    except Exception:
+        pass
+
+    try:
+        await db.execute(
+            text("""
+                INSERT INTO public.blocked_users (blocker_id, blocked_id)
+                VALUES (:b1, :b2)
+            """),
+            {"b1": current_user.id, "b2": reported_user_id}
+        )
+    except Exception:
+        pass
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "action": "user_blocked_and_dm_banned",
+        "message": "User has been blocked. Direct DM privileges for the reported user have been frozen."
+    }
+

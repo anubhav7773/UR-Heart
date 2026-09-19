@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
 import '../../../core/config/env_config.dart';
+import '../../../core/network/api_client.dart';
 import '../data/chat_repository.dart';
 
 class DirectChatScreen extends StatefulWidget {
@@ -241,6 +243,73 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     });
   }
 
+  void _showReportAndBlockDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF16161D),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Report & Block Sender",
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          "Are you sure? This sender will be blocked immediately and their direct messaging privilege will be frozen to prevent harassment.",
+          style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF334B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _executeReportAndBlock();
+            },
+            child: const Text("Block & Auto-Ban", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executeReportAndBlock() async {
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = createApiClient();
+      await dio.post(
+        '/api/v1/safety/report-and-block',
+        data: {
+          'reported_user_id': widget.partnerId,
+          'report_type': 'direct_dm_abuse',
+          'message_snippet': _messages.isNotEmpty ? _messages.last.content : '',
+        },
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✓ User reported and blocked. Direct DM privileges suspended."),
+            backgroundColor: Color(0xFF06D6A0),
+          ),
+        );
+        Navigator.of(context).pop(); // Exit chat screen
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: const Color(0xFFFF334B)),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color canvasBg = Color(0xFF0A0A0D);
@@ -283,6 +352,33 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
             ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white70),
+            color: const Color(0xFF16161D),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            onSelected: (val) {
+              if (val == 'report_block') {
+                _showReportAndBlockDialog(context);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'report_block',
+                child: Row(
+                  children: [
+                    Icon(Icons.shield_outlined, color: Color(0xFFFF334B), size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      "Report & Block Sender",
+                      style: TextStyle(color: Color(0xFFFF334B), fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [

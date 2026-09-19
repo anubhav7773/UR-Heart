@@ -14,6 +14,9 @@ from app.core.security import decode_access_token, verify_firebase_token
 from app.services.websocket_manager import chat_manager
 from app.services.notification_service import send_push_notification
 from app.services.chat_sanitizer import sanitize_chat_message
+from uuid import UUID, uuid4
+from app.models.domain.wallet import UserWallet
+from app.services.text_moderation_service import validate_direct_dm_content
 from app.models.domain.message import Message
 from app.models.domain.direct_message import DirectMessage
 from app.models.domain.match import Match
@@ -502,3 +505,107 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
 
 # Alias for backwards compatibility with main.py
 handle_chat_websocket = chat_websocket_endpoint
+
+
+@router.post("/send-direct-dm", status_code=status.HTTP_200_OK)
+async def send_direct_dm_without_match(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Enables direct DM without matching while protecting recipients from abuse.
+    """
+    target_user_id_str = payload.get("target_user_id")
+    message_text = (payload.get("content") or "").strip()
+
+    if not target_user_id_str or not message_text:
+        raise HTTPException(status_code=400, detail="Missing target_user_id or content.")
+
+    try:
+        target_user_id = UUID(target_user_id_str)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid target_user_id format.")
+
+    # 1. Verify sender is not auto-banned from Direct DMs
+    if getattr(current_user, "is_dm_banned", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your Direct DM privilege has been suspended due to safety reports."
+        )
+
+    # 2. Pre-flight text moderation pipeline
+    is_valid, rejection_reason = validate_direct_dm_content(message_text)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=rejection_reason
+        )
+
+    # 3. Check and deduct DM credit
+    wallet_stmt = select(UserWallet).where(UserWallet.user_id == current_user.id)
+    wallet_res = await db.execute(wallet_stmt)
+    wallet = wallet_res.scalar_one_or_none()
+
+    if not wallet or wallet.dm_credits < 1:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Insufficient DM credits. Watch an ad or refill wallet to send a direct message."
+        )
+
+    wallet.dm_credits -= 1
+
+    # 4. Create or fetch Direct DM conversation container
+    match_stmt = select(Match).where(
+        or_(
+            and_(Match.user1_id == current_user.id, Match.user2_id == target_user_id),
+            and_(Match.user1_id == target_user_id, Match.user2_id == current_user.id)
+        )
+    )
+    match_res = await db.execute(match_stmt)
+    match_record = match_res.scalar_one_or_none()
+
+    if not match_record:
+        match_record = Match(
+            id=uuid4(),
+            user1_id=current_user.id,
+            user2_id=target_user_id,
+            last_message_at=func.now()
+        )
+        db.add(match_record)
+        await db.flush()
+
+    # 5. Insert DM record
+    new_dm = DirectMessage(
+        match_id=match_record.id,
+        sender_id=current_user.id,
+        recipient_id=target_user_id,
+        content=message_text,
+        is_delivered=False,
+        is_read=False
+    )
+    db.add(new_dm)
+    await db.commit()
+
+    # 6. Dispatch FCM alert to recipient
+    recipient_stmt = select(User.fcm_token).where(User.id == target_user_id)
+    rec_res = await db.execute(recipient_stmt)
+    rec_fcm = rec_res.scalar_one_or_none()
+
+    if rec_fcm:
+        try:
+            await send_push_notification(
+                fcm_token=rec_fcm,
+                title="💌 New Direct Message",
+                body=f"{current_user.full_name}: {message_text[:45]}...",
+                data={"match_id": str(match_record.id), "type": "direct_dm"}
+            )
+        except Exception as e:
+            print(f"⚠️ [FCM Send Warning] {e}")
+
+    return {
+        "status": "success",
+        "match_id": str(match_record.id),
+        "remaining_credits": wallet.dm_credits
+    }
+
