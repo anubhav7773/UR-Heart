@@ -91,3 +91,8 @@ async def admin_token():
         if db_admin:
             await session.delete(db_admin)
             await session.commit()
+
+@pytest_asyncio.fixture
+async def master_admin_headers(admin_token):
+    return {"Authorization": f"Bearer {admin_token}"}
+

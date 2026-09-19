@@ -12,7 +12,7 @@ from app.core.database import get_db
 from app.api.dependencies import get_current_user, require_master_admin
 from app.models.domain.user import User
 from app.models.domain.kyc_queue import KycReviewQueue
-from app.services.storage_service import purge_kyc_video_from_storage, supabase_storage_client, SUPABASE_URL
+from app.services.storage_service import purge_kyc_video_from_storage, hard_delete_kyc_video, supabase_storage_client, SUPABASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -222,3 +222,81 @@ async def submit_review_decision(
         "video_purged_from_storage": video_purged,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+@router.post("/review/{queue_id}", status_code=status.HTTP_200_OK)
+async def review_kyc_submission(
+    queue_id: str,
+    payload: dict,
+    admin: User = Depends(require_master_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    action = payload.get("action")  # "approve" or "reject"
+    rejection_reason = payload.get("reason", "")
+
+    if action not in ["approve", "reject"]:
+        raise HTTPException(status_code=400, detail="Action must be 'approve' or 'reject'.")
+
+    # 1. Fetch queue entry (supports both integer queue id and user UUID)
+    entry = None
+    try:
+        qid_int = int(queue_id)
+        stmt = select(KycReviewQueue).where(KycReviewQueue.id == qid_int)
+        res = await db.execute(stmt)
+        entry = res.scalar_one_or_none()
+    except (ValueError, TypeError):
+        pass
+
+    if not entry:
+        try:
+            qid_uuid = UUID(str(queue_id))
+            stmt = select(KycReviewQueue).where(KycReviewQueue.user_id == qid_uuid)
+            res = await db.execute(stmt)
+            entry = res.scalar_one_or_none()
+        except Exception:
+            pass
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="KYC submission not found.")
+
+    target_user_id = entry.user_id
+    video_path = entry.video_storage_path
+
+    # 2. Hard-delete biometric video file immediately
+    if video_path and video_path != "PURGED":
+        await hard_delete_kyc_video(video_path)
+
+    # 3. Update target User record (store only boolean status)
+    is_approved = (action == "approve")
+    await db.execute(
+        update(User)
+        .where(User.id == target_user_id)
+        .values(
+            kyc_status=is_approved,
+            kyc_state="verified" if is_approved else "rejected",
+            kyc_failure_reason=None if is_approved else (rejection_reason or "Manual review rejection."),
+            kyc_verified_at=datetime.now(timezone.utc) if is_approved else None
+        )
+    )
+
+    # 4. Resolve Queue Entry and purge path reference
+    await db.execute(
+        update(KycReviewQueue)
+        .where(KycReviewQueue.id == entry.id)
+        .values(
+            status="approved" if is_approved else "rejected",
+            video_storage_path="PURGED",
+            rejection_reason=rejection_reason if not is_approved else None,
+            resolved_at=datetime.now(timezone.utc)
+        )
+    )
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "action": action,
+        "user_id": str(target_user_id),
+        "media_status": "PURGED_FROM_STORAGE"
+    }
+

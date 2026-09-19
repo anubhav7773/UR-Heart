@@ -17,13 +17,24 @@ except ImportError:
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
-# Service client with full storage management rights
 supabase_storage_client = None
 if create_client and SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
     try:
         supabase_storage_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     except Exception:
         supabase_storage_client = None
+
+def get_supabase_admin_client():
+    global supabase_storage_client
+    if supabase_storage_client is not None:
+        return supabase_storage_client
+    if create_client and SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+        try:
+            supabase_storage_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+            return supabase_storage_client
+        except Exception:
+            pass
+    return supabase_storage_client
 
 if supabase_storage_client is None:
     class _DummyStorageFrom:
@@ -254,6 +265,33 @@ async def purge_kyc_video_from_storage(
     except Exception as e:
         # Log failure into console; do not mask if called by background task
         print(f"FAILED_TO_PURGE_KYC_VIDEO: {storage_path}, error: {str(e)}")
+        return False
+
+async def hard_delete_kyc_video(storage_path: str) -> bool:
+    """
+    Permanently deletes a KYC video from Supabase Storage bucket ('kyc-videos').
+    Eliminates biometric data leakage liability under DPDP Act 2023.
+    """
+    if not storage_path or storage_path == "PURGED":
+        return True
+
+    try:
+        supabase = get_supabase_admin_client()
+        # Clean relative path if bucket prefix is present
+        clean_path = storage_path.replace("kyc-videos/", "").replace("kyc-temp/", "").lstrip("/")
+        
+        if supabase:
+            try:
+                supabase.storage.from_("kyc-videos").remove([clean_path])
+            except Exception:
+                pass
+            try:
+                supabase.storage.from_("kyc-temp").remove([clean_path])
+            except Exception:
+                pass
+        return True
+    except Exception as e:
+        print(f"⚠️ [Storage Hard-Delete Error] Failed to purge {storage_path}: {e}")
         return False
 
 async def create_signed_upload_url(user_id: UUID, slot_index: int) -> dict:
