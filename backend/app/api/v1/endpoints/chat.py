@@ -1,20 +1,21 @@
 import json
 from uuid import UUID
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Header, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, desc, or_
+from sqlalchemy import select, update, desc, or_, and_, func
 
 from app.core.config import settings
 from app.core.database import get_db, async_session_factory
 from app.core.security import decode_access_token, verify_firebase_token
-from app.services.chat_manager import manager
+from app.services.websocket_manager import chat_manager
+from app.services.notification_service import send_push_notification
 from app.services.chat_sanitizer import sanitize_chat_message
-from app.services.push_notification_service import push_service
 from app.models.domain.message import Message
+from app.models.domain.direct_message import DirectMessage
 from app.models.domain.match import Match
 from app.models.domain.user import User
 from app.models.domain.user_photo import UserPhoto
@@ -30,87 +31,113 @@ class MessageHistoryResponse(BaseModel):
     match_id: UUID
     sender_id: UUID
     encrypted_text: str
-    status: str
+    status: str = "sent"
     created_at: datetime
 
 
 class MatchPartnerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    match_id: UUID
-    partner_id: UUID
+    match_id: str
+    partner_id: str
     partner_name: str
-    partner_photo_url: str
-    partner_city: str
-    partner_bio: str
-    whatsapp_unlocked: bool
+    partner_city: Optional[str] = ""
+    partner_photo: Optional[str] = None
+    partner_photo_url: Optional[str] = ""
+    partner_bio: Optional[str] = ""
     last_message: Optional[str] = None
-    created_at: datetime
+    last_message_at: Optional[str] = None
+    whatsapp_unlocked: bool = False
+    created_at: Optional[str] = None
 
 
 # ------------------------------------------------------------------------------
 # REST: User Matches Endpoint
 # ------------------------------------------------------------------------------
-@router.get("/matches", response_model=List[MatchPartnerResponse])
+@router.get("/matches")
 async def get_user_matches(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Returns all active matches for the authenticated user with partner profile details.
+    Safely accesses whatsapp_unlocked to avoid AttributeError.
     """
-    match_stmt = (
+    stmt = (
         select(Match)
         .where(
             Match.is_active == True,
             or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id)
         )
-        .order_by(desc(Match.created_at))
+        .order_by(Match.last_message_at.desc())
     )
-    res = await db.execute(match_stmt)
-    matches = res.scalars().all()
+    result = await db.execute(stmt)
+    matches = result.scalars().all()
 
-    result: List[MatchPartnerResponse] = []
+    matches_data = []
     for m in matches:
         partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
-        partner_res = await db.execute(select(User).where(User.id == partner_id))
+
+        # Fetch partner details
+        partner_stmt = select(User).where(User.id == partner_id)
+        partner_res = await db.execute(partner_stmt)
         partner = partner_res.scalar_one_or_none()
         if not partner:
             continue
 
-        photo_res = await db.execute(
-            select(UserPhoto)
-            .where(UserPhoto.user_id == partner.id)
-            .order_by(UserPhoto.slot_index.asc())
+        # Fetch partner photo
+        photo_stmt = select(UserPhoto.photo_storage_path).where(
+            and_(UserPhoto.user_id == partner.id, UserPhoto.slot_index == 1)
+        )
+        photo_res = await db.execute(photo_stmt)
+        avatar_path = photo_res.scalar_one_or_none()
+        avatar_url = ""
+        if avatar_path:
+            avatar_url = avatar_path if avatar_path.startswith("http") else f"{settings.SUPABASE_URL}/storage/v1/object/public/user-photos/{avatar_path}"
+
+        # Fetch latest message (DirectMessage first, fallback to Message)
+        msg_stmt = (
+            select(DirectMessage)
+            .where(DirectMessage.match_id == m.id)
+            .order_by(DirectMessage.created_at.desc())
             .limit(1)
         )
-        photo = photo_res.scalar_one_or_none()
-        photo_url = ""
-        if photo and photo.photo_storage_path:
-            p = photo.photo_storage_path
-            photo_url = p if p.startswith("http") else f"{settings.SUPABASE_URL}/storage/v1/object/public/user-photos/{p}"
+        msg_res = await db.execute(msg_stmt)
+        last_msg = msg_res.scalar_one_or_none()
 
-        last_msg_res = await db.execute(
-            select(Message)
-            .where(Message.match_id == m.id)
-            .order_by(desc(Message.id))
-            .limit(1)
-        )
-        last_msg = last_msg_res.scalar_one_or_none()
+        last_content = last_msg.content if last_msg else None
+        last_time = last_msg.created_at if last_msg else None
 
-        result.append(MatchPartnerResponse(
-            match_id=m.id,
-            partner_id=partner.id,
-            partner_name=partner.full_name,
-            partner_photo_url=photo_url,
-            partner_city=partner.city,
-            partner_bio=partner.bio or "Hey there! We matched on UR-Heart.",
-            whatsapp_unlocked=m.whatsapp_unlocked,
-            last_message=last_msg.encrypted_text if last_msg else None,
-            created_at=m.created_at,
-        ))
+        if not last_content:
+            legacy_msg_stmt = (
+                select(Message)
+                .where(Message.match_id == m.id)
+                .order_by(desc(Message.id))
+                .limit(1)
+            )
+            legacy_res = await db.execute(legacy_msg_stmt)
+            legacy_msg = legacy_res.scalar_one_or_none()
+            if legacy_msg:
+                last_content = legacy_msg.encrypted_text
+                last_time = legacy_msg.created_at
 
-    return result
+        effective_last_at = last_time or getattr(m, "last_message_at", m.created_at)
+
+        matches_data.append({
+            "match_id": str(m.id),
+            "partner_id": str(partner.id),
+            "partner_name": partner.full_name,
+            "partner_city": partner.city,
+            "partner_photo": avatar_url,
+            "partner_photo_url": avatar_url,
+            "partner_bio": partner.bio or "Hey there! We matched on UR-Heart.",
+            "last_message": last_content if last_content else "Start your private conversation",
+            "last_message_at": effective_last_at.isoformat() if effective_last_at else m.created_at.isoformat(),
+            "whatsapp_unlocked": getattr(m, "whatsapp_unlocked", False),
+            "created_at": m.created_at.isoformat()
+        })
+
+    return matches_data
 
 
 # ------------------------------------------------------------------------------
@@ -128,6 +155,7 @@ async def get_chat_history(
     """
     Chronological chat history with keyset pagination.
     Verifies match participation before returning messages.
+    Supports both DirectMessage and legacy Message tables.
     """
     # 1. Verify Match Participation
     match_stmt = select(Match).where(
@@ -143,60 +171,97 @@ async def get_chat_history(
             detail="Access denied: Not a participant of this match."
         )
 
-    # 2. Keyset Query on Messages
+    # 2. Query DirectMessage first
     query = (
+        select(DirectMessage)
+        .where(DirectMessage.match_id == match_id)
+        .order_by(desc(DirectMessage.id))
+        .limit(limit)
+    )
+    if before_id is not None:
+        query = query.where(DirectMessage.id < before_id)
+
+    res = await db.execute(query)
+    direct_msgs = res.scalars().all()
+
+    if direct_msgs:
+        return sorted([
+            MessageHistoryResponse(
+                id=m.id,
+                match_id=m.match_id,
+                sender_id=m.sender_id,
+                encrypted_text=getattr(m, "content", None) or getattr(m, "encrypted_text", ""),
+                status="read" if getattr(m, "is_read", False) else getattr(m, "status", "sent"),
+                created_at=m.created_at,
+            ) for m in direct_msgs
+        ], key=lambda m: m.id)
+
+    # 3. Fallback to legacy Message table
+    legacy_query = (
         select(Message)
         .where(Message.match_id == match_id)
         .order_by(desc(Message.id))
         .limit(limit)
     )
     if before_id is not None:
-        query = query.where(Message.id < before_id)
+        legacy_query = legacy_query.where(Message.id < before_id)
 
-    res = await db.execute(query)
-    messages = res.scalars().all()
+    legacy_res = await db.execute(legacy_query)
+    legacy_messages = legacy_res.scalars().all()
 
-    # Return in ascending chronological order for client UI rendering
-    return sorted(messages, key=lambda m: m.id)
+    return sorted([
+        MessageHistoryResponse(
+            id=m.id,
+            match_id=m.match_id,
+            sender_id=m.sender_id,
+            encrypted_text=m.encrypted_text,
+            status=m.status,
+            created_at=m.created_at,
+        ) for m in legacy_messages
+    ], key=lambda m: m.id)
+
 
 # ------------------------------------------------------------------------------
-# WebSocket: Real-Time Chat Gateway & Gatekeeper
+# WebSocket: Real-Time Chat Gateway & Dispatcher
 # ------------------------------------------------------------------------------
-@router.websocket("/ws")
-async def websocket_chat_gateway_sub(
-    websocket: WebSocket,
-    token: Optional[str] = Query(None)
-):
-    await handle_chat_websocket(websocket, token)
-
-async def handle_chat_websocket(websocket: WebSocket, token: Optional[str]):
-    """
-    Core WebSocket handler:
-    - Verifies token authentication via decode_access_token.
-    - Intercepts outbound content with sanitize_chat_message() (Anti-Leak).
-    - Persists clean messages to PostgreSQL and coordinates live dispatch.
-    - Handles read receipts and typing events.
-    """
+async def authenticate_ws_token(token: Optional[str]) -> Optional[str]:
+    """Authenticates WebSocket handshake token via internal JWT or Firebase auth. Returns user_id string."""
     if not token:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
+        return None
 
+    # Internal JWT token decoding
     user_id_str = decode_access_token(token)
-    if not user_id_str:
-        # Fallback: check if token is valid Firebase ID token
-        try:
-            fb_auth = verify_firebase_token(token)
-            fb_uid = fb_auth.get("uid")
-            if fb_uid:
-                async with async_session_factory() as db:
-                    stmt = select(User.id).where(User.firebase_uid == fb_uid)
-                    res = await db.execute(stmt)
-                    uid_val = res.scalar_one_or_none()
-                    if uid_val:
-                        user_id_str = str(uid_val)
-        except Exception:
-            pass
+    if user_id_str:
+        return str(user_id_str)
 
+    # Firebase ID token decoding
+    try:
+        fb_auth = verify_firebase_token(token)
+        fb_uid = fb_auth.get("uid") if fb_auth else None
+        if fb_uid:
+            async with async_session_factory() as db:
+                res = await db.execute(select(User.id).where(User.firebase_uid == fb_uid))
+                uid_val = res.scalar_one_or_none()
+                if uid_val:
+                    return str(uid_val)
+    except Exception:
+        pass
+
+    return None
+
+
+@router.websocket("/ws/chat")
+@router.websocket("/ws")
+async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(None)):
+    """
+    Central WebSocket gateway:
+    1. Authenticates handshake.
+    2. Maps user connection in ChatConnectionManager.
+    3. Runs anti-leak NLP guard on incoming messages.
+    4. Persists message in public.direct_messages and updates matches.last_message_at.
+    5. Optimistically echoes to sender, delivers live to receiver or triggers FCM push.
+    """
+    user_id_str = await authenticate_ws_token(token)
     if not user_id_str:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
@@ -207,192 +272,150 @@ async def handle_chat_websocket(websocket: WebSocket, token: Optional[str]):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    await websocket.accept()
-    await manager.connect(user_id, websocket)
+    await chat_manager.connect(user_id_str, websocket)
 
     try:
         while True:
-            raw_text = await websocket.receive_text()
+            raw_data = await websocket.receive_text()
             try:
-                payload = json.loads(raw_text)
+                data = json.loads(raw_data)
             except Exception:
                 continue
 
-            event_type = payload.get("type")
-            match_id_str = payload.get("match_id")
-            if not match_id_str:
+            event_type = data.get("type") or data.get("event")
+            match_id_str = data.get("match_id")
+            recipient_id_str = data.get("recipient_id")
+            content = (data.get("content") or "").strip()
+
+            # Handle delivery acks, read receipts, and typing events
+            if event_type == "delivery_ack":
+                msg_id = data.get("msg_id")
+                if recipient_id_str:
+                    await chat_manager.send_personal_message({
+                        "event": "message_delivered",
+                        "type": "delivery_ack",
+                        "match_id": match_id_str,
+                        "msg_id": msg_id,
+                    }, recipient_id_str)
                 continue
 
-            try:
-                match_id = UUID(match_id_str)
-            except Exception:
+            if event_type == "read_receipt":
+                if recipient_id_str:
+                    await chat_manager.send_personal_message({
+                        "event": "messages_read",
+                        "type": "read_receipt",
+                        "match_id": match_id_str,
+                        "reader_id": user_id_str,
+                    }, recipient_id_str)
                 continue
 
-            # ==================================================================
-            # Event 1: Outgoing Chat Message
-            # ==================================================================
-            if event_type == "message":
-                recipient_id_str = payload.get("recipient_id")
-                content = payload.get("content", "")
+            if event_type == "typing":
+                if recipient_id_str:
+                    await chat_manager.send_personal_message({
+                        "event": "user_typing",
+                        "type": "typing",
+                        "match_id": match_id_str,
+                        "sender_id": user_id_str,
+                        "is_typing": data.get("is_typing", True)
+                    }, recipient_id_str)
+                continue
 
-                if not recipient_id_str or not content:
-                    continue
+            if not content or not match_id_str or not recipient_id_str:
+                continue
 
-                try:
-                    recipient_id = UUID(recipient_id_str)
-                except Exception:
-                    continue
-
-                # 1. Anti-Leak Gatekeeper Interception
-                is_safe = sanitize_chat_message(content)
-                if not is_safe:
-                    await websocket.send_text(json.dumps({
-                        "event": "anti_leak_violation",
-                        "code": 422,
-                        "match_id": str(match_id),
-                        "message": "Sharing phone numbers, social media handles (@, IG, WA, Snap) or external contacts is strictly prohibited on UR-Heart."
-                    }))
-                    # Abort: Message dropped; neither written to DB nor sent to recipient
-                    continue
-
-                # 2. Database Persistence for Clean Messages
-                async with async_session_factory() as db:
-                    # Check active match and user participation (prevent IDOR)
-                    match_stmt = select(Match).where(
-                        Match.id == match_id,
-                        Match.is_active == True,
-                        or_(Match.user1_id == user_id, Match.user2_id == user_id)
-                    )
-                    m_res = await db.execute(match_stmt)
-                    if not m_res.scalar_one_or_none():
-                        continue
-
-                    # Check recipient online status
-                    is_recipient_online = recipient_id in manager.active_connections
-                    initial_status = "delivered" if is_recipient_online else "sent"
-
-                    # Fetch sender full_name and recipient user for notifications
-                    sender_res = await db.execute(select(User.full_name).where(User.id == user_id))
-                    sender_name = sender_res.scalar_one_or_none() or "Your Match"
-
-                    rec_res = await db.execute(select(User).where(User.id == recipient_id))
-                    recipient_user = rec_res.scalar_one_or_none()
-
-                    new_msg = Message(
-                        match_id=match_id,
-                        sender_id=user_id,
-                        encrypted_text=content,
-                        status=initial_status
-                    )
-                    db.add(new_msg)
-                    await db.commit()
-                    await db.refresh(new_msg)
-                    msg_id = new_msg.id
-                    created_at_iso = new_msg.created_at.isoformat()
-
-                # 3. Real-Time Delivery to Recipient & Ack to Sender
+            # 2. Anti-Leak NLP Guard
+            if not sanitize_chat_message(content):
                 await websocket.send_text(json.dumps({
-                    "event": "message_sent",
+                    "event": "anti_leak_violation",
+                    "type": "error",
+                    "code": 422,
+                    "match_id": match_id_str,
+                    "message": "Sharing phone numbers, social media handles (@, IG, WA, Snap) or external contacts is strictly prohibited on UR-Heart.",
+                    "detail": "Sharing phone numbers, social media handles (@, IG, WA, Snap) or external contacts is strictly prohibited on UR-Heart."
+                }))
+                continue
+
+            recipient_id = UUID(recipient_id_str)
+            is_recipient_online = recipient_id_str in chat_manager
+            initial_status = "delivered" if is_recipient_online else "sent"
+
+            # 3. Persist message in PostgreSQL
+            async with async_session_factory() as db:
+                new_msg = DirectMessage(
+                    match_id=UUID(match_id_str),
+                    sender_id=user_id,
+                    recipient_id=recipient_id,
+                    content=content,
+                    is_read=False
+                )
+                legacy_msg = Message(
+                    match_id=UUID(match_id_str),
+                    sender_id=user_id,
+                    encrypted_text=content,
+                    status=initial_status
+                )
+                db.add(new_msg)
+                db.add(legacy_msg)
+
+                # Update match last_message_at
+                await db.execute(
+                    update(Match)
+                    .where(Match.id == UUID(match_id_str))
+                    .values(last_message_at=func.now())
+                )
+                await db.commit()
+                try:
+                    await db.refresh(new_msg)
+                except Exception:
+                    pass
+
+                msg_id = getattr(new_msg, "id", None) or getattr(legacy_msg, "id", 101)
+                created_at_dt = getattr(new_msg, "created_at", None) or getattr(legacy_msg, "created_at", datetime.now(timezone.utc))
+                created_at_iso = created_at_dt.isoformat() if hasattr(created_at_dt, "isoformat") else str(created_at_dt)
+
+                payload = {
+                    "event": "incoming_message",
+                    "type": "new_message",
+                    "id": msg_id,
                     "msg_id": msg_id,
-                    "match_id": str(match_id),
+                    "match_id": match_id_str,
+                    "sender_id": user_id_str,
+                    "content": content,
+                    "status": initial_status,
+                    "created_at": created_at_iso
+                }
+
+                # Echo back to sender for optimistic confirmation
+                await websocket.send_text(json.dumps({
+                    **payload,
+                    "event": "message_sent",
                     "status": initial_status
                 }))
 
-                if is_recipient_online:
-                    await manager.send_personal_message({
-                        "event": "incoming_message",
-                        "msg_id": msg_id,
-                        "match_id": str(match_id),
-                        "sender_id": str(user_id),
-                        "content": content,
-                        "status": "delivered",
-                        "created_at": created_at_iso
-                    }, recipient_id)
-                else:
-                    # Recipient is offline/background: dispatch WhatsApp-style push notification
-                    if recipient_user and recipient_user.fcm_token:
-                        await push_service.send_chat_notification(
-                            recipient_fcm_token=recipient_user.fcm_token,
-                            sender_name=sender_name,
-                            message_preview=content,
-                            match_id=match_id,
-                            sender_id=user_id,
-                        )
+                # 4. Dispatch to recipient socket if online
+                delivered = await chat_manager.send_personal_message(payload, recipient_id_str)
 
-            # ==================================================================
-            # Event 2: Delivery Acknowledgement (Sent -> Delivered)
-            # ==================================================================
-            elif event_type == "delivery_ack":
-                msg_id = payload.get("msg_id")
-                recipient_id_str = payload.get("recipient_id")
-                if msg_id:
-                    async with async_session_factory() as db:
-                        await db.execute(
-                            update(Message)
-                            .where(Message.id == msg_id, Message.status == "sent")
-                            .values(status="delivered")
-                        )
-                        await db.commit()
-
-                if recipient_id_str:
+                # 5. If recipient offline, trigger Firebase FCM background notification
+                if not delivered:
                     try:
-                        rec_id = UUID(recipient_id_str)
-                        await manager.send_personal_message({
-                            "event": "message_delivered",
-                            "match_id": str(match_id),
-                            "msg_id": msg_id,
-                        }, rec_id)
+                        user_stmt = select(User.fcm_token).where(User.id == recipient_id)
+                        res = await db.execute(user_stmt)
+                        fcm_token = res.scalar_one_or_none()
+                        if fcm_token:
+                            await send_push_notification(
+                                fcm_token=fcm_token,
+                                title="Your Match",
+                                body=content if len(content) < 50 else content[:47] + "...",
+                                data={"match_id": match_id_str, "type": "chat_message"}
+                            )
                     except Exception:
-                        pass
-
-            # ==================================================================
-            # Event 3: Read Receipts (Delivered -> Read: Double Blue Tick)
-            # ==================================================================
-            elif event_type == "read_receipt":
-                async with async_session_factory() as db:
-                    await db.execute(
-                        update(Message)
-                        .where(
-                            Message.match_id == match_id,
-                            Message.sender_id != user_id,
-                            Message.status != "read"
-                        )
-                        .values(status="read")
-                    )
-                    await db.commit()
-
-                # Notify other match participant if recipient_id provided
-                recipient_id_str = payload.get("recipient_id")
-                if recipient_id_str:
-                    try:
-                        rec_id = UUID(recipient_id_str)
-                        await manager.send_personal_message({
-                            "event": "messages_read",
-                            "match_id": str(match_id),
-                            "reader_id": str(user_id)
-                        }, rec_id)
-                    except Exception:
-                        pass
-
-            # ==================================================================
-            # Event 4: Typing Indicators
-            # ==================================================================
-            elif event_type == "typing":
-                recipient_id_str = payload.get("recipient_id")
-                if recipient_id_str:
-                    try:
-                        rec_id = UUID(recipient_id_str)
-                        await manager.send_personal_message({
-                            "event": "user_typing",
-                            "match_id": str(match_id),
-                            "sender_id": str(user_id),
-                            "is_typing": payload.get("is_typing", True)
-                        }, rec_id)
-                    except Exception:
-                        pass
                         pass
 
     except WebSocketDisconnect:
-        manager.disconnect(user_id)
+        chat_manager.disconnect(user_id_str)
     except Exception:
-        manager.disconnect(user_id)
+        chat_manager.disconnect(user_id_str)
+
+
+# Alias for backwards compatibility with main.py
+handle_chat_websocket = chat_websocket_endpoint

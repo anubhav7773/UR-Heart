@@ -6,14 +6,14 @@ from app.models.domain.user import User
 from app.models.domain.kyc_queue import KycReviewQueue
 
 @pytest.mark.asyncio
-async def test_admin_endpoints_unrestricted_access(async_client: AsyncClient, regular_user_token):
-    """Assert admin endpoints grant unrestricted access to users without 403 Forbidden."""
+async def test_admin_endpoints_restricted_access(async_client: AsyncClient, regular_user_token):
+    """Assert admin endpoints deny access to regular users with 403 Forbidden."""
     headers = {"Authorization": f"Bearer {regular_user_token}"}
     r1 = await async_client.get("/api/v1/admin/kyc/stats", headers=headers)
-    assert r1.status_code == 200
+    assert r1.status_code == 403
 
     r2 = await async_client.get("/api/v1/admin/kyc/queue", headers=headers)
-    assert r2.status_code == 200
+    assert r2.status_code == 403
 
 @pytest.mark.asyncio
 async def test_admin_decision_approves_and_purges_storage(async_client: AsyncClient, admin_token, db_session):

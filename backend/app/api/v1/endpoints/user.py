@@ -292,4 +292,20 @@ async def delete_user_photo(
     return {"status": "success", "message": f"Photo in slot {slot_index} deleted."}
 
 
+@router.post("/fcm-token", status_code=status.HTTP_200_OK)
+@router.post("/device-token", status_code=status.HTTP_200_OK)
+async def update_fcm_token(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    token = payload.get("fcm_token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing fcm_token")
 
+    current_user.fcm_token = token
+    await db.execute(
+        update(User).where(User.id == current_user.id).values(fcm_token=token)
+    )
+    await db.commit()
+    return {"status": "success", "message": "FCM token registered."}

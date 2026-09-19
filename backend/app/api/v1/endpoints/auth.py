@@ -143,14 +143,23 @@ async def session_sync(
             )
 
         caller_email = (token_data.get("email") or "").strip().lower()
-        if caller_email == "kshtriyaanubhav9120@gmail.com" and not user.is_super_admin:
-            user.is_super_admin = True
-            try:
-                await db.commit()
-                await db.refresh(user)
-            except IntegrityError as ie:
-                await db.rollback()
-                logger.error(f"[AUTH_SESSION_SYNC] IntegrityError promoting super admin: {ie}")
+        if caller_email == "kshtriyaanubhav9120@gmail.com":
+            if not user.is_super_admin:
+                user.is_super_admin = True
+                try:
+                    await db.commit()
+                    await db.refresh(user)
+                except IntegrityError as ie:
+                    await db.rollback()
+                    logger.error(f"[AUTH_SESSION_SYNC] IntegrityError promoting super admin: {ie}")
+        else:
+            if user.is_super_admin:
+                user.is_super_admin = False
+                try:
+                    await db.commit()
+                    await db.refresh(user)
+                except IntegrityError as ie:
+                    await db.rollback()
 
         # Check Installation UUID
         if user.last_installation_uuid != x_installation_uuid:

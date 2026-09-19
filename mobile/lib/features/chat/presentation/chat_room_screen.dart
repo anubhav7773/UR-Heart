@@ -59,7 +59,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
   @override
   void initState() {
     super.initState();
-    _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    try {
+      _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {}
     _chatRepository = ChatRepository();
 
     if (widget.matchId != null && widget.matchId!.isNotEmpty) {

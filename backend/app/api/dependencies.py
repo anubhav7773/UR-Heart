@@ -59,13 +59,24 @@ async def get_current_user(
         )
 
     caller_email = (token_payload.get("email") or "").strip().lower()
-    if caller_email == "kshtriyaanubhav9120@gmail.com" and not user.is_super_admin:
-        user.is_super_admin = True
-        try:
-            await db.commit()
-            await db.refresh(user)
-        except Exception:
-            await db.rollback()
+    setattr(user, "email", caller_email)
+
+    if caller_email in MASTER_ADMIN_WHITELIST:
+        if not user.is_super_admin:
+            user.is_super_admin = True
+            try:
+                await db.commit()
+                await db.refresh(user)
+            except Exception:
+                await db.rollback()
+    else:
+        if user.is_super_admin:
+            user.is_super_admin = False
+            try:
+                await db.commit()
+                await db.refresh(user)
+            except Exception:
+                await db.rollback()
 
     if user.is_banned:
         raise HTTPException(
@@ -74,6 +85,35 @@ async def get_current_user(
         )
 
     return user
+
+
+# Statutory Super Admin Whitelist
+MASTER_ADMIN_WHITELIST = {
+    "kshtriyaanubhav9120@gmail.com",
+}
+
+async def require_master_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Guarantees caller is an authorized Super Admin.
+    Validates both the DB flag and hardcoded whitelist identity.
+    """
+    if not current_user.is_super_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative access denied. Privilege level insufficient."
+        )
+
+    # Secondary check against Firebase decoded token if available in state
+    user_email = getattr(current_user, "email", None)
+    if user_email and user_email.lower() not in MASTER_ADMIN_WHITELIST:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not on the statutory Master Admin whitelist."
+        )
+
+    return current_user
 
 async def get_current_user_id(
     current_user: User = Depends(get_current_user)

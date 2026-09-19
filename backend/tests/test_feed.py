@@ -160,3 +160,24 @@ def test_swipe_direct_dm_token_decrement(mock_current_user, mock_candidate_user)
     assert mock_current_user.reward_balance == 2
 
     app.dependency_overrides.clear()
+
+
+def test_reset_my_swipes(mock_current_user):
+    """Verifies that POST /api/v1/feed/reset-my-swipes clears swipes and returns 200."""
+    app.dependency_overrides[get_current_user] = lambda: mock_current_user
+
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.rowcount = 4
+    mock_db.execute.return_value = mock_result
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    response = client.post("/api/v1/feed/reset-my-swipes")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "Successfully reset 4 swipes" in data["message"]
+    assert data["actor_id"] == str(mock_current_user.id)
+    assert mock_db.commit.called
+
+    app.dependency_overrides.clear()

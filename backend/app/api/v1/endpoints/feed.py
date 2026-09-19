@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, not_, or_
+from sqlalchemy import select, and_, not_, or_, delete
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -286,3 +286,24 @@ async def record_swipe(
         whatsapp_unlocked=False,
         remaining_dm_tokens=remaining_tokens,
     )
+
+
+@router.post("/reset-my-swipes", status_code=status.HTTP_200_OK)
+async def reset_my_swipes(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Developer & Testing utility: Wipes out previous swipes made by the caller
+    so the Discovery Feed immediately refills with all candidates.
+    """
+    stmt = delete(Swipe).where(Swipe.actor_id == current_user.id)
+    result = await db.execute(stmt)
+    await db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Successfully reset {result.rowcount} swipes. Discovery Feed refilled.",
+        "actor_id": str(current_user.id)
+    }
+

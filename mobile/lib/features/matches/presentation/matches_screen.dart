@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/network/api_client.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/core/widgets/insufficient_credits_sheet.dart';
 import 'package:ur_heart/core/widgets/luxury_empty_card.dart';
-import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
-import 'package:ur_heart/features/matches/data/matches_repository.dart';
+import 'package:ur_heart/features/chat/data/chat_repository.dart';
+import 'package:ur_heart/features/chat/presentation/direct_chat_screen.dart';
 import 'package:ur_heart/features/ads/services/ad_manager.dart';
 import 'package:ur_heart/features/wallet/data/wallet_repository.dart';
 
@@ -31,10 +30,7 @@ class MatchesScreen extends StatefulWidget {
 class _MatchesScreenState extends State<MatchesScreen>
     with SingleTickerProviderStateMixin, SecureScreenMixin {
   late TabController _tabController;
-  final MatchesRepository _repo = MatchesRepository();
   final WalletRepository _walletRepo = WalletRepository();
-  List<MatchItemModel> _matches = [];
-  bool _isLoadingMatches = true;
 
   bool _isLoadingMissed = false;
   List<Map<String, dynamic>> _missedProfiles = [];
@@ -43,7 +39,6 @@ class _MatchesScreenState extends State<MatchesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadMatches();
     _fetchMissedConnections();
   }
 
@@ -51,21 +46,6 @@ class _MatchesScreenState extends State<MatchesScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadMatches() async {
-    setState(() => _isLoadingMatches = true);
-    try {
-      final list = await _repo.getMatches();
-      if (mounted) {
-        setState(() {
-          _matches = list;
-          _isLoadingMatches = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingMatches = false);
-    }
   }
 
   Future<void> _fetchMissedConnections() async {
@@ -301,19 +281,6 @@ class _MatchesScreenState extends State<MatchesScreen>
     );
   }
 
-  void _openChat(MatchItemModel match) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ChatRoomScreen(
-          lang: widget.lang,
-          matchId: match.matchId,
-          participantName: match.partnerName,
-          participantId: match.partnerId,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     const Color canvasBg = Color(0xFF0A0A0D);
@@ -358,67 +325,79 @@ class _MatchesScreenState extends State<MatchesScreen>
   }
 
   Widget _buildConnectedMatchesTab() {
-    if (_isLoadingMatches) {
-      return const Center(child: CircularProgressIndicator(color: URHeartColors.brandPrimary));
-    }
-
-    if (_matches.isEmpty) {
-      return LuxuryEmptyCard(
-        icon: Icons.favorite_rounded,
-        accentColor: const Color(0xFFFF2E63),
-        title: "No Mutual Matches Yet",
-        description: "When you and another member like each other on Discovery, your mutual match connection will blossom here.",
-        actionLabel: "Explore Nearby Profiles →",
-        onAction: () {
-          if (widget.onExploreTap != null) {
-            widget.onExploreTap!();
-          } else {
-            DefaultTabController.of(context).animateTo(0);
-          }
-        },
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadMatches,
-      color: URHeartColors.brandPrimary,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _matches.length,
-        separatorBuilder: (_, __) => const Divider(
-          color: URHeartColors.surfaceRaised,
-          height: 1,
-          indent: 76,
-        ),
-        itemBuilder: (context, index) {
-          final match = _matches[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(vertical: 4),
-            leading: CircleAvatar(
-              radius: 28,
-              backgroundColor: URHeartColors.surfaceRaised,
-              backgroundImage: match.partnerPhotoUrl.isNotEmpty
-                  ? CachedNetworkImageProvider(match.partnerPhotoUrl)
-                  : null,
-              child: match.partnerPhotoUrl.isEmpty
-                  ? const Icon(Icons.person, color: Colors.grey)
-                  : null,
-            ),
-            title: Text(
-              match.partnerName,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-            ),
-            subtitle: Text(
-              match.lastMessage ?? "📍 ${match.partnerCity}",
-              style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFFFF2E63), size: 20),
-            onTap: () => _openChat(match),
+    return FutureBuilder<List<MatchConversationModel>>(
+      future: ChatRepository().fetchMatches(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFFFF2E63)));
+        }
+        final matches = snapshot.data ?? [];
+        if (matches.isEmpty) {
+          return LuxuryEmptyCard(
+            icon: Icons.favorite_rounded,
+            accentColor: const Color(0xFFFF2E63),
+            title: "No Mutual Matches Yet",
+            description: "When you and another member like each other on Discovery, your mutual match connection will blossom here.",
+            actionLabel: "Explore Nearby Profiles →",
+            onAction: () {
+              if (widget.onExploreTap != null) {
+                widget.onExploreTap!();
+              } else {
+                DefaultTabController.of(context).animateTo(0);
+              }
+            },
           );
-        },
-      ),
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: matches.length,
+          itemBuilder: (ctx, idx) {
+            final m = matches[idx];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16161D),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+              child: ListTile(
+                leading: CircleAvatar(
+                  radius: 24,
+                  backgroundImage: m.partnerPhoto != null && m.partnerPhoto!.isNotEmpty
+                      ? CachedNetworkImageProvider(m.partnerPhoto!)
+                      : null,
+                  child: m.partnerPhoto == null || m.partnerPhoto!.isEmpty
+                      ? const Icon(Icons.person, color: Colors.grey)
+                      : null,
+                ),
+                title: Text(m.partnerName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text("📍 ${m.partnerCity}", style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12)),
+                trailing: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF2E63),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => DirectChatScreen(
+                          matchId: m.matchId,
+                          partnerId: m.partnerId,
+                          partnerName: m.partnerName,
+                          partnerPhoto: m.partnerPhoto,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("Chat", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

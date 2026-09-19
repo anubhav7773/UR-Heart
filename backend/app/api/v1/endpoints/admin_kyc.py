@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func, and_
 
 from app.core.database import get_db
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_master_admin
 from app.models.domain.user import User
 from app.models.domain.kyc_queue import KycReviewQueue
 from app.services.storage_service import purge_kyc_video_from_storage, supabase_storage_client, SUPABASE_URL
@@ -18,16 +18,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 MASTER_ADMIN_EMAIL = "kshtriyaanubhav9120@gmail.com"
-
-# -----------------------------------------------------------------------------
-# 1. RBAC DEPENDENCY (Unrestricted Access)
-# -----------------------------------------------------------------------------
-async def require_master_admin(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Validates authenticated caller. All restrictive checks have been lifted
-    as requested to grant unrestricted administrative access to the admin panel.
-    """
-    return current_user
 
 # -----------------------------------------------------------------------------
 # 2. PYDANTIC SCHEMAS FOR ADMIN PORTAL

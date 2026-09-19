@@ -58,6 +58,12 @@ async def regular_user_token(test_user):
     app.dependency_overrides.pop(get_current_user, None)
 
 @pytest_asyncio.fixture
+async def regular_user_auth_headers(test_user):
+    app.dependency_overrides[get_current_user] = lambda: test_user
+    yield {"Authorization": "Bearer mock_regular_user_token"}
+    app.dependency_overrides.pop(get_current_user, None)
+
+@pytest_asyncio.fixture
 async def admin_token():
     admin = User(
         id=uuid4(),

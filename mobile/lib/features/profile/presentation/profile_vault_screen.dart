@@ -203,7 +203,11 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
       tierText = 'New Spark 🌱';
     }
 
-    const bool isMasterAdmin = true; // All admin restrictions removed as requested
+    String currentEmail = '';
+    try {
+      currentEmail = FirebaseAuth.instance.currentUser?.email?.toLowerCase() ?? '';
+    } catch (_) {}
+    final bool isMasterAdmin = currentEmail == "kshtriyaanubhav9120@gmail.com";
 
     return Scaffold(
       backgroundColor: URHeartColors.canvasBackground,
@@ -473,54 +477,29 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
 
                     // Render Super Admin banner if master admin
                     if (isMasterAdmin) ...[
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const AdminKycDashboardScreen()),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22222C),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFFFFD166), width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFFD166).withValues(alpha: 0.15),
-                                blurRadius: 16,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                      const SizedBox(height: 14),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16161D),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.5)),
+                        ),
+                        child: ListTile(
+                          leading: const Icon(Icons.shield_rounded, color: Color(0xFFFFD166)),
+                          title: const Text(
+                            "Super Admin KYC Hub",
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                           ),
-                          child: const Row(
-                            children: [
-                              Text("👑", style: TextStyle(fontSize: 22)),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "Super Admin KYC Hub",
-                                      style: TextStyle(
-                                        color: Color(0xFFFFD166),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      "Manual override portal & pending queue",
-                                      style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(Icons.arrow_forward_ios, color: Color(0xFFFFD166), size: 16),
-                            ],
+                          subtitle: const Text(
+                            "Manual override portal & pending queue",
+                            style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
                           ),
+                          trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFFFFD166), size: 14),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const AdminKycDashboardScreen()),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 16),

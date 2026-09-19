@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import 'onboarding_screen.dart';
@@ -32,6 +33,18 @@ class AuthGate extends StatelessWidget {
       );
 
       if (response.statusCode == 200 && response.data != null) {
+        // Register FCM device token
+        try {
+          final fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            await dio.post(
+              '/api/v1/users/fcm-token',
+              data: {'fcm_token': fcmToken},
+              options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+            );
+          }
+        } catch (_) {}
+
         final data = response.data;
         final String fullName = data['full_name'] ?? '';
         final List photos = data['photos'] ?? [];

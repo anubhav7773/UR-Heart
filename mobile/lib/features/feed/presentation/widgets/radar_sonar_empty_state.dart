@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/network/api_client.dart';
 
 class RadarSonarEmptyState extends StatefulWidget {
   final String city;
@@ -32,6 +35,35 @@ class _RadarSonarEmptyStateState extends State<RadarSonarEmptyState>
   void dispose() {
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleResetAndRefresh(BuildContext context) async {
+    HapticFeedback.heavyImpact();
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = createApiClient();
+
+      // Call reset endpoint
+      await dio.post(
+        '/api/v1/feed/reset-my-swipes',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✓ Sonar Range reset! Discovering new candidates..."),
+            backgroundColor: Color(0xFF06D6A0),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Trigger parent feed reload
+      widget.onRefresh();
+    } catch (e) {
+      widget.onRefresh();
+    }
   }
 
   @override
@@ -173,10 +205,7 @@ class _RadarSonarEmptyStateState extends State<RadarSonarEmptyState>
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  widget.onRefresh();
-                },
+                onPressed: () => _handleResetAndRefresh(context),
               ),
             ),
           ],
