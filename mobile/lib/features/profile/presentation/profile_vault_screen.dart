@@ -8,6 +8,7 @@ import 'package:ur_heart/features/auth/presentation/onboarding_screen.dart';
 import 'manage_photos_screen.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import '../../admin/presentation/admin_kyc_dashboard.dart';
+import '../../ads/services/consent_manager.dart';
 import '../../legal/presentation/grievance_hub_screen.dart';
 import '../../privacy/presentation/privacy_center_screen.dart';
 import '../../wallet/presentation/manual_rewards_hub_screen.dart';
@@ -545,6 +546,29 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                             },
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16161D),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.06)),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.privacy_tip_outlined, color: Color(0xFF08D9D6), size: 20),
+                        title: const Text(
+                          "Ad Privacy & Tracking Preferences",
+                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: const Text(
+                          "Manage Google UMP consent for personalized ads",
+                          style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 11),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 13),
+                        onTap: () {
+                          ConsentManager.instance.showPrivacyOptionsForm(context);
+                        },
                       ),
                     ),
                     const SizedBox(height: 24),

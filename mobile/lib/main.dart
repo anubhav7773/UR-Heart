@@ -8,6 +8,7 @@ import 'core/config/theme.dart';
 import 'core/security/screen_security_service.dart';
 import 'core/security/window_security_bridge.dart';
 import 'core/services/notification_service.dart';
+import 'features/ads/services/consent_manager.dart';
 import 'features/auth/presentation/auth_gate.dart';
 
 // Top-level entry point for processing background/killed state FCM packets
@@ -24,6 +25,13 @@ Future<void> main() async {
     // 1. Register FCM Background Handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     await NotificationService.instance.initialize();
+
+    // Gather CMP consent at cold start
+    ConsentManager.instance.gatherConsent(
+      onConsentGathered: () {
+        debugPrint("✓ CMP Consent flow completed.");
+      },
+    );
   } catch (e) {
     debugPrint("Firebase/Notification initialization notice: $e");
   }

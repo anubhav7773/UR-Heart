@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:ur_heart/core/config/env_config.dart';
 
+import 'consent_manager.dart';
+
 /// Multi-Network Ad Preload Buffer and SSV Custom Data Engine
 /// Implements dual-slot background preload buffer to eliminate ad loading latency.
 class AdManager {
@@ -34,6 +36,11 @@ class AdManager {
 
   Future<void> initialize() async {
     try {
+      final canRequest = await ConsentManager.instance.canRequestAds();
+      if (!canRequest) {
+        debugPrint("ℹ️ [AdManager] Skipping MobileAds initialize: CMP consent not granted.");
+        return;
+      }
       await MobileAds.instance.initialize();
       if (EnvConfig.admobTestDeviceIds.isNotEmpty) {
         await MobileAds.instance.updateRequestConfiguration(
@@ -47,8 +54,31 @@ class AdManager {
     }
   }
 
-  void preloadRewardedAd() {
+  Future<void> loadRewardedAd() async {
+    final canRequest = await ConsentManager.instance.canRequestAds();
+    if (!canRequest) {
+      debugPrint("ℹ️ [AdManager] Skipping Rewarded load: CMP consent not granted.");
+      return;
+    }
+    preloadRewardedAd();
+  }
+
+  Future<void> loadInterstitialAd() async {
+    final canRequest = await ConsentManager.instance.canRequestAds();
+    if (!canRequest) {
+      debugPrint("ℹ️ [AdManager] Skipping Interstitial load: CMP consent not granted.");
+      return;
+    }
+    preloadInterstitialAd();
+  }
+
+  Future<void> preloadRewardedAd() async {
     if (_isRewardedLoading || _preloadedRewardedAd != null) return;
+    final canRequest = await ConsentManager.instance.canRequestAds();
+    if (!canRequest) {
+      debugPrint("ℹ️ [AdManager] Skipping Rewarded load: CMP consent not granted.");
+      return;
+    }
     _isRewardedLoading = true;
 
     RewardedAd.load(
@@ -69,8 +99,13 @@ class AdManager {
     );
   }
 
-  void preloadInterstitialAd() {
+  Future<void> preloadInterstitialAd() async {
     if (_isInterstitialLoading || _preloadedInterstitialAd != null) return;
+    final canRequest = await ConsentManager.instance.canRequestAds();
+    if (!canRequest) {
+      debugPrint("ℹ️ [AdManager] Skipping Interstitial load: CMP consent not granted.");
+      return;
+    }
     _isInterstitialLoading = true;
 
     InterstitialAd.load(

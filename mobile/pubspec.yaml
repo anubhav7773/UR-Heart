@@ -29,7 +29,7 @@ dependencies:
   supabase_flutter: ^2.3.4
 
   # Ads Monetization (Google AdMob Mediation)
-  google_mobile_ads: ^5.0.0
+  google_mobile_ads: ^5.1.0
 
   # Security & Device Sandbox
   shared_preferences: ^2.2.2
