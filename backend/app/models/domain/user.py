@@ -58,6 +58,12 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow, onupdate=func.now(), nullable=False)
 
+    # Automated Bannery & Strike Tracking
+    report_count = Column(Integer, default=0, nullable=False)
+    is_frozen = Column(Boolean, default=False, nullable=False)
+    frozen_at = Column(DateTime(timezone=True), nullable=True)
+    freeze_reason = Column(Text, nullable=True)
+
     # Referral & Virality
     referral_code = Column(String(12), unique=True, nullable=True)
     referred_by = Column(UUID(as_uuid=True), nullable=True)

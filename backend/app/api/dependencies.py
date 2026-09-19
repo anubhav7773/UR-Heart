@@ -78,7 +78,7 @@ async def get_current_user(
             except Exception:
                 await db.rollback()
 
-    if user.is_banned:
+    if user.is_banned or user.is_frozen:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account has been suspended for safety violations."

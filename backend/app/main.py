@@ -82,6 +82,9 @@ app.include_router(location_router, prefix="/api/v1/location", tags=["Location"]
 from app.api.v1.endpoints.referral import router as referral_router
 app.include_router(referral_router, prefix="/api/v1/referral", tags=["Referral"])
 
+from app.api.v1.endpoints.admin_legal import router as admin_legal_router
+app.include_router(admin_legal_router, prefix="/api/v1/admin/legal", tags=["Legal Admin"])
+
 
 from fastapi.responses import PlainTextResponse
 

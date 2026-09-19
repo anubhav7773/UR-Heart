@@ -20,6 +20,7 @@ from app.models.schemas.user import (
 )
 from app.core.legal_audit import record_legal_audit_event
 from app.services.storage_service import validate_photo_file, upload_profile_photo_to_storage, supabase_storage_client
+from app.services.image_moderation_service import detect_explicit_content
 
 router = APIRouter()
 
@@ -209,6 +210,13 @@ async def upload_user_photo(
     """
     contents = await file.read()
     validate_photo_file(contents, filename=file.filename or "")
+
+    # IPC Section 67 & Obscenity Shield: Automated NSFW Screening
+    if detect_explicit_content(contents):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Prohibited: Uploaded photo violates platform decency policies and IPC Section 67 (Obscenity Prevention). Please upload a standard portrait."
+        )
 
     # Upload to Supabase Storage bucket 'user-photos'
     public_url = await upload_profile_photo_to_storage(

@@ -12,6 +12,7 @@ from app.services.photo_moderation_service import (
     TESSERACT_FAST_CONFIG
 )
 from app.services.storage_service import validate_photo_file
+from app.services.image_moderation_service import detect_explicit_content
 
 router = APIRouter()
 
@@ -27,6 +28,7 @@ async def scan_uploaded_photo(
     1. EXIF orientation correction (fixes gallery 90/270 degree rotation).
     2. Face detection (requires at least 1 clear human face if require_face is True).
     3. Anti-leak text/number screening & QR codes.
+    4. IPC Section 67 obscenity/NSFW detection.
     """
     if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -39,6 +41,13 @@ async def scan_uploaded_photo(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
 
     validate_photo_file(contents, filename=file.filename or "")
+
+    # IPC Section 67 & Obscenity Shield: Automated NSFW Screening
+    if detect_explicit_content(contents):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Prohibited: Uploaded photo violates platform decency policies and IPC Section 67 (Obscenity Prevention). Please upload a standard portrait."
+        )
 
     try:
         # 1. Physically transpose pixels based on EXIF tag (resolves gallery 422 errors)

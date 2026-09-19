@@ -15,8 +15,10 @@ from app.models.domain.user_report import UserReport
 from app.models.domain.blocked_user import BlockedUser
 from app.core.legal_audit import record_legal_audit_event
 from app.services.storage_service import purge_user_storage_assets
+from app.services.websocket_manager import chat_manager
 
 router = APIRouter()
+STRIKE_THRESHOLD = 3  # 3 distinct reports trigger automated account freeze
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +93,127 @@ async def submit_safety_report(
         "status": "reported",
         "message": "Safety report received and queued for immediate human safety review."
     }
+
+
+@router.post("/report-user", status_code=status.HTTP_200_OK)
+async def report_violating_user(
+    payload: dict,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submits a violation report against another user.
+    Enforces 3-strike automated bannery: 3 distinct reports auto-freeze the offending account.
+    """
+    target_user_id_str = payload.get("target_user_id")
+    reason = payload.get("reason", "harassment_or_abuse")
+    details = payload.get("details", "")
+
+    if not target_user_id_str:
+        raise HTTPException(status_code=400, detail="Missing target_user_id.")
+
+    try:
+        target_user_id = UUID(str(target_user_id_str))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid target_user_id format.")
+
+    if target_user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot report your own account.")
+
+    # 1. Capture Client IP and Device ID for statutory compliance
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "0.0.0.0")
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    device_id = request.headers.get("x-device-id", "unknown-device")
+    user_agent = request.headers.get("user-agent", "")
+
+    # 2. Insert report and log to legal_audit_logs
+    await db.execute(
+        text("""
+            INSERT INTO public.user_safety_reports (reporter_id, reported_user_id, report_type, message_content_snapshot)
+            VALUES (:rep_id, :target_id, :rtype, :snap)
+        """),
+        {"rep_id": current_user.id, "target_id": target_user_id, "rtype": reason, "snap": details}
+    )
+
+    clean_reason = reason.replace('"', '\\"')
+    await db.execute(
+        text("""
+            INSERT INTO public.legal_audit_logs (user_id, partner_id, action_type, ip_address, device_id, user_agent, event_metadata)
+            VALUES (:uid, :pid, 'report_filed', :ip, :dev, :ua, CAST(:meta AS jsonb))
+        """),
+        {
+            "uid": current_user.id,
+            "pid": target_user_id,
+            "ip": client_ip,
+            "dev": device_id,
+            "ua": user_agent,
+            "meta": '{"reason": "' + clean_reason + '"}'
+        }
+    )
+
+    # 3. Calculate distinct reporters count for target user
+    count_stmt = select(func.count(func.distinct(text("reporter_id")))).select_from(
+        text("public.user_safety_reports")
+    ).where(text("reported_user_id = :tid"))
+    
+    count_res = await db.execute(count_stmt, {"tid": target_user_id})
+    distinct_reports = count_res.scalar() or 0
+
+    # 4. Check 3-strike threshold
+    account_frozen = False
+    if distinct_reports >= STRIKE_THRESHOLD:
+        account_frozen = True
+        # Automated Bannery: Freeze account, ban profile, and purge live session
+        await db.execute(
+            update(User)
+            .where(User.id == target_user_id)
+            .values(
+                is_frozen=True,
+                is_banned=True,
+                report_count=distinct_reports,
+                frozen_at=datetime.now(timezone.utc),
+                freeze_reason=f"Automated Bannery: {distinct_reports} distinct violation reports received."
+            )
+        )
+
+        # Log freeze event in legal audit trail
+        await db.execute(
+            text("""
+                INSERT INTO public.legal_audit_logs (user_id, partner_id, action_type, ip_address, device_id, user_agent, event_metadata)
+                VALUES (:uid, NULL, 'account_frozen', :ip, :dev, :ua, CAST(:meta AS jsonb))
+            """),
+            {
+                "uid": target_user_id,
+                "ip": client_ip,
+                "dev": device_id,
+                "ua": user_agent,
+                "meta": '{"distinct_reports": ' + str(distinct_reports) + '}'
+            }
+        )
+
+        # Terminate live WebSocket connection if active
+        try:
+            chat_manager.disconnect(str(target_user_id))
+        except Exception:
+            pass
+    else:
+        await db.execute(
+            update(User)
+            .where(User.id == target_user_id)
+            .values(report_count=distinct_reports)
+        )
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "message": "Report logged and evaluated.",
+        "distinct_reports": distinct_reports,
+        "account_frozen": account_frozen
+    }
+
 
 
 # ---------------------------------------------------------------------------
