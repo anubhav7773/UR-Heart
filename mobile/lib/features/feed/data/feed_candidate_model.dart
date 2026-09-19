@@ -27,6 +27,7 @@ class FeedCandidateModel {
   final String gender;
   final String bio;
   final int streakCount;
+  final bool isVerified;
   final List<CandidatePhotoModel> photos;
 
   FeedCandidateModel({
@@ -38,6 +39,7 @@ class FeedCandidateModel {
     required this.gender,
     required this.bio,
     required this.streakCount,
+    this.isVerified = false,
     required this.photos,
   });
 
@@ -52,6 +54,7 @@ class FeedCandidateModel {
       gender: (json['gender'] ?? 'other').toString(),
       bio: (json['bio'] ?? '').toString(),
       streakCount: json['streak_count'] as int? ?? 0,
+      isVerified: (json['is_verified'] ?? json['kyc_status'] ?? false) as bool,
       photos: rawPhotos
           .map((p) => CandidatePhotoModel.fromJson(p as Map<String, dynamic>))
           .toList(),

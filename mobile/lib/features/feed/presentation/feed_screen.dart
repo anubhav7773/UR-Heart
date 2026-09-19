@@ -9,6 +9,7 @@ import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import 'package:ur_heart/features/wallet/data/wallet_repository.dart';
 import 'widgets/radar_sonar_empty_state.dart';
 import 'widgets/feed_card.dart';
+import 'widgets/verification_nudge_banner.dart';
 
 /// Screen 3: Production Discovery Swipe Feed with Real Candidate Profiles & Live Swiping
 class FeedScreen extends StatefulWidget {
@@ -42,6 +43,8 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
   int _streakCount = 0;
   String _currentUserCity = '';
   bool _isProcessingSwipe = false;
+  bool _isCurrentUserVerified = false;
+  bool _isNudgeDismissed = false;
 
   String _t(String key, [Map<String, String>? args]) =>
       VernacularStrings.tr(key, lang: widget.lang, args: args);
@@ -75,6 +78,7 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
           if (profile != null) {
             _streakCount = profile.streakCount;
             _currentUserCity = profile.city;
+            _isCurrentUserVerified = profile.kycStatus;
           }
           if (wallet != null) {
             _dmTokens = wallet.dmCredits;
@@ -459,6 +463,10 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
       body: SafeArea(
         child: Column(
           children: [
+            if (!_isCurrentUserVerified && !_isNudgeDismissed)
+              VerificationNudgeBanner(
+                onDismiss: () => setState(() => _isNudgeDismissed = true),
+              ),
             const SizedBox(height: 8),
 
             // Card Stack Viewport

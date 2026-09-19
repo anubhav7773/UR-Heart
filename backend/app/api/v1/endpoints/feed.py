@@ -100,6 +100,7 @@ async def get_discovery_feed_endpoint(
             "gender": row["gender"],
             "bio": row.get("bio") or "",
             "streak_count": row.get("streak_count") or 0,
+            "is_verified": bool(row.get("is_verified", False)),
             "photos": normalized_photos,
         })
 

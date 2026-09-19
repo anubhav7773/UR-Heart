@@ -56,12 +56,12 @@ class AuthGate extends StatelessWidget {
           return const ProfileSetupScreen();
         }
 
-        // 2. Only route to Onboarding KYC if user has ZERO photos AND never submitted KYC
-        if (photos.isEmpty && kycState == 'pending_ai' && !kycStatus) {
+        // 2. If user has ZERO photos, guide them to photo upload
+        if (photos.isEmpty) {
           return const PhotoUploadScreen();
         }
 
-        // 3. User has photos or already submitted KYC -> Main Navigation Feed
+        // 3. Regardless of kyc_status, route user to main app screen (Zero-Friction Onboarding)
         return const MainNavScaffold();
       }
     } catch (e) {

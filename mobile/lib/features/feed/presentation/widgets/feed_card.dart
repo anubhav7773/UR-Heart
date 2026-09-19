@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
+import '../../../../core/widgets/verified_badge.dart';
 import '../../data/feed_candidate_model.dart';
 
 class FeedCard extends StatefulWidget {
@@ -179,8 +180,10 @@ class _FeedCardState extends State<FeedCard> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.verified, color: Color(0xFF06D6A0), size: 20),
+                      if (candidate.isVerified) ...[
+                        const SizedBox(width: 8),
+                        const VerifiedBadge(size: 20),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 6),

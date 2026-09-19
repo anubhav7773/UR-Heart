@@ -13,6 +13,8 @@ import '../../legal/presentation/grievance_hub_screen.dart';
 import '../../privacy/presentation/privacy_center_screen.dart';
 import '../../wallet/presentation/manual_rewards_hub_screen.dart';
 import '../../wallet/presentation/widgets/referral_share_card.dart';
+import '../../../core/widgets/verified_badge.dart';
+import '../../kyc/presentation/video_kyc_screen.dart';
 
 /// Screen 6: Profile, Streak Vault & One-Tap Account Erase Center
 /// Spec: URH-UIX-009 Section 3 Screen 6
@@ -293,6 +295,36 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                             userCity,
                             style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 13),
                           ),
+                          const SizedBox(height: 8),
+
+                          // Verification Status Chip / Voluntary CTA
+                          if (_profile?.kycStatus == true)
+                            const VerifiedBadge(size: 16, showLabel: true)
+                          else
+                            GestureDetector(
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const VideoKycScreen()),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFD166).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.4)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.shield_outlined, color: Color(0xFFFFD166), size: 12),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "Get Verified Badge →",
+                                      style: TextStyle(color: Color(0xFFFFD166), fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           const SizedBox(height: 8),
 
                           // Tier Badge Pill

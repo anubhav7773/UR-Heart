@@ -10,6 +10,7 @@ import 'core/security/window_security_bridge.dart';
 import 'core/services/notification_service.dart';
 import 'features/ads/services/consent_manager.dart';
 import 'features/auth/presentation/auth_gate.dart';
+import 'features/feed/presentation/main_nav_scaffold.dart';
 
 // Top-level entry point for processing background/killed state FCM packets
 @pragma('vm:entry-point')
@@ -106,6 +107,9 @@ class UrHeartApp extends StatelessWidget {
         SentryNavigatorObserver(),
       ],
       home: const AuthGate(),
+      routes: {
+        '/home': (_) => const MainNavScaffold(),
+      },
     );
   }
 }

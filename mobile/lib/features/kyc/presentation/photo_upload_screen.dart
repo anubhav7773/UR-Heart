@@ -314,8 +314,8 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
     final int secondaryPhotoCount = [2, 3, 4, 5]
         .where((s) => _photos[s] != null || (_networkPhotoUrls[s]?.isNotEmpty == true))
         .length;
-    final bool hasMinPhotos = hasHeroPhoto && secondaryPhotoCount >= 2;
-    final bool isReadyToExplore = hasMinPhotos && _isVideoVerified;
+    final bool hasMinPhotos = hasHeroPhoto;
+    final bool isReadyToExplore = hasHeroPhoto; // Voluntary KYC: Hero photo unlocks immediate discovery
 
     return PopScope(
       canPop: false,
@@ -407,12 +407,13 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
                           if (widget.onContinue != null) {
                             widget.onContinue!();
                           } else {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (_) => MainShellScreen(lang: widget.lang),
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("✓ Welcome to UR-Heart! Your journey begins now."),
+                                backgroundColor: Color(0xFF06D6A0),
                               ),
-                              (route) => false,
                             );
+                            Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
                           }
                         }
                       : null,
@@ -427,21 +428,17 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> with SecureScreen
                   child: Text(
                     isReadyToExplore
                         ? _t('verifyContinue')
-                        : 'Complete Photos & Video KYC to Unlock',
+                        : 'Upload Profile Photo to Unlock',
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
               if (!isReadyToExplore) ...[
                 const SizedBox(height: 8),
-                Text(
-                  !hasHeroPhoto
-                      ? '⚠️ Step 1: Please upload Slot 1 Hero Photo.'
-                      : (secondaryPhotoCount < 2
-                          ? '⚠️ Step 2: Please upload at least 2 lifestyle photos ($secondaryPhotoCount/2 uploaded).'
-                          : '⚠️ Step 3: Please record 5-second video KYC above.'),
+                const Text(
+                  '⚠️ Step 1: Please upload Slot 1 Hero Photo to start exploring.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Color(0xFFFFD166),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
