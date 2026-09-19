@@ -35,6 +35,7 @@ dependencies:
   shared_preferences: ^2.2.2
   uuid: ^4.3.3
   wakelock_plus: ^1.2.8
+  sentry_flutter: ^8.10.0
 
   # Media Processing & Optimization
   image: ^4.1.7

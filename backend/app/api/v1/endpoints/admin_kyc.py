@@ -65,10 +65,28 @@ async def get_kyc_dashboard_stats(
     admin: User = Depends(require_master_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Returns aggregated real-time counts across verification states."""
-    pending_query = select(func.count(KycReviewQueue.id)).where(KycReviewQueue.status == "unreviewed")
-    verified_query = select(func.count(User.id)).where(and_(User.kyc_status == True, User.deleted_at.is_(None)))
-    rejected_query = select(func.count(User.id)).where(and_(User.kyc_state == "rejected", User.deleted_at.is_(None)))
+    """
+    Returns verified, pending, and rejected counts.
+    Ensures pending count strictly mirrors the actionable items in the review queue.
+    """
+    # Filter pending count strictly by active unreviewed items containing videos
+    pending_query = (
+        select(func.count(KycReviewQueue.id))
+        .where(
+            and_(
+                KycReviewQueue.status == "unreviewed",
+                KycReviewQueue.video_storage_path.is_not(None),
+                KycReviewQueue.video_storage_path != "PURGED"
+            )
+        )
+    )
+
+    verified_query = select(func.count(User.id)).where(
+        and_(User.kyc_status.is_(True), User.deleted_at.is_(None))
+    )
+    rejected_query = select(func.count(User.id)).where(
+        and_(User.kyc_state == "rejected", User.deleted_at.is_(None))
+    )
 
     pending_res = await db.execute(pending_query)
     verified_res = await db.execute(verified_query)

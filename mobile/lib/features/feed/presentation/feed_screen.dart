@@ -8,6 +8,7 @@ import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
 import 'package:ur_heart/features/feed/data/feed_repository.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import 'package:ur_heart/features/wallet/data/wallet_repository.dart';
+import 'widgets/radar_sonar_empty_state.dart';
 
 /// Screen 3: Production Discovery Swipe Feed with Real Candidate Profiles & Live Swiping
 class FeedScreen extends StatefulWidget {
@@ -39,6 +40,7 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
   String? _errorMessage;
   int _dmTokens = 0;
   int _streakCount = 0;
+  String _currentUserCity = '';
   bool _isProcessingSwipe = false;
 
   String _t(String key, [Map<String, String>? args]) =>
@@ -72,6 +74,7 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
           _currentIndex = 0;
           if (profile != null) {
             _streakCount = profile.streakCount;
+            _currentUserCity = profile.city;
           }
           if (wallet != null) {
             _dmTokens = wallet.dmCredits;
@@ -572,34 +575,9 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
     }
 
     if (_currentIndex >= _candidates.length) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.celebration_rounded, size: 64, color: URHeartColors.accentGold),
-              const SizedBox(height: 16),
-              const Text(
-                'You\'re all caught up! ✨',
-                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'No more active candidates in your area right now. Check back soon or refresh.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: URHeartColors.textSecondary, fontSize: 14),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _loadFeed,
-                style: ElevatedButton.styleFrom(backgroundColor: URHeartColors.surfaceRaised),
-                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                label: const Text('Refresh Feed', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        ),
+      return RadarSonarEmptyState(
+        city: _currentUserCity,
+        onRefresh: _loadFeed,
       );
     }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../data/wallet_repository.dart';
 import '../../ads/services/ad_manager.dart';
 import 'night_farmer_screen.dart';
@@ -319,15 +320,23 @@ class _ManualRewardsHubScreenState extends State<ManualRewardsHubScreen> {
     required ValueChanged<String> onChoiceChanged,
     required VoidCallback onWatchTap,
   }) {
-    const Color cardSurface = Color(0xFF16161D);
-    const Color surfaceRaised = Color(0xFF22222C);
-
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: cardSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: badgeColor.withOpacity(0.3)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B1B26), Color(0xFF13131A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.25), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,36 +346,47 @@ class _ManualRewardsHubScreenState extends State<ManualRewardsHubScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: badgeColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: badgeColor.withValues(alpha: 0.3), width: 0.8),
                 ),
                 child: Text(
                   badgeText,
-                  style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  style: TextStyle(
+                    color: badgeColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
-              Icon(icon, color: badgeColor, size: 20),
+              Icon(icon, color: badgeColor, size: 22),
             ],
           ),
           const SizedBox(height: 14),
 
-          // Radio Selection Rows
+          // Radio Selection Cards with Haptics
           ...options.map((opt) {
             final bool isSelected = selectedChoice == opt['value'];
             return GestureDetector(
-              onTap: () => onChoiceChanged(opt['value']!),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onChoiceChanged(opt['value']!);
+              },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                duration: const Duration(milliseconds: 180),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isSelected ? badgeColor.withOpacity(0.1) : surfaceRaised,
+                  color: isSelected
+                      ? badgeColor.withValues(alpha: 0.08)
+                      : const Color(0xFF22222C).withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isSelected ? badgeColor : Colors.transparent,
-                    width: 1.2,
+                    color: isSelected ? badgeColor : Colors.white.withValues(alpha: 0.06),
+                    width: isSelected ? 1.4 : 1.0,
                   ),
                 ),
                 child: Row(
@@ -374,9 +394,9 @@ class _ManualRewardsHubScreenState extends State<ManualRewardsHubScreen> {
                     Icon(
                       isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
                       color: isSelected ? badgeColor : const Color(0xFF636375),
-                      size: 18,
+                      size: 20,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,7 +409,11 @@ class _ManualRewardsHubScreenState extends State<ManualRewardsHubScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(opt['sub']!, style: const TextStyle(color: Color(0xFF636375), fontSize: 11)),
+                          const SizedBox(height: 2),
+                          Text(
+                            opt['sub']!,
+                            style: const TextStyle(color: Color(0xFF636375), fontSize: 11),
+                          ),
                         ],
                       ),
                     ),
@@ -398,23 +422,49 @@ class _ManualRewardsHubScreenState extends State<ManualRewardsHubScreen> {
               ),
             );
           }),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
-          // Launch CTA Button
-          SizedBox(
+          // Elevated Tactile Action Button
+          Container(
             width: double.infinity,
-            height: 46,
+            height: 48,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: badgeColor.withValues(alpha: 0.25),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: badgeColor,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
               ),
-              onPressed: _isClaiming ? null : onWatchTap,
+              onPressed: _isClaiming
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      onWatchTap();
+                    },
               child: _isClaiming
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                    )
                   : Text(
                       "Watch $tier Ad & Claim Reward",
-                      style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: badgeColor == const Color(0xFFFFD166) || badgeColor == const Color(0xFF08D9D6)
+                            ? Colors.black
+                            : Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
             ),
           ),

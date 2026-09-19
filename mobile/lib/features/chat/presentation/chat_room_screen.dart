@@ -6,6 +6,7 @@ import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/network/api_client.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
+import 'package:ur_heart/core/widgets/luxury_empty_card.dart';
 import 'package:ur_heart/features/chat/data/chat_repository.dart';
 import 'package:ur_heart/features/chat/presentation/whatsapp_reveal_sheet.dart';
 
@@ -338,46 +339,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
         appBar: AppBar(
           title: const Text('Direct Chat'),
         ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: URHeartColors.cardSurface,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: URHeartColors.surfaceRaised),
-                  ),
-                  child: const Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    size: 48,
-                    color: URHeartColors.brandSecondary,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'No Conversation Selected',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Select a matched profile from the Matches tab to begin real-time encrypted messaging.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: URHeartColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        body: LuxuryEmptyCard(
+          icon: Icons.chat_bubble_rounded,
+          accentColor: const Color(0xFF08D9D6),
+          title: "Direct Encrypted Chats",
+          description: "Mutual matches and unlocked Second-Chance DMs will appear in this private ledger.",
+          actionLabel: "Check Missed Connections",
+          onAction: () {
+            Navigator.of(context).pushNamed('/matches');
+          },
         ),
       );
     }

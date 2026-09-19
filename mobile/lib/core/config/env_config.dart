@@ -41,6 +41,12 @@ class EnvConfig {
   // Registered Developer Test Device IDs for AdMob anti-fraud compliance
   static const List<String> admobTestDeviceIds = <String>[];
 
+  // Sentry Error Monitoring & Telemetry DSN
+  static const String sentryDsn = String.fromEnvironment(
+    'SENTRY_DSN',
+    defaultValue: 'https://50975310ec57ce2a670eba5bc7fc07ab@o4511946639015936.ingest.us.sentry.io/4512111002845184',
+  );
+
   // Verification helper confirming no service_role key is present
   static bool get isSecureClientConfig {
     return !supabaseAnonKey.contains('service_role');

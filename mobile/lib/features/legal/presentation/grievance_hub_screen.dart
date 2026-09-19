@@ -4,7 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/network/api_client.dart';
 
 class GrievanceHubScreen extends StatefulWidget {
-  const GrievanceHubScreen({super.key});
+  final Map<String, dynamic>? initialOfficerInfo;
+  const GrievanceHubScreen({super.key, this.initialOfficerInfo});
 
   @override
   State<GrievanceHubScreen> createState() => _GrievanceHubScreenState();
@@ -20,7 +21,12 @@ class _GrievanceHubScreenState extends State<GrievanceHubScreen> with SingleTick
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadData();
+    if (widget.initialOfficerInfo != null) {
+      _officerInfo = widget.initialOfficerInfo;
+      _isLoading = false;
+    } else {
+      _loadData();
+    }
   }
 
   @override
@@ -251,40 +257,106 @@ class _GrievanceHubScreenState extends State<GrievanceHubScreen> with SingleTick
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // 1. Header Row (Fixed 14px Overflow via Expanded + softWrap)
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.gavel_rounded, color: Color(0xFFFFD166), size: 22),
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: Icon(Icons.gavel_rounded, color: Color(0xFFFFD166), size: 20),
+                                ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  _officerInfo!['designation'] ?? '',
-                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 13, fontWeight: FontWeight.bold),
+                                Expanded(
+                                  child: Text(
+                                    _officerInfo!['designation'] ?? 'Grievance Redressal Officer (Rule 3(2) IT Rules 2021)',
+                                    style: const TextStyle(
+                                      color: Color(0xFFFFD166),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.3,
+                                    ),
+                                    softWrap: true,
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 12),
-                            Text("Name: ${_officerInfo!['officer_name'] ?? ''}", style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+
+                            // Officer Details
+                            Text(
+                              "Name: ${_officerInfo!['officer_name'] ?? ''}",
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                            ),
                             const SizedBox(height: 4),
-                            Text("Entity: ${_officerInfo!['entity_name'] ?? ''}", style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 13)),
-                            Text("Email: ${_officerInfo!['email'] ?? ''}", style: const TextStyle(color: Color(0xFF08D9D6), fontSize: 13)),
+                            Text("Entity: ${_officerInfo!['entity_name'] ?? ''}", style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12)),
+                            Text("Email: ${_officerInfo!['email'] ?? ''}", style: const TextStyle(color: Color(0xFF08D9D6), fontSize: 12)),
                             const SizedBox(height: 4),
                             Text("Jurisdiction: ${_officerInfo!['physical_address'] ?? ''}", style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 12)),
+
                             const Divider(color: Colors.white12, height: 20),
+
+                            // 2. SLA Footer Badges (Fixed 67px Overflow via Flexible Badges)
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text("Acknowledgment SLA", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 11)),
-                                    Text(_officerInfo!['acknowledgement_sla'] ?? '', style: const TextStyle(color: Color(0xFF06D6A0), fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ],
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF22222C),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "Acknowledgment SLA",
+                                          style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 10, fontWeight: FontWeight.w500),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _officerInfo!['acknowledgement_sla'] ?? 'Within 24 Hours',
+                                          style: const TextStyle(
+                                            color: Color(0xFF06D6A0),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          softWrap: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    const Text("Resolution SLA", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 11)),
-                                    Text(_officerInfo!['resolution_sla'] ?? '', style: const TextStyle(color: Color(0xFF06D6A0), fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ],
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF22222C),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "Resolution SLA",
+                                          style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 10, fontWeight: FontWeight.w500),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _officerInfo!['resolution_sla'] ?? 'Within 15 Days (72h for NCII)',
+                                          style: const TextStyle(
+                                            color: Color(0xFF06D6A0),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          softWrap: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),

@@ -437,30 +437,36 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.35)),
                       ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFD166).withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(18),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD166).withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.card_giftcard, color: Color(0xFFFFD166), size: 22),
                           ),
-                          child: const Icon(Icons.card_giftcard, color: Color(0xFFFFD166), size: 22),
+                          title: const Text(
+                            "Watch Ads & Earn Rewards / रिवॉर्ड पाएं",
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: const Text(
+                            "Claim Direct DMs, WhatsApp Tokens & Shields (10s, 20s, 30s)",
+                            style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 11),
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFFFD166)),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ManualRewardsHubScreen(),
+                              ),
+                            );
+                          },
                         ),
-                        title: const Text(
-                          "Watch Ads & Earn Rewards / रिवॉर्ड पाएं",
-                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: const Text(
-                          "Claim Direct DMs, WhatsApp Tokens & Shields (10s, 20s, 30s)",
-                          style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 11),
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFFFFD166), size: 14),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ManualRewardsHubScreen()),
-                          );
-                        },
                       ),
                     ),
                     const SizedBox(height: 20),

@@ -12,5 +12,8 @@ void main() {
 
     // Verify AppBar Title
     expect(find.text('Privacy & Blocked Users'), findsOneWidget);
+
+    // Advance fake timer past Dio timeouts to ensure clean teardown
+    await tester.pump(const Duration(seconds: 35));
   });
 }

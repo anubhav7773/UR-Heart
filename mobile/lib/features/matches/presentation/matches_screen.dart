@@ -7,6 +7,7 @@ import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/network/api_client.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/core/widgets/insufficient_credits_sheet.dart';
+import 'package:ur_heart/core/widgets/luxury_empty_card.dart';
 import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
 import 'package:ur_heart/features/matches/data/matches_repository.dart';
 import 'package:ur_heart/features/ads/services/ad_manager.dart';
@@ -362,39 +363,19 @@ class _MatchesScreenState extends State<MatchesScreen>
     }
 
     if (_matches.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.favorite_border, color: Color(0xFFFF2E63), size: 56),
-            const SizedBox(height: 12),
-            const Text(
-              "No Matches Yet",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              "Swipe right on Discovery Feed to create mutual matches.",
-              style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 13),
-            ),
-            if (widget.onExploreTap != null) ...[
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: widget.onExploreTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: URHeartColors.brandPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                ),
-                icon: const Icon(Icons.explore_rounded, color: Colors.white, size: 18),
-                label: const Text(
-                  "Explore Discovery Feed",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ],
-        ),
+      return LuxuryEmptyCard(
+        icon: Icons.favorite_rounded,
+        accentColor: const Color(0xFFFF2E63),
+        title: "No Mutual Matches Yet",
+        description: "When you and another member like each other on Discovery, your mutual match connection will blossom here.",
+        actionLabel: "Explore Nearby Profiles →",
+        onAction: () {
+          if (widget.onExploreTap != null) {
+            widget.onExploreTap!();
+          } else {
+            DefaultTabController.of(context).animateTo(0);
+          }
+        },
       );
     }
 

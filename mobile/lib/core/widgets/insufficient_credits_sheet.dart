@@ -90,7 +90,6 @@ class _InsufficientCreditsSheetState extends State<InsufficientCreditsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    const cardSurface = Color(0xFF16161D);
     const surfaceRaised = Color(0xFF22222C);
     const brandCrimson = Color(0xFFFF2E63);
     const accentGold = Color(0xFFFFD166);
@@ -197,9 +196,9 @@ class _InsufficientCreditsSheetState extends State<InsufficientCreditsSheet> {
           ],
 
           // Tip on Overnight Auto-Farm
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Icon(Icons.bedtime_outlined, color: Color(0xFF08D9D6), size: 14),
               SizedBox(width: 6),
               Text(
