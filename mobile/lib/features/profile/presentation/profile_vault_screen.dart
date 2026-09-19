@@ -9,6 +9,7 @@ import 'manage_photos_screen.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import '../../admin/presentation/admin_kyc_dashboard.dart';
 import '../../legal/presentation/grievance_hub_screen.dart';
+import '../../privacy/presentation/privacy_center_screen.dart';
 
 /// Screen 6: Profile, Streak Vault & One-Tap Account Erase Center
 /// Spec: URH-UIX-009 Section 3 Screen 6
@@ -61,24 +62,56 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
   }
 
   Future<void> _confirmAndEraseAccount() async {
+    final confirmController = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: URHeartColors.cardSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: URHeartColors.statusDanger, size: 28),
-            const SizedBox(width: 8),
+            Icon(Icons.warning_amber_rounded, color: URHeartColors.statusDanger, size: 24),
+            SizedBox(width: 8),
             Text(
-              _t('dataEraseButton'),
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              'Erase All Data?',
+              style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
             ),
           ],
         ),
-        content: Text(
-          _t('dataEraseNotice'),
-          style: const TextStyle(color: URHeartColors.textPrimary, fontSize: 13, height: 1.4),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Under Section 11 of DPDP Act 2023, this action is permanent and irreversible:\n\n'
+              '• All 5 profile photos will be wiped from cloud storage.\n'
+              '• All chats, matches, and streaks will be destroyed.\n'
+              '• Your account credentials will be permanently erased.',
+              style: TextStyle(color: URHeartColors.textPrimary, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Type 'DELETE' to confirm:",
+              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: confirmController,
+              style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 1.5),
+              decoration: InputDecoration(
+                hintText: 'DELETE',
+                hintStyle: const TextStyle(color: URHeartColors.textMuted),
+                filled: true,
+                fillColor: const Color(0xFF22222C),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -87,8 +120,19 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: URHeartColors.statusDanger),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirm & Erase All', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            onPressed: () {
+              if (confirmController.text.trim() != 'DELETE') {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text("Please type 'DELETE' exactly to confirm.")),
+                );
+                return;
+              }
+              Navigator.of(ctx).pop(true);
+            },
+            child: const Text(
+              'Permanently Erase',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -104,31 +148,29 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
       await _profileRepo.eraseAccount();
       await FirebaseAuth.instance.signOut();
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: URHeartColors.statusSuccess,
-            content: Text('Account and all photos permanently erased.'),
-          ),
-        );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          backgroundColor: URHeartColors.statusSuccess,
+          content: Text('Account and all data permanently erased per DPDP Act 2023 Section 11.'),
+        ),
+      );
 
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-          (route) => false,
-        );
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        (route) => false,
+      );
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isErasing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: URHeartColors.statusDanger,
-            content: Text('Account erase failed: $e'),
-          ),
-        );
-      }
+      if (!mounted) return;
+      setState(() {
+        _isErasing = false;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: URHeartColors.statusDanger,
+          content: Text('Account erase failed: $e'),
+        ),
+      );
     }
   }
 
@@ -475,7 +517,11 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                           _buildSettingsTile(
                             icon: Icons.lock_outline_rounded,
                             title: 'Privacy & Blocked Users',
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const PrivacyCenterScreen()),
+                              );
+                            },
                           ),
                         ],
                       ),

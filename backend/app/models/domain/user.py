@@ -53,6 +53,10 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow, onupdate=func.now(), nullable=False)
 
+    # Privacy Controls
+    is_incognito = Column(Boolean, default=False, nullable=False)
+    hide_distance = Column(Boolean, default=False, nullable=False)
+
     __table_args__ = (
         CheckConstraint("gender IN ('male', 'female', 'lgbtq+')", name="users_gender_check"),
         CheckConstraint("streak_count >= 0", name="users_streak_positive"),
