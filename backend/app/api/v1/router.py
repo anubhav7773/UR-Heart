@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import moderation, health, kyc, ad_verification, auth, chat, user, safety, feed, admin_kyc, swipes, legal, wallet
+from app.api.v1.endpoints import moderation, health, kyc, ad_verification, auth, chat, user, safety, feed, admin_kyc, swipes, legal, wallet, location
 
 api_router = APIRouter()
 
@@ -18,6 +18,8 @@ api_router.include_router(admin_kyc.router, prefix="/admin/kyc", tags=["Super Ad
 api_router.include_router(swipes.router, prefix="/swipes", tags=["Swipes & Second Chance"])
 api_router.include_router(legal.router, prefix="/legal", tags=["Legal & Grievance Redressal"])
 api_router.include_router(wallet.router, prefix="/wallet", tags=["Universal Wallet & Rewards"])
+api_router.include_router(location.router, prefix="/location", tags=["Location"])
+
 
 
 

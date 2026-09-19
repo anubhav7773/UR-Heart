@@ -30,9 +30,11 @@ class User(Base):
     bio = Column(String(250), default="")
     
     # Spatial Attributes (Protected, never sent in discovery responses)
+    state = Column(String(50), default="Uttar Pradesh", nullable=True)
     latitude = Column(Numeric(9, 6), nullable=True)
     longitude = Column(Numeric(9, 6), nullable=True)
     detected_locality = Column(String(100), nullable=True)
+    fuzzy_radius_km = Column(Integer, default=5, nullable=True)
 
     # Gamification & Verification
     streak_count = Column(Integer, default=0, nullable=False)

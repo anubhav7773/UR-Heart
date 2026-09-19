@@ -59,6 +59,9 @@ app.include_router(health_router, tags=["Health & Keep-Alive"])
 # Mount API v1 router
 app.include_router(api_router, prefix="/api/v1")
 
+from app.api.v1.endpoints.location import router as location_router
+app.include_router(location_router, prefix="/api/v1/location", tags=["Location"])
+
 from fastapi.responses import PlainTextResponse
 
 APP_ADS_TXT_CONTENT = """# UR-Heart / ASI Verticals Authorized Digital Sellers

@@ -7,9 +7,10 @@ from typing import Optional, Dict, Any
 from uuid import UUID
 
 import httpx
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update, select
+from sqlalchemy import update, select, text
 from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes
@@ -22,7 +23,7 @@ from app.models.domain.user import User
 from app.models.domain.match import Match
 from app.models.domain.whatsapp_token import WhatsAppRevealToken
 from app.services.whatsapp_service import process_whatsapp_ad_completion
-from app.api.dependencies import get_current_user_id
+from app.api.dependencies import get_current_user_id, get_current_user
 
 router = APIRouter()
 
@@ -332,4 +333,76 @@ async def get_ssv_status():
         "keys_url": GOOGLE_VERIFIER_KEYS_URL,
         "operational": True,
     }
+
+
+@router.post("/reveal-whatsapp/{match_id}", status_code=status.HTTP_200_OK)
+async def reveal_partner_whatsapp(
+    match_id: UUID,
+    payload: dict,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unlocks WhatsApp contact details following 30-sec ad verification.
+    Records client IP and disclaimer acceptance in consent_logs as a statutory legal shield.
+    """
+    disclaimer_accepted = payload.get("disclaimer_accepted", False)
+    if not disclaimer_accepted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mandatory safety disclaimer must be accepted prior to contact reveal."
+        )
+
+    # 1. Fetch match record
+    match_stmt = select(Match).where(Match.id == match_id)
+    match_res = await db.execute(match_stmt)
+    match = match_res.scalar_one_or_none()
+
+    if not match or (match.user1_id != current_user.id and match.user2_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Match connection not found.")
+
+    partner_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
+
+    # 2. Extract Client IP address
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "0.0.0.0")
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    user_agent = request.headers.get("user-agent", "UR-Heart-Mobile")
+
+    # 3. Write immutable audit entry to consent_logs
+    await db.execute(
+        text("""
+            INSERT INTO public.consent_logs (user_id, partner_id, consent_type, ip_address, user_agent, disclaimer_accepted)
+            VALUES (:uid, :pid, 'whatsapp_reveal', :ip, :ua, :accepted)
+        """),
+        {
+            "uid": current_user.id,
+            "pid": partner_id,
+            "ip": client_ip,
+            "ua": user_agent,
+            "accepted": True
+        }
+    )
+
+    # 4. Mark match whatsapp_unlocked flag as true
+    await db.execute(
+        update(Match)
+        .where(Match.id == match_id)
+        .values(whatsapp_unlocked=True)
+    )
+    await db.commit()
+
+    # 5. Retrieve partner phone number
+    partner_stmt = select(User).where(User.id == partner_id)
+    partner_res = await db.execute(partner_stmt)
+    partner = partner_res.scalar_one_or_none()
+
+    return {
+        "status": "success",
+        "match_id": str(match_id),
+        "whatsapp_number": partner.whatsapp_number if partner else None,
+        "consent_logged_at": datetime.utcnow().isoformat()
+    }
+
 

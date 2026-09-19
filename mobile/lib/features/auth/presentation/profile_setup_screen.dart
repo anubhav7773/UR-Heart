@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/services/location_service.dart';
 import '../data/profile_repository.dart';
 import '../../kyc/presentation/photo_upload_screen.dart';
@@ -24,15 +25,42 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   double? _longitude;
   String? _detectedLocality;
 
+  String _selectedState = "Uttar Pradesh";
+  String? _selectedCity;
+  Map<String, List<String>> _locationCatalog = {
+    "Uttar Pradesh": ["Lucknow", "Ayodhya", "Kanpur", "Varanasi", "Prayagraj", "Noida", "Agra"],
+    "Delhi NCR": ["New Delhi", "Gurugram"],
+    "Maharashtra": ["Mumbai", "Pune"],
+  };
+
   bool _isLocating = false;
   bool _isSubmitting = false;
   final ProfileRepository _profileRepo = ProfileRepository();
 
-  // Tier-2/3 Indian Cities Fallback List
-  final List<String> _quickCities = [
-    "Lucknow", "Ayodhya", "Varanasi", "Kanpur", 
-    "Prayagraj", "Gorakhpur", "Agra", "Meerut", "Patna", "Indore"
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadLocationCatalog();
+  }
+
+  Future<void> _loadLocationCatalog() async {
+    try {
+      final dio = createApiClient();
+      final res = await dio.get('/api/v1/location/catalog');
+      if (res.statusCode == 200 && res.data is Map && mounted) {
+        final Map<String, dynamic> rawMap = res.data;
+        final Map<String, List<String>> catalog = {};
+        rawMap.forEach((k, v) {
+          if (v is List) {
+            catalog[k] = v.map((e) => e.toString()).toList();
+          }
+        });
+        setState(() {
+          _locationCatalog = catalog;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -88,10 +116,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
 
-    if (_cityController.text.trim().isEmpty) {
+    if ((_selectedCity == null || _selectedCity!.trim().isEmpty) && _cityController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please select or detect your city."),
+          content: Text("Please select your city from the verified list."),
           backgroundColor: Color(0xFFFF334B),
         ),
       );
@@ -103,12 +131,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       final String rawPhone = _whatsappController.text.trim();
       final String fullWhatsApp = rawPhone.startsWith("+91") ? rawPhone : "+91$rawPhone";
+      final String resolvedCity = _selectedCity ?? _cityController.text.trim();
 
       await _profileRepo.submitProfileSetup(
         fullName: _nameController.text.trim(),
         whatsappNumber: fullWhatsApp,
         gender: _selectedGender!,
-        city: _cityController.text.trim(),
+        city: resolvedCity,
         bio: _bioController.text.trim(),
         latitude: _latitude,
         longitude: _longitude,
@@ -305,63 +334,49 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 4. City Selection & GPS Detection
-                const Text("City & Discovery Area / शहर", style: TextStyle(color: textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _cityController,
-                        style: const TextStyle(color: textPrimary, fontSize: 15),
-                        decoration: InputDecoration(
-                          hintText: "Your City (e.g. Lucknow)",
-                          hintStyle: const TextStyle(color: Color(0xFF636375)),
-                          filled: true,
-                          fillColor: cardSurface,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton.icon(
-                        onPressed: _isLocating ? null : _handleGpsLocation,
-                        icon: _isLocating
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                            : const Icon(Icons.my_location, size: 18, color: Colors.black),
-                        label: const Text("GPS", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: brandCyan,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                // 4. Verified City/State Selection (Anti-Spoofing)
+                const Text("Verified State & City / राज्य और शहर", style: TextStyle(color: textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
 
-                // Quick City Select Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _quickCities.map((c) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ActionChip(
-                          label: Text(c, style: const TextStyle(color: textSecondary, fontSize: 12)),
-                          backgroundColor: surfaceRaised,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          onPressed: () => setState(() => _cityController.text = c),
-                        ),
-                      );
-                    }).toList(),
+                // Location selection using dropdowns instead of raw text fields or manual coordinates
+                DropdownButtonFormField<String>(
+                  value: _selectedState,
+                  dropdownColor: const Color(0xFF16161D),
+                  decoration: InputDecoration(
+                    labelText: "State / राज्य",
+                    labelStyle: const TextStyle(color: Color(0xFFA0A0B2)),
+                    filled: true,
+                    fillColor: const Color(0xFF22222C),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   ),
+                  items: (_locationCatalog.keys.isNotEmpty ? _locationCatalog.keys.toList() : ["Uttar Pradesh", "Delhi NCR", "Maharashtra"])
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: Colors.white))))
+                      .toList(),
+                  onChanged: (val) => setState(() {
+                    _selectedState = val ?? "Uttar Pradesh";
+                    _selectedCity = null;
+                  }),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  value: _selectedCity,
+                  dropdownColor: const Color(0xFF16161D),
+                  decoration: InputDecoration(
+                    labelText: "City / शहर",
+                    labelStyle: const TextStyle(color: Color(0xFFA0A0B2)),
+                    filled: true,
+                    fillColor: const Color(0xFF22222C),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  items: (_locationCatalog[_selectedState] ?? ["Lucknow", "Ayodhya", "Kanpur"])
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(color: Colors.white))))
+                      .toList(),
+                  onChanged: (val) => setState(() {
+                    _selectedCity = val;
+                    _cityController.text = val ?? "";
+                  }),
+                ),
+                const SizedBox(height: 8),
 
                 // Geospatial Privacy Microcopy Notice
                 Container(
