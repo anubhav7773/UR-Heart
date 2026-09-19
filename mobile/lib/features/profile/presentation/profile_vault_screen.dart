@@ -12,6 +12,7 @@ import '../../ads/services/consent_manager.dart';
 import '../../legal/presentation/grievance_hub_screen.dart';
 import '../../privacy/presentation/privacy_center_screen.dart';
 import '../../wallet/presentation/manual_rewards_hub_screen.dart';
+import '../../wallet/presentation/widgets/referral_share_card.dart';
 
 /// Screen 6: Profile, Streak Vault & One-Tap Account Erase Center
 /// Spec: URH-UIX-009 Section 3 Screen 6
@@ -433,6 +434,10 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 14),
+
+                    // Viral Referral Loop Card
+                    const ReferralShareCard(),
                     const SizedBox(height: 14),
 
                     // Watch Ads & Earn Rewards Hub Tile

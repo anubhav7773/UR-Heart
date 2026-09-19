@@ -58,6 +58,11 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow, onupdate=func.now(), nullable=False)
 
+    # Referral & Virality
+    referral_code = Column(String(12), unique=True, nullable=True)
+    referred_by = Column(UUID(as_uuid=True), nullable=True)
+    has_redeemed_referral = Column(Boolean, default=False, nullable=False)
+
     # Privacy Controls
     is_incognito = Column(Boolean, default=False, nullable=False)
     hide_distance = Column(Boolean, default=False, nullable=False)

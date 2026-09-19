@@ -62,6 +62,10 @@ app.include_router(api_router, prefix="/api/v1")
 from app.api.v1.endpoints.location import router as location_router
 app.include_router(location_router, prefix="/api/v1/location", tags=["Location"])
 
+from app.api.v1.endpoints.referral import router as referral_router
+app.include_router(referral_router, prefix="/api/v1/referral", tags=["Referral"])
+
+
 from fastapi.responses import PlainTextResponse
 
 APP_ADS_TXT_CONTENT = """# UR-Heart / ASI Verticals Authorized Digital Sellers

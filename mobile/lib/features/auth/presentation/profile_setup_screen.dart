@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/location_service.dart';
 import '../data/profile_repository.dart';
@@ -19,6 +21,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _whatsappController = TextEditingController();
   final _cityController = TextEditingController();
   final _bioController = TextEditingController();
+  bool _showReferralInput = false;
+  final TextEditingController _referralController = TextEditingController();
 
   String? _selectedGender; // 'male', 'female', 'lgbtq+'
   double? _latitude;
@@ -68,6 +72,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _whatsappController.dispose();
     _cityController.dispose();
     _bioController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
 
@@ -143,6 +148,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         longitude: _longitude,
         detectedLocality: _detectedLocality,
       );
+
+      // Redeem referral code if provided
+      if (_referralController.text.trim().isNotEmpty) {
+        try {
+          final dio = createApiClient();
+          final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+          await dio.post(
+            '/api/v1/referral/redeem',
+            data: {'referral_code': _referralController.text.trim().toUpperCase()},
+            options: token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null,
+          );
+        } catch (_) {
+          // Graceful ignore if code was invalid so onboarding is never blocked
+        }
+      }
 
       if (mounted) {
         // Navigate forward to 5-Photo Upload & Video KYC Screen
@@ -419,6 +439,42 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // Collapsible Referral Code Input
+                GestureDetector(
+                  onTap: () => setState(() => _showReferralInput = !_showReferralInput),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _showReferralInput ? Icons.keyboard_arrow_up : Icons.card_giftcard_rounded,
+                        color: const Color(0xFFFFD166),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _showReferralInput ? "Hide Referral Code" : "Have an invite code? (Get 5 Free DMs)",
+                        style: const TextStyle(color: Color(0xFFFFD166), fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_showReferralInput) ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _referralController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 1.2),
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      hintText: "Enter code (e.g. UR-K9X2)",
+                      hintStyle: const TextStyle(color: Color(0xFF636375), fontSize: 13),
+                      filled: true,
+                      fillColor: const Color(0xFF22222C),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
 
                 // Submit CTA Button
