@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ur_heart/features/auth/presentation/profile_setup_screen.dart';
+import 'package:ur_heart/features/onboarding/presentation/widgets/gender_selector_bottom_sheet.dart';
 
 void main() {
-  testWidgets('ProfileSetupScreen renders inputs and toggles LGBTQ+ chip correctly', (WidgetTester tester) async {
+  testWidgets('ProfileSetupScreen renders inputs and opens gender spectrum bottom sheet correctly', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -20,14 +21,24 @@ void main() {
     expect(find.text('Gender Identity / लिंग पहचान'), findsOneWidget);
     expect(find.text('City & Discovery Area / शहर'), findsOneWidget);
 
-    // Verify all 3 gender options exist
-    expect(find.text('♂️ Male'), findsOneWidget);
-    expect(find.text('♀️ Female'), findsOneWidget);
-    expect(find.text('🏳️🌈 LGBTQ+'), findsOneWidget);
+    // Verify gender identity selector prompt exists
+    expect(find.text('Select your gender identity...'), findsOneWidget);
 
-    // Tap LGBTQ+ gender chip
-    await tester.tap(find.text('🏳️🌈 LGBTQ+'));
+    // Tap gender selector to open bottom sheet
+    await tester.tap(find.text('Select your gender identity...'));
     await tester.pumpAndSettle();
+
+    // Verify spectrum options in bottom sheet
+    expect(find.text('Non-Binary'), findsOneWidget);
+    expect(find.text('Transgender Woman (Trans Female)'), findsOneWidget);
+    expect(find.text('Man (पुरुष)'), findsOneWidget);
+
+    // Select Non-Binary
+    await tester.tap(find.text('Non-Binary'));
+    await tester.pumpAndSettle();
+
+    // Verify selected gender identity is displayed
+    expect(find.text('Non-Binary'), findsOneWidget);
 
     // Verify submission button
     final ctaButton = find.text('Continue to Photos & KYC / आगे बढ़ें →');

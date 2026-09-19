@@ -1,14 +1,71 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/env_config.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/network/api_client.dart';
 import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
 
-/// WhatsApp-style Heads-Up Notification Service for In-App Message Alerts
 class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
   NotificationService._internal();
+  static final NotificationService instance = NotificationService._internal();
+  factory NotificationService() => instance;
+
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+
+  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
+    'ur_heart_high_importance',
+    'UR-Heart Alerts',
+    description: 'Instant notifications for matches and direct chat messages.',
+    importance: Importance.max,
+    playSound: true,
+  );
+
+  /// Configures the High Importance Android Notification Channel so push banners pop down
+  /// even when the app is actively open in the foreground.
+  Future<void> initialize() async {
+    // 1. Request OS Permissions
+    final messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // 2. Setup Local Notification Channel for Android Foreground Alerts
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const initSettings = InitializationSettings(android: androidInit);
+    await _localNotifications.initialize(initSettings);
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_channel);
+
+    // 3. Foreground Message Listener
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final notification = message.notification;
+      final android = message.notification?.android;
+
+      if (notification != null && android != null && !kIsWeb) {
+        _localNotifications.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channel.id,
+              _channel.name,
+              channelDescription: _channel.description,
+              icon: android.smallIcon ?? '@mipmap/ic_launcher',
+              importance: Importance.max,
+              priority: Priority.high,
+            ),
+          ),
+        );
+      }
+    });
+  }
 
   /// Registers or syncs device FCM token with backend
   Future<void> registerDeviceToken(String fcmToken) async {

@@ -24,7 +24,8 @@ class User(Base):
     whatsapp_number = Column(String(15), nullable=False)
     full_name = Column(String(50), nullable=False)
     dob = Column(CoerceDate, nullable=False)
-    gender = Column(String(10), nullable=False)  # 'male', 'female', 'lgbtq+'
+    gender = Column(String(50), nullable=False)
+    gender_sub_identity = Column(String(50), nullable=True)
     city = Column(String(50), nullable=False)
     bio = Column(String(250), default="")
     
@@ -58,7 +59,7 @@ class User(Base):
     hide_distance = Column(Boolean, default=False, nullable=False)
 
     __table_args__ = (
-        CheckConstraint("gender IN ('male', 'female', 'lgbtq+')", name="users_gender_check"),
+        CheckConstraint("gender IN ('male', 'female', 'non_binary', 'trans_man', 'trans_woman', 'genderfluid', 'agender', 'queer', 'other', 'lgbtq+')", name="users_gender_check"),
         CheckConstraint("streak_count >= 0", name="users_streak_positive"),
         CheckConstraint("reward_balance >= 0", name="users_reward_positive"),
         {"schema": "public"}

@@ -31,8 +31,12 @@ class MessageHistoryResponse(BaseModel):
     match_id: UUID
     sender_id: UUID
     encrypted_text: str
+    content: Optional[str] = None
     status: str = "sent"
+    is_delivered: bool = False
+    is_read: bool = False
     created_at: datetime
+
 
 
 class MatchPartnerResponse(BaseModel):
@@ -190,8 +194,11 @@ async def get_chat_history(
                 id=m.id,
                 match_id=m.match_id,
                 sender_id=m.sender_id,
-                encrypted_text=getattr(m, "content", None) or getattr(m, "encrypted_text", ""),
-                status="read" if getattr(m, "is_read", False) else getattr(m, "status", "sent"),
+                encrypted_text=getattr(m, "content", getattr(m, "encrypted_text", "")),
+                content=getattr(m, "content", getattr(m, "encrypted_text", "")),
+                status="read" if getattr(m, "is_read", False) else ("delivered" if getattr(m, "is_delivered", False) else getattr(m, "status", "sent")),
+                is_delivered=getattr(m, "is_delivered", False) or getattr(m, "is_read", False),
+                is_read=getattr(m, "is_read", False),
                 created_at=m.created_at,
             ) for m in direct_msgs
         ], key=lambda m: m.id)
@@ -214,8 +221,11 @@ async def get_chat_history(
             id=m.id,
             match_id=m.match_id,
             sender_id=m.sender_id,
-            encrypted_text=m.encrypted_text,
-            status=m.status,
+            encrypted_text=getattr(m, "encrypted_text", getattr(m, "content", "")),
+            content=getattr(m, "content", getattr(m, "encrypted_text", "")),
+            status=getattr(m, "status", "sent"),
+            is_delivered=getattr(m, "status", "") in ("delivered", "read"),
+            is_read=getattr(m, "status", "") == "read",
             created_at=m.created_at,
         ) for m in legacy_messages
     ], key=lambda m: m.id)
@@ -282,34 +292,58 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
             except Exception:
                 continue
 
-            event_type = data.get("type") or data.get("event")
+            action = data.get("action") or data.get("type") or data.get("event") or "send_message"
             match_id_str = data.get("match_id")
             recipient_id_str = data.get("recipient_id")
             content = (data.get("content") or "").strip()
 
-            # Handle delivery acks, read receipts, and typing events
-            if event_type == "delivery_ack":
-                msg_id = data.get("msg_id")
+            # -------------------------------------------------------------
+            # ACTION 1: MARK READ (Emits Blue Ticks to Sender)
+            # -------------------------------------------------------------
+            if action in ("mark_read", "read_receipt"):
+                sender_id = data.get("sender_id") or recipient_id_str
+                if match_id_str:
+                    try:
+                        async with async_session_factory() as db:
+                            await db.execute(
+                                update(DirectMessage)
+                                .where(
+                                    and_(
+                                        DirectMessage.match_id == UUID(match_id_str),
+                                        DirectMessage.recipient_id == user_id,
+                                        DirectMessage.is_read.is_(False)
+                                    )
+                                )
+                                .values(is_read=True, is_delivered=True, read_at=func.now())
+                            )
+                            await db.commit()
+                    except Exception:
+                        pass
+
+                    if sender_id:
+                        # Notify sender in real time to turn ticks blue
+                        await chat_manager.send_personal_message({
+                            "type": "messages_read",
+                            "event": "messages_read",
+                            "match_id": match_id_str,
+                            "reader_id": user_id_str
+                        }, str(sender_id))
+                continue
+
+            # Handle delivery acks and typing events
+            if action == "delivery_ack":
+                msg_id = data.get("msg_id") or data.get("message_id")
                 if recipient_id_str:
                     await chat_manager.send_personal_message({
                         "event": "message_delivered",
-                        "type": "delivery_ack",
+                        "type": "message_delivered",
                         "match_id": match_id_str,
                         "msg_id": msg_id,
+                        "message_id": str(msg_id) if msg_id else "",
                     }, recipient_id_str)
                 continue
 
-            if event_type == "read_receipt":
-                if recipient_id_str:
-                    await chat_manager.send_personal_message({
-                        "event": "messages_read",
-                        "type": "read_receipt",
-                        "match_id": match_id_str,
-                        "reader_id": user_id_str,
-                    }, recipient_id_str)
-                continue
-
-            if event_type == "typing":
+            if action == "typing":
                 if recipient_id_str:
                     await chat_manager.send_personal_message({
                         "event": "user_typing",
@@ -336,7 +370,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                 continue
 
             recipient_id = UUID(recipient_id_str)
-            is_recipient_online = recipient_id_str in chat_manager
+            is_recipient_online = recipient_id_str in chat_manager.active_connections or recipient_id_str in chat_manager
             initial_status = "delivered" if is_recipient_online else "sent"
 
             # 3. Persist message in PostgreSQL
@@ -346,6 +380,8 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                     sender_id=user_id,
                     recipient_id=recipient_id,
                     content=content,
+                    is_delivered=is_recipient_online,
+                    delivered_at=func.now() if is_recipient_online else None,
                     is_read=False
                 )
                 legacy_msg = Message(
@@ -373,38 +409,44 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                 created_at_dt = getattr(new_msg, "created_at", None) or getattr(legacy_msg, "created_at", datetime.now(timezone.utc))
                 created_at_iso = created_at_dt.isoformat() if hasattr(created_at_dt, "isoformat") else str(created_at_dt)
 
-                payload = {
-                    "event": "incoming_message",
+                msg_payload = {
                     "type": "new_message",
-                    "id": msg_id,
+                    "event": "incoming_message",
+                    "id": str(msg_id),
                     "msg_id": msg_id,
+                    "message_id": str(msg_id),
                     "match_id": match_id_str,
                     "sender_id": user_id_str,
+                    "recipient_id": recipient_id_str,
                     "content": content,
+                    "is_delivered": is_recipient_online,
+                    "is_read": False,
                     "status": initial_status,
                     "created_at": created_at_iso
                 }
 
-                # Echo back to sender for optimistic confirmation
+                # Single / delivered tick confirmation to sender
                 await websocket.send_text(json.dumps({
-                    **payload,
-                    "event": "message_sent",
-                    "status": initial_status
+                    **msg_payload,
+                    "event": "message_sent"
                 }))
 
-                # 4. Dispatch to recipient socket if online
-                delivered = await chat_manager.send_personal_message(payload, recipient_id_str)
-
-                # 5. If recipient offline, trigger Firebase FCM background notification
-                if not delivered:
+                # 4. Deliver to recipient if online
+                if is_recipient_online:
+                    await chat_manager.send_personal_message(msg_payload, recipient_id_str)
+                else:
+                    # 5. If recipient offline, trigger Firebase FCM background notification
                     try:
                         user_stmt = select(User.fcm_token).where(User.id == recipient_id)
                         res = await db.execute(user_stmt)
                         fcm_token = res.scalar_one_or_none()
                         if fcm_token:
+                            sender_stmt = select(User.full_name).where(User.id == user_id)
+                            sender_res = await db.execute(sender_stmt)
+                            sender_name = sender_res.scalar_one_or_none() or "Your Match"
                             await send_push_notification(
                                 fcm_token=fcm_token,
-                                title="Your Match",
+                                title=sender_name,
                                 body=content if len(content) < 50 else content[:47] + "...",
                                 data={"match_id": match_id_str, "type": "chat_message"}
                             )

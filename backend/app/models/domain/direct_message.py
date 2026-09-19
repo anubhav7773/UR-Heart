@@ -15,4 +15,7 @@ class DirectMessage(Base):
     recipient_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="CASCADE"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_delivered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow, nullable=False)

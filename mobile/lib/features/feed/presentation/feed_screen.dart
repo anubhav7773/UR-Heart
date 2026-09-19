@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
@@ -9,6 +8,7 @@ import 'package:ur_heart/features/feed/data/feed_repository.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import 'package:ur_heart/features/wallet/data/wallet_repository.dart';
 import 'widgets/radar_sonar_empty_state.dart';
+import 'widgets/feed_card.dart';
 
 /// Screen 3: Production Discovery Swipe Feed with Real Candidate Profiles & Live Swiping
 class FeedScreen extends StatefulWidget {
@@ -465,71 +465,6 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
             Expanded(
               child: _buildFeedBody(),
             ),
-
-            // Bottom Action Dock
-            if (!_isLoading && _currentIndex < _candidates.length)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Pass Button (X)
-                    _buildCircleButton(
-                      size: 56,
-                      color: URHeartColors.surfaceRaised,
-                      icon: Icons.close_rounded,
-                      iconColor: URHeartColors.statusDanger,
-                      onTap: () => _handleSwipe('pass'),
-                    ),
-
-                    // Center Raised Star Button: Direct DM
-                    InkWell(
-                      onTap: () => widget.onDirectDmTap != null ? widget.onDirectDmTap!() : _handleDirectDmAction(),
-                      borderRadius: URHeartTheme.radiusPill,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [URHeartColors.brandSecondary, Color(0xFF0081C9)],
-                          ),
-                          borderRadius: URHeartTheme.radiusPill,
-                          boxShadow: [
-                            BoxShadow(
-                              color: URHeartColors.brandSecondary.withValues(alpha: 0.3),
-                              blurRadius: 12,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.star_rounded, color: Colors.white, size: 20),
-                            const SizedBox(width: 6),
-                            Text(
-                              _t('directDmCta'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Like Button (Heart)
-                    _buildCircleButton(
-                      size: 56,
-                      color: URHeartColors.brandPrimary,
-                      icon: Icons.favorite_rounded,
-                      iconColor: Colors.white,
-                      onTap: () => _handleSwipe('like'),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),
@@ -582,228 +517,48 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
     }
 
     final candidate = _candidates[_currentIndex];
-    final primaryPhoto = candidate.primaryPhotoUrl;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Dismissible(
-        key: ValueKey('feed_candidate_${candidate.id}_$_currentIndex'),
-        direction: DismissDirection.horizontal,
-        onDismissed: (direction) {
-          if (direction == DismissDirection.startToEnd) {
-            // Swiped Right -> Like
-            _handleSwipeDismissed('like', candidate);
-          } else {
-            // Swiped Left -> Pass
-            _handleSwipeDismissed('pass', candidate);
-          }
-        },
-        background: Container(
-          decoration: BoxDecoration(
-            color: URHeartColors.brandPrimary.withValues(alpha: 0.25),
-            borderRadius: URHeartTheme.radiusCardLarge,
-          ),
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.only(left: 32),
-          child: const Icon(Icons.favorite_rounded, color: URHeartColors.brandPrimary, size: 56),
-        ),
-        secondaryBackground: Container(
-          decoration: BoxDecoration(
-            color: URHeartColors.statusDanger.withValues(alpha: 0.25),
-            borderRadius: URHeartTheme.radiusCardLarge,
-          ),
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 32),
-          child: const Icon(Icons.close_rounded, color: URHeartColors.statusDanger, size: 56),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: URHeartColors.cardSurface,
-            borderRadius: URHeartTheme.radiusCardLarge,
-            border: Border.all(color: URHeartColors.surfaceRaised),
-          ),
-          child: ClipRRect(
-            borderRadius: URHeartTheme.radiusCardLarge,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Photo background
-                if (primaryPhoto.isNotEmpty)
-                  CachedNetworkImage(
-                    imageUrl: primaryPhoto,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: URHeartColors.surfaceRaised,
-                      child: const Center(
-                        child: CircularProgressIndicator(color: URHeartColors.brandPrimary),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: URHeartColors.surfaceRaised,
-                      child: const Center(
-                        child: Icon(Icons.person_rounded, size: 100, color: URHeartColors.textMuted),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    color: URHeartColors.surfaceRaised,
-                    child: const Center(
-                      child: Icon(Icons.person_rounded, size: 100, color: URHeartColors.textMuted),
-                    ),
-                  ),
-
-                // Frosted Privacy Pill (Top Left)
-                Positioned(
-                  top: 14,
-                  left: 14,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: URHeartTheme.radiusPill,
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Text(
-                      _t('screenshotBlocked'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Coarse Proximity Pill (Top Right - Zero GPS Leakage)
-                Positioned(
-                  top: 14,
-                  right: 14,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: URHeartTheme.radiusPill,
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.location_on_rounded, color: URHeartColors.brandSecondary, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${candidate.city} • ${candidate.distanceBadge}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Profile Details Overlay (Bottom)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.85),
-                          Colors.black,
-                        ],
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              '${candidate.fullName}, ${candidate.age}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (candidate.kycStatus) ...[
-                              const SizedBox(width: 6),
-                              const Icon(Icons.verified_rounded, color: URHeartColors.brandSecondary, size: 18),
-                            ],
-                          ],
-                        ),
-                        if (candidate.bio.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            candidate.bio,
-                            style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 13),
-                          ),
-                        ],
-                        if (candidate.interests.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: candidate.interests.map((tag) => _buildChip(tag)).toList(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: const BoxDecoration(
-        color: URHeartColors.surfaceRaised,
-        borderRadius: URHeartTheme.radiusPill,
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(color: URHeartColors.textSecondary, fontSize: 11),
-      ),
-    );
-  }
-
-  Widget _buildCircleButton({
-    required double size,
-    required Color color,
-    required IconData icon,
-    required Color iconColor,
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(size / 2),
-      child: Container(
-        width: size,
-        height: size,
+    return Dismissible(
+      key: ValueKey('feed_candidate_${candidate.id}_$_currentIndex'),
+      direction: DismissDirection.horizontal,
+      onDismissed: (direction) {
+        if (direction == DismissDirection.startToEnd) {
+          // Swiped Right -> Like
+          _handleSwipeDismissed('like', candidate);
+        } else {
+          // Swiped Left -> Pass
+          _handleSwipeDismissed('pass', candidate);
+        }
+      },
+      background: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
+          color: URHeartColors.brandPrimary.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(28),
         ),
-        child: Center(
-          child: Icon(icon, color: iconColor, size: size * 0.5),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 32),
+        child: const Icon(Icons.favorite_rounded, color: URHeartColors.brandPrimary, size: 56),
+      ),
+      secondaryBackground: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: URHeartColors.statusDanger.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(28),
         ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 32),
+        child: const Icon(Icons.close_rounded, color: URHeartColors.statusDanger, size: 56),
+      ),
+      child: FeedCard(
+        candidate: candidate.toFeedCandidate(),
+        onLike: () => _handleSwipe('like'),
+        onPass: () => _handleSwipe('pass'),
+        onDirectDm: () => widget.onDirectDmTap != null
+            ? widget.onDirectDmTap!()
+            : _handleDirectDmAction(),
       ),
     );
   }
 }
+

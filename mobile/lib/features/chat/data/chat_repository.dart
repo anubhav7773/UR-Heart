@@ -50,6 +50,8 @@ class ChatMessageModel {
   final String matchId;
   final String senderId;
   final String content;
+  bool isDelivered;
+  bool isRead;
   final String status;
   final DateTime createdAt;
   final bool isBlocked;
@@ -60,6 +62,8 @@ class ChatMessageModel {
     required this.senderId,
     required this.content,
     this.status = 'sent',
+    this.isDelivered = false,
+    this.isRead = false,
     required this.createdAt,
     this.isBlocked = false,
   });
@@ -70,6 +74,8 @@ class ChatMessageModel {
     String? senderId,
     String? content,
     String? status,
+    bool? isDelivered,
+    bool? isRead,
     DateTime? createdAt,
     bool? isBlocked,
   }) {
@@ -79,6 +85,8 @@ class ChatMessageModel {
       senderId: senderId ?? this.senderId,
       content: content ?? this.content,
       status: status ?? this.status,
+      isDelivered: isDelivered ?? this.isDelivered,
+      isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       isBlocked: isBlocked ?? this.isBlocked,
     );
@@ -88,13 +96,17 @@ class ChatMessageModel {
     final mId = json['match_id']?.toString() ?? matchId ?? '';
     final rawContent = json['encrypted_text']?.toString() ?? json['content']?.toString() ?? '';
     final decryptedContent = ChatCryptoService.decryptMessage(rawContent, mId);
+    final isDeliv = (json['is_delivered'] as bool?) ?? (json['status'] == 'delivered' || json['status'] == 'read');
+    final isRd = (json['is_read'] as bool?) ?? (json['status'] == 'read');
 
     return ChatMessageModel(
       id: json['id']?.toString() ?? json['msg_id']?.toString() ?? UniqueKey().toString(),
       matchId: mId,
       senderId: json['sender_id']?.toString() ?? '',
       content: decryptedContent,
-      status: json['status']?.toString() ?? 'sent',
+      status: json['status']?.toString() ?? (isRd ? 'read' : (isDeliv ? 'delivered' : 'sent')),
+      isDelivered: isDeliv,
+      isRead: isRd,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),

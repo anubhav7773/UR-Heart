@@ -6,6 +6,7 @@ import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/utils/image_normalizer.dart';
 import '../../../core/utils/media_compressor.dart';
 
 class ManagePhotosScreen extends StatefulWidget {
@@ -63,7 +64,8 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
     );
 
     try {
-      final compressed = await MediaCompressor.compressProfilePhoto(File(file.path));
+      final normalizedFile = await ImageNormalizer.normalizeAndCompress(File(file.path));
+      final compressed = await MediaCompressor.compressProfilePhoto(normalizedFile);
 
       final token = await FirebaseAuth.instance.currentUser?.getIdToken();
       final dio = createApiClient();

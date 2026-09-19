@@ -4,15 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/env_config.dart';
 import 'core/config/theme.dart';
+import 'core/security/screen_security_service.dart';
+import 'core/services/notification_service.dart';
 import 'features/auth/presentation/auth_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
+    await NotificationService.instance.initialize();
   } catch (e) {
-    debugPrint("Firebase initialization notice: $e");
+    debugPrint("Firebase/Notification initialization notice: $e");
   }
+
+  // 1. Immediately engage Hardware Screen Protection (FLAG_SECURE)
+  await ScreenSecurityService.instance.enableProtection();
 
   // Initialize Sentry with DPDP Act 2023 Data Scrubbing Pipeline
   await SentryFlutter.init(

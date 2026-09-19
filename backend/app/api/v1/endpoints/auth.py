@@ -29,7 +29,8 @@ class SessionSyncRequest(BaseModel):
     whatsapp_number: str = Field(..., pattern=r"^\+91[6-9]\d{9}$", description="WhatsApp phone number")
     full_name: str = Field(..., min_length=2, max_length=50, pattern=r"^[a-zA-Z\s]+$")
     dob: date = Field(..., description="Date of birth YYYY-MM-DD")
-    gender: Optional[str] = Field("other", pattern=r"^(male|female|lgbtq\+|other)$", description="male, female, lgbtq+, or other")
+    gender: Optional[str] = Field("other", pattern=r"^(male|female|non_binary|trans_man|trans_woman|genderfluid|agender|queer|other|lgbtq\+)$", description="Inclusive gender spectrum")
+    gender_sub_identity: Optional[str] = Field(None, max_length=50)
     city: str = Field(..., min_length=2, max_length=50)
     bio: Optional[str] = Field("", max_length=250)
     android_id: Optional[str] = Field("", max_length=100)
@@ -211,7 +212,10 @@ async def session_sync(
         # CASE C: New User Registration
         caller_email = (token_data.get("email") or "").strip().lower()
         is_master = (caller_email == "kshtriyaanubhav9120@gmail.com")
-        valid_gender = payload.gender if payload.gender in ("male", "female", "lgbtq+", "other") else "other"
+        valid_gender = payload.gender if payload.gender in (
+            "male", "female", "non_binary", "trans_man", "trans_woman",
+            "genderfluid", "agender", "queer", "other", "lgbtq+"
+        ) else "other"
 
         new_user = User(
             firebase_uid=firebase_uid,
@@ -220,6 +224,7 @@ async def session_sync(
             full_name=payload.full_name,
             dob=payload.dob,
             gender=valid_gender,
+            gender_sub_identity=payload.gender_sub_identity,
             city=payload.city,
             bio=payload.bio or "",
             streak_count=1,

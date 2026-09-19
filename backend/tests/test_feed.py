@@ -49,37 +49,60 @@ def mock_candidate_user():
     return user
 
 def test_get_discovery_feed(mock_current_user, mock_candidate_user):
-    """Verifies that GET /api/v1/feed returns formatted candidate profiles with coarse distance and zero GPS leakage."""
+    """Verifies that GET /api/v1/feed returns formatted candidate profiles with coarse distance and resolved HTTPS CDN photo URLs."""
     app.dependency_overrides[get_current_user] = lambda: mock_current_user
 
     mock_db = AsyncMock()
-    # 1. User query result
-    mock_users_res = MagicMock()
-    mock_users_res.scalars.return_value.all.return_value = [mock_candidate_user]
+    mock_res = MagicMock()
+    mock_res.mappings.return_value.all.return_value = [
+        {
+            "user_id": mock_candidate_user.id,
+            "full_name": mock_candidate_user.full_name,
+            "city": mock_candidate_user.city,
+            "detected_locality": "Hazratganj",
+            "distance_km": 5,
+            "gender": mock_candidate_user.gender,
+            "bio": mock_candidate_user.bio,
+            "streak_count": mock_candidate_user.streak_count,
+            "photos": [
+                {
+                    "slot_index": 1,
+                    "photo_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
+                    "blur_hash": "LEHLh[WB2yk8pyoJadR*.7kCMdnj",
+                },
+                {
+                    "slot_index": 2,
+                    "photo_storage_path": f"{mock_candidate_user.id}/slot_2.webp",
+                    "blur_hash": "LEHLh[WB2yk8pyoJadR*.7kCMdnj",
+                }
+            ],
+        }
+    ]
 
-    # 2. Photos query result
-    mock_photos_res = MagicMock()
-    mock_photos_res.scalars.return_value.all.return_value = []
-
-    mock_db.execute.side_effect = [mock_users_res, mock_photos_res]
+    mock_db.execute.return_value = mock_res
     app.dependency_overrides[get_db] = lambda: mock_db
 
     response = client.get("/api/v1/feed?lat=26.8467&lon=80.9462")
     assert response.status_code == 200
-    data = response.json()
-    assert data["total"] == 1
-    candidate = data["candidates"][0]
+    candidates = response.json()
+    assert isinstance(candidates, list)
+    assert len(candidates) == 1
+    candidate = candidates[0]
     assert candidate["full_name"] == "Priya Singh"
     assert candidate["gender"] == "female"
-    assert len(candidate["photos"]) > 0
+    assert len(candidate["photos"]) == 2
     assert "distance_km" in candidate
-    assert "distance_badge" in candidate
-    assert candidate["distance_badge"].startswith("Nearby")
     # Strict Geo-Privacy: Zero Coordinate Leakage
     assert "latitude" not in candidate
     assert "longitude" not in candidate
+    # CDN resolution verification
+    assert candidate["photos"][0]["photo_url"].startswith("https://")
+    assert candidate["photos"][1]["photo_url"].startswith("https://")
+    assert candidate["photos"][1]["photo_storage_path"].startswith("https://")
+    assert "slot_2.webp" in candidate["photos"][1]["photo_url"]
 
     app.dependency_overrides.clear()
+
 
 def test_swipe_like_mutual_match(mock_current_user, mock_candidate_user):
     """Verifies mutual like triggers is_match=True and creates a Match record."""

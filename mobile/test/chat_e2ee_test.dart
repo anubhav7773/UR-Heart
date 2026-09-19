@@ -111,6 +111,8 @@ void main() {
         'sender_id': 'user-2',
         'encrypted_text': encryptedPayload,
         'status': 'read',
+        'is_delivered': true,
+        'is_read': true,
         'created_at': now.toIso8601String(),
       };
 
@@ -118,6 +120,32 @@ void main() {
       expect(model.id, equals('msg-100'));
       expect(model.content, equals(rawText)); // Auto decrypted!
       expect(model.status, equals('read'));
+      expect(model.isDelivered, isTrue);
+      expect(model.isRead, isTrue);
+    });
+
+    test('ChatMessageModel 3-stage tick transitions (sent -> delivered -> read)', () {
+      final msg = ChatMessageModel(
+        id: 'msg-stage',
+        matchId: matchId,
+        senderId: 'user-sender',
+        content: 'Hello!',
+        createdAt: now,
+      );
+
+      // Stage 1: Sent (Single Gray Tick)
+      expect(msg.isDelivered, isFalse);
+      expect(msg.isRead, isFalse);
+
+      // Stage 2: Delivered (Double Gray Tick)
+      msg.isDelivered = true;
+      expect(msg.isDelivered, isTrue);
+      expect(msg.isRead, isFalse);
+
+      // Stage 3: Read (Double Blue Tick)
+      msg.isRead = true;
+      expect(msg.isDelivered, isTrue);
+      expect(msg.isRead, isTrue);
     });
   });
 }

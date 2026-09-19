@@ -2,26 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:ur_heart/core/config/env_config.dart';
 import 'package:ur_heart/core/network/api_client.dart';
+import 'feed_candidate_model.dart';
 
-class CandidatePhotoModel {
-  final int slotIndex;
-  final String photoUrl;
-  final String blurHash;
+export 'feed_candidate_model.dart';
 
-  CandidatePhotoModel({
-    required this.slotIndex,
-    required this.photoUrl,
-    required this.blurHash,
-  });
-
-  factory CandidatePhotoModel.fromJson(Map<String, dynamic> json) {
-    return CandidatePhotoModel(
-      slotIndex: json['slot_index'] as int? ?? 1,
-      photoUrl: json['photo_storage_path'] as String? ?? '',
-      blurHash: json['blur_hash'] as String? ?? '',
-    );
-  }
-}
 
 class CandidateProfileModel {
   final String id;
@@ -59,19 +43,34 @@ class CandidateProfileModel {
     return '';
   }
 
+  FeedCandidateModel toFeedCandidate() {
+    return FeedCandidateModel(
+      userId: id,
+      fullName: fullName,
+      city: city,
+      detectedLocality: city,
+      distanceKm: distanceKm,
+      gender: gender,
+      bio: bio,
+      streakCount: streakCount,
+      photos: photos,
+    );
+  }
+
   factory CandidateProfileModel.fromJson(Map<String, dynamic> json) {
     final rawPhotos = json['photos'] as List<dynamic>? ?? [];
     final rawInterests = json['interests'] as List<dynamic>? ?? [];
+    final distKm = json['distance_km'] as int? ?? 5;
 
     return CandidateProfileModel(
-      id: json['id'] as String? ?? '',
-      fullName: json['full_name'] as String? ?? 'User',
+      id: (json['user_id'] ?? json['id'] ?? '').toString(),
+      fullName: (json['full_name'] ?? 'User').toString(),
       age: json['age'] as int? ?? 22,
-      gender: json['gender'] as String? ?? 'unknown',
-      city: json['city'] as String? ?? 'City',
-      bio: json['bio'] as String? ?? '',
-      distanceKm: json['distance_km'] as int? ?? 5,
-      distanceBadge: json['distance_badge'] as String? ?? 'Nearby 5 km',
+      gender: (json['gender'] ?? 'unknown').toString(),
+      city: (json['city'] ?? 'City').toString(),
+      bio: (json['bio'] ?? '').toString(),
+      distanceKm: distKm,
+      distanceBadge: json['distance_badge'] as String? ?? 'Nearby $distKm km',
       kycStatus: json['kyc_status'] as bool? ?? false,
       streakCount: json['streak_count'] as int? ?? 0,
       interests: rawInterests.map((e) => e.toString()).toList(),
@@ -136,7 +135,14 @@ class FeedRepository {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final candidatesJson = response.data['candidates'] as List<dynamic>? ?? [];
+        final List<dynamic> candidatesJson;
+        if (response.data is List) {
+          candidatesJson = response.data as List<dynamic>;
+        } else if (response.data is Map && response.data['candidates'] != null) {
+          candidatesJson = response.data['candidates'] as List<dynamic>;
+        } else {
+          candidatesJson = [];
+        }
         return candidatesJson
             .map((c) => CandidateProfileModel.fromJson(c as Map<String, dynamic>))
             .toList();

@@ -291,8 +291,17 @@ async def validate_uploaded_photo(file: UploadFile, require_face: bool = False) 
             detail="Uploaded file is empty."
         )
 
-    nparr = np.frombuffer(contents, np.uint8)
-    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    try:
+        import io
+        from PIL import Image, ImageOps
+        pil_img = Image.open(io.BytesIO(contents))
+        transposed = ImageOps.exif_transpose(pil_img)
+        if transposed.mode != "RGB":
+            transposed = transposed.convert("RGB")
+        image = cv2.cvtColor(np.array(transposed), cv2.COLOR_RGB2BGR)
+    except Exception:
+        nparr = np.frombuffer(contents, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
     if image is None:
         raise HTTPException(

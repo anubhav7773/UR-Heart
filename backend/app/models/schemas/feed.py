@@ -6,7 +6,8 @@ class CandidatePhoto(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     slot_index: int
     photo_url: str
-    blur_hash: str = ""
+    photo_storage_path: Optional[str] = None
+    blur_hash: str = "LEHLh[WB2yk8pyoJadR*.7kCMdnj"
 
 class CandidateProfile(BaseModel):
     model_config = ConfigDict(from_attributes=True)

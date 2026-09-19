@@ -1,172 +1,110 @@
-import math
-from datetime import date, datetime, timezone
+import os
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, not_, or_, delete
+from sqlalchemy import text, select, delete, and_, or_
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencies import get_current_user
 from app.models.domain.user import User
-from app.models.domain.user_photo import UserPhoto
 from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
 from app.models.schemas.feed import (
-    CandidateProfile,
-    CandidatePhoto,
-    FeedResponse,
     SwipeRequest,
     SwipeResponse,
 )
+from app.services.notification_service import send_push_notification
 
 router = APIRouter()
 
-def calculate_haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> int:
-    """Calculates Haversine distance in km between two GPS coordinate pairs."""
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    )
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return max(1, round(R * c))
+SUPABASE_URL = (os.getenv("SUPABASE_URL") or getattr(settings, "SUPABASE_URL", "") or "https://pzrsyxvjbmzqlzlehuxg.supabase.co").rstrip("/")
+STORAGE_BASE_URL = f"{SUPABASE_URL}/storage/v1/object/public/user-photos"
 
-DEFAULT_INTERESTS_MAP = {
-    "lucknow": ["Chai Lover", "Bollywood", "Urdu Poetry", "Foodie"],
-    "gorakhpur": ["Bhojpuri Music", "Cricket", "Travel", "Street Food"],
-    "patna": ["Civil Services", "Reading", "Badminton", "Litti Chokha"],
-    "indore": ["Poha Jalebi", "Startups", "Night Bazaars", "Music"],
-    "delhi": ["Cafes", "Art Galleries", "Fitness", "Shopping"],
-}
+def resolve_photo_url(path_or_url: str) -> str:
+    if not path_or_url:
+        return ""
+    if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        return path_or_url
+    clean_path = path_or_url.lstrip("/")
+    return f"{STORAGE_BASE_URL}/{clean_path}"
 
-@router.get("", response_model=FeedResponse, status_code=status.HTTP_200_OK)
-async def get_discovery_feed(
+@router.get("", status_code=status.HTTP_200_OK)
+async def get_discovery_feed_endpoint(
     limit: int = Query(20, ge=1, le=50),
-    city: Optional[str] = Query(None),
+    offset: int = Query(0, ge=0),
     lat: Optional[float] = Query(None, ge=-90.0, le=90.0, description="Caller's current GPS Latitude"),
     lon: Optional[float] = Query(None, ge=-180.0, le=180.0, description="Caller's current GPS Longitude"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Returns verified candidate profiles for the Discovery Swipe Feed:
-    - Filters out the current user.
-    - Excludes users already swiped on by current_user.
-    - Excludes banned or soft-deleted accounts.
-    - Matches location / gender dynamics.
-    - Populates candidate photos and interests.
+    Returns verified candidate profiles for the Discovery Swipe Feed using
+    the optimized public.get_discovery_feed SQL function with CDN resolved photo URLs.
     """
-    # 1. Query IDs of users current user has already swiped
-    swiped_subquery = select(Swipe.target_id).where(Swipe.actor_id == current_user.id)
-
-    # 2. Build candidate query
-    query = (
-        select(User)
-        .where(
-            User.id != current_user.id,
-            User.is_banned == False,
-            User.deleted_at.is_(None),
-            not_(User.id.in_(swiped_subquery)),
-        )
-    )
-
-    # Filter opposite gender if binary, else show all
-    if current_user.gender == "male":
-        query = query.where(User.gender == "female")
-    elif current_user.gender == "female":
-        query = query.where(User.gender == "male")
-
-    if city:
-        query = query.where(User.city.ilike(f"%{city}%"))
-
-    query = query.order_by(User.created_at.desc()).limit(limit)
-    res = await db.execute(query)
-    candidate_users = res.scalars().all()
-
-    candidates: List[CandidateProfile] = []
-    today = date.today()
-
     caller_lat = lat if lat is not None else (float(current_user.latitude) if current_user.latitude is not None else None)
     caller_lon = lon if lon is not None else (float(current_user.longitude) if current_user.longitude is not None else None)
 
-    for user in candidate_users:
-        # Calculate Age
-        age = (today - user.dob).days // 365 if user.dob else 22
+    query = text("""
+        SELECT * FROM public.get_discovery_feed(
+            :user_id,
+            :lat,
+            :lon,
+            :limit,
+            :offset
+        );
+    """)
+    result = await db.execute(query, {
+        "user_id": current_user.id,
+        "lat": caller_lat,
+        "lon": caller_lon,
+        "limit": limit,
+        "offset": offset,
+    })
+    rows = result.mappings().all()
 
-        # Coarse Geolocation Proximity (Zero GPS Leakage: never returns raw lat/lon)
-        if (
-            caller_lat is not None
-            and caller_lon is not None
-            and user.latitude is not None
-            and user.longitude is not None
-        ):
-            dist_km = calculate_haversine_km(caller_lat, caller_lon, float(user.latitude), float(user.longitude))
-            badge = "Nearby < 1 km" if dist_km < 1 else f"Nearby {dist_km} km"
-        else:
-            dist_km = 5
-            badge = "Nearby 5 km"
+    feed_candidates = []
+    for row in rows:
+        raw_photos = row.get("photos") or []
+        normalized_photos = []
 
-        # Fetch Photos for Candidate
-        photos_query = (
-            select(UserPhoto)
-            .where(UserPhoto.user_id == user.id)
-            .order_by(UserPhoto.slot_index.asc())
-        )
-        photos_res = await db.execute(photos_query)
-        user_photos = photos_res.scalars().all()
+        for p in raw_photos:
+            raw_url = p.get("photo_url") or p.get("photo_storage_path") or ""
+            normalized_url = resolve_photo_url(raw_url)
+            normalized_photos.append({
+                "slot_index": p.get("slot_index", 1),
+                "photo_url": normalized_url,
+                "photo_storage_path": normalized_url,
+                "blur_hash": p.get("blur_hash") or "LEHLh[WB2yk8pyoJadR*.7kCMdnj",
+            })
 
-        photo_list: List[CandidatePhoto] = []
-        for p in user_photos:
-            path = p.photo_storage_path
-            if not path.startswith("http"):
-                url = f"{settings.SUPABASE_URL}/storage/v1/object/public/user-photos/{path}"
-            else:
-                url = path
-            photo_list.append(
-                CandidatePhoto(
-                    slot_index=p.slot_index,
-                    photo_url=url,
-                    blur_hash=p.blur_hash or "",
-                )
-            )
+        if not normalized_photos:
+            default_url = f"{STORAGE_BASE_URL}/default_avatar.png"
+            normalized_photos.append({
+                "slot_index": 1,
+                "photo_url": default_url,
+                "photo_storage_path": default_url,
+                "blur_hash": "LEHLh[WB2yk8pyoJadR*.7kCMdnj",
+            })
 
-        if not photo_list:
-            photo_list.append(
-                CandidatePhoto(
-                    slot_index=1,
-                    photo_url=f"{settings.SUPABASE_URL}/storage/v1/object/public/user-photos/default_avatar.png",
-                    blur_hash="",
-                )
-            )
+        feed_candidates.append({
+            "id": str(row["user_id"]),
+            "user_id": str(row["user_id"]),
+            "full_name": row["full_name"],
+            "city": row["city"],
+            "detected_locality": row.get("detected_locality"),
+            "distance_km": row.get("distance_km"),
+            "gender": row["gender"],
+            "bio": row.get("bio") or "",
+            "streak_count": row.get("streak_count") or 0,
+            "photos": normalized_photos,
+        })
 
+    return feed_candidates
 
-        # Determine interest chips
-        city_key = (user.city or "").lower()
-        interests = DEFAULT_INTERESTS_MAP.get(city_key, ["Music", "Travel", "Chai", "Photography"])
-
-        candidates.append(
-            CandidateProfile(
-                id=user.id,
-                full_name=user.full_name,
-                age=max(18, age),
-                city=user.city or "Lucknow",
-                bio=user.bio or "Here to connect authentically on UR-Heart.",
-                gender=user.gender,
-                streak_count=user.streak_count or 0,
-                kyc_status=user.kyc_status,
-                interests=interests,
-                photos=photo_list,
-                distance_km=dist_km,
-                distance_badge=badge,
-            )
-        )
-
-    return FeedResponse(candidates=candidates, total=len(candidates))
 
 
 @router.post("/swipe", response_model=SwipeResponse, status_code=status.HTTP_200_OK)
@@ -259,7 +197,38 @@ async def record_swipe(
                 )
                 db.add(new_match)
                 await db.commit()
-                await db.refresh(new_match)
+                try:
+                    await db.refresh(new_match)
+                except Exception:
+                    pass
+
+                # Dispatch FCM Push Notifications to both users on mutual match
+                try:
+                    users_stmt = select(User).where(User.id.in_([current_user.id, payload.target_user_id]))
+                    users_res = await db.execute(users_stmt)
+                    matched_users = {str(u.id): u for u in users_res.scalars().all()}
+
+                    actor = matched_users.get(str(current_user.id))
+                    target = matched_users.get(str(payload.target_user_id))
+
+                    if target and getattr(target, "fcm_token", None):
+                        await send_push_notification(
+                            fcm_token=target.fcm_token,
+                            title="🎉 New Mutual Resonance!",
+                            body=f"{actor.full_name if actor else 'Someone'} liked you back! Start chatting now.",
+                            data={"type": "mutual_match", "match_id": str(new_match.id)}
+                        )
+
+                    if actor and getattr(actor, "fcm_token", None):
+                        await send_push_notification(
+                            fcm_token=actor.fcm_token,
+                            title="🎉 New Mutual Resonance!",
+                            body=f"You and {target.full_name if target else 'a new member'} liked each other!",
+                            data={"type": "mutual_match", "match_id": str(new_match.id)}
+                        )
+                except Exception as e:
+                    pass
+
                 return SwipeResponse(
                     status="success",
                     is_match=True,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../core/services/location_service.dart';
 import '../data/profile_repository.dart';
 import '../../kyc/presentation/photo_upload_screen.dart';
+import '../../onboarding/presentation/widgets/gender_selector_bottom_sheet.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -257,17 +258,50 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 3. Gender Identity (High Contrast Inclusive Chips)
+                // 3. Gender Identity (Comprehensive Spectrum Selector)
                 const Text("Gender Identity / लिंग पहचान", style: TextStyle(color: textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _buildGenderChip("male", "♂️ Male", "पुरुष"),
-                    const SizedBox(width: 10),
-                    _buildGenderChip("female", "♀️ Female", "महिला"),
-                    const SizedBox(width: 10),
-                    _buildGenderChip("lgbtq+", "🏳️🌈 LGBTQ+", "अन्य"),
-                  ],
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () async {
+                    final selected = await GenderSelectorBottomSheet.show(context, _selectedGender ?? '');
+                    if (selected != null) {
+                      setState(() => _selectedGender = selected.key);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: cardSurface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _selectedGender != null ? brandPrimary.withValues(alpha: 0.6) : Colors.transparent,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.people_alt_outlined, color: brandPrimary, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _selectedGender != null
+                                ? kGenderSpectrum.firstWhere(
+                                    (g) => g.key == _selectedGender,
+                                    orElse: () => GenderOption(key: _selectedGender!, label: _selectedGender!, category: '', description: ''),
+                                  ).label
+                                : "Select your gender identity...",
+                            style: TextStyle(
+                              color: _selectedGender != null ? Colors.white : const Color(0xFF636375),
+                              fontSize: 14,
+                              fontWeight: _selectedGender != null ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFFA0A0B2), size: 22),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -400,49 +434,4 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     ),
   );
 }
-
-  Widget _buildGenderChip(String value, String labelEn, String labelHi) {
-    final bool isSelected = _selectedGender == value;
-    const Color brandPrimary = Color(0xFFFF2E63);
-    const Color cardSurface = Color(0xFF16161D);
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedGender = value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? brandPrimary.withValues(alpha: 0.18) : cardSurface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? brandPrimary : Colors.transparent,
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                labelEn,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFFA0A0B2),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                labelHi,
-                style: TextStyle(
-                  color: isSelected ? Colors.white70 : const Color(0xFF636375),
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

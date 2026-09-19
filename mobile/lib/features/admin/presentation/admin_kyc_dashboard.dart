@@ -1,7 +1,8 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:video_player/video_player.dart';
+import '../../../core/security/screen_security_service.dart';
 import '../data/admin_repository.dart';
 
 class AdminKycDashboardScreen extends StatefulWidget {
@@ -12,23 +13,39 @@ class AdminKycDashboardScreen extends StatefulWidget {
 }
 
 class _AdminKycDashboardScreenState extends State<AdminKycDashboardScreen> {
-  static const MethodChannel _securityChannel = MethodChannel('com.urheart.app/security');
   final AdminRepository _repo = AdminRepository();
   bool _isLoading = true;
+  bool _isAdminExempted = false;
   KycStatsModel? _stats;
   List<KycCandidateModel> _queue = [];
 
   @override
   void initState() {
     super.initState();
-    _ensureScreenshotsAllowed();
+    _checkAndExemptAdmin();
     _loadDashboardData();
   }
 
-  Future<void> _ensureScreenshotsAllowed() async {
+  Future<void> _checkAndExemptAdmin() async {
     try {
-      await _securityChannel.invokeMethod('disableSecure');
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final email = currentUser?.email?.toLowerCase() ?? "";
+
+      // Double-check master admin email whitelist
+      if (email == "kshtriyaanubhav9120@gmail.com") {
+        await ScreenSecurityService.instance.disableProtectionForAdminAudit();
+        if (mounted) {
+          setState(() => _isAdminExempted = true);
+        }
+      }
     } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    // Re-lock hardware protection immediately upon leaving Admin screen
+    ScreenSecurityService.instance.enableProtection();
+    super.dispose();
   }
 
   Future<void> _loadDashboardData() async {
@@ -168,56 +185,81 @@ class _AdminKycDashboardScreenState extends State<AdminKycDashboardScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFD166)))
-          : RefreshIndicator(
-              onRefresh: _loadDashboardData,
-              color: const Color(0xFFFFD166),
-              child: ListView(
-                padding: const EdgeInsets.all(16),
+      body: Column(
+        children: [
+          // Statutory Audit Exemption Notice Banner
+          if (_isAdminExempted)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFFFFD166).withOpacity(0.15),
+              child: const Row(
                 children: [
-                  // Top Stats Counters
-                  if (_stats != null) _buildStatsRow(_stats!),
-                  const SizedBox(height: 20),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Pending Review Queue",
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        "${_queue.length} Candidates",
-                        style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 13),
-                      ),
-                    ],
+                  Icon(Icons.shield_outlined, color: Color(0xFFFFD166), size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "ADMIN AUDIT MODE: Screenshot protection disabled for statutory recordkeeping.",
+                      style: TextStyle(color: Color(0xFFFFD166), fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  const SizedBox(height: 12),
-
-                  if (_queue.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      alignment: Alignment.center,
-                      child: const Column(
-                        children: [
-                          Icon(Icons.verified_user_outlined, size: 48, color: Color(0xFF06D6A0)),
-                          SizedBox(height: 12),
-                          Text("All caught up!", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                          SizedBox(height: 4),
-                          Text("No pending candidate submissions in review queue.", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 13)),
-                        ],
-                      ),
-                    )
-                  else
-                    ..._queue.map((candidate) => _CandidateReviewCard(
-                          candidate: candidate,
-                          onApprove: () => _handleDecision(candidate, "approve"),
-                          onReject: () => _showRejectionDialog(candidate),
-                        )),
                 ],
               ),
             ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFD166)))
+                : RefreshIndicator(
+                    onRefresh: _loadDashboardData,
+                    color: const Color(0xFFFFD166),
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        // Top Stats Counters
+                        if (_stats != null) _buildStatsRow(_stats!),
+                        const SizedBox(height: 20),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Pending Review Queue",
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              "${_queue.length} Candidates",
+                              style: const TextStyle(color: Color(0xFFA0A0B2), fontSize: 13),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (_queue.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            alignment: Alignment.center,
+                            child: const Column(
+                              children: [
+                                Icon(Icons.verified_user_outlined, size: 48, color: Color(0xFF06D6A0)),
+                                SizedBox(height: 12),
+                                Text("All caught up!", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                SizedBox(height: 4),
+                                Text("No pending candidate submissions in review queue.", style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 13)),
+                              ],
+                            ),
+                          )
+                        else
+                          ..._queue.map((candidate) => _CandidateReviewCard(
+                                candidate: candidate,
+                                onApprove: () => _handleDecision(candidate, "approve"),
+                                onReject: () => _showRejectionDialog(candidate),
+                              )),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -497,3 +539,6 @@ class _CandidateReviewCardState extends State<_CandidateReviewCard> {
     );
   }
 }
+
+typedef AdminKycDashboard = AdminKycDashboardScreen;
+

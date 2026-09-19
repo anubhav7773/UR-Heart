@@ -48,7 +48,19 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     } catch (_) {
       _currentUid = "";
     }
-    _initChat();
+    _initChat().then((_) {
+      _sendMarkRead();
+    });
+  }
+
+  void _sendMarkRead() {
+    if (_wsChannel != null && widget.matchId.isNotEmpty) {
+      _wsChannel?.sink.add(jsonEncode({
+        "action": "mark_read",
+        "match_id": widget.matchId,
+        "sender_id": widget.partnerId,
+      }));
+    }
   }
 
   @override
@@ -89,6 +101,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
           : 'wss://ur-heart.onrender.com';
       final wsUrl = Uri.parse('$baseWs/ws/chat?token=$idToken');
       _wsChannel = WebSocketChannel.connect(wsUrl);
+      _sendMarkRead();
 
       _wsSubscription = _wsChannel!.stream.listen(
         (data) {
@@ -96,7 +109,30 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
             final json = jsonDecode(data.toString()) as Map<String, dynamic>;
             final event = json['event'] ?? json['type'];
 
-            if (event == 'new_message' || event == 'incoming_message') {
+            if (event == 'message_delivered') {
+              final msgId = json['message_id']?.toString() ?? json['msg_id']?.toString();
+              if (mounted) {
+                setState(() {
+                  final idx = _messages.indexWhere((m) => m.id == msgId);
+                  if (idx != -1) {
+                    _messages[idx].isDelivered = true;
+                  }
+                });
+              }
+            } else if (event == 'messages_read') {
+              // Partner opened chat -> update all sent messages to read (double blue ticks)
+              if (mounted) {
+                setState(() {
+                  for (var m in _messages) {
+                    final bool isMe = (m.senderId == _currentUid) || (widget.partnerId.isNotEmpty && m.senderId != widget.partnerId);
+                    if (isMe) {
+                      m.isDelivered = true;
+                      m.isRead = true;
+                    }
+                  }
+                });
+              }
+            } else if (event == 'new_message' || event == 'incoming_message') {
               final newMsg = ChatMessageModel.fromJson(json);
               if (newMsg.matchId == widget.matchId) {
                 if (mounted) {
@@ -110,6 +146,8 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                       _messages.add(newMsg);
                     }
                   });
+                  // Send immediate mark_read ack
+                  _sendMarkRead();
                   _scrollToBottom();
                 }
               }
@@ -335,16 +373,38 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
               style: const TextStyle(color: Colors.white, fontSize: 14),
             ),
             const SizedBox(height: 4),
-            Text(
-              DateFormat('hh:mm a').format(m.createdAt),
-              style: TextStyle(
-                color: isMe ? Colors.white70 : const Color(0xFFA0A0B2),
-                fontSize: 10,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  DateFormat('hh:mm a').format(m.createdAt),
+                  style: TextStyle(
+                    color: isMe ? Colors.white70 : const Color(0xFFA0A0B2),
+                    fontSize: 10,
+                  ),
+                ),
+                if (isMe) ...[
+                  const SizedBox(width: 4),
+                  _buildTickIndicator(m),
+                ],
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildTickIndicator(ChatMessageModel m) {
+    if (m.isRead) {
+      // 3. Stage: Double Blue Tick
+      return const Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF00B2FF));
+    } else if (m.isDelivered) {
+      // 2. Stage: Double Gray Tick
+      return const Icon(Icons.done_all_rounded, size: 14, color: Colors.white60);
+    } else {
+      // 1. Stage: Single Gray Tick
+      return const Icon(Icons.done_rounded, size: 14, color: Colors.white60);
+    }
   }
 }
