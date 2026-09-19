@@ -293,15 +293,26 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                 continue
 
             action = data.get("action") or data.get("type") or data.get("event") or "send_message"
-            match_id_str = data.get("match_id")
-            recipient_id_str = data.get("recipient_id")
-            content = (data.get("content") or "").strip()
 
             # -------------------------------------------------------------
-            # ACTION 1: MARK READ (Emits Blue Ticks to Sender)
+            # 1. Focus / Blur Room Lifecycle
+            # -------------------------------------------------------------
+            if action == "focus_room":
+                match_id = data.get("match_id")
+                if match_id:
+                    chat_manager.focus_room(user_id_str, match_id)
+                continue
+
+            if action == "blur_room":
+                chat_manager.blur_room(user_id_str)
+                continue
+
+            # -------------------------------------------------------------
+            # 2. MARK READ (Emits Blue Ticks to Sender)
             # -------------------------------------------------------------
             if action in ("mark_read", "read_receipt"):
-                sender_id = data.get("sender_id") or recipient_id_str
+                match_id_str = data.get("match_id")
+                sender_id = data.get("sender_id") or data.get("recipient_id")
                 if match_id_str:
                     try:
                         async with async_session_factory() as db:
@@ -309,7 +320,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                                 update(DirectMessage)
                                 .where(
                                     and_(
-                                        DirectMessage.match_id == UUID(match_id_str),
+                                        DirectMessage.match_id == UUID(str(match_id_str)),
                                         DirectMessage.recipient_id == user_id,
                                         DirectMessage.is_read.is_(False)
                                     )
@@ -325,7 +336,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                         await chat_manager.send_personal_message({
                             "type": "messages_read",
                             "event": "messages_read",
-                            "match_id": match_id_str,
+                            "match_id": str(match_id_str),
                             "reader_id": user_id_str
                         }, str(sender_id))
                 continue
@@ -333,6 +344,8 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
             # Handle delivery acks and typing events
             if action == "delivery_ack":
                 msg_id = data.get("msg_id") or data.get("message_id")
+                recipient_id_str = data.get("recipient_id")
+                match_id_str = data.get("match_id")
                 if recipient_id_str:
                     await chat_manager.send_personal_message({
                         "event": "message_delivered",
@@ -340,10 +353,12 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                         "match_id": match_id_str,
                         "msg_id": msg_id,
                         "message_id": str(msg_id) if msg_id else "",
-                    }, recipient_id_str)
+                    }, str(recipient_id_str))
                 continue
 
             if action == "typing":
+                recipient_id_str = data.get("recipient_id")
+                match_id_str = data.get("match_id")
                 if recipient_id_str:
                     await chat_manager.send_personal_message({
                         "event": "user_typing",
@@ -351,13 +366,20 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                         "match_id": match_id_str,
                         "sender_id": user_id_str,
                         "is_typing": data.get("is_typing", True)
-                    }, recipient_id_str)
+                    }, str(recipient_id_str))
                 continue
+
+            # -------------------------------------------------------------
+            # 3. Send Message Action
+            # -------------------------------------------------------------
+            match_id_str = data.get("match_id")
+            recipient_id_str = data.get("recipient_id")
+            content = (data.get("content") or "").strip()
 
             if not content or not match_id_str or not recipient_id_str:
                 continue
 
-            # 2. Anti-Leak NLP Guard
+            # Anti-Leak NLP Guard
             if not sanitize_chat_message(content):
                 await websocket.send_text(json.dumps({
                     "event": "anti_leak_violation",
@@ -365,24 +387,26 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                     "code": 422,
                     "match_id": match_id_str,
                     "message": "Sharing phone numbers, social media handles (@, IG, WA, Snap) or external contacts is strictly prohibited on UR-Heart.",
-                    "detail": "Sharing phone numbers, social media handles (@, IG, WA, Snap) or external contacts is strictly prohibited on UR-Heart."
+                    "detail": "Contact sharing (numbers, handles, links) is strictly prohibited."
                 }))
                 continue
 
             recipient_id = UUID(recipient_id_str)
-            is_recipient_online = recipient_id_str in chat_manager.active_connections or recipient_id_str in chat_manager
-            initial_status = "delivered" if is_recipient_online else "sent"
+            is_socket_connected = (recipient_id_str in chat_manager.active_connections) or (recipient_id_str in chat_manager)
+            is_actively_reading = chat_manager.is_user_actively_reading(recipient_id_str, match_id_str)
+            initial_status = "read" if is_actively_reading else ("delivered" if is_socket_connected else "sent")
 
-            # 3. Persist message in PostgreSQL
+            # Persist message in PostgreSQL
             async with async_session_factory() as db:
                 new_msg = DirectMessage(
                     match_id=UUID(match_id_str),
                     sender_id=user_id,
                     recipient_id=recipient_id,
                     content=content,
-                    is_delivered=is_recipient_online,
-                    delivered_at=func.now() if is_recipient_online else None,
-                    is_read=False
+                    is_delivered=is_socket_connected,
+                    is_read=is_actively_reading,
+                    delivered_at=func.now() if is_socket_connected else None,
+                    read_at=func.now() if is_actively_reading else None
                 )
                 legacy_msg = Message(
                     match_id=UUID(match_id_str),
@@ -419,39 +443,56 @@ async def chat_websocket_endpoint(websocket: WebSocket, token: Optional[str] = Q
                     "sender_id": user_id_str,
                     "recipient_id": recipient_id_str,
                     "content": content,
-                    "is_delivered": is_recipient_online,
-                    "is_read": False,
+                    "is_delivered": is_socket_connected,
+                    "is_read": is_actively_reading,
                     "status": initial_status,
                     "created_at": created_at_iso
                 }
 
-                # Single / delivered tick confirmation to sender
+                # Immediate confirmation to sender
                 await websocket.send_text(json.dumps({
                     **msg_payload,
                     "event": "message_sent"
                 }))
 
-                # 4. Deliver to recipient if online
-                if is_recipient_online:
+                # Deliver over socket if connected
+                if is_socket_connected:
                     await chat_manager.send_personal_message(msg_payload, recipient_id_str)
-                else:
-                    # 5. If recipient offline, trigger Firebase FCM background notification
+                    if not is_actively_reading:
+                        # Echo delivered gray tick back to sender
+                        await websocket.send_text(json.dumps({
+                            "event": "message_delivered",
+                            "type": "message_delivered",
+                            "message_id": str(msg_id),
+                            "msg_id": msg_id,
+                            "match_id": match_id_str
+                        }))
+
+                # CRITICAL: If NOT actively looking at this chat room, fire FCM Push Notification
+                if not is_actively_reading:
                     try:
                         user_stmt = select(User.fcm_token).where(User.id == recipient_id)
                         res = await db.execute(user_stmt)
                         fcm_token = res.scalar_one_or_none()
+
                         if fcm_token:
                             sender_stmt = select(User.full_name).where(User.id == user_id)
                             sender_res = await db.execute(sender_stmt)
                             sender_name = sender_res.scalar_one_or_none() or "Your Match"
+
                             await send_push_notification(
                                 fcm_token=fcm_token,
                                 title=sender_name,
-                                body=content if len(content) < 50 else content[:47] + "...",
-                                data={"match_id": match_id_str, "type": "chat_message"}
+                                body=content if len(content) <= 50 else f"{content[:47]}...",
+                                data={
+                                    "type": "chat_message",
+                                    "match_id": match_id_str,
+                                    "sender_id": user_id_str,
+                                    "sender_name": sender_name
+                                }
                             )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"⚠️ [FCM Trigger Error] {e}")
 
     except WebSocketDisconnect:
         chat_manager.disconnect(user_id_str)

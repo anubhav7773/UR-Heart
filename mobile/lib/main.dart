@@ -1,23 +1,35 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/env_config.dart';
 import 'core/config/theme.dart';
 import 'core/security/screen_security_service.dart';
+import 'core/security/window_security_bridge.dart';
 import 'core/services/notification_service.dart';
 import 'features/auth/presentation/auth_gate.dart';
+
+// Top-level entry point for processing background/killed state FCM packets
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint("📩 [FCM Background Handler] Received message: ${message.messageId}");
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
+    // 1. Register FCM Background Handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     await NotificationService.instance.initialize();
   } catch (e) {
     debugPrint("Firebase/Notification initialization notice: $e");
   }
 
-  // 1. Immediately engage Hardware Screen Protection (FLAG_SECURE)
+  // 2. Hardware Screen Protection
+  await WindowSecurityBridge.instance.enable();
   await ScreenSecurityService.instance.enableProtection();
 
   // Initialize Sentry with DPDP Act 2023 Data Scrubbing Pipeline

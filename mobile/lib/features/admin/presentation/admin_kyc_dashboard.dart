@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:video_player/video_player.dart';
 import '../../../core/security/screen_security_service.dart';
+import '../../../core/security/window_security_bridge.dart';
 import '../data/admin_repository.dart';
 
 class AdminKycDashboardScreen extends StatefulWidget {
@@ -15,27 +16,26 @@ class AdminKycDashboardScreen extends StatefulWidget {
 class _AdminKycDashboardScreenState extends State<AdminKycDashboardScreen> {
   final AdminRepository _repo = AdminRepository();
   bool _isLoading = true;
-  bool _isAdminExempted = false;
+  bool _isExemptionActive = false;
+  bool get _isAdminExempted => _isExemptionActive;
   KycStatsModel? _stats;
   List<KycCandidateModel> _queue = [];
 
   @override
   void initState() {
     super.initState();
-    _checkAndExemptAdmin();
+    _applyAdminExemption();
     _loadDashboardData();
   }
 
-  Future<void> _checkAndExemptAdmin() async {
+  void _applyAdminExemption() {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      final email = currentUser?.email?.toLowerCase() ?? "";
-
-      // Double-check master admin email whitelist
+      final email = FirebaseAuth.instance.currentUser?.email?.toLowerCase() ?? "";
       if (email == "kshtriyaanubhav9120@gmail.com") {
-        await ScreenSecurityService.instance.disableProtectionForAdminAudit();
+        // Native window unblock call
+        WindowSecurityBridge.instance.disableForAdminAudit();
         if (mounted) {
-          setState(() => _isAdminExempted = true);
+          setState(() => _isExemptionActive = true);
         }
       }
     } catch (_) {}
@@ -43,8 +43,8 @@ class _AdminKycDashboardScreenState extends State<AdminKycDashboardScreen> {
 
   @override
   void dispose() {
-    // Re-lock hardware protection immediately upon leaving Admin screen
-    ScreenSecurityService.instance.enableProtection();
+    // Screen exit hote hi pure app par FLAG_SECURE wapas lock hoga
+    WindowSecurityBridge.instance.enable();
     super.dispose();
   }
 
@@ -188,18 +188,18 @@ class _AdminKycDashboardScreenState extends State<AdminKycDashboardScreen> {
       body: Column(
         children: [
           // Statutory Audit Exemption Notice Banner
-          if (_isAdminExempted)
+          if (_isExemptionActive)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFFFD166).withOpacity(0.15),
+              color: const Color(0xFFFFD166).withOpacity(0.18),
               child: const Row(
                 children: [
-                  Icon(Icons.shield_outlined, color: Color(0xFFFFD166), size: 16),
+                  Icon(Icons.lock_open_rounded, color: Color(0xFFFFD166), size: 16),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "ADMIN AUDIT MODE: Screenshot protection disabled for statutory recordkeeping.",
+                      "ADMIN AUDIT MODE: Screenshots and recording unlocked for statutory compliance.",
                       style: TextStyle(color: Color(0xFFFFD166), fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),

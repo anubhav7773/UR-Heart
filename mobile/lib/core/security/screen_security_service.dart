@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:screen_protector/screen_protector.dart';
+import 'window_security_bridge.dart';
 
 class ScreenSecurityService {
   ScreenSecurityService._internal();
@@ -17,6 +18,7 @@ class ScreenSecurityService {
     try {
       if (kIsWeb) return;
       _isProtectionActive = true;
+      await WindowSecurityBridge.instance.enable();
       await ScreenProtector.preventScreenshotOn();
       if (!kIsWeb && Platform.isIOS) {
         await ScreenProtector.protectDataLeakageWithColor(const Color(0xFF0A0A0D));
@@ -32,6 +34,7 @@ class ScreenSecurityService {
     try {
       if (kIsWeb) return;
       _isProtectionActive = false;
+      await WindowSecurityBridge.instance.disableForAdminAudit();
       await ScreenProtector.preventScreenshotOff();
       debugPrint("🔓 ScreenSecurityService: Hardware protection temporarily DISABLED for Admin Audit.");
     } catch (e) {

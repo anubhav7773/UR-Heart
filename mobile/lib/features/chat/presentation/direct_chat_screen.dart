@@ -49,22 +49,44 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
       _currentUid = "";
     }
     _initChat().then((_) {
+      // Focus room and mark unread messages as read
+      _focusRoom();
       _sendMarkRead();
     });
   }
 
+  void _focusRoom() {
+    if (_wsChannel != null && widget.matchId.isNotEmpty) {
+      try {
+        _wsChannel?.sink.add(jsonEncode({
+          "action": "focus_room",
+          "match_id": widget.matchId,
+        }));
+      } catch (_) {}
+    }
+  }
+
   void _sendMarkRead() {
     if (_wsChannel != null && widget.matchId.isNotEmpty) {
-      _wsChannel?.sink.add(jsonEncode({
-        "action": "mark_read",
-        "match_id": widget.matchId,
-        "sender_id": widget.partnerId,
-      }));
+      try {
+        _wsChannel?.sink.add(jsonEncode({
+          "action": "mark_read",
+          "match_id": widget.matchId,
+          "sender_id": widget.partnerId,
+        }));
+      } catch (_) {}
     }
   }
 
   @override
   void dispose() {
+    // Notify backend that user has left the screen
+    try {
+      _wsChannel?.sink.add(jsonEncode({
+        "action": "blur_room",
+      }));
+    } catch (_) {}
+
     _wsSubscription?.cancel();
     _wsChannel?.sink.close();
     _msgController.dispose();
@@ -101,6 +123,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
           : 'wss://ur-heart.onrender.com';
       final wsUrl = Uri.parse('$baseWs/ws/chat?token=$idToken');
       _wsChannel = WebSocketChannel.connect(wsUrl);
+      _focusRoom();
       _sendMarkRead();
 
       _wsSubscription = _wsChannel!.stream.listen(
