@@ -115,3 +115,16 @@ async def root(request: Request):
         "status": "online"
     }
 
+import asyncio
+from app.services.ephemeral_cleaner import purge_ephemeral_container_cache
+
+@app.on_event("startup")
+async def schedule_cache_cleaner():
+    async def periodic_purge():
+        while True:
+            await asyncio.sleep(600)  # Every 10 minutes
+            purge_ephemeral_container_cache()
+
+    asyncio.create_task(periodic_purge())
+
+
