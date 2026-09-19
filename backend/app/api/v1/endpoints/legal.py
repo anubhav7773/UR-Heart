@@ -53,8 +53,19 @@ async def get_legal_policy(policy_type: Literal["privacy", "terms", "community_g
     policies = {
         "privacy": {
             "title": "DPDP Privacy Notice & Data Charter",
-            "version": "1.2 (September 2026)",
-            "content": "UR-Heart operates under ASI Verticals. In accordance with the Digital Personal Data Protection Act, 2023 (DPDP), user geolocation is strictly obfuscated to city-level and approximate distances. Raw KYC verification video files are auto-purged following verification under Section 8(7). Users retain full Section 11 rights to erasure."
+            "version": "1.3 (September 2026)",
+            "content": (
+                "UR-Heart operates under ASI Verticals. In accordance with the Digital Personal Data Protection Act, 2023 (DPDP), "
+                "user geolocation is strictly obfuscated to city-level and approximate distances. "
+                "Raw KYC verification video files are auto-purged following verification under Section 8(7). "
+                "Users retain full Section 11 rights to erasure.\n\n"
+                "5. THIRD-PARTY ADVERTISING NETWORKS & MONETIZATION\n"
+                "We use third-party ad networks (Google AdMob, AppLovin) to monetize our platform. They may collect device identifiers and approximate location to serve targeted ads.\n\n"
+                "Under Google Play Developer Policy and DPDP Act 2023:\n"
+                "- We never share your real phone number, KYC documents, or real-time GPS coordinates with ad networks.\n"
+                "- Only approximate (fuzzy) location and advertising identifiers are processed subject to your Google UMP consent choices.\n"
+                "- You can revoke or modify your personalized ad tracking preferences at any time via Profile Settings > Ad Privacy & Tracking Preferences."
+            )
         },
         "terms": {
             "title": "End User License Agreement (EULA)",

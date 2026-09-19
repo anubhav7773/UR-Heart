@@ -59,6 +59,20 @@ app.include_router(health_router, tags=["Health & Keep-Alive"])
 # Mount API v1 router
 app.include_router(api_router, prefix="/api/v1")
 
+from fastapi.responses import PlainTextResponse
+
+APP_ADS_TXT_CONTENT = """# UR-Heart / ASI Verticals Authorized Digital Sellers
+google.com, pub-3940256099942544, DIRECT, f08c47fec0942fa0
+applovin.com, 0123456789abcdef, DIRECT
+"""
+
+@app.get("/app-ads.txt", response_class=PlainTextResponse, tags=["Monetization"])
+async def get_app_ads_txt():
+    """
+    Serves statutory app-ads.txt to prevent ad fraud and preserve 100% fill rates.
+    """
+    return PlainTextResponse(content=APP_ADS_TXT_CONTENT.strip(), media_type="text/plain")
+
 @app.websocket("/ws/chat")
 async def root_websocket_chat(websocket: WebSocket, token: Optional[str] = Query(None)):
     await handle_chat_websocket(websocket, token)
