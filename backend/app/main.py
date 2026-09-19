@@ -53,6 +53,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import JSONResponse
+
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Monitoring"])
+async def health_check():
+    """
+    Zero-database keep-alive endpoint for UptimeRobot pings.
+    Returns instantly from memory without allocating database sessions or leaking RAM.
+    """
+    return JSONResponse(
+        content={
+            "status": "healthy",
+            "service": "ur-heart-api",
+            "memory_guard": "512MB_optimized"
+        },
+        status_code=200
+    )
+
 # Mount Health and Keep-Alive router directly at root level for UptimeRobot / Ping monitors
 app.include_router(health_router, tags=["Health & Keep-Alive"])
 

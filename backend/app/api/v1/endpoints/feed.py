@@ -18,6 +18,7 @@ from app.models.schemas.feed import (
     SwipeResponse,
 )
 from app.services.notification_service import send_push_notification
+from app.services.feed_cache import feed_cache
 
 router = APIRouter()
 
@@ -43,8 +44,14 @@ async def get_discovery_feed_endpoint(
 ):
     """
     Returns verified candidate profiles for the Discovery Swipe Feed using
-    the optimized public.get_discovery_feed SQL function with CDN resolved photo URLs.
+    in-memory TTL caching layer to shield database under high concurrency.
     """
+    # 1. Attempt cached fetch to shield DB on concurrent swipes
+    cached_candidates = feed_cache.get(current_user.city, limit, offset)
+    if cached_candidates:
+        # Filter out current user ID from cached segment
+        return [c for c in cached_candidates if c["user_id"] != str(current_user.id)]
+
     caller_lat = lat if lat is not None else (float(current_user.latitude) if current_user.latitude is not None else None)
     caller_lon = lon if lon is not None else (float(current_user.longitude) if current_user.longitude is not None else None)
 
@@ -103,6 +110,9 @@ async def get_discovery_feed_endpoint(
             "is_verified": bool(row.get("is_verified", False)),
             "photos": normalized_photos,
         })
+
+    # 3. Store in cache for subsequent concurrent requests
+    feed_cache.set(current_user.city, limit, offset, feed_candidates)
 
     return feed_candidates
 
