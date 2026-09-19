@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
+import 'package:ur_heart/core/widgets/insufficient_credits_sheet.dart';
 import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
 import 'package:ur_heart/features/feed/data/feed_repository.dart';
 import 'package:ur_heart/features/profile/data/profile_repository.dart';
+import 'package:ur_heart/features/wallet/data/wallet_repository.dart';
 
 /// Screen 3: Production Discovery Swipe Feed with Real Candidate Profiles & Live Swiping
 class FeedScreen extends StatefulWidget {
@@ -29,12 +31,12 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
   final FeedRepository _feedRepository = FeedRepository();
   final ProfileRepository _profileRepository = ProfileRepository();
+  final WalletRepository _walletRepository = WalletRepository();
 
   List<CandidateProfileModel> _candidates = [];
   int _currentIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;
-  int _swipesUntilAd = 4;
   int _dmTokens = 0;
   int _streakCount = 0;
   bool _isProcessingSwipe = false;
@@ -58,9 +60,11 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
       final results = await Future.wait([
         _feedRepository.getCandidates(),
         _profileRepository.getProfile(),
+        _walletRepository.fetchBalance(),
       ]);
       final candidates = results[0] as List<CandidateProfileModel>;
       final profile = results[1] as UserProfileData?;
+      final wallet = results[2] as WalletBalanceModel?;
 
       if (mounted) {
         setState(() {
@@ -68,6 +72,10 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
           _currentIndex = 0;
           if (profile != null) {
             _streakCount = profile.streakCount;
+          }
+          if (wallet != null) {
+            _dmTokens = wallet.dmCredits;
+          } else if (profile != null) {
             _dmTokens = profile.rewardBalance;
           }
           _isLoading = false;
@@ -90,7 +98,6 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
     setState(() {
       _isProcessingSwipe = true;
       _currentIndex++;
-      _swipesUntilAd = (_swipesUntilAd > 1) ? _swipesUntilAd - 1 : 4;
     });
 
     try {
@@ -123,7 +130,6 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
   Future<void> _handleSwipeDismissed(String swipeType, CandidateProfileModel candidate) async {
     setState(() {
       _currentIndex++;
-      _swipesUntilAd = (_swipesUntilAd > 1) ? _swipesUntilAd - 1 : 4;
     });
 
     try {
@@ -144,6 +150,165 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
     } catch (e) {
       debugPrint('Feed swipe error: $e');
     }
+  }
+
+  Future<void> _handleDirectDmAction() async {
+    if (_currentIndex >= _candidates.length) return;
+    final candidate = _candidates[_currentIndex];
+
+    try {
+      final balance = await _walletRepository.fetchBalance();
+      if (mounted) {
+        setState(() {
+          _dmTokens = balance.dmCredits;
+        });
+      }
+
+      if (balance.dmCredits > 0) {
+        final spent = await _walletRepository.spendCredit(
+          rewardType: "dm_credit",
+          amount: 1,
+          targetId: candidate.id,
+        );
+        if (spent) {
+          if (mounted) {
+            setState(() {
+              _dmTokens = (balance.dmCredits - 1).clamp(0, 9999);
+            });
+            _openDirectDmComposer(candidate);
+          }
+        } else {
+          if (mounted) {
+            _showInsufficientDmSheet(candidate);
+          }
+        }
+      } else {
+        if (mounted) {
+          _showInsufficientDmSheet(candidate);
+        }
+      }
+    } catch (_) {
+      if (_dmTokens > 0) {
+        _openDirectDmComposer(candidate);
+      } else {
+        _showInsufficientDmSheet(candidate);
+      }
+    }
+  }
+
+  void _showInsufficientDmSheet(CandidateProfileModel candidate) {
+    InsufficientCreditsSheet.show(
+      context,
+      actionType: CreditActionType.directDm,
+      targetUserId: candidate.id,
+      onCreditAcquired: () async {
+        try {
+          await _walletRepository.spendCredit(
+            rewardType: "dm_credit",
+            amount: 1,
+            targetId: candidate.id,
+          );
+        } catch (_) {}
+        if (mounted) {
+          _openDirectDmComposer(candidate);
+        }
+      },
+    );
+  }
+
+  void _openDirectDmComposer(CandidateProfileModel candidate) {
+    final TextEditingController msgController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF16161D),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.star_rounded, color: Color(0xFFFFD166), size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  "Direct DM to ${candidate.fullName}",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Send an instant direct message using your DM credit.",
+              style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: msgController,
+              maxLines: 3,
+              maxLength: 250,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "Write a respectful message...",
+                hintStyle: const TextStyle(color: Color(0xFF636375)),
+                filled: true,
+                fillColor: const Color(0xFF22222C),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF2E63),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  final text = msgController.text.trim();
+                  if (text.isEmpty) return;
+                  Navigator.pop(ctx);
+                  await _handleSwipe('direct_dm');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("✓ Direct message sent!"),
+                        backgroundColor: Color(0xFF06D6A0),
+                      ),
+                    );
+                  }
+                },
+                child: const Text(
+                  "Send Message",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showMatchDialog(CandidateProfileModel candidate, String? matchId) {
@@ -291,26 +456,7 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
       body: SafeArea(
         child: Column(
           children: [
-            // Paced Ad Countdown Pill directly below top bar
-            Center(
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                decoration: BoxDecoration(
-                  color: URHeartColors.cardSurface,
-                  borderRadius: URHeartTheme.radiusPill,
-                  border: Border.all(color: URHeartColors.brandSecondary.withValues(alpha: 0.6)),
-                ),
-                child: Text(
-                  _t('feedAdCounter', {'x': '$_swipesUntilAd'}),
-                  style: const TextStyle(
-                    color: URHeartColors.brandSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+            const SizedBox(height: 8),
 
             // Card Stack Viewport
             Expanded(
@@ -335,7 +481,7 @@ class _FeedScreenState extends State<FeedScreen> with SecureScreenMixin {
 
                     // Center Raised Star Button: Direct DM
                     InkWell(
-                      onTap: () => _handleSwipe('direct_dm'),
+                      onTap: () => widget.onDirectDmTap != null ? widget.onDirectDmTap!() : _handleDirectDmAction(),
                       borderRadius: URHeartTheme.radiusPill,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

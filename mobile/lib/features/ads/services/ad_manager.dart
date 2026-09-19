@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:ur_heart/core/config/env_config.dart';
 
@@ -158,5 +160,39 @@ class AdManager {
 
     _preloadedInterstitialAd!.show();
     return true;
+  }
+}
+
+extension MultiTierAdManager on AdManager {
+  Future<void> showTieredAd({
+    required BuildContext context,
+    required String adTier, // '10s', '20s', '30s'
+    required String rewardChoice,
+    required VoidCallback onRewardSuccess,
+  }) async {
+    final String currentUid = FirebaseAuth.instance.currentUser?.uid ?? "anonymous";
+
+    if (adTier == "10s" || adTier == "20s") {
+      // 10s Bumper or 20s Interstitial
+      final bool shown = showInterstitialAd(
+        onDismissed: onRewardSuccess,
+      );
+      if (!shown) {
+        // Fallback for test / dev environment when real ad is not buffered
+        onRewardSuccess();
+      }
+    } else {
+      // 30s Rewarded Video
+      final bool shown = showRewardedAd(
+        userId: currentUid,
+        adType: "manual_$adTier",
+        targetId: rewardChoice,
+        onRewardGranted: onRewardSuccess,
+      );
+      if (!shown) {
+        // Fallback for test / dev environment when real ad is not buffered
+        onRewardSuccess();
+      }
+    }
   }
 }

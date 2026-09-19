@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/utils/vernacular_strings.dart';
+import 'package:ur_heart/core/widgets/insufficient_credits_sheet.dart';
+import 'package:ur_heart/features/wallet/data/wallet_repository.dart';
 
 /// Screen 5: Mutual WhatsApp Reveal 3-Ad Checkpoint Bottom Sheet
 /// Spec: URH-UIX-009 Section 3 Screen 5
@@ -10,6 +12,7 @@ class WhatsAppRevealSheet extends StatelessWidget {
   final int userAdsWatched;
   final int matchAdsWatched;
   final VoidCallback? onWatchAdTap;
+  final String? targetUserId;
 
   const WhatsAppRevealSheet({
     super.key,
@@ -18,6 +21,7 @@ class WhatsAppRevealSheet extends StatelessWidget {
     this.userAdsWatched = 0,
     this.matchAdsWatched = 0,
     this.onWatchAdTap,
+    this.targetUserId,
   });
 
   String _t(String key, [Map<String, String>? args]) =>
@@ -157,7 +161,7 @@ class WhatsAppRevealSheet extends StatelessWidget {
           SizedBox(
             height: 52,
             child: InkWell(
-              onTap: onWatchAdTap,
+              onTap: () => _handleProgressTap(context),
               borderRadius: URHeartTheme.radiusPill,
               child: Container(
                 decoration: BoxDecoration(
@@ -180,7 +184,7 @@ class WhatsAppRevealSheet extends StatelessWidget {
                       const Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 22),
                       const SizedBox(width: 8),
                       Text(
-                        'Watch Video Ad (30s) to Progress [$userAdsWatched/3]',
+                        'Progress Checkpoint [$userAdsWatched/3]',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -236,5 +240,65 @@ class WhatsAppRevealSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handleProgressTap(BuildContext context) async {
+    final walletRepo = WalletRepository();
+    final targetId = targetUserId ?? "match_partner";
+
+    try {
+      final balance = await walletRepo.fetchBalance();
+      if (balance.waRevealTokens > 0) {
+        final spent = await walletRepo.spendCredit(
+          rewardType: "wa_reveal_token",
+          amount: 1,
+          targetId: targetId,
+        );
+        if (spent) {
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+          onWatchAdTap?.call();
+          return;
+        }
+      }
+
+      // 0 tokens: Present InsufficientCreditsSheet
+      if (context.mounted) {
+        InsufficientCreditsSheet.show(
+          context,
+          actionType: CreditActionType.waReveal,
+          targetUserId: targetId,
+          onCreditAcquired: () async {
+            try {
+              await walletRepo.spendCredit(
+                rewardType: "wa_reveal_token",
+                amount: 1,
+                targetId: targetId,
+              );
+            } catch (_) {}
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
+            onWatchAdTap?.call();
+          },
+        );
+      }
+    } catch (_) {
+      // Fallback
+      if (context.mounted) {
+        InsufficientCreditsSheet.show(
+          context,
+          actionType: CreditActionType.waReveal,
+          targetUserId: targetId,
+          onCreditAcquired: () {
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
+            onWatchAdTap?.call();
+          },
+        );
+      }
+    }
   }
 }

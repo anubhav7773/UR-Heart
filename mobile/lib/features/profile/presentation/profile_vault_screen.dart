@@ -10,6 +10,7 @@ import 'package:ur_heart/features/profile/data/profile_repository.dart';
 import '../../admin/presentation/admin_kyc_dashboard.dart';
 import '../../legal/presentation/grievance_hub_screen.dart';
 import '../../privacy/presentation/privacy_center_screen.dart';
+import '../../wallet/presentation/manual_rewards_hub_screen.dart';
 
 /// Screen 6: Profile, Streak Vault & One-Tap Account Erase Center
 /// Spec: URH-UIX-009 Section 3 Screen 6
@@ -425,6 +426,41 @@ class _ProfileVaultScreenState extends State<ProfileVaultScreen> {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Watch Ads & Earn Rewards Hub Tile
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16161D),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.35)),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD166).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.card_giftcard, color: Color(0xFFFFD166), size: 22),
+                        ),
+                        title: const Text(
+                          "Watch Ads & Earn Rewards / रिवॉर्ड पाएं",
+                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: const Text(
+                          "Claim Direct DMs, WhatsApp Tokens & Shields (10s, 20s, 30s)",
+                          style: TextStyle(color: Color(0xFFA0A0B2), fontSize: 11),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFFFFD166), size: 14),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const ManualRewardsHubScreen()),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 20),

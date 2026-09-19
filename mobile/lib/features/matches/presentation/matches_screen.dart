@@ -6,9 +6,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ur_heart/core/config/theme.dart';
 import 'package:ur_heart/core/network/api_client.dart';
 import 'package:ur_heart/core/security/secure_screen_mixin.dart';
+import 'package:ur_heart/core/widgets/insufficient_credits_sheet.dart';
 import 'package:ur_heart/features/chat/presentation/chat_room_screen.dart';
 import 'package:ur_heart/features/matches/data/matches_repository.dart';
 import 'package:ur_heart/features/ads/services/ad_manager.dart';
+import 'package:ur_heart/features/wallet/data/wallet_repository.dart';
 
 /// Dual-Tab Screen: Connected Matches & "Second Chance" Missed Connections Tray
 class MatchesScreen extends StatefulWidget {
@@ -29,6 +31,7 @@ class _MatchesScreenState extends State<MatchesScreen>
     with SingleTickerProviderStateMixin, SecureScreenMixin {
   late TabController _tabController;
   final MatchesRepository _repo = MatchesRepository();
+  final WalletRepository _walletRepo = WalletRepository();
   List<MatchItemModel> _matches = [];
   bool _isLoadingMatches = true;
 
@@ -121,13 +124,49 @@ class _MatchesScreenState extends State<MatchesScreen>
   }
 
   Future<void> _handleUnlockProfile(Map<String, dynamic> profile) async {
-    // Show 5-10s Interstitial Ad
-    final bool shown = AdManager.instance.showInterstitialAd(
-      onDismissed: () => _executeUnlock(profile),
-    );
-    if (!shown) {
-      // In dev/test when real ad is not preloaded, allow unlock directly
-      await _executeUnlock(profile);
+    final targetUserId = profile['user_id']?.toString() ?? "missed_profile";
+
+    try {
+      final balance = await _walletRepo.fetchBalance();
+      if (balance.missedBioPasses > 0) {
+        final spent = await _walletRepo.spendCredit(
+          rewardType: "missed_bio_pass",
+          amount: 1,
+          targetId: targetUserId,
+        );
+        if (spent) {
+          await _executeUnlock(profile);
+          return;
+        }
+      }
+
+      // If 0 passes: Present InsufficientCreditsSheet
+      if (mounted) {
+        InsufficientCreditsSheet.show(
+          context,
+          actionType: CreditActionType.missedBio,
+          targetUserId: targetUserId,
+          onCreditAcquired: () async {
+            try {
+              await _walletRepo.spendCredit(
+                rewardType: "missed_bio_pass",
+                amount: 1,
+                targetId: targetUserId,
+              );
+            } catch (_) {}
+            await _executeUnlock(profile);
+          },
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        InsufficientCreditsSheet.show(
+          context,
+          actionType: CreditActionType.missedBio,
+          targetUserId: targetUserId,
+          onCreditAcquired: () => _executeUnlock(profile),
+        );
+      }
     }
   }
 
@@ -513,7 +552,7 @@ class _MatchesScreenState extends State<MatchesScreen>
                           onPressed: () => _handleUnlockProfile(p),
                           icon: const Icon(Icons.lock_open, size: 14, color: Color(0xFFFFD166)),
                           label: const Text(
-                            "Watch 10s Ad -> View Bio",
+                            "View Bio",
                             style: TextStyle(color: Color(0xFFFFD166), fontSize: 11),
                           ),
                           style: TextButton.styleFrom(

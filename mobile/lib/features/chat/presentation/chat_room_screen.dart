@@ -294,10 +294,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SecureScreenMixin 
         matchPartnerName: widget.participantName ?? 'Match',
         userAdsWatched: _userAdsWatched,
         matchAdsWatched: _matchAdsWatched,
-        onWatchAdTap: () {
-          Navigator.of(ctx).pop();
-          _onWatchAd();
-        },
+        targetUserId: widget.participantId,
+        onWatchAdTap: _onWatchAd,
       ),
     );
   }
