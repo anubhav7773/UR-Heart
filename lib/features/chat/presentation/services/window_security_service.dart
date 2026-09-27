@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_windowmanager/flutter_windowmanager.dart';
+import '../../../../core/services/flutter_windowmanager.dart';
 
 /// Secure window management service enforcing screenshot & screen-recording prevention
 /// for 1:1 Encrypted Dialogues (Screen 9) per DPDP Act 2023 directives.

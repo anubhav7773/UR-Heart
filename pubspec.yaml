@@ -19,7 +19,6 @@ dependencies:
   image: ^4.1.7
   http: ^1.2.2
   sentry_flutter: ^8.0.0
-  flutter_windowmanager: ^0.2.0
   web_socket_channel: ^3.0.3
   firebase_core: ^4.15.0
   firebase_storage: ^13.6.0
