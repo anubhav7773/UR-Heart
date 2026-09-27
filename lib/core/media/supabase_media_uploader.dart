@@ -1,0 +1,70 @@
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
+
+/// Direct Client-to-Supabase Cloud Storage Media Uploader
+/// Bypasses backend server completely (0 MB Render server bandwidth)
+/// 100% Free with zero credit card required
+class SupabaseMediaUploader {
+  SupabaseMediaUploader._();
+
+  static const String supabaseUrl = 'https://fmedkihgcvvzcekwybhe.supabase.co';
+  static const String anonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtZWRraWhnY3Z2emNla3d5YmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzMjU1NzEsImV4cCI6MjEwNTkwMTU3MX0.BKYfJW8rh-eP1fRdaEGmeELoS5s2aQpuIROpiRDgVFU';
+  static const String bucketName = 'ur-heart-media';
+
+  static http.Client? _customClient;
+
+  /// Allows mock injection in test environments
+  static void setClientForTesting(http.Client? client) {
+    _customClient = client;
+  }
+
+  /// Uploads compressed WebP direct to user moment slot (1 through 5)
+  static Future<String?> uploadProfileSlot({
+    required String userUuid,
+    required int slotNumber,
+    required Uint8List webpBytes,
+  }) async {
+    if (slotNumber < 1 || slotNumber > 5) return null;
+
+    final String objectPath = 'users/$userUuid/moments/slot_$slotNumber.webp';
+    final Uri uploadUri = Uri.parse(
+      '$supabaseUrl/storage/v1/object/$bucketName/$objectPath',
+    );
+
+    final client = _customClient ?? http.Client();
+    try {
+      final response = await client.post(
+        uploadUri,
+        headers: {
+          'apikey': anonKey,
+          'Authorization': 'Bearer $anonKey',
+          'Content-Type': 'image/webp',
+          'x-upsert': 'true',
+          'cache-control': 'public, max-age=2592000',
+        },
+        body: webpBytes,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return '$supabaseUrl/storage/v1/object/public/$bucketName/$objectPath';
+      }
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      if (_customClient == null) {
+        client.close();
+      }
+    }
+  }
+
+  /// Returns public CDN URL for a user moment slot
+  static String getPublicUrl({
+    required String userUuid,
+    required int slotNumber,
+  }) {
+    final String objectPath = 'users/$userUuid/moments/slot_$slotNumber.webp';
+    return '$supabaseUrl/storage/v1/object/public/$bucketName/$objectPath';
+  }
+}

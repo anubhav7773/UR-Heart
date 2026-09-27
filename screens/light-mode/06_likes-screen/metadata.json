@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "fbef17aa12864e2e820505962a25cf94",
+  "resourceName": "projects/3794057334896238495/screens/fbef17aa12864e2e820505962a25cf94",
+  "title": "UR-Heart - Likes Screen (Light Mode - Exact Background & Single-Line 3D Cards)",
+  "mode": "Light Mode",
+  "category": "Likes Screen",
+  "folder": "06_likes-screen",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "1772",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1X2AaFIBYvKSlaaS-L9Vj_s5yM1Cza0XYqS_56dHVtkLSUDikpNEOOMsjJaP02iVUCrcsuy1bbCyq55WDouwOrqUgyHutYzbHxIpFTfgHVpwz40YGYBU7VWTui0v4uhhI71nkFcnbHd3g-HGTlsG7w8LsHdQDay106dSkaXv-FXOK6vlQyI8C2e35BpOENdxrSIj6LBpqjVfPy9CTD-lS2Me3cIRBpTZEq_YrWMHCBJpbU6LXZwJlsuyRM",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRkMWMyYTM1NzEwMjhmMDhhYTAyMmFlNTk2EgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/light-mode/06_likes-screen/screenshot.png",
+  "localHtml": "screens/light-mode/06_likes-screen/screen.html"
+}

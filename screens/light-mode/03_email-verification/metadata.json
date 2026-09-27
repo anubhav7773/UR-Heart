@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "b54525c7a43d46e582f46bc5a4dff9ce",
+  "resourceName": "projects/3794057334896238495/screens/b54525c7a43d46e582f46bc5a4dff9ce",
+  "title": "UR-Heart - Email Verification (Light Mode - Ultra Premium)",
+  "mode": "Light Mode",
+  "category": "Email Verification",
+  "folder": "03_email-verification",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "1768",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1V49HgHnzAqUP9Z5-FET2lNoJ_24FxLPq617EKR4PcfjyF4Dqs5nnJ0xVSyZo1wAlNBhlj6jiIoQnVdv6gbkvfOZXRiPJjoVMA9xw8EAwvws0jYcUcq2BjakZXRsXLKHo56k86A_aV3fCeyBQsszdhABDASXf_kre7Y4PBN2Yi4P3PMDLZdqxBMt_9Zz8vsUqdvVhioCnPbi20pNS9TE_7TM5A5ez9bweP5yfTLAjlyNcJtnKYsFLNnr7A",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRjMjA4YjMxMjYwNzllNmUyMWNhMDg0ZmQzEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/light-mode/03_email-verification/screenshot.png",
+  "localHtml": "screens/light-mode/03_email-verification/screen.html"
+}

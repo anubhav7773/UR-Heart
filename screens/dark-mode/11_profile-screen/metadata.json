@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "ba49662d359b405dbe492911e8262582",
+  "resourceName": "projects/3794057334896238495/screens/ba49662d359b405dbe492911e8262582",
+  "title": "UR-Heart - Profile Screen (Dark Mode - Fluid 3D Redesign)",
+  "mode": "Dark Mode",
+  "category": "Profile Screen",
+  "folder": "11_profile-screen",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "4614",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1VKo0U7461UGrvXNgSHD7vn9yhsK219PzBhf-9NXmUwvZvmm4Pgf4c0BIZVZYtPUBpAc0JlMs0B70_LnngRDX1zI-xkkSh6Iy6HAw3X00qlTjquv-bvJoOZwVgBy1OY-vnN5fGSf2z_zF7LAz9YBRm9v_Xp86SRQGvV3YeurjHwCkn5ETT3EkyrcZXnVlegryMmMVdJq0IZlIh5Z2AzZ-0P3VHeh0h2b-2Om8EyHypTjI9-GvJDHzfDhho",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRlMWY1OWE4ZDkwMWE2Mzg3NzVmMGFlOTZkEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/dark-mode/11_profile-screen/screenshot.png",
+  "localHtml": "screens/dark-mode/11_profile-screen/screen.html"
+}

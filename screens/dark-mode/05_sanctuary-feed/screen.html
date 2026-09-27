@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="mobile_tab" name="shell-type"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "coral": "#EE8A70",
+            "coral-glow": "#fc9174",
+            "forest-deep": "#082d26",
+            "forest-card": "#13211d",
+            "forest-accent": "#1d3b34",
+            "obsidian": "#0b1110",
+            "card-dark": "#121d1a",
+            "mint-badge": "#a9cec4"
+          },
+          fontFamily: {
+            "headline-md": ["Newsreader", "serif"],
+            "headline-lg": ["Newsreader", "serif"],
+            "subhead-italic": ["Newsreader", "serif"],
+            "display-serif": ["Newsreader", "serif"],
+            "body-md": ["Plus Jakarta Sans", "sans-serif"],
+            "body-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "label-caps": ["Plus Jakarta Sans", "sans-serif"],
+            "label-md": ["Plus Jakarta Sans", "sans-serif"],
+            "label-sm": ["Plus Jakarta Sans", "sans-serif"]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    @layer base {
+      html, body {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #0b1110;
+      }
+      body {
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .pb-safe {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-[#0b1110] font-body-md text-white antialiased relative min-h-screen selection:bg-coral/30">
+<!-- ==================== BACKGROUND FRAME & BOTANICAL ACCENTS (IMAGE_39 / IMAGE_6 RIGHT HALF) ==================== -->
+<div class="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#0a100f]">
+<!-- Ambient glowing copper/emerald blooms -->
+<div class="absolute -top-24 -left-20 w-[420px] h-[420px] bg-[#16382f]/35 rounded-full blur-[100px]"></div>
+<div class="absolute top-[28%] -right-28 w-[380px] h-[380px] bg-[#EE8A70]/12 rounded-full blur-[120px]"></div>
+<div class="absolute bottom-10 -left-20 w-[420px] h-[420px] bg-[#1a382e]/25 rounded-full blur-[110px]"></div>
+<!-- Wireframe glowing copper heart curve (exact matching reference image 6 / 39 right side) -->
+<svg class="absolute top-10 right-2 w-[280px] h-[280px] text-[#EE8A70]/18 stroke-current fill-none stroke-[1.2] opacity-80" viewbox="0 0 100 100">
+<path d="M50,88 C50,88 12,62 12,34 C12,18 25,12 36,18 C43,22 50,30 50,30 C50,30 57,22 64,18 C75,12 88,18 88,34 C88,62 50,88 50,88 Z" stroke-dasharray="2 1.5"></path>
+</svg>
+<svg class="absolute -bottom-16 -right-12 w-[340px] h-[340px] text-[#EE8A70]/10 stroke-current fill-none stroke-[1]" viewbox="0 0 100 100">
+<path d="M50,85 C50,85 15,60 15,35 C15,20 27,15 37,20 C44,24 50,32 50,32 C50,32 56,24 63,20 C73,15 85,20 85,35 C85,60 50,85 50,85 Z"></path>
+</svg>
+<!-- Subtle botanical silhouette shadows (warm organic leaves like reference) -->
+<svg class="absolute bottom-0 right-0 w-64 h-72 opacity-25 text-[#1e342b] fill-current pointer-events-none" viewbox="0 0 200 200">
+<path d="M200,200 C150,180 120,130 140,80 C145,68 155,55 168,48 C160,75 175,110 200,120 Z"></path>
+<path d="M180,200 C140,160 110,120 120,70 C105,95 110,140 150,180 Z"></path>
+</svg>
+<!-- Top Left Editorial Serif Whisper -->
+<div class="absolute top-[52px] left-6 font-subhead-italic text-[15px] italic text-[#bec9c2]/45 select-none leading-snug">
+      More<br/>than<br/>swipes
+      <div class="w-4 h-[1px] bg-[#bec9c2]/30 mt-1.5"></div>
+</div>
+<!-- Center/Right Editorial Serif Whisper -->
+<div class="absolute top-[68px] right-6 font-subhead-italic text-[15px] italic text-[#bec9c2]/40 select-none text-right leading-tight">
+      Safer<br/>Kinder<br/>Real
+    </div>
+<!-- Bottom Editorial Whisper -->
+<div class="absolute bottom-28 left-6 font-subhead-italic text-[14px] italic text-[#bec9c2]/35 select-none leading-tight">
+      Real<br/>Connections<br/>Brighter Days
+      <div class="w-4 h-[1px] bg-[#bec9c2]/25 mt-1.5"></div>
+</div>
+</div>
+<!-- ==================== HEADER (STATUS & LANGUAGE BAR) ==================== -->
+<header class="fixed top-0 inset-x-0 z-40 pt-safe">
+<!-- iOS Status bar container -->
+<div class="h-11 px-7 flex items-center justify-between text-white/90">
+<span class="text-[15px] font-semibold tracking-tight">9:41</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[17px]">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[17px]">wifi</span>
+<span class="material-symbols-outlined text-[20px]">battery_full</span>
+</div>
+</div>
+<!-- Top Bar with Language Selector & Header Title -->
+<div class="px-6 py-2 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-[#162722] border border-white/10 flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-[18px] text-[#a9cec4]">spa</span>
+</div>
+<div class="flex flex-col">
+<h1 class="font-headline-md text-[24px] text-[#faf9f3] tracking-tight leading-none">Sanctuary Feed</h1>
+<span class="font-label-caps text-[9px] uppercase tracking-[0.2em] text-[#EE8A70] mt-0.5">Mindful Discovery</span>
+</div>
+</div>
+<!-- Reference Language Pill -->
+<button class="h-9 px-3.5 rounded-full bg-[#14231f]/90 border border-white/10 text-[#e3e3dd] flex items-center gap-1.5 text-[12px] font-medium backdrop-blur-md hover:bg-[#1a2d28] active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[15px] text-[#bec9c2]">language</span>
+<span>English</span>
+<span class="material-symbols-outlined text-[15px] text-[#bec9c2]">expand_more</span>
+</button>
+</div>
+</header>
+<!-- ==================== MAIN CONTENT AREA ==================== -->
+<main class="relative z-10 flex flex-col items-center w-full px-4 pt-[114px] pb-safe">
+<!-- 3D ELEVATED LUXURY CARD CONTAINER (36px rounded corners + layered glow shadow) -->
+<div class="w-full max-w-[420px] rounded-[36px] bg-[#121c19] border border-white/[0.09] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85),0_4px_24px_rgba(238,138,112,0.06),inset_0_1px_1px_rgba(255,255,255,0.08)] p-3.5 flex flex-col relative transition-all duration-300">
+<!-- INSIDE CARD HEADER: Brand badge / crest matching light mode exactly -->
+<div class="flex items-center justify-between px-1.5 pt-1 pb-3">
+<div class="flex items-center gap-2.5">
+<!-- Dark forest green rounded container with heart icon (exact to reference) -->
+<div class="w-10 h-10 rounded-[14px] bg-[#0c241e] border border-[#21433c]/80 flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]">
+<span class="material-symbols-outlined text-[20px] text-white" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-[17px] text-[#faf9f3] tracking-tight leading-tight font-semibold">UR-Heart</span>
+<span class="font-label-caps text-[9px] uppercase tracking-[0.16em] text-[#bec9c2]/75">A BETTER WAY TO MEET</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<!-- SANCTUARY VERIFIED Badge -->
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#162a24] border border-[#23453b] text-[#a9cec4] shadow-sm">
+<span class="material-symbols-outlined text-[13px] text-[#55d6a2]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-caps text-[9px] font-bold tracking-wider text-[#a9cec4]">SANCTUARY</span>
+</div>
+<!-- Filter / tuning settings icon button -->
+<button class="w-8 h-8 rounded-full bg-[#182723] border border-white/10 flex items-center justify-center text-[#bec9c2] hover:text-white active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[16px]">tune</span>
+</button>
+</div>
+</div>
+<!-- PROFILE PHOTO SLIDER / CAROUSEL -->
+<div class="relative w-full aspect-[4/5] rounded-[28px] overflow-hidden bg-[#162420] shadow-[0_12px_32px_rgba(0,0,0,0.5)] select-none group" id="carousel-container">
+<!-- High-res photo of Aanya, 24 -->
+<div class="w-full h-full bg-cover bg-center transition-all duration-500 ease-out" id="photo-viewer" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBw-EUDKkz1Jg8kET9pnkc06EZKVko6Ec3TUu6HZqbTzxl7nPJS1R1UhuYSc9RUirtsMffdN9m_6FePWdSO-XUmBzc0oN2rODAVH6SqqvaHCYIb1SY4Y7qy-yMgW3gblV0Mw-OWsA76z33vMdlYGi5FMd7ATMyhgc66kdx8rfiYA8SwGyTPRK0Bjvn7pz_0OgnRwwEgofYx7sBLjhJ7e29noAlW0Fqg7X4_dyA3XgtECz7wyLSQMGqC')"></div>
+<!-- Soft gradient vignette overlay -->
+<div class="absolute inset-0 bg-gradient-to-t from-[#0e1715]/95 via-transparent to-black/45 pointer-events-none"></div>
+<!-- Top overlay: 5-segment story progress indicators -->
+<div class="absolute top-3 inset-x-3.5 z-20 flex flex-col gap-2.5">
+<div class="flex items-center gap-1.5 w-full" id="carousel-indicators">
+<div class="h-1 flex-1 rounded-full bg-[#EE8A70] shadow-[0_0_8px_rgba(238,138,112,0.8)] transition-all"></div>
+<div class="h-1 flex-1 rounded-full bg-white/30 backdrop-blur-sm transition-all"></div>
+<div class="h-1 flex-1 rounded-full bg-white/30 backdrop-blur-sm transition-all"></div>
+<div class="h-1 flex-1 rounded-full bg-white/30 backdrop-blur-sm transition-all"></div>
+<div class="h-1 flex-1 rounded-full bg-white/30 backdrop-blur-sm transition-all"></div>
+</div>
+<!-- Badges under progress bar -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/55 backdrop-blur-md border border-white/10 shadow-sm">
+<span class="material-symbols-outlined text-[13px] text-[#55d6a2]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-caps text-[9px] text-[#faf9f3] tracking-wider font-semibold">VERIFIED ARCHITECT</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/55 backdrop-blur-md border border-white/10 text-[#a9cec4] font-label-caps text-[9px] tracking-wide">
+<span class="w-1.5 h-1.5 rounded-full bg-[#55d6a2] animate-pulse"></span>
+<span>ONLINE NOW</span>
+</div>
+</div>
+</div>
+<!-- Floating circular glassmorphic arrow buttons -->
+<button aria-label="Previous Photo" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/45 backdrop-blur-md border border-white/15 flex items-center justify-center text-white/90 hover:text-white active:scale-90 transition-all z-20 shadow-lg" id="prev-photo">
+<span class="material-symbols-outlined text-[19px]">chevron_left</span>
+</button>
+<button aria-label="Next Photo" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/45 backdrop-blur-md border border-white/15 flex items-center justify-center text-white/90 hover:text-white active:scale-90 transition-all z-20 shadow-lg" id="next-photo">
+<span class="material-symbols-outlined text-[19px]">chevron_right</span>
+</button>
+<!-- Bottom overlay on photo: GPS & candid thumbnails -->
+<div class="absolute bottom-3 inset-x-3 z-20 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<div class="px-3 py-1 rounded-full bg-[#0d1815]/85 backdrop-blur-md border border-white/10 flex items-center gap-1.5 text-[#a9cec4] font-label-sm text-[12px]">
+<span class="material-symbols-outlined text-[14px] text-[#EE8A70]">location_on</span>
+<span>Bandra West, Mumbai (~1.5 km away)</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-[#bec9c2] font-label-caps text-[9px] tracking-wider">
+              +4 Candid Glimpses
+            </span>
+</div>
+<!-- 4 circular/rounded thumbnail previews -->
+<div class="flex items-center gap-2 overflow-x-auto py-0.5" id="mini-previews">
+<div class="w-10 h-10 rounded-full bg-cover bg-center shrink-0 ring-2 ring-[#EE8A70] shadow-md cursor-pointer transition-all" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBhqg6RLOg7t9EajTcAYV0CJt_hcn-oz36tb-AqNwVy0U9zQtBWQZv8OWElFKEoEpIJ-dhr05CUfrLtW0nXlTGf07Z2COcMistRwfTyfNqEeGa8Vs22AfdGY-O37jUsuDnJb5G_tlZRiSp0cbvCU7PzoB2XBpUaZv6hAIPWwSN2426wmbLEXS81pveFwJe3QpfMx9F5UxGS0TqSFgnKAwnxdYH8Kdy5EJQUTWII6-hJCe2psqminRAf')"></div>
+<div class="w-10 h-10 rounded-full bg-cover bg-center shrink-0 opacity-65 hover:opacity-100 ring-1 ring-white/20 transition-all cursor-pointer" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCUG_FIe-PI02vAdid8_H7DxbPJbzniL-NiM6h6_yreLVXhDahfo6qjEmMupy_HtGXh22cQs8bjmafu2EQPrXa0cn-ygnFf8w08Iy06nZR_-KgPDHA0YSMuD5qkoOJEOlFj1VreXYULvyUou8g6tgmsrDWav4SM_hM0mWXxAen2aut_zC0OEFqjr6lJ5MBMVbTnB_H8IE2czf82m-hFuONm39S0hfDpvMz-l9eM_hZbk4DXIp_JYaro')"></div>
+<div class="w-10 h-10 rounded-full bg-cover bg-center shrink-0 opacity-65 hover:opacity-100 ring-1 ring-white/20 transition-all cursor-pointer" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAERV5Vl1qyKXXu3dANGl8arc28-Q9ru-RU-nxLrbA4C3PLOhGU4811eAwl8nosJCSXVb3tcSBCWius63UyQv5qOaORVo7IwbaKkCG-5VkGF51Q02EwHmYWDKorbdnPmJwcnvqLOelNSWlPgKGU5IXOJNf6NZAMUmIm4o1cLFre_P9Xksc9xUH7mc9xcs6gU6V6j5wsORFo1A0gK0ftL2T8w6hs_KAo0ucb1MAC880de9OtWFBoRfa_')"></div>
+<div class="w-10 h-10 rounded-full bg-cover bg-center shrink-0 opacity-65 hover:opacity-100 ring-1 ring-white/20 transition-all cursor-pointer" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCp8TRyBwJnT1arUS2botdom2sZKb68MKvOd2yT-W2oB2GQbkWZVTSp1Cb_2rOQOelGN9FO1c22TlI6NDJqh4H5ZpJ3qOSo_c4Z93aJNwhoaoY3NKilqpolGyPqNaHTv6t14OYzJRPqNxKlA7_3Z_leP7a6TX7P1VEHLqY2gmkTGNSW96bjy7BNU6iFoxD-nFtxqnL2-bJaVkgOK9Gy07Xbr4xP4a_Rz4qD3wgtMecpAs4DISe63GSl')"></div>
+</div>
+</div>
+</div>
+<!-- USER DETAILS & REFLECTIONS SECTION -->
+<div class="p-3.5 flex flex-col gap-3.5">
+<!-- Name, Age & Dating Intent Pill -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<h2 class="font-headline-lg text-[30px] font-semibold text-[#faf9f3] tracking-tight">
+              Aanya, <span class="font-light text-[#bec9c2]">24</span>
+</h2>
+<span class="material-symbols-outlined text-[20px] text-[#55d6a2]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<!-- Dating intent tactile pill -->
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#182a24] border border-[#28493f] text-[#c5eae0] font-label-sm text-[12px] shadow-sm">
+<span class="material-symbols-outlined text-[13px] text-[#EE8A70]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="text-[#bec9c2]">Woman · Looking for Men</span>
+</div>
+</div>
+<!-- SANCTUARY INTENTION / REFLECTION CARD (Dark elevated #182622 container) -->
+<div class="p-3.5 rounded-2xl bg-[#172722] border border-white/[0.07] shadow-inner flex flex-col gap-1.5">
+<div class="flex items-center gap-1.5 text-[#EE8A70] font-label-caps text-[10px] tracking-wider font-bold">
+<span class="text-[14px] leading-none">❝</span>
+<span>AUTHENTIC INTENTION</span>
+</div>
+<p class="font-subhead-italic text-[15px] text-[#e3e3dd] leading-relaxed italic">
+            “Architect who finds calm in vinyl jazz and morning pottery. Looking for gentle conversations that feel like coming home after a quiet rain.”
+          </p>
+</div>
+<!-- Tactile Rounded Tag Chips -->
+<div class="flex flex-wrap gap-1.5">
+<span class="px-3 py-1 rounded-full bg-[#182924] border border-white/5 text-[#bec9c2] font-label-sm text-[12px] flex items-center gap-1.5 shadow-sm">
+<span>🌿</span> Architecture
+          </span>
+<span class="px-3 py-1 rounded-full bg-[#182924] border border-white/5 text-[#bec9c2] font-label-sm text-[12px] flex items-center gap-1.5 shadow-sm">
+<span>☕</span> Pour-Over Coffee
+          </span>
+<span class="px-3 py-1 rounded-full bg-[#182924] border border-white/5 text-[#bec9c2] font-label-sm text-[12px] flex items-center gap-1.5 shadow-sm">
+<span>🎨</span> Ceramic Arts
+          </span>
+<span class="px-3 py-1 rounded-full bg-[#182924] border border-white/5 text-[#bec9c2] font-label-sm text-[12px] flex items-center gap-1.5 shadow-sm">
+<span>📚</span> Murakami
+          </span>
+</div>
+<!-- Trust / Resonance Footer Line -->
+<div class="flex items-center justify-between pt-1 border-t border-white/5">
+<div class="flex items-center gap-1.5 text-[#bec9c2]/75 font-body-sm text-[12px]">
+<span class="material-symbols-outlined text-[15px] text-[#a9cec4]">psychology_alt</span>
+<span>Values: Mindful Presence, Slowness</span>
+</div>
+<span class="font-label-caps text-[11px] font-bold text-[#EE8A70] tracking-wider">
+            98% RESONANCE
+          </span>
+</div>
+</div>
+</div>
+<!-- ==================== 3 SIGNATURE TACTILE 3D BOTTOM ACTION BUTTONS ==================== -->
+<div class="w-full max-w-[420px] mt-4 px-2 flex items-center justify-between gap-4">
+<!-- 1. Pass / Ignore (Left): 56px circular tactile dark button -->
+<button aria-label="Pass" class="w-14 h-14 rounded-full bg-[#15231f] border border-white/10 text-[#bec9c2] hover:text-white flex items-center justify-center shadow-[0_12px_24px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.12)] active:scale-95 transition-all" id="btn-pass">
+<span class="material-symbols-outlined text-[24px]">close</span>
+</button>
+<!-- 2. Direct Message / Resonate (Center): Wide pill CTA button (emerald forest green) -->
+<button aria-label="Send Resonating Letter" class="flex-1 h-14 px-6 rounded-full bg-[#1c3a32] border border-[#2b554b] text-white flex items-center justify-center gap-2 shadow-[0_16px_36px_rgba(8,45,38,0.7),inset_0_1px_2px_rgba(255,255,255,0.2)] hover:bg-[#22463d] active:scale-95 transition-all" id="btn-letter">
+<span class="material-symbols-outlined text-[20px] text-[#EE8A70]" style="font-variation-settings: 'FILL' 1;">mark_email_unread</span>
+<span class="font-label-md text-[14px] font-semibold tracking-wide">Resonate ✨</span>
+</button>
+<!-- 3. Like / Heart (Right): 56px circular glowing warm terracotta coral button -->
+<button aria-label="Like Profile" class="w-14 h-14 rounded-full bg-[#EE8A70] text-[#082d26] flex items-center justify-center shadow-[0_12px_28px_rgba(238,138,112,0.45),inset_0_1px_2px_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 transition-all" id="btn-like">
+<span class="material-symbols-outlined text-[26px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+<!-- ==================== FOOTER WITH PAGINATION & EDITORIAL SERIF (IMAGE_39 RIGHT MATCH) ==================== -->
+<div class="mt-6 flex flex-col items-center justify-center gap-2 mb-2">
+<!-- 3-dot pagination indicator (active glowing coral #EE8A70, inactive dark dots) -->
+<div class="flex items-center gap-2">
+<div class="w-6 h-1.5 rounded-full bg-[#EE8A70] shadow-[0_0_10px_rgba(238,138,112,0.8)]"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+</div>
+<span class="font-subhead-italic text-[13px] italic text-[#bec9c2]/45 tracking-wide">
+        Real Connections · Brighter Days
+      </span>
+</div>
+<!-- MODAL: RESONANCE LETTER COMPOSER -->
+<div class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex-col justify-end p-4 transition-opacity" id="resonance-modal">
+<div class="w-full max-w-[420px] mx-auto bg-[#14231f] border border-white/10 rounded-[32px] p-5 shadow-2xl flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#EE8A70]">auto_awesome</span>
+<h3 class="font-headline-md text-[20px] text-white font-normal">Send a Thought</h3>
+</div>
+<button class="w-8 h-8 rounded-full bg-[#1d332d] text-[#bec9c2] flex items-center justify-center hover:text-white" id="close-modal">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<p class="font-body-sm text-[13px] text-[#bec9c2]">
+          UR-Heart encourages unhurried letters. Respond to Aanya's note about vinyl jazz or morning pottery:
+        </p>
+<div class="rounded-2xl bg-[#0d1815] border border-white/5 p-3.5 shadow-inner">
+<textarea class="w-full bg-transparent text-white font-body-md text-[14px] placeholder:text-white/30 focus:outline-none resize-none" id="modal-input" placeholder="What song brings you calm after a long day?" rows="3"></textarea>
+</div>
+<button class="w-full h-12 rounded-full bg-[#EE8A70] text-[#082d26] font-label-md text-[14px] font-semibold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all" id="confirm-send">
+<span>Send Letter with Intention</span>
+<span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+</div>
+</div>
+</main>
+<!-- ==================== FIXED DOCKED DARK BOTTOM TAB NAVIGATION ==================== -->
+<nav class="fixed bottom-4 inset-x-4 max-w-md mx-auto z-50 rounded-full bg-[#121f1b]/90 backdrop-blur-xl border border-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.7)]" data-active-classes="text-[#EE8A70] font-semibold">
+<div class="flex justify-around items-center h-16 px-2">
+<!-- Tab 1: Feed (Active) -->
+<a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 min-w-[48px] min-h-[44px] px-2 text-[#EE8A70] font-semibold transition-colors" data-path="sanctuary-feed" href="#">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">spa</span>
+<span class="font-label-caps text-[10px] tracking-wider">Feed</span>
+</a>
+<!-- Tab 2: Discover -->
+<a class="flex flex-col items-center justify-center gap-0.5 min-w-[48px] min-h-[44px] px-2 text-[#bec9c2] hover:text-white transition-colors" data-path="sanctuary-discover" href="#">
+<span class="material-symbols-outlined text-[22px]">nature_people</span>
+<span class="font-label-caps text-[10px] tracking-wider">Discover</span>
+</a>
+<!-- Tab 3: Resonances -->
+<a class="flex flex-col items-center justify-center gap-0.5 min-w-[48px] min-h-[44px] px-2 text-[#bec9c2] hover:text-white transition-colors" data-path="resonances" href="#">
+<span class="material-symbols-outlined text-[22px]">favorite</span>
+<span class="font-label-caps text-[10px] tracking-wider">Resonances</span>
+</a>
+<!-- Tab 4: Profile -->
+<a class="flex flex-col items-center justify-center gap-0.5 min-w-[48px] min-h-[44px] px-2 text-[#bec9c2] hover:text-white transition-colors" data-path="sanctuary-profile" href="#">
+<span class="material-symbols-outlined text-[22px]">account_circle</span>
+<span class="font-label-caps text-[10px] tracking-wider">Profile</span>
+</a>
+</div>
+</nav>
+<!-- ==================== INTERACTION LOGIC ==================== -->
+<script>
+    (function() {
+      const photos = [
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuBw-EUDKkz1Jg8kET9pnkc06EZKVko6Ec3TUu6HZqbTzxl7nPJS1R1UhuYSc9RUirtsMffdN9m_6FePWdSO-XUmBzc0oN2rODAVH6SqqvaHCYIb1SY4Y7qy-yMgW3gblV0Mw-OWsA76z33vMdlYGi5FMd7ATMyhgc66kdx8rfiYA8SwGyTPRK0Bjvn7pz_0OgnRwwEgofYx7sBLjhJ7e29noAlW0Fqg7X4_dyA3XgtECz7wyLSQMGqC',
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuBhqg6RLOg7t9EajTcAYV0CJt_hcn-oz36tb-AqNwVy0U9zQtBWQZv8OWElFKEoEpIJ-dhr05CUfrLtW0nXlTGf07Z2COcMistRwfTyfNqEeGa8Vs22AfdGY-O37jUsuDnJb5G_tlZRiSp0cbvCU7PzoB2XBpUaZv6hAIPWwSN2426wmbLEXS81pveFwJe3QpfMx9F5UxGS0TqSFgnKAwnxdYH8Kdy5EJQUTWII6-hJCe2psqminRAf',
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuCUG_FIe-PI02vAdid8_H7DxbPJbzniL-NiM6h6_yreLVXhDahfo6qjEmMupy_HtGXh22cQs8bjmafu2EQPrXa0cn-ygnFf8w08Iy06nZR_-KgPDHA0YSMuD5qkoOJEOlFj1VreXYULvyUou8g6tgmsrDWav4SM_hM0mWXxAen2aut_zC0OEFqjr6lJ5MBMVbTnB_H8IE2czf82m-hFuONm39S0hfDpvMz-l9eM_hZbk4DXIp_JYaro',
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuAERV5Vl1qyKXXu3dANGl8arc28-Q9ru-RU-nxLrbA4C3PLOhGU4811eAwl8nosJCSXVb3tcSBCWius63UyQv5qOaORVo7IwbaKkCG-5VkGF51Q02EwHmYWDKorbdnPmJwcnvqLOelNSWlPgKGU5IXOJNf6NZAMUmIm4o1cLFre_P9Xksc9xUH7mc9xcs6gU6V6j5wsORFo1A0gK0ftL2T8w6hs_KAo0ucb1MAC880de9OtWFBoRfa_',
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuCp8TRyBwJnT1arUS2botdom2sZKb68MKvOd2yT-W2oB2GQbkWZVTSp1Cb_2rOQOelGN9FO1c22TlI6NDJqh4H5ZpJ3qOSo_c4Z93aJNwhoaoY3NKilqpolGyPqNaHTv6t14OYzJRPqNxKlA7_3Z_leP7a6TX7P1VEHLqY2gmkTGNSW96bjy7BNU6iFoxD-nFtxqnL2-bJaVkgOK9Gy07Xbr4xP4a_Rz4qD3wgtMecpAs4DISe63GSl'
+      ];
+
+      let currentIndex = 0;
+      const photoViewer = document.getElementById('photo-viewer');
+      const prevBtn = document.getElementById('prev-photo');
+      const nextBtn = document.getElementById('next-photo');
+      const indicators = document.getElementById('carousel-indicators');
+      const miniPreviews = document.querySelectorAll('#mini-previews > div');
+
+      function updatePhoto(index) {
+        currentIndex = (index + photos.length) % photos.length;
+        if (photoViewer) {
+          photoViewer.style.opacity = '0.5';
+          setTimeout(() => {
+            photoViewer.style.backgroundImage = `url('${photos[currentIndex]}')`;
+            photoViewer.style.opacity = '1';
+          }, 120);
+        }
+
+        if (indicators) {
+          Array.from(indicators.children).forEach((bar, idx) => {
+            if (idx === currentIndex) {
+              bar.className = 'h-1 flex-1 rounded-full bg-[#EE8A70] shadow-[0_0_8px_rgba(238,138,112,0.8)] transition-all';
+            } else {
+              bar.className = 'h-1 flex-1 rounded-full bg-white/30 backdrop-blur-sm transition-all';
+            }
+          });
+        }
+
+        miniPreviews.forEach((thumb, idx) => {
+          if (idx === (currentIndex - 1 + miniPreviews.length) % miniPreviews.length) {
+            thumb.classList.add('ring-2', 'ring-[#EE8A70]', 'opacity-100');
+            thumb.classList.remove('opacity-65', 'ring-1', 'ring-white/20');
+          } else {
+            thumb.classList.remove('ring-2', 'ring-[#EE8A70]', 'opacity-100');
+            thumb.classList.add('opacity-65', 'ring-1', 'ring-white/20');
+          }
+        });
+      }
+
+      if (prevBtn) prevBtn.addEventListener('click', () => updatePhoto(currentIndex - 1));
+      if (nextBtn) nextBtn.addEventListener('click', () => updatePhoto(currentIndex + 1));
+
+      miniPreviews.forEach((thumb, idx) => {
+        thumb.addEventListener('click', () => updatePhoto(idx + 1));
+      });
+
+      // Resonance Modal
+      const modal = document.getElementById('resonance-modal');
+      const btnLetter = document.getElementById('btn-letter');
+      const closeModal = document.getElementById('close-modal');
+      const confirmSend = document.getElementById('confirm-send');
+      const btnLike = document.getElementById('btn-like');
+      const btnPass = document.getElementById('btn-pass');
+
+      if (btnLetter && modal) {
+        btnLetter.addEventListener('click', () => {
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+        });
+      }
+
+      if (closeModal && modal) {
+        closeModal.addEventListener('click', () => {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        });
+      }
+
+      if (confirmSend && modal) {
+        confirmSend.addEventListener('click', () => {
+          confirmSend.innerHTML = '<span class="material-symbols-outlined text-[18px]">done</span> Letter Delivered';
+          confirmSend.classList.add('bg-[#55d6a2]', 'text-[#082d26]');
+          setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            confirmSend.innerHTML = '<span>Send Letter with Intention</span><span class="material-symbols-outlined text-[18px]">send</span>';
+            confirmSend.classList.remove('bg-[#55d6a2]', 'text-[#082d26]');
+          }, 1100);
+        });
+      }
+
+      if (btnLike) {
+        btnLike.addEventListener('click', () => {
+          btnLike.classList.add('scale-125');
+          setTimeout(() => btnLike.classList.remove('scale-125'), 180);
+        });
+      }
+
+      if (btnPass) {
+        btnPass.addEventListener('click', () => {
+          const card = document.querySelector('#carousel-container').closest('.rounded-\\[36px\\]');
+          if (card) {
+            card.style.transform = 'translateX(-16px) rotate(-1.5deg)';
+            setTimeout(() => {
+              card.style.transform = 'none';
+            }, 200);
+          }
+        });
+      }
+    })();
+  </script>
+</body></html>

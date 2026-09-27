@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UR-Heart — Ultra-Premium App Icon Showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070B0A;
+      --card-bg: rgba(15, 23, 20, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-coral: #EE8A70;
+      --accent-forest: #1C3F38;
+      --text: #F3F6F4;
+      --text-muted: #8B9E97;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 50% 10%, rgba(238, 138, 112, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 10% 90%, rgba(28, 63, 56, 0.3) 0%, transparent 60%);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      max-width: 1024px;
+      width: 100%;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(238, 138, 112, 0.15);
+      border: 1px solid rgba(238, 138, 112, 0.3);
+      padding: 6px 14px;
+      border-radius: 999px;
+      color: var(--accent-coral);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+
+    p.sub {
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 36px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 800px) {
+      .hero-grid { grid-template-columns: 1fr; }
+    }
+
+    .icon-showcase {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+
+    .main-icon-container {
+      width: 256px;
+      height: 256px;
+      border-radius: 56px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.8), 0 0 40px rgba(238, 138, 112, 0.25);
+      position: relative;
+      transition: transform 0.3s ease;
+    }
+
+    .main-icon-container:hover {
+      transform: scale(1.04);
+    }
+
+    .main-icon-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .details-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .spec-group {
+      margin-bottom: 20px;
+    }
+
+    .spec-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+
+    .spec-value {
+      font-size: 15px;
+      color: #fff;
+    }
+
+    .spec-value code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255,255,255,0.06);
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    /* Scaling previews */
+    .sizes-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .sizes-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: flex-end;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 40px;
+    }
+
+    .size-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .size-item span {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .size-item img {
+      display: block;
+      border-radius: 22%;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #EE8A70 0%, #D87A60 100%);
+      color: #0E1311;
+      font-weight: 700;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="badge">✨ Stitch App Icon Masterpiece</div>
+    <h1>UR-Heart App Icon Design</h1>
+    <p class="sub">3D tactile craftsmanship featuring deep dark pine emerald, obsidian velvet depth, and liquid rose-gold calligraphic emblem intertwined with an organic botanical leaf aura.</p>
+
+    <div class="hero-grid">
+      <div class="icon-showcase">
+        <div class="main-icon-container">
+          <img src="app_icon_1024.png" alt="UR-Heart 3D App Icon">
+        </div>
+        <p style="margin-top: 20px; font-size: 13px; color: var(--text-muted);">Rendered at 1024 × 1024 Native Resolution</p>
+      </div>
+
+      <div class="details-card">
+        <div>
+          <div class="spec-group">
+            <div class="spec-label">Screen & Asset ID</div>
+            <div class="spec-value"><code>4c7a9d3124e249eb81106c76563cee49</code></div>
+          </div>
+          <div class="spec-group">
+            <div class="spec-label">Stitch Project</div>
+            <div class="spec-value">Dating App Dual UI (<code>3794057334896238495</code>)</div>
+          </div>
+          <div class="spec-group">
+            <div class="spec-label">Dimensions & Format</div>
+            <div class="spec-value">1024 × 1024 PNG (Production Master)</div>
+          </div>
+          <div class="spec-group">
+            <div class="spec-label">Visual Design Spec</div>
+            <div class="spec-value" style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+              Liquid rose-gold & warm terracotta copper enamel calligraphic heart, deep pine obsidian background (<code>#0A1311</code> to <code>#030807</code>), subtle botanical leaf aura, rim lighting & chamfered border edges.
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <a href="app_icon_1024.png" target="_blank" class="btn btn-primary">Open 1024x1024 PNG</a>
+          <a href="../../index.html" class="btn btn-secondary">← Back to Gallery</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="sizes-title">📱 Multi-Resolution & Home Screen Previews</div>
+    <div class="sizes-grid">
+      <div class="size-item">
+        <img src="app_icon_1024.png" width="128" height="128" style="border-radius: 28px;">
+        <span>128px (Store)</span>
+      </div>
+      <div class="size-item">
+        <img src="app_icon_1024.png" width="96" height="96" style="border-radius: 21px;">
+        <span>96px (HDPI)</span>
+      </div>
+      <div class="size-item">
+        <img src="app_icon_1024.png" width="64" height="64" style="border-radius: 14px;">
+        <span>64px (Home)</span>
+      </div>
+      <div class="size-item">
+        <img src="app_icon_1024.png" width="48" height="48" style="border-radius: 10px;">
+        <span>48px (Dock)</span>
+      </div>
+      <div class="size-item">
+        <img src="app_icon_1024.png" width="32" height="32" style="border-radius: 7px;">
+        <span>32px (Menu)</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

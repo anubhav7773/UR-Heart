@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "ef1769b4f0614605a0027a96794bd20f",
+  "resourceName": "projects/3794057334896238495/screens/ef1769b4f0614605a0027a96794bd20f",
+  "title": "UR-Heart - Auth & Age Screen (Dark Mode - Ultra Premium)",
+  "mode": "Dark Mode",
+  "category": "Auth & Age Screen",
+  "folder": "02_auth-and-age-screen",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "1930",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1XE88LVtO8RiN8NEuifdFVNCST8zJtsKCHi0u58CnhaV5NXajvCY-I9JpsIvcCQJ-bCdkIraGX8uhDtbgkLi4_VyGGqm2QWTcuZdmMQV3J6nU-WiylbuPatuBNgRNmdLTTXK3LyHBY8DQIq9AzlCBiGNDDx4gAurS4m2jXYbeZAIhwSQQJm7y0qxwj2YkP5GSXAJBXQVuZWSI1g_h90iBPnbShmfx84EZTvUt3zWiMtTv3pUnyoYoCKVXc",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRjMWE2ZTM0N2EwNzNhZDA5OGZiMzFhNGI2EgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/dark-mode/02_auth-and-age-screen/screenshot.png",
+  "localHtml": "screens/dark-mode/02_auth-and-age-screen/screen.html"
+}

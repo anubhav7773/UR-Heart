@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>UR-Heart - Mindful Sanctuary</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Newsreader & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500;1,6..72,600&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "sanctuary-bg": "#0D1311",
+            "sanctuary-card": "#141C19",
+            "sanctuary-nested": "#17231E",
+            "sanctuary-border": "#22332C",
+            "sanctuary-coral": "#EE8A70",
+            "sanctuary-pine": "#1A2E26",
+            "sanctuary-pine-light": "#8BAFA6",
+            "sanctuary-muted": "#8B9E95",
+            "sanctuary-light": "#F9F8F6"
+          },
+          fontFamily: {
+            serif: ['"Newsreader"', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+    .soft-ring-ambient {
+      box-shadow: 0 0 0 10px rgba(139, 175, 166, 0.04), 0 0 0 22px rgba(139, 175, 166, 0.02);
+    }
+  </style>
+</head>
+<body class="bg-[#090D0C] font-sans text-neutral-300 antialiased min-h-screen flex justify-center items-center py-2 sm:py-6 selection:bg-[#EE8A70] selection:text-black">
+<!-- Mobile Frame Container -->
+<main class="w-full max-w-[412px] bg-[#0E1513] relative overflow-hidden flex flex-col justify-between min-h-[892px] shadow-2xl rounded-[48px] border border-white/5" data-purpose="mobile-viewport">
+<!-- BACKGROUND ART: Hand-drawn Sketch Heart Lines & Atmospheric Dark Glows -->
+<div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
+<!-- Ambient glowing blurs -->
+<div class="absolute -top-24 right-[-10%] w-80 h-80 rounded-full bg-[#EE8A70]/10 blur-3xl"></div>
+<div class="absolute top-1/3 -left-28 w-80 h-80 rounded-full bg-[#18392F]/30 blur-3xl"></div>
+<div class="absolute bottom-16 right-[-15%] w-96 h-96 rounded-full bg-[#132822]/40 blur-3xl"></div>
+<!-- Hand-drawn heart contour & celestial orbital arcs -->
+<svg class="absolute inset-0 w-full h-full opacity-[0.22] pointer-events-none" fill="none" viewbox="0 0 412 892" xmlns="http://www.w3.org/2000/svg">
+<!-- Outer soft dashed heart silhouette -->
+<path d="M206,170 C125,70 25,145 68,285 C98,382 206,468 206,535 C206,468 314,382 344,285 C387,145 287,70 206,170 Z" stroke="#EE8A70" stroke-dasharray="5 7" stroke-width="1.2"></path>
+<!-- Inner crisp solid heart contour with copper tone -->
+<path d="M206,196 C140,110 50,172 88,295 C114,380 206,458 206,512 C206,458 298,380 324,295 C362,172 272,110 206,196 Z" opacity="0.6" stroke="#F9F8F6" stroke-width="0.75"></path>
+<!-- Subtle sweeping orbital rings -->
+<ellipse cx="206" cy="330" rx="168" ry="200" stroke="#EE8A70" stroke-dasharray="4 10" stroke-width="0.65" transform="rotate(-14 206 330)"></ellipse>
+<ellipse cx="206" cy="340" opacity="0.4" rx="180" ry="220" stroke="#8BAFA6" stroke-width="0.5" transform="rotate(10 206 340)"></ellipse>
+</svg>
+</div>
+<!-- TOP STATUS BAR & HEADER ROW -->
+<header class="relative z-10 w-full pt-3 px-6 select-none flex flex-col">
+<!-- iOS Status Bar -->
+<div class="flex items-center justify-between py-1">
+<span class="font-sans text-[14px] font-semibold text-[#F9F8F6] tracking-tight">9:41</span>
+<div class="flex items-center gap-1.5 text-[#F9F8F6]/85 text-[14px]">
+<span class="material-symbols-outlined text-[15px]">signal_cellular_4_bar</span>
+<span class="material-symbols-outlined text-[15px]">wifi</span>
+<span class="material-symbols-outlined text-[16px]">battery_full</span>
+</div>
+</div>
+<!-- Editorial Header Row Above Card -->
+<div class="flex items-center justify-between pt-2 pb-1.5">
+<!-- Left: Italic Serif Micro-label -->
+<span class="font-serif italic text-[13px] tracking-wide text-neutral-400">More than swipes</span>
+<!-- Right: SAFER · KINDER · REAL and Language Selector -->
+<div class="flex items-center gap-2.5">
+<span class="text-[9px] tracking-[0.16em] uppercase text-neutral-400 font-sans font-medium">SAFER · KINDER · REAL</span>
+<button class="flex items-center gap-1 text-[11px] font-sans text-neutral-300 hover:text-white transition-colors px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10" type="button">
+<span class="material-symbols-outlined text-[12px] opacity-70">language</span>
+<span>English</span>
+<span class="material-symbols-outlined text-[12px] leading-none">expand_more</span>
+</button>
+</div>
+</div>
+</header>
+<!-- MAIN ELEVATED LUXURY SANCTUARY CARD -->
+<section class="relative z-10 w-full px-4 py-1.5 flex-1 flex flex-col justify-center select-none">
+<div class="w-full rounded-[34px] bg-[#141C19]/95 backdrop-blur-2xl p-5 sm:p-6 flex flex-col relative overflow-hidden border border-white/[0.08] shadow-[0_24px_50px_-10px_rgba(0,0,0,0.8)]">
+<!-- BRAND HEADER INSIDE CARD -->
+<div class="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-4">
+<div class="flex items-center gap-2.5">
+<!-- Rounded squircle badge with heart icon -->
+<div class="w-9 h-9 rounded-2xl bg-[#1B3028] border border-[#8BAFA6]/20 flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-[#8BAFA6] text-[17px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</div>
+<div class="flex flex-col">
+<span class="font-serif font-bold tracking-tight text-[#F9F8F6] text-[16px] leading-snug">UR-Heart</span>
+<span class="font-sans text-[8.5px] tracking-[0.14em] uppercase text-neutral-400 font-medium">A Better Way to Meet</span>
+</div>
+</div>
+<!-- Sanctuary shield pill badge -->
+<div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#1A2621] border border-[#EE8A70]/30 shadow-sm">
+<span class="material-symbols-outlined text-[#EE8A70] text-[12px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="text-[9px] font-sans font-bold tracking-[0.14em] uppercase text-[#EE8A70]">SANCTUARY</span>
+</div>
+</div>
+<!-- HERO ICON ACCENT: Concentric Soft Rings + Central Envelope + Sparkle Badge -->
+<div class="w-full flex justify-center py-2.5 mb-1 relative">
+<div class="relative flex items-center justify-center">
+<!-- Concentric soft rings -->
+<div class="w-20 h-20 rounded-full soft-ring-ambient bg-[#182822]/60 flex items-center justify-center border border-[#8BAFA6]/15">
+<!-- Central forest/mint tinted avatar circle -->
+<div class="w-14 h-14 rounded-full bg-[#1F352C] border border-[#8BAFA6]/30 flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-[#8BAFA6] text-[26px]">mail</span>
+</div>
+</div>
+<!-- Sparkle/Magic badge on top-right edge -->
+<div class="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[#EE8A70] flex items-center justify-center shadow-[0_2px_8px_rgba(238,138,112,0.45)] border-2 border-[#141C19]">
+<span class="material-symbols-outlined text-[#111A16] text-[14px] font-bold" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+</div>
+</div>
+<!-- EDITORIAL HEADLINE & SUBTEXT -->
+<div class="text-left w-full mb-3.5">
+<h1 class="font-serif text-[28px] sm:text-[31px] text-[#F9F8F6] leading-[1.14] tracking-tight font-normal">
+          Almost home.<br/>
+<span class="italic font-serif text-[#EE8A70]">Verify your sanctuary.</span>
+</h1>
+<p class="font-sans text-[12.5px] text-[#A3B8B0] mt-2 leading-relaxed">
+          We have dispatched an encrypted invitation link to confirm your genuine space:
+        </p>
+</div>
+<!-- RECIPIENT EMAIL PILL -->
+<div class="w-full bg-[#18241F] rounded-2xl px-3.5 py-2.5 flex items-center justify-between border border-[#24352C] mb-4 shadow-inner">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-[#EE8A70] text-[17px] shrink-0">alternate_email</span>
+<span class="font-sans text-[13px] text-[#F9F8F6] font-medium truncate" id="target-email">priya.sharma@domain.com</span>
+</div>
+<button class="flex items-center gap-1 text-[12px] font-sans font-semibold text-[#EE8A70] hover:text-[#ffb4a1] transition-colors px-2 py-0.5 rounded-lg hover:bg-white/[0.04] shrink-0" id="edit-email-btn" type="button">
+<span class="material-symbols-outlined text-[13px]">edit</span>
+<span>Edit</span>
+</button>
+</div>
+<!-- 3-STEP MINDFUL PASSAGE CARD -->
+<div class="w-full bg-[#16211C] rounded-2xl p-3.5 sm:p-4 border border-[#24352C] mb-4">
+<!-- Passage Card Header -->
+<div class="flex items-center justify-between mb-3 pb-1 border-b border-white/[0.04]">
+<span class="text-[9px] font-sans font-bold tracking-[0.14em] uppercase text-[#8B9E95]">3-STEP MINDFUL PASSAGE</span>
+<span class="text-[9.5px] font-serif italic text-neutral-400">Encrypted Magic Link</span>
+</div>
+<!-- Steps List -->
+<div class="space-y-2.5">
+<!-- Step 1 -->
+<div class="flex items-start gap-2.5">
+<div class="w-5 h-5 rounded-full bg-[#1F3028] border border-[#8BAFA6]/30 text-[#8BAFA6] flex items-center justify-center text-[10.5px] font-bold shrink-0 mt-0.5 shadow-sm">1</div>
+<p class="font-sans text-[12px] text-neutral-200 leading-snug">
+              Open the letter from <span class="font-serif italic text-[#F9F8F6]">UR-Heart Sanctuary</span>
+</p>
+</div>
+<!-- Step 2 -->
+<div class="flex items-start gap-2.5">
+<div class="w-5 h-5 rounded-full bg-[#EE8A70] text-[#111A16] flex items-center justify-center text-[10.5px] font-bold shrink-0 mt-0.5 shadow-md shadow-[#EE8A70]/25">2</div>
+<p class="font-sans text-[12px] text-neutral-200 leading-snug">
+              Tap the single-click <span class="text-[#EE8A70] font-semibold">Magic Link</span> inside
+            </p>
+</div>
+<!-- Step 3 -->
+<div class="flex items-start gap-2.5">
+<div class="w-5 h-5 rounded-full bg-[#1F3028] border border-white/10 text-[#8B9E95] flex items-center justify-center text-[10.5px] font-semibold shrink-0 mt-0.5">3</div>
+<p class="font-sans text-[12px] text-neutral-200 leading-snug">
+              Automatically enter your mindful dating space
+            </p>
+</div>
+</div>
+</div>
+<!-- PRIMARY CTA & SECONDARY ACTIONS -->
+<div class="w-full flex flex-col gap-2">
+<a class="w-full min-h-[48px] rounded-full bg-[#EE8A70] hover:bg-[#e47d63] text-[#122019] font-sans font-bold text-[14px] flex items-center justify-center gap-1.5 shadow-[0_8px_20px_rgba(238,138,112,0.3)] transition-all active:scale-[0.98]" href="mailto:">
+<span>Open Email App</span>
+<span class="material-symbols-outlined text-[17px] font-bold">arrow_forward</span>
+</a>
+<!-- Resend Link with Clock & Countdown -->
+<button class="w-full py-1.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-[#F9F8F6] text-[12.5px] font-sans transition-colors" id="resend-btn" type="button">
+<span class="material-symbols-outlined text-[15px] text-[#EE8A70]">schedule</span>
+<span id="resend-label">Resend link in</span>
+<span class="font-semibold text-[#EE8A70]" id="countdown-badge">40s</span>
+</button>
+</div>
+<!-- Help Concierge Copy -->
+<div class="mt-2.5 pt-2 text-center border-t border-white/[0.04]">
+<p class="font-sans text-[11px] text-neutral-400 leading-normal">
+          Can't find the email? Check your spam folder or
+          <button class="text-[#EE8A70] underline underline-offset-2 ml-1 hover:text-[#ffb4a1] transition-colors font-medium" type="button">
+            Contact Sanctuary Concierge
+          </button>
+</p>
+</div>
+</div>
+</section>
+<!-- FOOTER ROW & HOME INDICATOR -->
+<footer class="relative z-10 w-full px-7 pb-2 select-none flex flex-col">
+<div class="flex items-center justify-between py-2">
+<!-- Bottom-left corner: lock icon with italic tagline -->
+<div class="flex items-center gap-1.5 text-[#6B7D76]">
+<span class="material-symbols-outlined text-[13px]">lock</span>
+<span class="font-serif italic text-[11px] tracking-wide">Real Connections · Brighter Days</span>
+</div>
+<!-- Bottom-right corner: 3-pill pagination carousel -->
+<div class="flex items-center gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+<div class="w-4 h-1.5 rounded-full bg-[#EE8A70] shadow-sm shadow-[#EE8A70]/40"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+</div>
+</div>
+<!-- iOS Home Indicator -->
+<div class="w-full flex justify-center pb-2 pt-1">
+<div class="w-32 h-1 rounded-full bg-white/25"></div>
+</div>
+</footer>
+<!-- Interactive Countdown & Edit Script -->
+<script>
+    (function () {
+      let timeLeft = 40;
+      const badge = document.getElementById('countdown-badge');
+      const label = document.getElementById('resend-label');
+      const resendBtn = document.getElementById('resend-btn');
+
+      const timer = setInterval(() => {
+        timeLeft -= 1;
+        if (badge && timeLeft > 0) {
+          badge.textContent = timeLeft + 's';
+        } else if (timeLeft <= 0) {
+          clearInterval(timer);
+          if (badge) badge.remove();
+          if (label) label.textContent = 'Resend link now';
+          if (resendBtn) {
+            resendBtn.classList.remove('text-neutral-400');
+            resendBtn.classList.add('text-[#EE8A70]', 'font-semibold');
+          }
+        }
+      }, 1000);
+
+      const editBtn = document.getElementById('edit-email-btn');
+      if (editBtn) {
+        editBtn.addEventListener('click', () => {
+          const currentEmail = document.getElementById('target-email');
+          const newEmail = prompt('Update your account email address:', currentEmail ? currentEmail.textContent.trim() : '');
+          if (newEmail && newEmail.includes('@') && currentEmail) {
+            currentEmail.textContent = newEmail.trim();
+          }
+        });
+      }
+    })();
+  </script>
+</main>
+<!-- END: Mobile Frame Container -->
+</body></html>

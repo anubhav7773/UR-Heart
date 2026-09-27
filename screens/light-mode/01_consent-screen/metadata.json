@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "6f1c8e4a7c5442509daa760238adb077",
+  "resourceName": "projects/3794057334896238495/screens/6f1c8e4a7c5442509daa760238adb077",
+  "title": "UR-Heart - Consent Screen (Light Mode - Ultra Premium)",
+  "mode": "Light Mode",
+  "category": "Consent Screen",
+  "folder": "01_consent-screen",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "2038",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1W4K98mDKyhVTQBv0e59lbFyN9tXeliIOJswcjoRlbdlGkcnQOi_OWZSt3TIiI9aSyuank5KXg06Pufb6FFuMiIL8RmfNoE5LSvu3LduOSEFWl6Yc09aIZtmsZgLpNPoA5r6ZW_VdPlOSgAcxf8U46IoKZzo6wCOeZuf9PQ4ehIPN1Qx1Ae0d4zfNwa5zuW98D_DYvVPf_BKdcbLN4bP-kBSBOMRErJ8AvWwkOL8CEl82HKi6L1s9IwxcE",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRiZjBlNGE4NWQwODlhZjY3ZjI3MjBkZTllEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/light-mode/01_consent-screen/screenshot.png",
+  "localHtml": "screens/light-mode/01_consent-screen/screen.html"
+}

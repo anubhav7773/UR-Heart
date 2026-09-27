@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-surface" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;min-height:100%;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-primary-container": "#8bafa6", "on-tertiary-fixed": "#141e19", "inverse-surface": "#30312d", "tertiary": "#1f2924", "surface-container-low": "#f5f4ee", "surface-container-high": "#e9e8e2", "surface": "#faf9f3", "error": "#ba1a1a", "inverse-on-surface": "#f2f1eb", "tertiary-container": "#353f3a", "primary-container": "#21433c", "on-secondary-fixed-variant": "#7c2e19", "on-surface": "#1b1c19", "surface-dim": "#dbdad4", "secondary": "#9a442d", "tertiary-fixed": "#dae5dd", "surface-container-lowest": "#ffffff", "surface-bright": "#faf9f3", "surface-tint": "#43655d", "on-secondary": "#ffffff", "error-container": "#ffdad6", "primary-fixed": "#c5eae0", "on-secondary-fixed": "#3c0800", "on-tertiary-container": "#9faaa3", "outline": "#717976", "surface-variant": "#e3e3dd", "surface-container-highest": "#e3e3dd", "surface-container": "#efeee8", "on-background": "#1b1c19", "background": "#faf9f3", "outline-variant": "#c1c8c5", "on-primary": "#ffffff", "on-primary-fixed": "#00201b", "secondary-container": "#fc9174", "inverse-primary": "#a9cec4", "on-error-container": "#93000a", "on-tertiary": "#ffffff", "tertiary-fixed-dim": "#bec9c2", "primary": "#082d26", "on-primary-fixed-variant": "#2b4d46", "on-error": "#ffffff", "on-secondary-container": "#742814", "secondary-fixed": "#ffdbd2", "secondary-fixed-dim": "#ffb4a1", "on-surface-variant": "#414846", "primary-fixed-dim": "#a9cec4", "on-tertiary-fixed-variant": "#3e4944" }, "borderRadius": { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" }, "spacing": { "margin-tablet": "2rem", "space-md": "1rem", "margin": "1.25rem", "space-sm": "0.5rem", "space-xl": "2rem", "gutter": "1rem", "gutter-desktop": "1.5rem", "space-lg": "1.5rem", "space-xs": "0.25rem", "margin-desktop": "3rem" }, "fontFamily": { "body-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-lg": ["Newsreader"], "label-md": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "display-lg": ["Newsreader"], "headline-md": ["Newsreader"], "body-lg": ["Plus Jakarta Sans"], "display-lg-mobile": ["Newsreader"], "label-sm": ["Plus Jakarta Sans"], "label-caps": ["Plus Jakarta Sans"], "subhead-italic": ["Newsreader"] }, "fontSize": { "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "headline-lg": ["32px", { "lineHeight": "38px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-md": ["14px", { "lineHeight": "20px", "fontWeight": "600" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "700" }], "display-lg": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "headline-md": ["26px", { "lineHeight": "32px", "fontWeight": "500" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "display-lg-mobile": ["34px", { "lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }], "label-caps": ["10px", { "lineHeight": "14px", "letterSpacing": "0.14em", "fontWeight": "700" }], "subhead-italic": ["16px", { "lineHeight": "22px", "letterSpacing": "0.01em", "fontWeight": "400" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased relative min-h-screen flex flex-col selection:bg-primary-fixed selection:text-primary"><div class="fixed inset-0 pointer-events-none z-0 overflow-hidden"><div class="absolute -top-32 -left-20 w-96 h-96 bg-primary-fixed-dim/20 rounded-full blur-3xl"></div><div class="absolute top-1/3 -right-24 w-80 h-80 bg-secondary-fixed-dim/25 rounded-full blur-3xl"></div><div class="absolute -bottom-28 left-1/4 w-[420px] h-[420px] bg-tertiary-fixed/30 rounded-full blur-3xl"></div><svg class="absolute inset-0 w-full h-full opacity-35" fill="none" preserveaspectratio="xMidYMid slice" viewbox="0 0 400 850" xmlns="http://www.w3.org/2000/svg"><path d="M200 130 C200 130 140 70 80 120 C20 170 30 260 110 320 L200 400 L290 320 C370 260 380 170 320 120 C260 70 200 130 200 130Z" stroke="#21433c" stroke-dasharray="3 5" stroke-opacity="0.12" stroke-width="1"></path><path d="M205 140 C205 140 148 85 92 132 C38 178 48 262 122 318 L205 390 L288 318 C362 262 372 178 318 132 C262 85 205 140 205 140Z" stroke="#9a442d" stroke-opacity="0.09" stroke-width="0.8"></path><path d="M200 480 C200 480 130 410 65 470 C-5 530 5 635 95 700 L200 790 L305 700 C395 635 405 530 335 470 C270 410 200 480 200 480Z" stroke="#21433c" stroke-opacity="0.08" stroke-width="1.2"></path></svg></div><header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(33,67,60,0.04)] pt-safe"><div class="px-margin pt-1 pb-1.5 flex items-center justify-between"><span class="font-label-sm text-label-sm font-semibold tracking-tight text-on-surface">9:41</span><div class="flex items-center gap-1.5 text-on-surface"><span class="material-symbols-outlined text-[15px]">signal_cellular_4_bar</span><span class="material-symbols-outlined text-[15px]">wifi</span><span class="material-symbols-outlined text-[17px]">battery_full</span></div></div><div class="px-margin py-1 flex items-center justify-between text-on-surface-variant"><span class="font-subhead-italic text-subhead-italic text-[13px] text-primary/75 italic">More than swipes</span><span class="font-label-caps text-label-caps tracking-[0.18em] text-primary/70 font-semibold">SAFER · KINDER · REAL</span><button class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high/60 text-on-surface hover:bg-surface-container-high transition-colors"><span class="text-[12px]">🌐</span><span class="font-label-sm text-[11px] font-medium">English</span><span class="material-symbols-outlined text-[13px] text-outline">expand_more</span></button></div><div class="h-16 px-margin flex items-center justify-between"><button aria-label="Go back" class="w-11 h-11 rounded-full flex items-center justify-center text-primary bg-surface-container-low/70 hover:bg-surface-container transition-all active:scale-95" onclick="history.back()"><span class="material-symbols-outlined text-[20px]">arrow_back_ios_new</span></button><div class="flex flex-col items-center justify-center text-center"><div class="flex items-center gap-1.5"><span class="material-symbols-outlined text-secondary text-[16px]">favorite</span><span class="font-headline-md text-[19px] leading-tight font-semibold text-primary tracking-tight">UR-Heart</span></div><span class="font-label-caps text-label-caps text-outline font-semibold tracking-[0.14em]">STEP 3 OF 4 · PROFILE SETUP</span></div><div class="flex items-center gap-2"><button class="h-9 px-3 rounded-full bg-surface-container-high/70 hover:bg-surface-container text-primary font-label-sm text-[12px] flex items-center gap-1 transition-all"><span class="material-symbols-outlined text-[15px] text-primary">verified_user</span><span class="hidden xs:inline">Sanctuary</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-[132px] pb-24 bg-surface min-h-screen"><div class="w-full max-w-[440px] mx-auto px-margin py-space-sm flex-1 flex flex-col"><div class="flex flex-col w-full pb-8">
+<!-- Elevated Central Luxury Card -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-[0_20px_48px_-12px_rgba(33,67,60,0.08),0_4px_16px_-2px_rgba(33,67,60,0.03)] p-6 space-y-7 relative overflow-hidden">
+<!-- Decorative Warm Ray Aura -->
+<div class="absolute -top-24 -right-24 w-56 h-56 bg-secondary-fixed/40 rounded-full blur-2xl pointer-events-none"></div>
+<!-- 1. Card Header Section -->
+<div class="space-y-4 relative">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-10 h-10 rounded-2xl bg-primary-container flex items-center justify-center text-surface-container-lowest shadow-sm">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary leading-tight">UR-Heart</span>
+<span class="font-label-caps text-label-caps text-outline tracking-[0.16em]">A BETTER WAY TO MEET</span>
+</div>
+</div>
+<div class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-fixed/50 text-primary">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-caps text-label-caps font-bold tracking-wider">SANCTUARY VERIFIED</span>
+</div>
+</div>
+<div class="pt-1">
+<h1 class="font-display-lg-mobile text-display-lg-mobile text-primary tracking-tight">
+          Show up truly.
+          <span class="block font-headline-lg text-secondary italic font-normal pt-0.5">Complete your sanctuary.</span>
+</h1>
+<p class="font-body-md text-body-md text-on-surface-variant pt-2 leading-relaxed">
+          Authentic profiles build sacred connections. Curate your presence with intention and gentle honesty.
+        </p>
+</div>
+</div>
+<!-- 2. Sanctuary Gallery Section -->
+<div class="space-y-3.5 pt-1">
+<div class="flex items-baseline justify-between">
+<span class="font-label-caps text-label-caps text-primary tracking-widest font-bold">YOUR SANCTUARY GALLERY</span>
+<span class="font-body-sm text-body-sm text-outline">1 primary + 4 authentic glimpses</span>
+</div>
+<!-- Main Photo + Grid Layout -->
+<div class="grid grid-cols-12 gap-2.5">
+<!-- Featured Primary Photo (7 Cols) -->
+<div class="col-span-7 relative group rounded-2xl overflow-hidden aspect-[4/5] bg-surface-container-high shadow-[0_4px_16px_rgba(33,67,60,0.06)]">
+<img class="w-full h-full object-cover" data-alt="Warm natural golden hour portrait of Alexandra Vance smiling thoughtfully in an airy architectural design studio filled with Monstera leaves and parchment blueprints, soft lens blur, earth tones and warm cream light, editorial aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDq2yN58yRelJslRdxDCUJx7y-6vj0wgVO1RzJg6ptyYNHXu0PIMcGKNDNuxoUunO5TbDDXympB7rmkFzPEmnTLAQJzU_l5ELLCBL1RD9t2CGUICsvqDsg_ucO9xJAxsKu91tZxSETQGWIXG2UrZ-c9_pzl_R6Nvg5Qhk5Bjz71cdLFbaCKbeac8-oTey_JAoPIDAxau49468Jbz-YBMUFyV7vR2meFiqejuCgPC_ibqw2aCDWoN42D"/>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/70 via-transparent to-black/10"></div>
+<div class="absolute top-2.5 left-2.5 bg-surface-container-lowest/90 backdrop-blur-md px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[12px] text-secondary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-caps text-[9px] tracking-wider text-primary font-bold">PRIMARY PHOTO</span>
+</div>
+<button aria-label="Edit main photo" class="absolute bottom-2.5 right-2.5 w-8 h-8 rounded-full bg-surface-container-lowest text-primary flex items-center justify-center shadow-md active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+</button>
+</div>
+<!-- 4 Supplementary Photos (5 Cols, 2x2 Grid) -->
+<div class="col-span-5 grid grid-cols-2 gap-2.5 aspect-[4/5]">
+<!-- Photo 2 -->
+<div class="relative rounded-xl overflow-hidden bg-surface-container shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Casual aesthetic close-up shot of hands gently browsing vintage vinyl records in a warm wooden record store, soft atmospheric morning light, editorial beige and pine green tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMEY7NU7FMzJxXakn5hS67aLDZPSHPd0v8s9U_xmHtQZTYLzEcDvmL1jBqB7TEsuwIjFuVPwtmfJZvyHm31aT9XDX28o9ylZEe40Vyz_P9adJtLevWMmQNrAsoUD5N7I1fmyfsvpMif7a4q-nIMzCucmQGooeJfE2e85lesurFH22trS6pegB66K_Hi4SexqFvf4Z5D5fk383mMzBx3K3jaL_OruMELk8NB_uLVdZeo6DifV0NFWkw"/>
+<span class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm flex items-center justify-center text-primary text-[10px]">
+<span class="material-symbols-outlined text-[12px]">check</span>
+</span>
+</div>
+<!-- Photo 3 -->
+<div class="relative rounded-xl overflow-hidden bg-surface-container shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Candid lifestyle portrait of a young woman with a warm ceramic mug sitting on a sunlit veranda overlooking a tranquil coastal garden in Mumbai, natural soft lighting, warm linen palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2YJpTFs8QzVkXSJbie0FDb95FJe5Oo8Vnq4IPpO_X2qNJLUIwLy9VvDMscOcN9usBIDHyxjJPbFMRJo6ljex8L9rhyp4O4YPrUubbxPtODfM4mWeys_t5p-JMy0LiNecGWpT0P5YPVw9_E7aPHPSVkIpESSIjq5YOjrq7R-HXyDPvMMCbF7L0Ce1CbVcjKGr0ZNUgjhl52ehtpDdbegjnbapTRdWHgxuTK273n3y34XzIxMDGn_DS"/>
+<span class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm flex items-center justify-center text-primary text-[10px]">
+<span class="material-symbols-outlined text-[12px]">check</span>
+</span>
+</div>
+<!-- Photo 4 -->
+<div class="relative rounded-xl overflow-hidden bg-surface-container shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Atmospheric architectural sketchpad on an oak table next to a brass ruler and morning espresso, soft shadows, quiet luxury stationery vibes." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcsPgpVAQY886XeJ27ioi6nPmdNw1XlJ1ZGWKehrk2633JHjBuSYhz8emaRzgRD3pqoUiCKCXV8Cif-brQ6D4EdlaWxyAj5X4xdX2ZavC9KKq6OW74xlRDwnA_FIip0wIW0bGwpFSv2iMErV7xy_LxdtVz8S-IRZiWEyD9QNVraYSqLMw52lX7Iwc0KKZoT4o9lM_6Oha7cvHD5v6UYYOaG5W7gC5ibFfX6NX7PjqieMofbD2-SZmZ"/>
+<span class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm flex items-center justify-center text-primary text-[10px]">
+<span class="material-symbols-outlined text-[12px]">check</span>
+</span>
+</div>
+<!-- Slot 5: Add New -->
+<button aria-label="Upload photo" class="w-full h-full rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors flex flex-col items-center justify-center text-primary gap-1 active:scale-95 group" type="button">
+<div class="w-7 h-7 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-sm text-secondary group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</div>
+<span class="font-label-caps text-[9px] text-outline font-semibold tracking-wider">ADD</span>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-1.5 text-on-surface-variant pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-primary">eco</span>
+<p class="font-subhead-italic text-subhead-italic text-body-sm text-outline italic">No heavy filters or impersonation. Keep it real.</p>
+</div>
+</div>
+<!-- 3. Personal Identity & Locked DOB -->
+<div class="space-y-4 pt-1">
+<div class="space-y-1.5">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold" for="fullNameInput">LEGAL FULL NAME</label>
+<div class="relative flex items-center">
+<div class="absolute left-4 text-primary/70 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-[18px]">person</span>
+</div>
+<input class="w-full rounded-full bg-surface-container-low pl-11 pr-4 py-3.5 text-primary font-headline-sm text-body-lg focus:outline-none focus:bg-surface-container transition-all" id="fullNameInput" type="text" value="Alexandra Vance"/>
+</div>
+</div>
+<!-- Locked Date of Birth Module -->
+<div class="rounded-2xl bg-surface-container-low p-4 space-y-2 relative overflow-hidden">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[16px] text-secondary">lock</span>
+<span class="font-label-caps text-label-caps font-bold tracking-wider">DATE OF BIRTH</span>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-primary font-label-caps text-[10px] font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+            Verified Adult (18+)
+          </span>
+</div>
+<div class="flex items-baseline justify-between pt-0.5">
+<span class="font-headline-md text-headline-md text-primary font-semibold">14 Oct 2002</span>
+<span class="font-body-md text-body-md text-secondary font-semibold">22 yrs old</span>
+</div>
+<p class="font-body-sm text-body-sm text-outline flex items-center gap-1 leading-snug">
+<span class="material-symbols-outlined text-[14px] text-outline shrink-0">shield</span>
+          Age locked from government ID verification to protect sanctuary safety.
+        </p>
+</div>
+</div>
+<!-- 4. Gender & Dating Intentions -->
+<div class="grid grid-cols-1 gap-4 pt-1">
+<!-- Gender Selector -->
+<div class="space-y-1.5">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold">MY GENDER</label>
+<div class="relative">
+<select class="w-full appearance-none rounded-full bg-surface-container-low py-3.5 pl-5 pr-11 text-primary font-label-md text-label-md focus:outline-none focus:bg-surface-container transition-all cursor-pointer">
+<option selected="">Woman</option>
+<option>Man</option>
+<option>Non-binary</option>
+<option>Gender Fluid</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none text-[20px]">expand_more</span>
+</div>
+</div>
+<!-- Dating Intentions Pills -->
+<div class="space-y-2">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold">INTERESTED IN</label>
+<div class="grid grid-cols-3 gap-2" id="orientationGroup">
+<button class="interest-pill py-3 px-3 rounded-full bg-primary-container text-on-primary font-label-md text-label-md font-semibold text-center transition-all shadow-sm active:scale-95" onclick="setInterest(this)" type="button">Men</button>
+<button class="interest-pill py-3 px-3 rounded-full bg-surface-container-low text-primary font-label-md text-label-md text-center hover:bg-surface-container transition-all active:scale-95" onclick="setInterest(this)" type="button">Women</button>
+<button class="interest-pill py-3 px-3 rounded-full bg-surface-container-low text-primary font-label-md text-label-md text-center hover:bg-surface-container transition-all active:scale-95" onclick="setInterest(this)" type="button">Everyone</button>
+</div>
+</div>
+</div>
+<!-- 5. WhatsApp Contact & Real GPS Location -->
+<div class="space-y-4 pt-1">
+<!-- WhatsApp Number -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold" for="waPhoneInput">WHATSAPP CONTACT</label>
+<span class="font-label-caps text-[9px] text-secondary font-bold tracking-wider">CONFIDENTIAL &amp; ENCRYPTED</span>
+</div>
+<div class="relative flex items-center">
+<div class="absolute left-3.5 flex items-center gap-1.5 text-primary text-body-sm font-semibold pointer-events-none">
+<span class="text-base">🇮🇳</span>
+<span>+91</span>
+<span class="text-outline-variant font-light">|</span>
+</div>
+<input class="w-full rounded-full bg-surface-container-low pl-20 pr-10 py-3.5 text-primary font-label-md text-body-md focus:outline-none focus:bg-surface-container transition-all" id="waPhoneInput" type="text" value="98765 •••••"/>
+<span class="material-symbols-outlined absolute right-4 text-primary/70 text-[18px]">lock</span>
+</div>
+<div class="flex items-center gap-1.5 px-1">
+<span class="material-symbols-outlined text-[13px] text-secondary">verified_user</span>
+<p class="font-body-sm text-[11px] text-outline">Only shared with mutual resonance consent. Never exposed publicly.</p>
+</div>
+</div>
+<!-- Real GPS Location -->
+<div class="rounded-2xl bg-surface-container-low p-4 space-y-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[18px] text-secondary" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<span class="font-label-caps text-label-caps font-bold tracking-wider">REAL GPS SANCTUARY LOCATION</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest rounded-full p-2 pl-4 shadow-sm">
+<div class="flex flex-col truncate pr-2">
+<span class="font-label-md text-label-md text-primary font-semibold truncate">Bandra West, Mumbai</span>
+<span class="font-body-sm text-[11px] text-outline">GPS Verified 📍</span>
+</div>
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-primary-fixed text-primary font-label-sm text-[11px] font-bold hover:bg-primary-fixed-dim transition-colors active:scale-95" type="button">
+            Update
+          </button>
+</div>
+<p class="font-body-sm text-[11px] text-outline flex items-center gap-1 px-1">
+<span class="material-symbols-outlined text-[12px] text-outline">blur_on</span>
+          Approximate 1km privacy radius zone displayed to matches.
+        </p>
+</div>
+</div>
+<!-- 6. Video KYC Banner -->
+<div class="rounded-2xl bg-gradient-to-br from-secondary-fixed/50 via-surface-container-low to-primary-fixed/40 p-5 space-y-3.5 shadow-sm relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="space-y-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[18px]" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+<span class="font-label-caps text-label-caps text-secondary font-bold tracking-widest">VIDEO KYC · SACRED TRUST BADGE</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-primary">Claim the Verified Sanctuary Crest</h2>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-lowest flex items-center justify-center text-secondary shadow-md shrink-0">
+<span class="material-symbols-outlined text-[22px]">videocam</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+        Complete a gentle 5-second video selfie to ensure genuine human presence and activate verified-only sanctuary lounges.
+      </p>
+<button class="w-full py-3.5 px-5 rounded-full bg-surface-container-lowest text-primary hover:bg-white transition-all shadow-[0_4px_14px_rgba(0,0,0,0.04)] font-label-md text-label-md font-bold flex items-center justify-center gap-2 active:scale-98" type="button">
+<span class="material-symbols-outlined text-[17px] text-secondary">bolt</span>
+<span>Start Video KYC (Instant ⚡)</span>
+</button>
+</div>
+<!-- 7. Story & Intellect Section -->
+<div class="space-y-4 pt-1">
+<!-- Bio -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold" for="mindfulBioTextarea">MINDFUL BIO / PHILOSOPHY</label>
+<span class="font-body-sm text-[11px] text-outline" id="charCount">124 / 300</span>
+</div>
+<div class="relative">
+<textarea class="w-full rounded-2xl bg-surface-container-low p-4 text-primary font-subhead-italic text-subhead-italic italic focus:outline-none focus:bg-surface-container transition-all resize-none leading-relaxed" id="mindfulBioTextarea" oninput="updateCount(this)" rows="3">Architect by day, vinyl record collector by evening. Looking for gentle conversations, deep stillness, and laughter that feels like home.</textarea>
+<span class="material-symbols-outlined absolute right-3 bottom-3 text-primary/30 text-[18px]">format_quote</span>
+</div>
+</div>
+<!-- Profession -->
+<div class="space-y-1.5">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold" for="professionInput">PROFESSION</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-primary/70 text-[18px]">work_outline</span>
+<input class="w-full rounded-full bg-surface-container-low pl-11 pr-4 py-3.5 text-primary font-label-md text-body-md focus:outline-none focus:bg-surface-container transition-all" id="professionInput" type="text" value="Senior Architect &amp; Spatial Designer"/>
+</div>
+</div>
+<!-- Education -->
+<div class="space-y-1.5">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold" for="educationInput">EDUCATION / ALMA MATER</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-primary/70 text-[18px]">school</span>
+<input class="w-full rounded-full bg-surface-container-low pl-11 pr-4 py-3.5 text-primary font-label-md text-body-md focus:outline-none focus:bg-surface-container transition-all" id="educationInput" type="text" value="National Institute of Design (NID)"/>
+</div>
+</div>
+</div>
+<!-- 8. Preferred Meetup Age Range (18 - 50) -->
+<div class="space-y-3 pt-1">
+<div class="flex items-center justify-between">
+<label class="font-label-caps text-label-caps text-primary tracking-widest font-bold" for="ageMinInput">PREFERRED MEETUP AGE</label>
+<span class="font-label-md text-label-md text-secondary font-bold" id="rangeLabel">22 — 32 yrs</span>
+</div>
+<div class="px-2 pt-2 pb-1 space-y-3">
+<!-- Interactive Sliders Container -->
+<div class="relative flex items-center">
+<div class="w-full h-2 rounded-full bg-surface-container relative">
+<div class="absolute h-full rounded-full bg-primary-container" id="sliderFill" style="left: 12.5%; right: 56.25%;"></div>
+</div>
+<input class="absolute w-full h-2 opacity-0 cursor-pointer pointer-events-auto" id="ageMinInput" max="50" min="18" oninput="handleRangeChange()" type="range" value="22"/>
+<input class="absolute w-full h-2 opacity-0 cursor-pointer pointer-events-auto" id="ageMaxInput" max="50" min="18" oninput="handleRangeChange()" type="range" value="32"/>
+</div>
+<div class="flex justify-between items-center text-outline font-label-caps text-[10px]">
+<span>18 YRS (LEGAL MIN)</span>
+<span>50 YRS</span>
+</div>
+</div>
+</div>
+<!-- 9. Bottom Action Button & Policy Notice -->
+<div class="space-y-3 pt-2">
+<button class="w-full h-14 rounded-full bg-primary-container text-on-primary font-label-md text-label-md font-semibold flex items-center justify-center gap-2 shadow-[0_12px_28px_rgba(33,67,60,0.18)] hover:bg-primary transition-all active:scale-98" type="button">
+<span>Enter Sanctuary Feed</span>
+<span class="material-symbols-outlined text-[18px] text-secondary-fixed">auto_awesome</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+<div class="flex items-center justify-center gap-1.5 text-center text-outline">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+<span class="font-body-sm text-[11px]">Your privacy is protected under DPDP Act 2023.</span>
+</div>
+</div>
+</div>
+</div>
+<script>
+  function setInterest(btn) {
+    const group = document.querySelectorAll('#orientationGroup .interest-pill');
+    group.forEach(el => {
+      el.classList.remove('bg-primary-container', 'text-on-primary', 'shadow-sm');
+      el.classList.add('bg-surface-container-low', 'text-primary');
+    });
+    btn.classList.remove('bg-surface-container-low', 'text-primary');
+    btn.classList.add('bg-primary-container', 'text-on-primary', 'shadow-sm');
+  }
+
+  function updateCount(textarea) {
+    const counter = document.getElementById('charCount');
+    if (counter) {
+      counter.innerText = textarea.value.length + ' / 300';
+    }
+  }
+
+  function handleRangeChange() {
+    const minInput = document.getElementById('ageMinInput');
+    const maxInput = document.getElementById('ageMaxInput');
+    const label = document.getElementById('rangeLabel');
+    const fill = document.getElementById('sliderFill');
+    if (!minInput || !maxInput || !label || !fill) return;
+
+    let min = parseInt(minInput.value);
+    let max = parseInt(maxInput.value);
+
+    if (min > max) {
+      const temp = min;
+      min = max;
+      max = temp;
+    }
+
+    const total = 50 - 18;
+    const leftPct = ((min - 18) / total) * 100;
+    const rightPct = 100 - (((max - 18) / total) * 100);
+
+    fill.style.left = leftPct + '%';
+    fill.style.right = rightPct + '%';
+    label.innerText = min + ' — ' + max + ' yrs';
+  }
+</script></div></main><footer class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-1px_10px_rgba(33,67,60,0.03)]"><div class="flex flex-col items-center justify-center pt-2.5 pb-2 px-margin"><div class="flex items-center gap-1.5 mb-1.5"><div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div><div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div><div class="w-5 h-1.5 rounded-full bg-primary-container"></div><div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div></div><p class="font-subhead-italic text-[13px] text-on-surface-variant/80 italic">Real Connections · Brighter Days</p><div class="w-32 h-1 bg-on-surface/20 rounded-full mt-2"></div></div></footer></body></html>

@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "98d39a173435497b9d4d5cae8fa76ffa",
+  "resourceName": "projects/3794057334896238495/screens/98d39a173435497b9d4d5cae8fa76ffa",
+  "title": "UR-Heart - Profile Screen (Light Mode - 100% 1:1 Parity)",
+  "mode": "Light Mode",
+  "category": "Profile Screen",
+  "folder": "11_profile-screen",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "3886",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1XYTfv6-eVDam_CytZFHrvugbO6-cS9XYFk6-739YYrUwD9BjEzflUtJrEmn1K5b8vlYGOv_bWYzMc-9yqktfsGCvrf4Qi6u60VieoESWPSXK6Z1dajsQJ9cswSV-bSYEDKtK9xhlsE7tHFON3DW3w12qvg6BGothTUmxFjKlMkytFPQgpMNMScliwa3m8KKaX086feCPwdvXwDbluurhVIc2e8Q7_Ryzvc_UzDOFgRlxLVMc-8dBFgWzo",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRlMmFmNzQzZGIwNzc5OWQzOGVhMGQ0OTlkEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/light-mode/11_profile-screen/screenshot.png",
+  "localHtml": "screens/light-mode/11_profile-screen/screen.html"
+}

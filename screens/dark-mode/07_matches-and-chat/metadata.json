@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "71983c94213a499a92f2227d4338d64d",
+  "resourceName": "projects/3794057334896238495/screens/71983c94213a499a92f2227d4338d64d",
+  "title": "UR-Heart - Matches & Chat Screen (Dark Mode - Exact Background)",
+  "mode": "Dark Mode",
+  "category": "Matches & Chat Screen",
+  "folder": "07_matches-and-chat",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "1768",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1WA0d9DI6nwAlyChfbPaI1MTsgGsxAfUwZKOPAnaJoQHejqDxOY4gENfahicEOpujgQSIgT1ZqVL_l6NoyL6yGdgXCb8xampCAXVm6I7Y-G0lzk99CAq9Que75jOl3EMkZq1IIlVu1Uvdp9IHGO3USO6_-o8Scg3DYTssVQCPEitRl2wS2Uuz4dqlkXSs68SwhCZ3wJPr5aLfQx5BqvNTa2aPlwv_u-gO9Dlujhbte2rpM8ifLEiLkxH70",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRkNDg3Nzg0ZGMwNzBkY2EwMTAwMWM4M2JkEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/dark-mode/07_matches-and-chat/screenshot.png",
+  "localHtml": "screens/dark-mode/07_matches-and-chat/screen.html"
+}

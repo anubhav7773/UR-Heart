@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "82c13ece085c4cb78b7cfbf0dd0f05a2",
+  "resourceName": "projects/3794057334896238495/screens/82c13ece085c4cb78b7cfbf0dd0f05a2",
+  "title": "UR-Heart - Sanctuary Feed (Light Mode - 100% 1:1 Parity)",
+  "mode": "Light Mode",
+  "category": "Sanctuary Feed",
+  "folder": "05_sanctuary-feed",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "2510",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1Us3AGIP-aADyHWCiUKVqKzrNjHWJ3tzXOzEuKfcZzDefPoXf6c9OaO0_GQZm2JE-trieGWeNN5EyvMNp0MtV6_kfTtCdraalWAExNCPBPmIi0n0WphUJBushkNU7k3zILuQQsaDa521Jjw0vdAr9gKvqJxn3W3XA-q1w8sJ_CklEOGTghrsVsZyezFlLITTSKyuQoGNWovxVRvwxgE0CLI1tbWwhZ9Uz4YAJxmGyO7sb-Pjk2fsoBktpQ",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRjYjhlMjNmMGUwN2M0ZWViYzEzMDk5N2ZlEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/light-mode/05_sanctuary-feed/screenshot.png",
+  "localHtml": "screens/light-mode/05_sanctuary-feed/screen.html"
+}

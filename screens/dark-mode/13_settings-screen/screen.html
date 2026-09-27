@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="mobile_stack" name="shell-type"/>
+<title>UR-Heart - Settings</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-surface": "#faf9f3",
+            "surface-bright": "#faf9f3",
+            "surface-variant": "#c1c8c5",
+            "surface-dim": "#1b2320",
+            "primary": "#082d26",
+            "primary-container": "#21433c",
+            "primary-fixed": "#c5eae0",
+            "primary-fixed-dim": "#a9cec4",
+            "secondary": "#9a442d",
+            "secondary-container": "#fc9174",
+            "secondary-fixed": "#ffdbd2",
+            "tertiary-container": "#1d2622",
+            "tertiary-fixed": "#dae5dd",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6"
+          },
+          fontFamily: {
+            "display-lg": ["Newsreader", "serif"],
+            "headline-lg": ["Newsreader", "serif"],
+            "headline-md": ["Newsreader", "serif"],
+            "headline-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "body-lg": ["Plus Jakarta Sans", "sans-serif"],
+            "body-md": ["Plus Jakarta Sans", "sans-serif"],
+            "body-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "label-md": ["Plus Jakarta Sans", "sans-serif"],
+            "label-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "label-caps": ["Plus Jakarta Sans", "sans-serif"],
+            "subhead-italic": ["Newsreader", "serif"]
+          },
+          fontSize: {
+            "headline-lg": ["28px", { lineHeight: "34px", letterSpacing: "-0.01em", fontWeight: "600" }],
+            "headline-md": ["22px", { lineHeight: "28px", fontWeight: "500" }],
+            "headline-sm": ["16px", { lineHeight: "22px", fontWeight: "600" }],
+            "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+            "body-sm": ["12px", { lineHeight: "17px", fontWeight: "400" }],
+            "label-md": ["14px", { lineHeight: "20px", fontWeight: "600" }],
+            "label-sm": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+            "label-caps": ["10px", { lineHeight: "14px", letterSpacing: "0.14em", fontWeight: "700" }],
+            "subhead-italic": ["15px", { lineHeight: "22px", letterSpacing: "0.01em", fontWeight: "400" }]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #080c0b;
+        color: #faf9f3;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      ::-webkit-scrollbar { display: none; }
+    }
+  </style>
+</head>
+<body class="bg-[#080c0b] text-[#faf9f3] min-h-screen relative overflow-x-hidden" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCJ-9dy8naXuLKlD5Xp2673FAGn9IDk-0QHwp0-jS1ZhXr0iAQK57TFadIpn-Sh-5kSF_uQykHJQd0YBO3r4CRsLazaTw7kPyMRii6FkQkqzie13-fHJxZTUrwm4kTFJe7h9yEReyOZD9ZMvtniLj2Xke_7DNBHKTaaAz-C_-XxHSwose1c8sDzSKrpKu3esprcpDQX4INJpJ6HXrHAlK3GeU9zxSThMFdqzw-MN4VVBs5bvn_kURiksiB-p2L4zyowlQ'); background-size: cover; background-position: center top; background-repeat: no-repeat; background-attachment: fixed; min-height: 100vh; background-color: #080c0b;">
+<!-- Ambient Cinematic Overlay to enhance glassmorphism contrast -->
+<div class="fixed inset-0 pointer-events-none bg-gradient-to-b from-[#080c0b]/80 via-[#080c0b]/60 to-[#080c0b]/90 z-0"></div>
+<!-- iOS Status Bar (crisp white / light ivory) -->
+<header class="sticky top-0 z-50 w-full bg-[#080c0b]/75 backdrop-blur-xl border-b border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+<!-- Status Bar Row -->
+<div class="flex justify-between items-center px-6 pt-3 pb-1 text-xs text-white/90 font-medium tracking-tight">
+<span class="font-semibold tracking-normal text-[14px]">9:41</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[15px]">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[16px]">wifi</span>
+<span class="material-symbols-outlined text-[18px]">battery_full</span>
+</div>
+</div>
+<!-- App Bar Navigation -->
+<div class="px-5 py-3 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<!-- Circular glassmorphic back arrow button -->
+<button aria-label="Go back" class="w-10 h-10 rounded-full bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/[0.12] shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center justify-center text-white transition-all" onclick="history.back()" type="button">
+<span class="material-symbols-outlined text-[19px]">arrow_back_ios_new</span>
+</button>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] tracking-[0.18em] text-[#fc9174] uppercase font-bold">SANCTUARY PREFERENCES</span>
+<h1 class="font-headline-lg text-[24px] text-white tracking-tight leading-tight">Settings</h1>
+</div>
+</div>
+<!-- Right Shield Badge -->
+<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#162520]/80 border border-emerald-500/30 shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-md">
+<span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse"></span>
+<span class="text-[11px] font-semibold text-emerald-200 tracking-wide">E2E Shielded</span>
+</div>
+</div>
+</header>
+<!-- Main Scrollable Content Container -->
+<main class="relative z-10 w-full max-w-[440px] mx-auto px-4 pt-4 pb-16 flex flex-col gap-6">
+<!-- SECTION 1: RESONANCE & SANCTUARY ALERTS -->
+<section class="flex flex-col gap-2.5">
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-[17px] text-[#fc9174]">notifications_active</span>
+<h2 class="font-label-caps text-[11px] tracking-[0.16em] text-white/70 uppercase font-semibold">Resonance &amp; Sanctuary Alerts</h2>
+</div>
+<!-- 3D Tactile Frosted Dark Glass Card -->
+<div class="rounded-2xl bg-[#111715]/85 backdrop-blur-2xl border border-white/[0.09] shadow-[0_16px_36px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.12)] p-4 flex flex-col gap-4">
+<!-- Item 1: Master Resonance -->
+<div class="flex items-center justify-between gap-3">
+<div class="flex items-start gap-3 min-w-0 pr-1">
+<div class="w-9 h-9 rounded-full bg-emerald-950/70 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]">
+<span class="material-symbols-outlined text-emerald-300 text-[18px]">favorite</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-white text-[15px]">Master Resonance</span>
+<p class="font-body-sm text-white/60 text-[12px] mt-0.5 leading-snug">Real-time resonant match alerts &amp; prose letters</p>
+</div>
+</div>
+<!-- 3D Tactile Toggle Switch (ON) -->
+<button aria-checked="true" class="toggle-btn relative w-13 h-7 rounded-full bg-gradient-to-r from-[#21433c] to-[#9a442d] shrink-0 p-0.5 flex items-center shadow-[0_3px_8px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.3)] transition-all duration-300" data-toggle="true" role="switch" type="button">
+<span class="toggle-thumb block w-6 h-6 rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.4),inset_0_-1px_1px_rgba(0,0,0,0.2)] translate-x-6 transition-transform duration-300"></span>
+</button>
+</div>
+<div class="w-full h-px bg-white/[0.06]"></div>
+<!-- Item 2: Discreet Mode -->
+<div class="flex items-center justify-between gap-3">
+<div class="flex items-start gap-3 min-w-0 pr-1">
+<div class="w-9 h-9 rounded-full bg-[#1b2220]/80 border border-white/[0.08] flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]">
+<span class="material-symbols-outlined text-[#fc9174] text-[18px]">visibility_off</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-white text-[15px]">Discreet Mode</span>
+<p class="font-body-sm text-white/60 text-[12px] mt-0.5 leading-snug">Mask message previews &amp; suppress app notifications</p>
+</div>
+</div>
+<!-- 3D Tactile Toggle Switch (OFF) -->
+<button aria-checked="false" class="toggle-btn relative w-13 h-7 rounded-full bg-[#161d1a] border border-white/[0.05] shrink-0 p-0.5 flex items-center shadow-[0_2px_6px_rgba(0,0,0,0.4),inset_0_1px_2px_rgba(0,0,0,0.6)] transition-all duration-300" data-toggle="false" role="switch" type="button">
+<span class="toggle-thumb block w-6 h-6 rounded-full bg-[#8c9490] shadow-[0_2px_5px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.25)] translate-x-0.5 transition-transform duration-300"></span>
+</button>
+</div>
+<div class="w-full h-px bg-white/[0.06]"></div>
+<!-- Item 3: Night Sanctuary Slumber -->
+<div class="flex items-center justify-between gap-3">
+<div class="flex items-start gap-3 min-w-0 pr-1">
+<div class="w-9 h-9 rounded-full bg-emerald-950/70 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]">
+<span class="material-symbols-outlined text-[#ffdbd2] text-[18px]">bedtime</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-white text-[15px]">Night Sanctuary Slumber</span>
+<p class="font-body-sm text-white/60 text-[12px] mt-0.5 leading-snug">Silence all chimes from 11:00 PM to 7:00 AM</p>
+</div>
+</div>
+<!-- 3D Tactile Toggle Switch (ON) -->
+<button aria-checked="true" class="toggle-btn relative w-13 h-7 rounded-full bg-gradient-to-r from-[#21433c] to-[#9a442d] shrink-0 p-0.5 flex items-center shadow-[0_3px_8px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.3)] transition-all duration-300" data-toggle="true" role="switch" type="button">
+<span class="toggle-thumb block w-6 h-6 rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.4),inset_0_-1px_1px_rgba(0,0,0,0.2)] translate-x-6 transition-transform duration-300"></span>
+</button>
+</div>
+</div>
+</section>
+<!-- SECTION 2: PRIVACY & DISCOVERY VAULT -->
+<section class="flex flex-col gap-2.5">
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-[17px] text-emerald-300">verified_user</span>
+<h2 class="font-label-caps text-[11px] tracking-[0.16em] text-white/70 uppercase font-semibold">Privacy &amp; Discovery Vault</h2>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Incognito Stream Radius -->
+<div class="rounded-2xl bg-[#111715]/85 backdrop-blur-2xl border border-white/[0.09] shadow-[0_12px_28px_rgba(0,0,0,0.45),inset_0_1px_1px_rgba(255,255,255,0.1)] p-4 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-10 h-10 rounded-full bg-[#1b2521] border border-white/[0.08] flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
+<span class="material-symbols-outlined text-[#fc9174] text-[20px]">explore_off</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-white text-[15px]">Incognito Stream Radius</span>
+<p class="font-body-sm text-white/60 text-[12px] leading-snug">Pause stream discovery while preserving existing bonds</p>
+</div>
+</div>
+<!-- 3D Interactive Selector Chip -->
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-[#1c2722] hover:bg-[#24332c] border border-white/[0.12] active:scale-95 shadow-[0_3px_8px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center gap-1.5 transition-all" id="radius-selector" type="button">
+<span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]"></span>
+<span class="text-[12px] text-white font-semibold">Visible</span>
+<span class="material-symbols-outlined text-[15px] text-white/60">arrow_drop_down</span>
+</button>
+</div>
+<!-- Cryptographic Key Rotation -->
+<div class="rounded-2xl bg-[#111715]/85 backdrop-blur-2xl border border-white/[0.09] shadow-[0_12px_28px_rgba(0,0,0,0.45),inset_0_1px_1px_rgba(255,255,255,0.1)] p-4 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-10 h-10 rounded-full bg-[#1b2521] border border-white/[0.08] flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
+<span class="material-symbols-outlined text-emerald-300 text-[20px]">key</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-white text-[15px]">Cryptographic Key Rotation</span>
+<p class="font-body-sm text-white/60 text-[12px] leading-snug">Rotate Curve25519 E2E keypair on demand</p>
+</div>
+</div>
+<!-- 3D Tactile Re-key Button -->
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#21433c] to-[#2c584f] hover:brightness-110 active:scale-95 border border-emerald-400/25 shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.25)] flex items-center gap-1.5 transition-all" onclick="rotateKey(this)" type="button">
+<span class="text-[12px] text-emerald-200 font-semibold tracking-wide">Re-key</span>
+<span class="material-symbols-outlined text-[15px] text-emerald-200">autorenew</span>
+</button>
+</div>
+</div>
+</section>
+<!-- SECTION 3: SANCTUARY COMMUNITY VOICE (FEEDBACK) -->
+<section class="flex flex-col gap-2.5">
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-[17px] text-[#fc9174]">forum</span>
+<h2 class="font-label-caps text-[11px] tracking-[0.16em] text-white/70 uppercase font-semibold">Sanctuary Community Voice</h2>
+</div>
+<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#18231f]/90 to-[#101614]/95 backdrop-blur-2xl border border-white/[0.1] shadow-[0_16px_34px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] p-5 flex flex-col gap-4">
+<!-- Warm terracotta ambient corner glow -->
+<div class="absolute -right-8 -bottom-8 w-36 h-36 rounded-full pointer-events-none bg-[radial-gradient(circle,rgba(252,145,116,0.18),transparent_70%)]"></div>
+<div class="flex items-start gap-3.5 relative z-10">
+<div class="w-11 h-11 rounded-full bg-[#fc9174]/15 border border-[#fc9174]/30 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
+<span class="material-symbols-outlined text-[#fc9174] text-[22px]">mark_chat_read</span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-headline-md text-white text-[20px] leading-tight">Share Reflections &amp; Ideas</h3>
+<p class="font-body-md text-white/75 text-[13px] mt-1 leading-relaxed">
+              Help shape our sanctuary for deliberate, unhurried romance and intentional intimacy.
+            </p>
+</div>
+</div>
+<button class="relative z-10 w-full min-h-[46px] rounded-full bg-gradient-to-r from-[#fc9174] via-[#9a442d] to-[#742814] hover:brightness-105 active:scale-[0.98] border border-white/[0.2] text-white text-[14px] font-semibold tracking-wide shadow-[0_8px_20px_rgba(154,68,45,0.4),inset_0_1px_1px_rgba(255,255,255,0.35)] flex items-center justify-center gap-2 transition-all" type="button">
+<span>Give Feedback</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</section>
+<!-- SECTION 4: GOVERNANCE & SOVEREIGN CONTROL -->
+<section class="flex flex-col gap-2.5">
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-[17px] text-red-400">gavel</span>
+<h2 class="font-label-caps text-[11px] tracking-[0.16em] text-white/70 uppercase font-semibold">Governance &amp; Sovereign Control</h2>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Log Out Card -->
+<div class="rounded-2xl bg-[#111715]/85 backdrop-blur-2xl border border-white/[0.09] shadow-[0_12px_28px_rgba(0,0,0,0.45),inset_0_1px_1px_rgba(255,255,255,0.1)] p-4 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-10 h-10 rounded-full bg-[#1b2521] border border-white/[0.08] flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
+<span class="material-symbols-outlined text-white/70 text-[20px]">logout</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-white text-[15px]">Log Out of Sanctuary</span>
+<p class="font-body-sm text-white/60 text-[12px] leading-snug">Secure RAM purge session memory on this handset</p>
+</div>
+</div>
+<button class="shrink-0 px-4 py-2 rounded-full bg-[#1e2723] hover:bg-[#28342f] active:scale-95 border border-white/[0.12] text-white font-semibold text-[13px] shadow-[0_3px_8px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.15)] transition-all" type="button">
+            Log Out
+          </button>
+</div>
+<!-- Danger Card: Delete Account & Erase All Data -->
+<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#2a0e11]/90 via-[#1e0a0d]/95 to-[#130608]/95 backdrop-blur-2xl border border-red-500/25 shadow-[0_16px_36px_rgba(186,26,26,0.3),inset_0_1px_1px_rgba(255,140,140,0.2)] p-5 flex flex-col gap-4">
+<!-- Crimson Aura -->
+<div class="absolute -top-10 -left-10 w-36 h-36 rounded-full pointer-events-none bg-[radial-gradient(circle,rgba(186,26,26,0.35),transparent_70%)]"></div>
+<div class="flex items-start gap-3.5 relative z-10">
+<div class="w-11 h-11 rounded-full bg-red-600/20 border border-red-500/30 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
+<span class="material-symbols-outlined text-red-300 text-[22px]">delete_forever</span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-headline-sm text-white text-[16px] leading-tight">Delete Account &amp; Erase All Data</h3>
+<p class="font-body-sm text-red-100/80 text-[12px] mt-1 leading-relaxed">
+                Statutory DPDP Act Sec 12 cryptographic incinerator. All letters, photos, voice prompts and encryption keys are permanently destroyed.
+              </p>
+</div>
+</div>
+<button class="relative z-10 w-full min-h-[48px] rounded-full bg-gradient-to-r from-[#ba1a1a] via-[#a31515] to-[#741010] hover:brightness-110 active:scale-[0.98] border border-white/[0.25] text-white font-bold text-[14px] tracking-wide shadow-[0_10px_24px_rgba(186,26,26,0.5),inset_0_1px_1px_rgba(255,255,255,0.4)] flex items-center justify-center gap-2 transition-all" onclick="confirmPurge()" type="button">
+<span class="material-symbols-outlined text-[18px]">shield</span>
+<span>Erase Everything Irrevocably →</span>
+</button>
+</div>
+</div>
+</section>
+<!-- FOOTER / STATUTORY AUDIT -->
+<footer class="flex flex-col items-center text-center gap-2.5 pt-4 pb-10">
+<div class="w-10 h-px bg-white/10 mb-1"></div>
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.08]">
+<span class="material-symbols-outlined text-[14px] text-emerald-300">verified</span>
+<span class="font-label-caps text-[10px] text-white/75 tracking-wider">DPDP ACT 2023 &amp; IT RULES 2021 CERTIFIED</span>
+</div>
+<p class="font-body-sm text-[12px] text-white/60">
+        UR-Heart v2.4.1 (Build 8904) · Zero-Knowledge Sovereign Core
+      </p>
+<p class="font-subhead-italic text-[15px] text-white/45 italic">
+        “Your sovereignty is uncompromised.”
+      </p>
+</footer>
+</main>
+<script>
+    // 3D Tactile Toggle Interactivity
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const isChecked = btn.getAttribute('data-toggle') === 'true';
+        const newState = !isChecked;
+        btn.setAttribute('data-toggle', String(newState));
+        btn.setAttribute('aria-checked', String(newState));
+
+        const thumb = btn.querySelector('.toggle-thumb');
+        if (newState) {
+          btn.classList.remove('bg-[#161d1a]', 'border-white/[0.05]', 'shadow-[0_2px_6px_rgba(0,0,0,0.4),inset_0_1px_2px_rgba(0,0,0,0.6)]');
+          btn.classList.add('bg-gradient-to-r', 'from-[#21433c]', 'to-[#9a442d]', 'shadow-[0_3px_8px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.3)]');
+          thumb.classList.remove('translate-x-0.5', 'bg-[#8c9490]');
+          thumb.classList.add('translate-x-6', 'bg-white');
+        } else {
+          btn.classList.remove('bg-gradient-to-r', 'from-[#21433c]', 'to-[#9a442d]', 'shadow-[0_3px_8px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.3)]');
+          btn.classList.add('bg-[#161d1a]', 'border-white/[0.05]', 'shadow-[0_2px_6px_rgba(0,0,0,0.4),inset_0_1px_2px_rgba(0,0,0,0.6)]');
+          thumb.classList.remove('translate-x-6', 'bg-white');
+          thumb.classList.add('translate-x-0.5', 'bg-[#8c9490]');
+        }
+      });
+    });
+
+    // Key Rotation Micro-interaction
+    function rotateKey(button) {
+      const icon = button.querySelector('.material-symbols-outlined');
+      const textSpan = button.querySelector('span:first-child');
+      icon.classList.add('animate-spin');
+      button.classList.add('opacity-75');
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+        button.classList.remove('opacity-75');
+        const orig = textSpan.innerText;
+        textSpan.innerText = 'Rotated ✓';
+        setTimeout(() => { textSpan.innerText = orig; }, 1600);
+      }, 700);
+    }
+
+    // Incognito Radius Chip Toggle
+    const radiusBtn = document.getElementById('radius-selector');
+    if (radiusBtn) {
+      let isVisible = true;
+      radiusBtn.addEventListener('click', () => {
+        isVisible = !isVisible;
+        const dot = radiusBtn.querySelector('span:first-child');
+        const text = radiusBtn.querySelector('span:nth-child(2)');
+        if (isVisible) {
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]';
+          text.innerText = 'Visible';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-[#fc9174] shadow-[0_0_6px_#fc9174]';
+          text.innerText = 'Cloaked';
+        }
+      });
+    }
+
+    // Account Purge Confirmation
+    function confirmPurge() {
+      if (confirm("UR-Heart Sanctuary Alert:\n\nAre you sure you wish to invoke Sec 12 statutory eradication? All matching history, chats, and cryptographic identity keys will be permanently zeroed.")) {
+        alert("Sanctuary keys wiped irrevocably.");
+      }
+    }
+  </script>
+</body></html>

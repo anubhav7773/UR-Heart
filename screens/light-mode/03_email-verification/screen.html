@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>UR-Heart - Mindful Consent</title>
+<!-- Tailwind CSS v3 CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Newsreader (Editorial Serif) & Plus Jakarta Sans / Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'cream-bg': '#F7F5F0',
+            'card-bg': '#FFFFFF',
+            'forest-dark': '#152C26',
+            'forest-primary': '#1C3F38',
+            'forest-btn': '#23463F',
+            'coral-accent': '#DE785C',
+            'border-subtle': '#EDE9E2',
+            'text-muted': '#727B75',
+            'gold-wire': '#CBB8A2',
+          },
+          fontFamily: {
+            serif: ['Newsreader', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          boxShadow: {
+            'luxury-card': '0 20px 48px -10px rgba(45, 42, 35, 0.08), 0 4px 16px -2px rgba(45, 42, 35, 0.03)',
+            'btn-shadow': '0 10px 24px -4px rgba(28, 63, 56, 0.28)',
+          },
+          borderRadius: {
+            '4xl': '36px',
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Visual Styles -->
+<style data-purpose="custom-typography-and-decor">
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: #F7F5F0;
+      color: #152C26;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-editorial {
+      font-family: 'Newsreader', Georgia, serif;
+    }
+    /* Delicate botanical & heart wireframe background overlay */
+    .bg-wireframe-heart {
+      background-image: 
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.9) 0%, rgba(247, 245, 240, 0.3) 70%),
+        radial-gradient(circle at 10% 88%, rgba(214, 222, 214, 0.45) 0%, transparent 50%),
+        radial-gradient(circle at 90% 92%, rgba(230, 220, 208, 0.5) 0%, transparent 60%);
+    }
+    /* Custom sleek checkbox appearance */
+    .custom-checkbox:checked {
+      background-color: #1C3F38;
+      border-color: #1C3F38;
+      background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+    }
+  </style>
+<!-- END: Custom Visual Styles -->
+<meta content="web_standard" name="shell-type"/><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex justify-center items-start sm:py-6 bg-cream-bg bg-wireframe-heart" style="background: radial-gradient(circle at 50% 12%, #FAF8F3 0%, #F3EFE6 100%); background-attachment: fixed; min-height: 100vh;">
+<!-- BEGIN: Mobile Device Frame Simulator -->
+<main class="w-full max-w-[428px] min-h-screen sm:min-h-[926px] relative overflow-hidden flex flex-col justify-between select-none sm:rounded-[50px] sm:border-[8px] sm:border-[#E8E4DC] sm:shadow-2xl px-5 py-3 sm:py-5" style="background: radial-gradient(130% 90% at 50% 10%, #FCFBF7 0%, #F5F1E8 100%);">
+<!-- SVG Organic Wireframe Heart Sketch Lines in Background -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-25 z-0" fill="none" viewbox="0 0 428 926" xmlns="http://www.w3.org/2000/svg">
+<path d="M214 260 C140 160, 40 240, 110 380 C160 480, 214 540, 214 540 C214 540, 268 480, 318 380 C388 240, 288 160, 214 260 Z" stroke="#1C3F38" stroke-dasharray="4 6" stroke-linecap="round" stroke-width="1.2"></path>
+<path d="M214 220 C110 100, -10 200, 80 390 C150 520, 214 600, 214 600 C214 600, 278 520, 348 390 C438 200, 318 100, 214 220 Z" stroke="#C8A882" stroke-opacity="0.6" stroke-width="0.8"></path>
+<circle cx="214" cy="430" opacity="0.5" r="160" stroke="#CBB8A2" stroke-dasharray="3 5" stroke-width="0.6"></circle>
+<circle cx="214" cy="430" opacity="0.2" r="210" stroke="#1C3F38" stroke-width="0.5"></circle>
+</svg>
+<!-- Top Header Zone: Mobile Status & Language selector -->
+<div class="relative z-10 w-full flex flex-col gap-1">
+<!-- iOS Status Bar -->
+<div class="flex items-center justify-between text-on-surface text-xs font-semibold px-2 pt-1">
+<span class="tracking-tight font-medium text-[15px]">9:41</span>
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[15px]">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[15px]">wifi</span>
+<span class="material-symbols-outlined text-[18px]">battery_full</span>
+</div>
+</div>
+<!-- Language & Whisper Bar -->
+<div class="flex items-center justify-between px-2 pt-2">
+<span class="font-serif italic text-xs tracking-wide text-[#727B75]">More than swipes</span>
+<div class="flex items-center gap-2">
+<span class="text-[10px] tracking-widest uppercase font-semibold text-[#8B938D]">Safer · Kinder · Real</span>
+<button class="flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-[#EAE6DC]/60 text-xs text-[#2A443C] font-medium border border-[#DDD8CD]/70 hover:bg-[#EAE6DC] transition-colors" type="button">
+<span>English</span>
+<span class="material-symbols-outlined text-[14px]">expand_more</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Floating Luxury Card Container -->
+<div class="relative z-10 w-full my-auto rounded-[36px] bg-white px-6 py-6 shadow-2xl flex flex-col gap-4 border border-[#21433C]/[0.07]" style="box-shadow: 0 20px 45px -10px rgba(33, 67, 60, 0.08), 0 2px 8px rgba(0, 0, 0, 0.03);">
+<!-- Brand Header inside card -->
+<div class="flex items-center justify-between pb-1 border-b border-[#F2EFE8]">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-xl bg-[#1C3F38] text-white flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</div>
+<div class="flex flex-col">
+<span class="font-serif font-bold text-base text-[#152C26] leading-none tracking-tight">UR-Heart</span>
+<span class="text-[9px] font-bold tracking-[0.18em] uppercase text-[#8B938D] mt-0.5">A Better Way to Meet</span>
+</div>
+</div>
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F3F7F5] border border-[#D5E4DE] text-[#1C3F38]">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="text-[10px] font-bold tracking-widest uppercase">SANCTUARY</span>
+</div>
+</div>
+<!-- Illuminated Envelope Feature Graphic -->
+<div class="relative flex flex-col items-center justify-center py-1">
+<div class="relative flex items-center justify-center">
+<!-- Soft mint aura pulse -->
+<div class="w-20 h-20 rounded-full bg-[#E5EFEA] flex items-center justify-center animate-pulse">
+<div class="w-14 h-14 rounded-full bg-[#D1E4DC] flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-[#1C3F38] text-2xl" style="font-variation-settings: 'FILL' 1;">mark_email_unread</span>
+</div>
+</div>
+<!-- Coral badge -->
+<div class="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[#DE785C] text-white flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+</div>
+</div>
+<!-- Hero Headline & Description -->
+<div class="text-center space-y-1.5">
+<h1 class="font-serif text-[28px] leading-tight text-[#152C26] font-semibold tracking-tight">
+        Almost home.<br/>
+<span class="italic font-normal text-[#DE785C]">Verify your sanctuary.</span>
+</h1>
+<p class="text-xs text-[#5E6761] leading-relaxed max-w-[270px] mx-auto">
+        We have dispatched an encrypted invitation link to confirm your genuine space:
+      </p>
+</div>
+<!-- Recessed Email Target Pill with Interactive Edit -->
+<div class="flex items-center justify-between bg-[#F8F7F3] border border-[#EDE8DE] px-3.5 py-2 rounded-2xl">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-[#1C3F38] text-base flex-shrink-0">alternate_email</span>
+<span class="text-xs font-semibold text-[#1C3F38] truncate" id="userEmailDisplay">priya.sharma@domain.com</span>
+</div>
+<button class="flex items-center gap-1 text-[11px] font-semibold text-[#DE785C] hover:text-[#C8644A] transition-colors ml-2 flex-shrink-0" onclick="const newMail = prompt('Update sanctuary email:', document.getElementById('userEmailDisplay').innerText); if(newMail) document.getElementById('userEmailDisplay').innerText = newMail;" type="button">
+<span class="material-symbols-outlined text-xs">edit</span>
+<span>Edit</span>
+</button>
+</div>
+<!-- 3-Step Guided Passage Box -->
+<div class="bg-[#FAF8F5] border border-[#ECE7DC] rounded-2xl p-3 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-bold uppercase tracking-wider text-[#7A837E]">3-Step Mindful Passage</span>
+<span class="text-[10px] text-[#A2A9A4]">Encrypted Magic Link</span>
+</div>
+<div class="space-y-1.5">
+<div class="flex items-center gap-2.5">
+<span class="w-4 h-4 rounded-full bg-[#1C3F38] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">1</span>
+<span class="text-xs text-[#243530]">Open the letter from <em class="font-serif italic text-[#1C3F38]">UR-Heart Sanctuary</em></span>
+</div>
+<div class="flex items-center gap-2.5">
+<span class="w-4 h-4 rounded-full bg-[#1C3F38] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">2</span>
+<span class="text-xs text-[#243530]">Tap the single-click Magic Link inside</span>
+</div>
+<div class="flex items-center gap-2.5">
+<span class="w-4 h-4 rounded-full bg-[#1C3F38] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">3</span>
+<span class="text-xs text-[#243530]">Automatically enter your mindful dating space</span>
+</div>
+</div>
+</div>
+<!-- Primary CTA & Timer Resend -->
+<div class="flex flex-col gap-2 pt-1">
+<a class="w-full h-12 rounded-full bg-[#1C3F38] text-white flex items-center justify-center gap-2 px-4 shadow-lg shadow-[#1C3F38]/20 hover:bg-[#234E45] active:scale-[0.99] transition-all font-semibold text-sm tracking-wide" href="mailto:">
+<span>Open Email App</span>
+<span class="material-symbols-outlined text-base">arrow_forward</span>
+</a>
+<!-- Interactive Countdown Resend Button -->
+<div class="flex items-center justify-center pt-0.5">
+<button class="text-xs text-[#727B75] flex items-center gap-1.5 cursor-not-allowed hover:text-[#1C3F38] transition-colors" id="resendBtn" type="button">
+<span class="material-symbols-outlined text-xs">schedule</span>
+<span>Resend link in <strong class="text-[#DE785C] font-semibold" id="countdownTimer">42s</strong></span>
+</button>
+</div>
+</div>
+<!-- Sanctuary Concierge Help Micro-Notice -->
+<div class="text-center pt-1 border-t border-[#F2EFE8]">
+<p class="text-[11px] text-[#7A837E] leading-normal">
+        Can’t find the email? Check your spam folder or 
+        <a class="text-[#DE785C] underline font-medium hover:text-[#1C3F38] transition-colors" href="#support">Contact Sanctuary Concierge</a>.
+      </p>
+</div>
+</div>
+<!-- Bottom Micro-Whispers Bar & Carousel Indicators -->
+<div class="relative z-10 w-full flex items-center justify-between px-2 pb-2 text-[#727B75]">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-[#1C3F38]" style="font-variation-settings: 'FILL' 1;">lock</span>
+<span class="font-serif italic text-xs">Real Connections · Brighter Days</span>
+</div>
+<!-- Carousel 3-dot pagination -->
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[#C2BDB2]"></span>
+<span class="w-5 h-1.5 rounded-full bg-[#1C3F38]"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#C2BDB2]"></span>
+</div>
+</div>
+<!-- Micro-interaction script for Resend Timer -->
+<script>
+    (function initVerificationTimer() {
+      let secondsRemaining = 42;
+      const timerElement = document.getElementById('countdownTimer');
+      const resendBtn = document.getElementById('resendBtn');
+      if (!timerElement || !resendBtn) return;
+      const countdownInterval = setInterval(() => {
+        secondsRemaining -= 1;
+        if (secondsRemaining > 0) {
+          timerElement.textContent = secondsRemaining + 's';
+        } else {
+          clearInterval(countdownInterval);
+          resendBtn.classList.remove('cursor-not-allowed', 'text-[#727B75]');
+          resendBtn.classList.add('text-[#DE785C]', 'hover:underline', 'cursor-pointer');
+          resendBtn.innerHTML = '<span class="material-symbols-outlined text-xs">refresh</span><span>Resend verification link now</span>';
+          resendBtn.onclick = function() {
+            resendBtn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">refresh</span><span>Sending fresh link...</span>';
+            setTimeout(() => {
+              resendBtn.innerHTML = '<span class="material-symbols-outlined text-xs text-[#1C3F38]">done</span><span class="text-[#1C3F38] font-semibold">Fresh link sent!</span>';
+            }, 800);
+          };
+        }
+      }, 1000);
+    })();
+  </script>
+</main>
+<!-- END: Mobile Device Frame Simulator -->
+</body></html>

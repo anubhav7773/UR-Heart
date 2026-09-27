@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "2ede0196e7f54f6aa2201b2c78f041a2",
+  "resourceName": "projects/3794057334896238495/screens/2ede0196e7f54f6aa2201b2c78f041a2",
+  "title": "UR-Heart - Chats & Conversations (Dark Mode - 100% 1:1 Parity)",
+  "mode": "Dark Mode",
+  "category": "Chats & Conversations",
+  "folder": "08_chats-and-conversations",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "3156",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1WhfrRC26pFYIWXqd_0aOZs-ao48CEzDozPUr-PcDmOUgCfOxFdHJGLFlDY3DQm_t31P1ROKZGYSJZ9gzXSag3kJkAKnt0nKy7ENKfSw8_WNyojNUesaSKBW4VeIQNikMClvRDzEKaXA7h87f36GwjCGFji0kYw1McuKfuyEGy9Zj_g35JO6RhTmIqfD-nAue0D3vvWktED6rN0bpAxpB-TcvgjhhSfaDOC0graU54g5g1D4oznFxjyc4Y",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRkODk0Y2YxZjUwNTc2MmM4YjhlMjNiNmMwEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/dark-mode/08_chats-and-conversations/screenshot.png",
+  "localHtml": "screens/dark-mode/08_chats-and-conversations/screen.html"
+}

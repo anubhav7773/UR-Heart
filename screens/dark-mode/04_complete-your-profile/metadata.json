@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "4f1c1369f9fa48b8a0a3e4e87515b435",
+  "resourceName": "projects/3794057334896238495/screens/4f1c1369f9fa48b8a0a3e4e87515b435",
+  "title": "UR-Heart - Complete Your Profile (Dark Mode - 100% 1:1 Parity)",
+  "mode": "Dark Mode",
+  "category": "Complete Your Profile",
+  "folder": "04_complete-your-profile",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "5302",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1Uya1GYeHcMd7PNmhXKq7u_JDBuFPw9qEr5uHpa4u61Ct0ZH77WtUqRzCOVVcl-BgKhT4fW8jg2RhzWIIdidqSu9W7NzP6GqLTkw1u3VhHrohTd4jGJMD_NHyXxUK9JBn8-eaAc9o-F-dJ6CSp6zCLAmVBzMfqKxqWajhKZqIJDcXFMfW9U80OvxaQEF0Db0GSpuwXw3ix901qT0x3CWewXpI7XRuNd8Z2hhlVtEXZ6Wv1MbBLxdKdcXrw",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRjYzQ2NTRjMzQwODlhZjcyNmYzMDk3MGVhEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/dark-mode/04_complete-your-profile/screenshot.png",
+  "localHtml": "screens/dark-mode/04_complete-your-profile/screen.html"
+}

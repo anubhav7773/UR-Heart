@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "47f120ed796e47a18a1d91dba34c75c9",
+  "resourceName": "projects/3794057334896238495/screens/47f120ed796e47a18a1d91dba34c75c9",
+  "title": "UR-Heart - Settings Screen (Dark Mode - Ultra Premium 3D)",
+  "mode": "Dark Mode",
+  "category": "Settings Screen",
+  "folder": "13_settings-screen",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "3150",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1UXpK_yFfS01ARmvyeAQuvuJrFQgWrCcweoqFUXxv_ZYDIC5yS3HQIMjO4bhSy7KHOIJYNfYgqQdOdLZMy1pd7temCEBhaioo5-gZdb8HZNFXLkV8PXJCUoQrUKsJVk1PxKAWRUu9Z-beWPymGV2J1ZgJonBR1-ifoMdrAPeNcS8V1ZtLu1aYuNWKlKmDMxBbK0GNJMjhauPeG63zVzR7FpegRUPzTLqEmDqcCTz-562Mnu2jCiNEhtE-4",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRlZTNkNzgzMWMwNTNiNTg0OWU5MTg2OWRiEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/dark-mode/13_settings-screen/screenshot.png",
+  "localHtml": "screens/dark-mode/13_settings-screen/screen.html"
+}

@@ -1,0 +1,17 @@
+{
+  "projectId": "3794057334896238495",
+  "projectTitle": "Dating App Dual UI",
+  "screenId": "526664648da04af5b326110fb0b30a32",
+  "resourceName": "projects/3794057334896238495/screens/526664648da04af5b326110fb0b30a32",
+  "title": "UR-Heart - Chats & Conversations (Light Mode - 100% 1:1 Parity)",
+  "mode": "Light Mode",
+  "category": "Chats & Conversations",
+  "folder": "08_chats-and-conversations",
+  "deviceType": "MOBILE",
+  "width": "780",
+  "height": "3100",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AEtjO1UZ6In8liuLIXi2tO2VvHx-KNeueBJpYHa5DzTDF0pdZjdq0D7TcDADdpoC5P7U1IMVVdSYsff8F1HJULgeeUaVNslyHae3IHxqWTmdKB5b8989LyPlmGTKLek9uBOCtgAO7sEyPXYFg9j-p8yO5kkMu2VdO-Xw9WYHKhoB2I9hHdGB3ww1UFZp2D9rFXNgkAbX19F2A4mb92Z32SxEwA8HEQStjeIqkEzriQUOuG3ichgwcJXvhh2fpbc",
+  "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1YzRkN2Y3NmUzZjkwNTIyODE2MGNjMWY4ZmRmEgsSBxCd8OX29QYYAZIBIwoKcHJvamVjdF9pZBIVQhMzNzk0MDU3MzM0ODk2MjM4NDk1&filename=&opi=89354086",
+  "localScreenshot": "screens/light-mode/08_chats-and-conversations/screenshot.png",
+  "localHtml": "screens/light-mode/08_chats-and-conversations/screen.html"
+}

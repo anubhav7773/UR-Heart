@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UR-Heart — Dual Theme UI/UX Design System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090a10;
+      --card-bg: rgba(22, 25, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hover: rgba(255, 64, 129, 0.4);
+      --text: #f0f3fa;
+      --text-muted: #8c93a8;
+      --accent-pink: #ff2e7e;
+      --accent-purple: #7952f5;
+      --accent-gradient: linear-gradient(135deg, #ff2e7e 0%, #7952f5 100%);
+      --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 15% 10%, rgba(255, 46, 126, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 20%, rgba(121, 82, 245, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 50% 80%, rgba(255, 46, 126, 0.08) 0%, transparent 50%);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    header {
+      padding: 40px 24px 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(255, 46, 126, 0.15);
+      border: 1px solid rgba(255, 46, 126, 0.3);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #ff65a0;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #ffffff 30%, #ff8cb3 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 16px;
+      max-width: 720px;
+      line-height: 1.6;
+    }
+
+    .toolbar {
+      max-width: 1400px;
+      margin: 24px auto;
+      padding: 0 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tabs {
+      display: flex;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--accent-gradient);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(255, 46, 126, 0.35);
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      max-width: 380px;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 11px 16px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent-pink);
+    }
+
+    .stats-bar {
+      max-width: 1400px;
+      margin: 0 auto 30px;
+      padding: 0 24px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .stat-pill strong {
+      color: #fff;
+    }
+
+    /* Container for Views */
+    .view-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Side by side comparison view */
+    .pair-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 30px;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--glass-shadow);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .pair-card:hover {
+      border-color: var(--card-border-hover);
+    }
+
+    .pair-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 14px;
+    }
+
+    .pair-title {
+      font-size: 20px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge-primary {
+      font-size: 11px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .pair-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .pair-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .screen-panel {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-head {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-mode {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mode-light { color: #facc15; }
+    .mode-dark { color: #a855f7; }
+
+    .screen-preview-box {
+      position: relative;
+      height: 480px;
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      cursor: pointer;
+    }
+
+    .screen-preview-box img {
+      width: 100%;
+      height: auto;
+      transition: transform 0.3s ease;
+    }
+
+    .screen-preview-box:hover img {
+      transform: scale(1.02);
+    }
+
+    .screen-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 10, 16, 0.75);
+      opacity: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: opacity 0.2s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .screen-preview-box:hover .screen-overlay {
+      opacity: 1;
+    }
+
+    .panel-footer {
+      padding: 14px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .id-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Modal for live HTML preview */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      padding: 24px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      width: 100%;
+      max-width: 900px;
+      height: 90vh;
+      background: #111420;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.8);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    .modal-body {
+      flex: 1;
+      background: #000;
+    }
+
+    .modal-body iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand-tag">
+      <span>✨ Stitch MCP Dual-Theme Import</span>
+    </div>
+    <h1>UR-Heart — Dating App Dual UI</h1>
+    <p class="subtitle">Complete collection of 26 screens from Stitch Project ID <code>3794057334896238495</code> with full light and dark mode separation, rendered screenshots, and responsive HTML code.</p>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-pill">Project: <strong>Dating App Dual UI</strong></div>
+    <div class="stat-pill">Total Screens: <strong>26</strong></div>
+    <div class="stat-pill">Light Mode: <strong>13 Screens</strong></div>
+    <div class="stat-pill">Dark Mode: <strong>13 Screens</strong></div>
+    <div class="stat-pill">Pair Parity: <strong>100% (13/13 Pairs)</strong></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="setFilter('both', this)">🌓 Side-by-Side (13 Pairs)</button>
+      <button class="tab-btn" onclick="setFilter('light', this)">☀️ Light Mode (13)</button>
+      <button class="tab-btn" onclick="setFilter('dark', this)">🌙 Dark Mode (13)</button>
+    </div>
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Filter screens (e.g. Consent, Chat, Profile)..." oninput="handleSearch()">
+    </div>
+  </div>
+
+  <main class="view-container" id="cardsContainer">
+
+    <div style="background: linear-gradient(135deg, rgba(238, 138, 112, 0.12) 0%, rgba(28, 63, 56, 0.25) 100%); border: 1px solid rgba(238, 138, 112, 0.3); border-radius: 18px; padding: 20px 24px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <img src="screens/app-icon/app_icon_1024.png" alt="App Icon" style="width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 20px rgba(238, 138, 112, 0.3);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <span style="font-size: 18px; font-weight: 800; color: #fff;">UR-Heart 3D App Icon Masterpiece</span>
+            <span style="font-size: 11px; background: #EE8A70; color: #0E1311; padding: 2px 8px; border-radius: 6px; font-weight: 800;">1024 × 1024</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Liquid rose-gold & terracotta copper calligraphic heart on deep pine obsidian velvet. ID: <code>4c7a9d3124e249eb81106c76563cee49</code></p>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <a href="screens/app-icon/icon_preview.html" target="_blank" class="btn btn-primary" style="background: linear-gradient(135deg, #EE8A70 0%, #D87A60 100%); color: #0E1311;">Showcase & Sizes</a>
+        <a href="screens/app-icon/app_icon_1024.png" target="_blank" class="btn btn-secondary">Open 1024px PNG</a>
+      </div>
+    </div>
+
+
+    <div class="pair-card" data-title="consent screen">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Consent Screen</span>
+          <span class="badge-primary">Requested Screen</span>
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 6f1c8e4a7c54...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Consent Screen (Light Mode - Ultra Premium)', 'screens/light-mode/01_consent-screen/screen.html')">
+            <img src="screens/light-mode/01_consent-screen/screenshot.png" alt="UR-Heart - Consent Screen (Light Mode - Ultra Premium)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2038</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/01_consent-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/01_consent-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 0bf059bc3372...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Consent Screen (Dark Mode - Ultra Premium)', 'screens/dark-mode/01_consent-screen/screen.html')">
+            <img src="screens/dark-mode/01_consent-screen/screenshot.png" alt="UR-Heart - Consent Screen (Dark Mode - Ultra Premium)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2084</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/01_consent-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/01_consent-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="auth & age screen">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Auth & Age Screen</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: cdbe48d46368...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Auth & Age Screen (Light Mode - Ultra Premium)', 'screens/light-mode/02_auth-and-age-screen/screen.html')">
+            <img src="screens/light-mode/02_auth-and-age-screen/screenshot.png" alt="UR-Heart - Auth & Age Screen (Light Mode - Ultra Premium)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2004</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/02_auth-and-age-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/02_auth-and-age-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: ef1769b4f061...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Auth & Age Screen (Dark Mode - Ultra Premium)', 'screens/dark-mode/02_auth-and-age-screen/screen.html')">
+            <img src="screens/dark-mode/02_auth-and-age-screen/screenshot.png" alt="UR-Heart - Auth & Age Screen (Dark Mode - Ultra Premium)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1930</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/02_auth-and-age-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/02_auth-and-age-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="email verification">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Email Verification</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: b54525c7a43d...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Email Verification (Light Mode - Ultra Premium)', 'screens/light-mode/03_email-verification/screen.html')">
+            <img src="screens/light-mode/03_email-verification/screenshot.png" alt="UR-Heart - Email Verification (Light Mode - Ultra Premium)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1768</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/03_email-verification/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/03_email-verification/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 646919883a69...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Email Verification (Dark Mode - Ultra Premium v2)', 'screens/dark-mode/03_email-verification/screen.html')">
+            <img src="screens/dark-mode/03_email-verification/screenshot.png" alt="UR-Heart - Email Verification (Dark Mode - Ultra Premium v2)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1816</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/03_email-verification/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/03_email-verification/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="complete your profile">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Complete Your Profile</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 0446e1a55b29...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Complete Your Profile (Light Mode - Ultra Premium)', 'screens/light-mode/04_complete-your-profile/screen.html')">
+            <img src="screens/light-mode/04_complete-your-profile/screenshot.png" alt="UR-Heart - Complete Your Profile (Light Mode - Ultra Premium)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 5254</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/04_complete-your-profile/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/04_complete-your-profile/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 4f1c1369f9fa...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Complete Your Profile (Dark Mode - 100% 1:1 Parity)', 'screens/dark-mode/04_complete-your-profile/screen.html')">
+            <img src="screens/dark-mode/04_complete-your-profile/screenshot.png" alt="UR-Heart - Complete Your Profile (Dark Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 5302</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/04_complete-your-profile/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/04_complete-your-profile/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="sanctuary feed">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Sanctuary Feed</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 82c13ece085c...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Sanctuary Feed (Light Mode - 100% 1:1 Parity)', 'screens/light-mode/05_sanctuary-feed/screen.html')">
+            <img src="screens/light-mode/05_sanctuary-feed/screenshot.png" alt="UR-Heart - Sanctuary Feed (Light Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2510</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/05_sanctuary-feed/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/05_sanctuary-feed/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 9387225be627...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Sanctuary Feed (Dark Mode - 1:1 Parity)', 'screens/dark-mode/05_sanctuary-feed/screen.html')">
+            <img src="screens/dark-mode/05_sanctuary-feed/screenshot.png" alt="UR-Heart - Sanctuary Feed (Dark Mode - 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2510</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/05_sanctuary-feed/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/05_sanctuary-feed/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="likes screen">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Likes Screen</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: fbef17aa1286...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Likes Screen (Light Mode - Exact Background & Single-Line 3D Cards)', 'screens/light-mode/06_likes-screen/screen.html')">
+            <img src="screens/light-mode/06_likes-screen/screenshot.png" alt="UR-Heart - Likes Screen (Light Mode - Exact Background & Single-Line 3D Cards)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1772</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/06_likes-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/06_likes-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 63088fa522bb...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Likes Screen (Dark Mode - Exact Background & Single-Line 3D Cards)', 'screens/dark-mode/06_likes-screen/screen.html')">
+            <img src="screens/dark-mode/06_likes-screen/screenshot.png" alt="UR-Heart - Likes Screen (Dark Mode - Exact Background & Single-Line 3D Cards)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1768</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/06_likes-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/06_likes-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="matches & chat screen">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Matches & Chat Screen</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 729359f5a2de...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Likes & Matches Screen (Light Mode - Exact Background)', 'screens/light-mode/07_matches-and-chat/screen.html')">
+            <img src="screens/light-mode/07_matches-and-chat/screenshot.png" alt="UR-Heart - Likes & Matches Screen (Light Mode - Exact Background)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1980</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/07_matches-and-chat/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/07_matches-and-chat/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 71983c94213a...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Matches & Chat Screen (Dark Mode - Exact Background)', 'screens/dark-mode/07_matches-and-chat/screen.html')">
+            <img src="screens/dark-mode/07_matches-and-chat/screenshot.png" alt="UR-Heart - Matches & Chat Screen (Dark Mode - Exact Background)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1768</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/07_matches-and-chat/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/07_matches-and-chat/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="chats & conversations">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Chats & Conversations</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 526664648da0...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Chats & Conversations (Light Mode - 100% 1:1 Parity)', 'screens/light-mode/08_chats-and-conversations/screen.html')">
+            <img src="screens/light-mode/08_chats-and-conversations/screenshot.png" alt="UR-Heart - Chats & Conversations (Light Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 3100</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/08_chats-and-conversations/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/08_chats-and-conversations/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 2ede0196e7f5...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Chats & Conversations (Dark Mode - 100% 1:1 Parity)', 'screens/dark-mode/08_chats-and-conversations/screen.html')">
+            <img src="screens/dark-mode/08_chats-and-conversations/screenshot.png" alt="UR-Heart - Chats & Conversations (Dark Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 3156</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/08_chats-and-conversations/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/08_chats-and-conversations/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="tara 1-on-1 dialogue & whatsapp reveal">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Tara 1-on-1 Dialogue & WhatsApp Reveal</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: b873a29c5c67...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Tara 1-on-1 Dialogue & WhatsApp Reveal (Light Mode - 1:1 Parity)', 'screens/light-mode/09_tara-dialogue-and-reveal/screen.html')">
+            <img src="screens/light-mode/09_tara-dialogue-and-reveal/screenshot.png" alt="UR-Heart - Tara 1-on-1 Dialogue & WhatsApp Reveal (Light Mode - 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2082</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/09_tara-dialogue-and-reveal/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/09_tara-dialogue-and-reveal/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 55919b13f7cb...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Tara 1-on-1 Dialogue & WhatsApp Reveal (Dark Mode)', 'screens/dark-mode/09_tara-dialogue-and-reveal/screen.html')">
+            <img src="screens/dark-mode/09_tara-dialogue-and-reveal/screenshot.png" alt="UR-Heart - Tara 1-on-1 Dialogue & WhatsApp Reveal (Dark Mode)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2490</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/09_tara-dialogue-and-reveal/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/09_tara-dialogue-and-reveal/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="growth & ad rewards">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Growth & Ad Rewards</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 3d0f865fe842...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Growth & Ad Rewards (Light Mode - 100% 1:1 Parity)', 'screens/light-mode/10_growth-and-ad-rewards/screen.html')">
+            <img src="screens/light-mode/10_growth-and-ad-rewards/screenshot.png" alt="UR-Heart - Growth & Ad Rewards (Light Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 3972</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/10_growth-and-ad-rewards/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/10_growth-and-ad-rewards/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: e53246a897f2...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Growth & Ad Rewards (Dark Mode - 3D Ultra Premium)', 'screens/dark-mode/10_growth-and-ad-rewards/screen.html')">
+            <img src="screens/dark-mode/10_growth-and-ad-rewards/screenshot.png" alt="UR-Heart - Growth & Ad Rewards (Dark Mode - 3D Ultra Premium)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 3716</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/10_growth-and-ad-rewards/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/10_growth-and-ad-rewards/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="profile screen">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Profile Screen</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 98d39a173435...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Profile Screen (Light Mode - 100% 1:1 Parity)', 'screens/light-mode/11_profile-screen/screen.html')">
+            <img src="screens/light-mode/11_profile-screen/screenshot.png" alt="UR-Heart - Profile Screen (Light Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 3886</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/11_profile-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/11_profile-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: ba49662d359b...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Profile Screen (Dark Mode - Fluid 3D Redesign)', 'screens/dark-mode/11_profile-screen/screen.html')">
+            <img src="screens/dark-mode/11_profile-screen/screenshot.png" alt="UR-Heart - Profile Screen (Dark Mode - Fluid 3D Redesign)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 4614</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/11_profile-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/11_profile-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="profile - vault & legal">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Profile - Vault & Legal</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: 9df8f66ba707...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Profile Screen - Vault & Legal (Light Mode - 100% 1:1 Parity)', 'screens/light-mode/12_profile-vault-and-legal/screen.html')">
+            <img src="screens/light-mode/12_profile-vault-and-legal/screenshot.png" alt="UR-Heart - Profile Screen - Vault & Legal (Light Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1980</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/12_profile-vault-and-legal/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/12_profile-vault-and-legal/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 7a008eafec97...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Profile Screen - Vault & Legal (Dark Mode - Ultra Premium 3D)', 'screens/dark-mode/12_profile-vault-and-legal/screen.html')">
+            <img src="screens/dark-mode/12_profile-vault-and-legal/screenshot.png" alt="UR-Heart - Profile Screen - Vault & Legal (Dark Mode - Ultra Premium 3D)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 1768</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/12_profile-vault-and-legal/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/12_profile-vault-and-legal/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pair-card" data-title="settings screen">
+      <div class="pair-header">
+        <div class="pair-title">
+          <span>Settings Screen</span>
+          
+        </div>
+      </div>
+      <div class="pair-columns">
+        <!-- Light Mode Panel -->
+        <div class="screen-panel theme-light">
+          <div class="panel-head">
+            <span class="panel-mode mode-light">☀️ Light Mode</span>
+            <span class="id-tag">ID: eb771f5ed7e3...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Settings Screen (Light Mode - 100% 1:1 Parity)', 'screens/light-mode/13_settings-screen/screen.html')">
+            <img src="screens/light-mode/13_settings-screen/screenshot.png" alt="UR-Heart - Settings Screen (Light Mode - 100% 1:1 Parity)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 2754</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/light-mode/13_settings-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/light-mode/13_settings-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Panel -->
+        <div class="screen-panel theme-dark">
+          <div class="panel-head">
+            <span class="panel-mode mode-dark">🌙 Dark Mode</span>
+            <span class="id-tag">ID: 47f120ed796e...</span>
+          </div>
+          <div class="screen-preview-box" onclick="openModal('UR-Heart - Settings Screen (Dark Mode - Ultra Premium 3D)', 'screens/dark-mode/13_settings-screen/screen.html')">
+            <img src="screens/dark-mode/13_settings-screen/screenshot.png" alt="UR-Heart - Settings Screen (Dark Mode - Ultra Premium 3D)">
+            <div class="screen-overlay">
+              <button class="btn btn-primary">🔍 Live Preview</button>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="id-tag">780 × 3150</span>
+            <div style="display:flex; gap:8px;">
+              <a href="screens/dark-mode/13_settings-screen/screenshot.png" target="_blank" class="btn btn-secondary">PNG</a>
+              <a href="screens/dark-mode/13_settings-screen/screen.html" target="_blank" class="btn btn-primary">Open Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </main>
+
+  <!-- Live HTML Preview Modal -->
+  <div class="modal-backdrop" id="previewModal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Screen Preview</div>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <iframe id="modalIframe" src=""></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentFilter = 'both';
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilters();
+    }
+
+    function handleSearch() {
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.pair-card');
+
+      cards.forEach(card => {
+        const title = card.getAttribute('data-title');
+        const matchesQuery = !query || title.includes(query);
+
+        if (!matchesQuery) {
+          card.style.display = 'none';
+          return;
+        }
+
+        card.style.display = 'block';
+        const lightPanel = card.querySelector('.theme-light');
+        const darkPanel = card.querySelector('.theme-dark');
+        const cols = card.querySelector('.pair-columns');
+
+        if (currentFilter === 'both') {
+          lightPanel.style.display = 'flex';
+          darkPanel.style.display = 'flex';
+          cols.style.gridTemplateColumns = '1fr 1fr';
+        } else if (currentFilter === 'light') {
+          lightPanel.style.display = 'flex';
+          darkPanel.style.display = 'none';
+          cols.style.gridTemplateColumns = '1fr';
+        } else if (currentFilter === 'dark') {
+          lightPanel.style.display = 'none';
+          darkPanel.style.display = 'flex';
+          cols.style.gridTemplateColumns = '1fr';
+        }
+      });
+    }
+
+    function openModal(title, url) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalIframe').src = url;
+      document.getElementById('previewModal').classList.add('open');
+    }
+
+    function closeModal(e) {
+      if (!e || e.target.id === 'previewModal' || e.target.classList.contains('modal-close')) {
+        document.getElementById('previewModal').classList.remove('open');
+        document.getElementById('modalIframe').src = '';
+      }
+    }
+  </script>
+</body>
+</html>

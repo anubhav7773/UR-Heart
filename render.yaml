@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: ur-heart-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_NAME
+        value: UR-Heart Core Engine
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: SUPABASE_URL
+        value: https://fmedkihgcvvzcekwybhe.supabase.co
+      - key: SUPABASE_STORAGE_BUCKET
+        value: ur-heart-media
+      - key: FIREBASE_PROJECT_ID
+        value: ur-heart-44b46
+      - key: FIREBASE_STORAGE_BUCKET
+        value: ur-heart-44b46.firebasestorage.app
+      - key: SUPERADMIN_EMAIL
+        value: kshtriyaanubhav9120@gmail.com
+      - key: APPLOVIN_SDK_KEY
+        value: demo_applovin_sdk_key_ur_heart
+      - key: ADMOB_VERIFIER_KEYS_URL
+        value: https://www.gstatic.com/admob/reward/verifier-keys.json
+      - key: SUPABASE_PGBOUNCER_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false

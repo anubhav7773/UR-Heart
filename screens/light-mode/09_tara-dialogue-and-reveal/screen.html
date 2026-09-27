@@ -1,0 +1,196 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<meta content="mobile_stack" name="shell-type">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        overscroll-behavior: none;
+      }
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    body {
+      background: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBDiWSZIjgK7i_ioGWRMSpWifTJ-le8GC3Vz1so5Y9pzy8ScbsWUwMGTvaxVhSaNmzgNuZke_Gt2u8F033Q2qict_OHnHwHtRc0M4Vc7UorBN-K-UD6veLiN8mkRGqnc733ZkL6r50RrADTGWkZBzGFpdftIdmPySo7GTQbVnsBx4IC6KF1whyUVfuWep32SST_4ag5C-q8phByWhnKY9ONY_27fyGWepCuJj51FfjMpKrPgGO8-6qIhD9A38aSz-8ZWQ') center top / cover no-repeat fixed;
+      background-color: #faf9f3;
+    }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#21433c",
+            "primary-dark": "#082d26",
+            "background": "#faf9f3",
+            "surface": "#faf9f3",
+            "terracotta": "#d97757",
+            "terracotta-hover": "#c86747"
+          },
+          fontFamily: {
+            "sans": ["Plus Jakarta Sans", "sans-serif"],
+            "serif": ["Newsreader", "serif"]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="min-h-screen font-sans text-stone-900 antialiased selection:bg-[#21433c]/15">
+<!-- Top Navigation & Profile Bar -->
+<header class="fixed top-0 left-0 right-0 z-50 pt-safe backdrop-blur-md bg-[#faf9f3]/85 border-b border-[#21433c]/10 shadow-sm">
+<div class="max-w-[480px] mx-auto px-3.5 py-2.5 flex items-center justify-between">
+<!-- Left side: Back + Avatar + Tara Info -->
+<div class="flex items-center gap-2.5 min-w-0">
+<button aria-label="Go Back" class="w-8 h-8 rounded-full flex items-center justify-center text-[#21433c] hover:bg-[#21433c]/5 active:scale-95 transition-all flex-shrink-0" onclick="history.back()">
+<span class="material-symbols-outlined text-[20px]">arrow_back_ios_new</span>
+</button>
+<!-- Tara's circular profile picture -->
+<div class="relative flex-shrink-0">
+<img alt="Tara" class="w-10 h-10 rounded-full object-cover shadow-sm ring-1 ring-[#21433c]/15" src="https://lh3.googleusercontent.com/aida/AEtjO1WJnh_qg6navIErhBVlVv9mxeS1GwnAH-hs7Mj2ns-B13AR5Ac1zoc-VMIX62Bt1xUrntwflc-NVbiy5XhHbbig7Ut9YM99voM7q-gPD7dh_lVrdq1RNpuWF7PCoOPJg_QBi5z7qN7xbJZagq6yZyo1sGuMD8KWkYq8Jgg-aNcDpGcfsIiuIV6iOvDIjtjJmLZrQ_dfnjTMuDFB8eqMsF8KVLVdwyRLz9Qzk2ekuHztwTab57M6MnFzQi8">
+<span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#22c55e] rounded-full ring-2 ring-white"></span>
+</div>
+<!-- User Info -->
+<div class="min-w-0 flex flex-col justify-center">
+<div class="flex items-center gap-1.5">
+<span class="font-serif font-semibold text-[#1c2d27] text-base leading-tight">Tara, 23</span>
+<span class="material-symbols-outlined text-[#21433c] text-[15px] flex-shrink-0" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<span class="text-[11px] text-[#556961] tracking-wide truncate leading-tight mt-0.5">Online now · Matched via Books &amp; Solitude</span>
+</div>
+</div>
+<!-- Right side: WA Key Pill + Profile Circle -->
+<div class="flex items-center gap-2 flex-shrink-0">
+<button aria-label="WhatsApp Key Toggle" class="rounded-full border border-emerald-600/30 bg-emerald-50 hover:bg-emerald-100/70 transition-colors px-2.5 py-1 text-[11px] font-medium text-emerald-800 flex items-center gap-1 shadow-xs">
+<span class="material-symbols-outlined text-[14px] text-emerald-700">chat</span>
+<span class="font-semibold">WA Key</span>
+<span class="material-symbols-outlined text-emerald-600 text-[14px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</button>
+<button aria-label="More Options" class="w-8 h-8 rounded-full bg-[#21433c] flex items-center justify-center text-white shadow-xs active:scale-95 transition-transform flex-shrink-0">
+<span class="material-symbols-outlined text-[17px]">more_vert</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Scrollable Chat Stage -->
+<main class="flex flex-col relative w-full pt-[72px] pb-[108px] min-h-screen">
+<div class="flex flex-col w-full max-w-[480px] mx-auto px-4">
+<!-- Mutual Match Origin Annotation Banner -->
+<div class="text-center my-3">
+<span class="text-[10px] tracking-widest text-[#695d52] font-semibold bg-white/70 backdrop-blur-sm border border-[#e8dfd8] px-3.5 py-1 rounded-full shadow-sm mx-auto inline-block uppercase">
+          ✦ Mutual Match on Books &amp; Solitude · Yesterday
+        </span>
+</div>
+<!-- Curved Quote Card -->
+<section class="w-full max-w-[92%] mx-auto rounded-3xl p-4 bg-white/90 backdrop-blur-md border border-[#e3ded4] shadow-sm text-center mb-1">
+<p class="font-serif italic text-sm text-[#21433c] leading-relaxed px-2">
+          “I loved that Haruki Murakami passage on quiet spaces”
+        </p>
+<p class="text-[11px] text-[#8c7a6b] font-medium mt-1.5 flex items-center justify-center gap-1">
+<span class="">•</span>
+<span class="">Shared Prompt Annotation</span>
+</p>
+</section>
+<!-- Date Divider -->
+<div class="flex items-center justify-center my-3">
+<span class="text-[10px] tracking-widest font-bold text-[#718079] bg-black/5 px-2.5 py-0.5 rounded-full inline-block">
+          TODAY
+        </span>
+</div>
+<!-- Chat Messages Stream -->
+<div class="flex flex-col gap-3.5 mt-1">
+<!-- Message 1 (Received from Tara) -->
+<div class="flex flex-col self-start max-w-[78%]">
+<div class="flex items-end gap-2">
+<img alt="Tara" class="w-7 h-7 rounded-full object-cover flex-shrink-0 shadow-xs ring-1 ring-black/5" src="https://lh3.googleusercontent.com/aida/AEtjO1WJnh_qg6navIErhBVlVv9mxeS1GwnAH-hs7Mj2ns-B13AR5Ac1zoc-VMIX62Bt1xUrntwflc-NVbiy5XhHbbig7Ut9YM99voM7q-gPD7dh_lVrdq1RNpuWF7PCoOPJg_QBi5z7qN7xbJZagq6yZyo1sGuMD8KWkYq8Jgg-aNcDpGcfsIiuIV6iOvDIjtjJmLZrQ_dfnjTMuDFB8eqMsF8KVLVdwyRLz9Qzk2ekuHztwTab57M6MnFzQi8">
+<div class="bg-white/95 text-[#1b2b25] border border-[#e8e4db] rounded-2xl rounded-bl-sm p-3.5 shadow-sm text-[13.5px] leading-relaxed">
+              I still can’t believe we both bookmarked the exact same page in Norwegian Wood. Do you always read in cozy corners, or was that just for that afternoon?
+            </div>
+</div>
+<span class="text-[10px] text-[#86928d] ml-9 mt-1">10:14 PM</span>
+</div>
+<!-- Message 2 (Sent by User) -->
+<div class="flex flex-col items-end self-end max-w-[78%]">
+<div class="bg-[#21433c] text-white rounded-2xl rounded-br-sm p-3.5 shadow-md text-[13.5px] leading-relaxed">
+            Guilty as charged. Rain on the glass, black coffee, and a book that makes time stop. What’s currently on your nightstand?
+          </div>
+<div class="flex items-center gap-1 mt-1 mr-1">
+<span class="text-[10px] text-[#86928d]">10:16 PM</span>
+<span class="material-symbols-outlined text-[#0284c7] text-[15px]" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</div>
+</div>
+<!-- Message 3 (Received from Tara) -->
+<div class="flex flex-col self-start max-w-[78%]">
+<div class="flex items-end gap-2">
+<img alt="Tara" class="w-7 h-7 rounded-full object-cover flex-shrink-0 shadow-xs ring-1 ring-black/5" src="https://lh3.googleusercontent.com/aida/AEtjO1WJnh_qg6navIErhBVlVv9mxeS1GwnAH-hs7Mj2ns-B13AR5Ac1zoc-VMIX62Bt1xUrntwflc-NVbiy5XhHbbig7Ut9YM99voM7q-gPD7dh_lVrdq1RNpuWF7PCoOPJg_QBi5z7qN7xbJZagq6yZyo1sGuMD8KWkYq8Jgg-aNcDpGcfsIiuIV6iOvDIjtjJmLZrQ_dfnjTMuDFB8eqMsF8KVLVdwyRLz9Qzk2ekuHztwTab57M6MnFzQi8">
+<div class="bg-white/95 text-[#1b2b25] border border-[#e8e4db] rounded-2xl rounded-bl-sm p-3.5 shadow-sm text-[13.5px] leading-relaxed">
+              A translated collection of Japanese short stories and a notepad with silly poems. Honestly, it’s rare to find someone who actually listens here.
+            </div>
+</div>
+<span class="text-[10px] text-[#86928d] ml-9 mt-1">10:18 PM</span>
+</div>
+<!-- Message 4 (Sent by User) -->
+<div class="flex flex-col items-end self-end max-w-[78%]">
+<div class="bg-[#21433c] text-white rounded-2xl rounded-br-sm p-3.5 shadow-md text-[13.5px] leading-relaxed">
+            Real conversations are rare everywhere. That’s why I’m here.
+          </div>
+<div class="flex items-center gap-1 mt-1 mr-1">
+<span class="text-[10px] text-[#86928d]">10:19 PM</span>
+<span class="material-symbols-outlined text-[#0284c7] text-[15px]" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</div>
+</div>
+<!-- Message 5 (Typing Presence Indicator) -->
+<div class="flex items-center gap-2 self-start mt-0.5">
+<img alt="Tara typing" class="w-7 h-7 rounded-full object-cover flex-shrink-0 shadow-xs ring-1 ring-black/5" src="https://lh3.googleusercontent.com/aida/AEtjO1WJnh_qg6navIErhBVlVv9mxeS1GwnAH-hs7Mj2ns-B13AR5Ac1zoc-VMIX62Bt1xUrntwflc-NVbiy5XhHbbig7Ut9YM99voM7q-gPD7dh_lVrdq1RNpuWF7PCoOPJg_QBi5z7qN7xbJZagq6yZyo1sGuMD8KWkYq8Jgg-aNcDpGcfsIiuIV6iOvDIjtjJmLZrQ_dfnjTMuDFB8eqMsF8KVLVdwyRLz9Qzk2ekuHztwTab57M6MnFzQi8">
+<div class="rounded-full bg-white/90 border border-[#e8e4db] px-4 py-2 flex items-center gap-2 shadow-sm">
+<div class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-[#d97757] animate-bounce"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#21433c] animate-bounce [animation-delay:0.18s]"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#8c7a6b] animate-bounce [animation-delay:0.36s]"></span>
+</div>
+<span class="font-serif italic text-xs text-[#556961]">
+              Tara is typing soulful thoughts...
+            </span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Floating Tactile Input Island & Security Notice -->
+<footer class="fixed bottom-0 left-0 right-0 z-40 px-4 pb-safe pt-2 bg-gradient-to-t from-[#faf9f3] via-[#faf9f3]/95 to-transparent">
+<div class="max-w-[480px] mx-auto flex flex-col gap-2 mb-2">
+<!-- Input Pill -->
+<form class="rounded-full bg-white/95 border border-[#dfdad0] shadow-sm px-4 py-1.5 flex items-center justify-between gap-3" onsubmit="event.preventDefault();">
+<input class="w-full bg-transparent border-0 p-0 text-sm text-[#1b2b25] placeholder:text-[#7a8882] focus:ring-0 focus:outline-none" placeholder="Write a heartfelt message..." type="text">
+<button aria-label="Send Message" class="w-9 h-9 rounded-full bg-[#d97757] hover:bg-[#c86747] flex items-center justify-center text-white shadow-md hover:scale-105 active:scale-95 transition-transform flex-shrink-0" type="submit">
+<span class="material-symbols-outlined text-[20px]">arrow_upward</span>
+</button>
+</form>
+<!-- Trust, Privacy & DPDPA Compliance Notice -->
+<div class="flex items-center justify-center gap-1.5 text-[11px] text-[#718079]">
+<span class="material-symbols-outlined text-[13px] text-[#21433c]">lock</span>
+<span class="">End-to-end encrypted · Authentic Human Dialogue · DPDPA Compliant</span>
+</div>
+</div>
+</footer>
+
+
+</body></html>

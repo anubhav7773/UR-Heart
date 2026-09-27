@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>UR-Heart - Settings Screen</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Newsreader & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['Newsreader', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Styles -->
+<style data-purpose="base-layout">
+    body {
+      margin: 0;
+      padding: 0;
+      background: #e5e5e5;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .mobile-frame {
+      width: 100%;
+      max-width: 412px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA0TkgFBVIyf9qmM-SSG_1O-J_khDuqAjq6xgWw7k8AxfEkqdCIZckmo8kZDWHFbYlkievwhx805NIr_yCbiPCLbl7aWNWnnskUW_L6TSw1vQLP40zuo1mU0yj98RigBLSJBCSHIDUnckcvPmUV4csyB4w5dF972wFCdLULCdpPIxxpgeIZluuN0h4yGnuXnU5WHuyyOitvhY798Qrt7obpCUPEaQir_sAb9gXhqWE7zsr3kNHOla-MaHkcP64vRkRAfg') center top / cover no-repeat, #faf9f3;
+      background-attachment: fixed;
+      position: relative;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+      overflow-x: hidden;
+    }
+  </style>
+<style data-purpose="glass-and-elevation">
+    .porcelain-card {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      border-radius: 20px;
+      box-shadow: 0 10px 25px -5px rgba(33, 67, 60, 0.07), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+    }
+    .porcelain-card-danger {
+      background: rgba(254, 242, 242, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(252, 165, 165, 0.45);
+      border-radius: 20px;
+      box-shadow: 0 10px 25px -4px rgba(220, 38, 38, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+    }
+    .icon-chip-emerald {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.22);
+      color: #047857;
+    }
+    .icon-chip-neutral {
+      background: rgba(100, 116, 139, 0.09);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      color: #475569;
+    }
+    .icon-chip-warm {
+      background: rgba(224, 122, 95, 0.12);
+      border: 1px solid rgba(224, 122, 95, 0.24);
+      color: #c2410c;
+    }
+    .icon-chip-rose {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #b91c1c;
+    }
+  </style>
+<style data-purpose="tactile-toggles">
+    /* 3D Tactile Switch Styles */
+    .toggle-active {
+      width: 48px;
+      height: 28px;
+      border-radius: 9999px;
+      background: linear-gradient(135deg, #e07a5f 0%, #c86348 100%);
+      box-shadow: 0 2px 8px rgba(200, 99, 72, 0.35), inset 0 1px 2px rgba(0, 0, 0, 0.15);
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .toggle-active .knob {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      position: absolute;
+      top: 3px;
+      right: 3px;
+    }
+    .toggle-inactive {
+      width: 48px;
+      height: 28px;
+      border-radius: 9999px;
+      background: #e2e1d9;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.14);
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .toggle-inactive .knob {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      position: absolute;
+      top: 3px;
+      left: 3px;
+    }
+  </style>
+<!-- END: Custom Styles -->
+</head>
+<body>
+<div class="mobile-frame flex flex-col pb-12">
+<!-- BEGIN: StatusBar -->
+<header class="w-full pt-3 px-7 flex items-center justify-between text-[#1c1c1c] text-sm font-semibold select-none z-20" data-purpose="ios-status-bar">
+<span class="tracking-tight text-[15px]">9:41</span>
+<div class="flex items-center space-x-2">
+<!-- Cellular Signal -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 18 12">
+<path d="M1 9.5a1.5 1.5 0 013 0v1a1.5 1.5 0 01-3 0v-1zm4.5-3a1.5 1.5 0 013 0v4a1.5 1.5 0 01-3 0v-4zm4.5-3a1.5 1.5 0 013 0v7a1.5 1.5 0 01-3 0v-7zm4.5-3a1.5 1.5 0 013 0v10a1.5 1.5 0 01-3 0v-10z"></path>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 16 12">
+<path d="M8 2.5a10.87 10.87 0 016.32 2.03.75.75 0 01-.04 1.15l-1.07.9a.75.75 0 01-.98-.05A7.85 7.85 0 008 4.75a7.85 7.85 0 00-4.23 1.78.75.75 0 01-.98.05l-1.07-.9a.75.75 0 01-.04-1.15A10.87 10.87 0 018 2.5zm0 3.75a7.1 7.1 0 014.28 1.44.75.75 0 01-.04 1.16l-1.14.94a.75.75 0 01-.97-.04A4.14 4.14 0 008 8.25a4.14 4.14 0 00-2.13.56.75.75 0 01-.97.04l-1.14-.94a.75.75 0 01-.04-1.16A7.1 7.1 0 018 6.25zm0 3.75a2 2 0 110 4 2 2 0 010-4z"></path>
+</svg>
+<!-- Battery Icon -->
+<div class="w-6 h-3 border border-[#1c1c1c] rounded-[4px] p-0.5 flex items-center">
+<div class="h-full w-4 bg-[#1c1c1c] rounded-[1.5px]"></div>
+</div>
+</div>
+</header>
+<!-- END: StatusBar -->
+<!-- BEGIN: TopNavigationBar -->
+<nav class="px-5 pt-3 pb-3 flex items-center justify-between relative z-10" data-purpose="top-navigation-bar">
+<div class="flex items-center space-x-3.5">
+<!-- Back Button -->
+<button aria-label="Go Back" class="w-11 h-11 rounded-full flex items-center justify-center text-[#1f302b] transition-transform active:scale-95" style="background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 4px 12px rgba(33, 67, 60, 0.06);" type="button">
+<svg class="w-5 h-5 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Sanctuary Title Block -->
+<div>
+<span class="block text-[10px] font-bold tracking-[0.14em] text-[#b45309] uppercase">SANCTUARY PREFERENCES</span>
+<h1 class="font-serif text-[28px] leading-tight text-[#192e28] font-normal tracking-tight">Settings</h1>
+</div>
+</div>
+<!-- Right Pill Status -->
+<div class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full select-none" data-purpose="e2e-status-pill" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25);">
+<span class="w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse"></span>
+<span class="text-[11px] font-semibold text-[#065f46] tracking-wide">E2E Shielded</span>
+</div>
+</nav>
+<!-- END: TopNavigationBar -->
+<!-- BEGIN: MainContent -->
+<main class="px-4 space-y-6 pt-1 flex-1">
+<!-- BEGIN: Section1_ResonanceAlerts -->
+<section data-purpose="resonance-and-alerts">
+<!-- Section Header -->
+<div class="flex items-center space-x-2 px-1 mb-2">
+<span class="text-sm">🔔</span>
+<h2 class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#c2410c]">RESONANCE &amp; SANCTUARY ALERTS</h2>
+</div>
+<!-- Section Porcelain Card -->
+<div class="porcelain-card p-4 space-y-4">
+<!-- Item 1: Master Resonance -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3 pr-2">
+<div class="w-10 h-10 rounded-full icon-chip-emerald flex items-center justify-center flex-shrink-0">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-[15px] font-semibold text-[#162a24] leading-snug">Master Resonance</h3>
+<p class="text-[12px] text-[#52635c] leading-tight mt-0.5">Real-time resonant match alerts &amp; prose letters</p>
+</div>
+</div>
+<!-- Toggle ON -->
+<div aria-checked="true" class="toggle-active" role="switch">
+<div class="knob"></div>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-[1px] w-full bg-[rgba(33,67,60,0.08)]"></div>
+<!-- Item 2: Discreet Mode -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3 pr-2">
+<div class="w-10 h-10 rounded-full icon-chip-neutral flex items-center justify-center flex-shrink-0">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-[15px] font-semibold text-[#162a24] leading-snug">Discreet Mode</h3>
+<p class="text-[12px] text-[#52635c] leading-tight mt-0.5">Mask message previews &amp; suppress app notifications</p>
+</div>
+</div>
+<!-- Toggle OFF -->
+<div aria-checked="false" class="toggle-inactive" role="switch">
+<div class="knob"></div>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-[1px] w-full bg-[rgba(33,67,60,0.08)]"></div>
+<!-- Item 3: Night Sanctuary Slumber -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3 pr-2">
+<div class="w-10 h-10 rounded-full icon-chip-emerald flex items-center justify-center flex-shrink-0">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-[15px] font-semibold text-[#162a24] leading-snug">Night Sanctuary Slumber</h3>
+<p class="text-[12px] text-[#52635c] leading-tight mt-0.5">Silence all chimes from 11:00 PM to 7:00 AM</p>
+</div>
+</div>
+<!-- Toggle ON -->
+<div aria-checked="true" class="toggle-active" role="switch">
+<div class="knob"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Section1_ResonanceAlerts -->
+<!-- BEGIN: Section2_PrivacyDiscoveryVault -->
+<section data-purpose="privacy-and-discovery-vault">
+<!-- Section Header -->
+<div class="flex items-center space-x-2 px-1 mb-2">
+<span class="text-sm">🛡️</span>
+<h2 class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#0f766e]">PRIVACY &amp; DISCOVERY VAULT</h2>
+</div>
+<div class="space-y-3">
+<!-- Card: Incognito Stream Radius -->
+<div class="porcelain-card p-4 flex items-center justify-between">
+<div class="flex items-center space-x-3 pr-2">
+<div class="w-10 h-10 rounded-full icon-chip-neutral flex items-center justify-center flex-shrink-0">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-[15px] font-semibold text-[#162a24] leading-snug">Incognito Stream Radius</h3>
+<p class="text-[12px] text-[#52635c] leading-tight mt-0.5">Pause stream discovery while preserving existing bonds</p>
+</div>
+</div>
+<!-- Visible Dropdown Pill -->
+<button class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full flex-shrink-0 active:scale-95 transition-transform" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); box-shadow: 0 2px 6px rgba(16,185,129,0.1);" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
+<span class="text-[12px] font-semibold text-[#065f46]">Visible</span>
+<svg class="w-3.5 h-3.5 text-[#065f46] stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Card: Cryptographic Key Rotation -->
+<div class="porcelain-card p-4 flex items-center justify-between">
+<div class="flex items-center space-x-3 pr-2">
+<div class="w-10 h-10 rounded-full icon-chip-emerald flex items-center justify-center flex-shrink-0">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-[15px] font-semibold text-[#162a24] leading-snug">Cryptographic Key Rotation</h3>
+<p class="text-[12px] text-[#52635c] leading-tight mt-0.5">Rotate Curve25519 E2E keypair on demand</p>
+</div>
+</div>
+<!-- Re-key Pill Button -->
+<button class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full flex-shrink-0 active:scale-95 transition-transform" style="background: #f0fdf4; border: 1px solid #86efac; color: #166534; box-shadow: 0 2px 6px rgba(22, 101, 52, 0.12);" type="button">
+<span class="text-[12px] font-semibold">Re-key</span>
+<svg class="w-3.5 h-3.5 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</div>
+</section>
+<!-- END: Section2_PrivacyDiscoveryVault -->
+<!-- BEGIN: Section3_SanctuaryCommunityVoice -->
+<section data-purpose="sanctuary-community-voice">
+<!-- Section Header -->
+<div class="flex items-center space-x-2 px-1 mb-2">
+<span class="text-sm">💬</span>
+<h2 class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#c2410c]">SANCTUARY COMMUNITY VOICE</h2>
+</div>
+<!-- Feedback Card -->
+<div class="porcelain-card p-4 space-y-3.5">
+<div class="flex items-start space-x-3">
+<div class="w-10 h-10 rounded-full icon-chip-warm flex items-center justify-center flex-shrink-0 mt-0.5">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="font-serif text-[17px] font-medium text-[#192e28] leading-tight">Share Reflections &amp; Ideas</h3>
+<p class="text-[12.5px] text-[#52635c] leading-[1.5] mt-1">Help shape our sanctuary for deliberate, unhurried romance and intentional intimacy.</p>
+</div>
+</div>
+<!-- Tactile Give Feedback Button -->
+<button class="w-full flex items-center justify-center space-x-2 py-3 rounded-full text-white font-semibold text-[14px] active:scale-[0.98] transition-all" style="background: linear-gradient(135deg, #e07a5f 0%, #c86348 100%); box-shadow: 0 6px 16px rgba(200, 99, 72, 0.32); border: 1px solid rgba(255, 255, 255, 0.25);" type="button">
+<span>Give Feedback</span>
+<svg class="w-4 h-4 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</section>
+<!-- END: Section3_SanctuaryCommunityVoice -->
+<!-- BEGIN: Section4_GovernanceControl -->
+<section class="space-y-3" data-purpose="governance-and-sovereign-control">
+<!-- Section Header -->
+<div class="flex items-center space-x-2 px-1 mb-2">
+<span class="text-sm">📐</span>
+<h2 class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#c2410c]">GOVERNANCE &amp; SOVEREIGN CONTROL</h2>
+</div>
+<!-- Log Out Card -->
+<div class="porcelain-card p-4 flex items-center justify-between">
+<div class="flex items-center space-x-3 pr-2">
+<div class="w-10 h-10 rounded-full icon-chip-neutral flex items-center justify-center flex-shrink-0">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-[15px] font-semibold text-[#162a24] leading-snug">Log Out of Sanctuary</h3>
+<p class="text-[12px] text-[#52635c] leading-tight mt-0.5">Secure RAM purge session memory on this handset</p>
+</div>
+</div>
+<!-- Log Out Button -->
+<button class="px-4 py-2 rounded-full text-[#1f2937] text-[12px] font-semibold bg-white active:scale-95 transition-transform flex-shrink-0" style="border: 1px solid #d1d5db; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);" type="button">
+            Log Out
+          </button>
+</div>
+<!-- Danger Incinerator Card -->
+<div class="porcelain-card-danger p-4 space-y-3.5">
+<div class="flex items-start space-x-3">
+<div class="w-10 h-10 rounded-full icon-chip-rose flex items-center justify-center flex-shrink-0 mt-0.5">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-[15px] font-semibold text-[#991b1b] leading-tight">Delete Account &amp; Erase All Data</h3>
+<p class="text-[12px] text-[#7f1d1d] leading-[1.45] mt-1">Statutory DPDP Act Sec 12 cryptographic incinerator. All letters, photos, voice prompts and encryption keys are permanently destroyed.</p>
+</div>
+</div>
+<!-- Erase Everything Button -->
+<button class="w-full flex items-center justify-center space-x-2 py-3 rounded-full text-white font-semibold text-[13.5px] active:scale-[0.98] transition-all" style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); box-shadow: 0 6px 18px rgba(185, 28, 28, 0.3); border: 1px solid rgba(255, 255, 255, 0.2);" type="button">
+<svg class="w-4 h-4 stroke-[2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Erase Everything Irrevocably →</span>
+</button>
+</div>
+</section>
+<!-- END: Section4_GovernanceControl -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: FooterSignOff -->
+<footer class="mt-8 px-6 flex flex-col items-center text-center space-y-3" data-purpose="footer-sign-off">
+<!-- Verified Statutory Badge -->
+<div class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full select-none" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2);">
+<svg class="w-3.5 h-3.5 text-[#047857] stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-bold tracking-[0.08em] text-[#047857] uppercase">DPDP ACT 2023 &amp; IT RULES 2021 CERTIFIED</span>
+</div>
+<!-- App Build Version -->
+<p class="text-[11px] text-[#788580] tracking-tight">
+        UR-Heart v2.4.1 (Build 8904) · Zero-Knowledge Sovereign Core
+      </p>
+<!-- Philosophical Motto -->
+<p class="font-serif italic text-[13px] text-[#52635c] tracking-wide">
+        “Your sovereignty is uncompromised.”
+      </p>
+</footer>
+<!-- END: FooterSignOff -->
+</div>
+</body></html>

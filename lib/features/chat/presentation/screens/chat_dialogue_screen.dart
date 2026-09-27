@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_windowmanager/flutter_windowmanager.dart';
+import '../../../../core/theme/dark_sanctuary_tokens.dart';
+import '../../../../core/theme/light_sanctuary_tokens.dart';
+import '../../../../core/theme/theme_controller.dart';
+import '../controllers/chat_dialogue_controller.dart';
+import '../widgets/ai_icebreaker_chips_row.dart';
+import '../widgets/dialogue_message_bubble.dart';
+import '../widgets/nlp_warning_dialog.dart';
+import '../widgets/sacred_bridge_app_bar_action.dart';
+import '../widgets/shared_context_prompt_card.dart';
+import '../widgets/text_only_chat_input_bar.dart';
+
+class ChatDialogueArguments {
+  final String matchId, recipientId, recipientName, sharedContextQuote;
+  final int recipientAge;
+  final bool isOnline, hasWaKey;
+
+  const ChatDialogueArguments({
+    required this.matchId,
+    required this.recipientId,
+    required this.recipientName,
+    required this.recipientAge,
+    required this.isOnline,
+    required this.hasWaKey,
+    required this.sharedContextQuote,
+  });
+}
+
+/// Screen 9: 1:1 Encrypted Dialogue Scaffold with FLAG_SECURE (< 210 lines)
+class ChatDialogueScreen extends ConsumerStatefulWidget {
+  final String? matchId;
+  const ChatDialogueScreen({super.key, this.matchId});
+  static const String routeName = '/chat-dialogue';
+
+  @override
+  ConsumerState<ChatDialogueScreen> createState() => _ChatDialogueScreenState();
+}
+
+class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  String _resolveMatchId() {
+    final explicitId = widget.matchId;
+    if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+    final routeArgs = ModalRoute.of(context)?.settings.arguments;
+    if (routeArgs is ChatDialogueArguments) return routeArgs.matchId;
+    return 'match-aarav-1';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+    } catch (_) {}
+
+    Future.microtask(() {
+      final mId = _resolveMatchId();
+      ref.read(chatDialogueControllerProvider(mId).notifier).initializeDialogue();
+    });
+  }
+
+  @override
+  void dispose() {
+    try {
+      FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
+    } catch (_) {}
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mId = _resolveMatchId();
+    final routeArgs = ModalRoute.of(context)?.settings.arguments;
+    final args = routeArgs is ChatDialogueArguments ? routeArgs : null;
+
+    final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
+    final dialogueState = ref.watch(chatDialogueControllerProvider(mId));
+    final notifier = ref.read(chatDialogueControllerProvider(mId).notifier);
+
+    final bg = isDark ? DarkSanctuaryTokens.background : LightSanctuaryTokens.background;
+    final primaryText = isDark ? DarkSanctuaryTokens.textHeadline : LightSanctuaryTokens.textHeadline;
+    final subText = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
+    final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
+
+    final peer = dialogueState.peerProfile;
+    final displayName = args != null
+        ? '${args.recipientName}, ${args.recipientAge}'
+        : (peer['full_name'] as String? ?? 'Meera Sen, 25');
+    final isOnline = args?.isOnline ?? (peer['is_online'] as bool? ?? false);
+    final bridgeData = {
+      ...dialogueState.bridgeData,
+      if (args != null) 'has_wa_key': args.hasWaKey,
+    };
+    final promptText = args?.sharedContextQuote ?? dialogueState.sharedPrompt;
+
+    ref.listen(chatDialogueControllerProvider(mId), (_, next) {
+      final violation = next.violationAlert;
+      if (violation != null && context.mounted) {
+        showDialog<void>(
+          context: context,
+          builder: (_) => NlpWarningDialog(
+            result: violation,
+            isDark: isDark,
+            onDismiss: () {
+              Navigator.of(context).pop();
+              notifier.dismissViolationAlert();
+            },
+          ),
+        );
+      }
+    });
+
+    return Scaffold(
+      backgroundColor: bg,
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        backgroundColor: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard,
+        elevation: 0.5,
+        leading: BackButton(color: primaryText),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 19,
+                  backgroundColor: pine.withValues(alpha: 0.15),
+                  child: Text(displayName.isNotEmpty ? displayName[0] : 'S',
+                      style: TextStyle(color: pine, fontWeight: FontWeight.bold)),
+                ),
+                if (isOnline)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: isDark ? DarkSanctuaryTokens.badgeOnline : LightSanctuaryTokens.badgeOnline,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    style: TextStyle(fontFamily: 'Serif', fontSize: 15, fontWeight: FontWeight.bold, color: primaryText),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(isOnline ? 'Quietly present' : 'Last seen recently', style: TextStyle(fontSize: 11, color: subText)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          SacredBridgeAppBarAction(matchId: mId, isDark: isDark, bridgeData: bridgeData),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (promptText.isNotEmpty)
+              SharedContextPromptCard(isDark: isDark, promptText: promptText),
+            if (dialogueState.messages.isEmpty && dialogueState.icebreakers.isNotEmpty)
+              AiIcebreakerChipsRow(
+                isDark: isDark,
+                icebreakers: dialogueState.icebreakers,
+                onSelectIcebreaker: (prompt) => notifier.sendMessage(prompt),
+              ),
+            Expanded(
+              child: dialogueState.messages.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Begin with intention. Conversations here flow unhurried.',
+                        style: TextStyle(fontSize: 13, color: subText, fontStyle: FontStyle.italic),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      itemCount: dialogueState.messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = dialogueState.messages[index];
+                        return DialogueMessageBubble(
+                          message: msg,
+                          isMe: msg.isMe,
+                          isDark: isDark,
+                        );
+                      },
+                    ),
+            ),
+            TextOnlyChatInputBar(
+              isDark: isDark,
+              onSendMessage: (cleanText) => notifier.sendMessage(cleanText),
+              onViolation: (violation) => notifier.setViolationAlert(violation),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

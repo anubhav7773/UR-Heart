@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>UR-Heart - Mindful Sanctuary (Dark Mode)</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Newsreader (Editorial Serif) & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500;1,6..72,600&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bg: '#0E1311',
+              card: '#161D1A',
+              cardBorder: '#27332F',
+              subcard: '#1D2622',
+              subcardBorder: '#2E3D37',
+              coral: '#EE8A70',
+              coralGlow: '#E07A5F',
+              coralMuted: '#3A201A',
+              forestIcon: '#174035',
+              forestIconBorder: '#235849',
+              muted: '#7E918B',
+              mutedLight: '#A2B3AD',
+              headingWhite: '#F3F6F4',
+              softDark: '#121715'
+            }
+          },
+          fontFamily: {
+            serif: ['Newsreader', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          boxShadow: {
+            'glow-coral': '0 10px 28px -4px rgba(238, 138, 112, 0.32)',
+            'card-shadow': '0 24px 56px -12px rgba(0, 0, 0, 0.75)',
+            'subcard-inner': 'inset 0 1px 1px 0 rgba(255, 255, 255, 0.04)'
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles for Atmospheric Visuals -->
+<style data-purpose="atmospheric-effects">
+    body {
+      background-color: #0E1311;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #A2B3AD;
+      -webkit-font-smoothing: antialiased;
+      min-height: max(884px, 100dvh);
+    }
+    
+    .font-editorial {
+      font-family: 'Newsreader', Georgia, serif;
+    }
+
+    /* Ambient Warm Glow in upper right */
+    .warm-glow-ambient {
+      background: radial-gradient(circle at 85% 15%, rgba(222, 122, 96, 0.16) 0%, rgba(14, 19, 17, 0) 65%);
+    }
+
+    /* Botanical silhouettes & bokeh */
+    .botanical-shadow-bokeh {
+      background: radial-gradient(circle at 10% 90%, rgba(20, 36, 30, 0.7) 0%, transparent 50%),
+                  radial-gradient(circle at 90% 88%, rgba(224, 114, 88, 0.09) 0%, transparent 60%);
+    }
+
+    .heart-sketch-glow {
+      filter: drop-shadow(0 0 14px rgba(222, 122, 96, 0.25));
+    }
+
+    /* Clean custom select styling */
+    select {
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%237E918B' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+      background-position: right 0.2rem center;
+      background-repeat: no-repeat;
+      background-size: 1.1em 1.1em;
+      padding-right: 1.25rem;
+    }
+  </style>
+</head>
+<body class="bg-brand-bg font-sans text-brand-mutedLight antialiased min-h-screen flex justify-center items-center py-2 sm:py-6 selection:bg-brand-coral selection:text-brand-softDark">
+<!-- BEGIN: PhoneShellContainer -->
+<main class="w-full max-w-[420px] bg-brand-bg relative overflow-hidden flex flex-col justify-between min-h-[920px] shadow-2xl rounded-[44px] border border-white/5 warm-glow-ambient botanical-shadow-bokeh select-none" data-purpose="mobile-viewport">
+<!-- Ambient Botanical & Ethereal Vector Watermark Overlay (Matching SCREEN_10 & IMAGE_16) -->
+<div aria-hidden="true" class="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+<!-- Copper fine-line heart sketch -->
+<svg class="absolute top-4 -right-10 w-[340px] h-[340px] opacity-35 heart-sketch-glow stroke-[#D88B70]" fill="none" stroke-width="1.2" viewbox="0 0 200 200">
+<path d="M100,165 C60,135 15,100 25,55 C32,25 65,22 88,48 C95,56 100,64 100,64 C100,64 105,56 112,48 C135,22 168,25 175,55 C185,100 140,135 100,165 Z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M100,150 C70,125 35,95 42,62 C47,38 72,37 90,56 C97,63 100,70 100,70" stroke-dasharray="2 3" stroke-opacity="0.45"></path>
+</svg>
+<!-- Soft Organic Botanical Bokeh Shadows -->
+<div class="absolute -bottom-12 -left-12 w-56 h-56 rounded-full bg-[#1B3830]/40 blur-3xl"></div>
+<div class="absolute -bottom-10 -right-10 w-48 h-48 rounded-full bg-[#DE785C]/15 blur-3xl"></div>
+</div>
+<div class="flex flex-col w-full relative z-10">
+<!-- BEGIN: iOS Status Bar & Top Poetic Branding Cues -->
+<header class="pt-3 px-6 flex flex-col w-full">
+<!-- 9:41 Status Bar -->
+<div class="flex justify-between items-center text-white text-[14px] font-semibold tracking-tight pb-2">
+<span class="pl-1">9:41</span>
+<div class="flex items-center space-x-2 text-white">
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 18 14">
+<rect height="4.5" rx="0.8" width="2.5" x="0.5" y="9.5"></rect>
+<rect height="7" rx="0.8" width="2.5" x="5" y="7"></rect>
+<rect height="10" rx="0.8" width="2.5" x="9.5" y="4"></rect>
+<rect height="13.2" rx="0.8" width="2.5" x="14" y="0.8"></rect>
+</svg>
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 16 12">
+<path d="M8 2.5C10.8 2.5 13.3 3.6 15.1 5.4L16 4.5C13.9 2.4 11.1 1.2 8 1.2C4.9 1.2 2.1 2.4 0 4.5L0.9 5.4C2.7 3.6 5.2 2.5 8 2.5ZM8 6.2C9.7 6.2 11.3 6.9 12.5 8.1L13.4 7.2C11.9 5.8 9.9 5 8 5C6.1 5 4.1 5.8 2.6 7.2L3.5 8.1C4.7 6.9 6.3 6.2 8 6.2ZM8 10C8.8 10 9.5 10.7 9.5 11.5C9.5 12.3 8.8 13 8 13C7.2 13 6.5 12.3 6.5 11.5C6.5 10.7 7.2 10 8 10Z"></path>
+</svg>
+<div class="w-6 h-3 border border-white/80 rounded-md p-0.5 flex items-center">
+<div class="h-full w-full bg-white rounded-xs"></div>
+</div>
+</div>
+</div>
+<!-- Top Peripheral Accents & Language Dropdown (Matching Reference IMAGE_16 Dark) -->
+<div class="pt-1.5 flex justify-between items-start text-[13px]">
+<!-- Top Left Poetic Tag -->
+<div class="font-editorial italic text-brand-muted/80 flex flex-col leading-snug">
+<span>More</span>
+<span>than</span>
+<span>swipes</span>
+<span class="w-3.5 h-[1px] bg-brand-muted/40 mt-1"></span>
+</div>
+<!-- Center Language Pill -->
+<button aria-label="Select language" class="inline-flex items-center gap-1.5 text-xs text-brand-mutedLight hover:text-white transition-colors bg-white/5 py-1 px-3 rounded-full border border-white/10 backdrop-blur-md" type="button">
+<svg class="w-3.5 h-3.5 text-brand-mutedLight" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10" stroke-width="1.5"></circle>
+<path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke-width="1.5"></path>
+</svg>
+<span class="font-medium text-[12px]">English</span>
+<svg class="w-3 h-3 text-brand-mutedLight/70" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7"></path>
+</svg>
+</button>
+<!-- Top Right Poetic Tag -->
+<div class="font-editorial italic text-right text-brand-muted/80 flex flex-col items-end leading-snug">
+<span>Safer</span>
+<span>Kinder</span>
+<span>Real</span>
+</div>
+</div>
+</header>
+<!-- END: iOS Status Bar & Top Poetic Branding Cues -->
+<!-- BEGIN: Elevated Main Dark Card Container (Matching SCREEN_60 layout in SCREEN_10 dark luxury style) -->
+<section class="relative z-10 mx-3 mt-3.5 bg-brand-card/95 border border-brand-cardBorder rounded-[36px] p-5 sm:p-6 shadow-card-shadow backdrop-blur-md flex flex-col gap-3.5" data-purpose="auth-container-card">
+<!-- Brand Crest & Header Tag -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<!-- Dark Pine Green Square with White Heart -->
+<div class="w-11 h-11 rounded-2xl bg-brand-forestIcon border border-brand-forestIconBorder/60 flex items-center justify-center shadow-inner">
+<svg class="w-5 h-5 text-white fill-current" viewbox="0 0 24 24">
+<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+</svg>
+</div>
+<div class="flex flex-col">
+<h1 class="font-editorial text-[22px] font-bold tracking-normal text-brand-headingWhite leading-none">UR-Heart</h1>
+<p class="text-[8.5px] uppercase tracking-[0.22em] text-brand-muted font-bold mt-1">A BETTER WAY TO MEET</p>
+</div>
+</div>
+<!-- Sanctuary Badge -->
+<div class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-brand-mutedLight">
+<span class="material-symbols-outlined text-brand-coral text-[13px]" style="font-variation-settings: 'FILL' 1;">shield</span>
+<span class="text-[9px] font-semibold tracking-wider uppercase text-brand-headingWhite">Sanctuary</span>
+</div>
+</div>
+<!-- Editorial Headlines (Exact typography of Dark Mode Reference IMAGE_16) -->
+<div>
+<h2 class="font-editorial text-[30px] leading-[1.08] tracking-tight">
+<span class="text-brand-headingWhite font-bold block">Real people.</span>
+<span class="text-brand-coral font-medium italic block mt-0.5">Real resonance.</span>
+</h2>
+<p class="text-[12.5px] leading-relaxed text-brand-muted mt-2 font-normal">
+          Connection starts with showing up as yourself.
+        </p>
+</div>
+<!-- Mode Selector Tabs: Create Sanctuary / Sign In -->
+<div class="bg-brand-subcard p-1 rounded-full flex items-center border border-brand-subcardBorder">
+<button class="flex-1 py-1.5 rounded-full bg-white/10 text-brand-headingWhite text-[12px] font-semibold shadow-sm transition-all text-center" id="tab-create" type="button">
+          Create Sanctuary
+        </button>
+<button class="flex-1 py-1.5 rounded-full text-brand-muted text-[12px] font-medium hover:text-brand-headingWhite transition-all text-center" id="tab-signin" type="button">
+          Sign In
+        </button>
+</div>
+<!-- Form Container -->
+<form class="flex flex-col gap-3" onsubmit="event.preventDefault();">
+<!-- 18+ Date of Birth (DOB) Selector Pod -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between px-0.5">
+<label class="text-[12.5px] font-semibold text-brand-headingWhite tracking-tight">
+              How old are you?
+            </label>
+<span class="px-2 py-0.5 rounded-full bg-brand-coral/20 text-brand-coral text-[9px] font-bold tracking-wider uppercase border border-brand-coral/30">
+              Strictly 18+
+            </span>
+</div>
+<!-- Tactile Segmented DOB Container -->
+<div class="bg-brand-subcard border border-brand-subcardBorder rounded-2xl p-2.5 flex flex-col gap-2 shadow-subcard-inner">
+<div class="grid grid-cols-3 gap-2">
+<!-- Day Segment -->
+<div class="flex flex-col bg-[#141A18] border border-[#273530] rounded-xl px-2.5 py-1.5 focus-within:border-brand-coral/60 transition-colors">
+<span class="text-[8px] uppercase tracking-wider text-brand-muted font-semibold">Day</span>
+<input class="w-full bg-transparent p-0 text-[14px] font-semibold text-brand-headingWhite focus:outline-none focus:ring-0 border-0 placeholder:text-brand-muted" id="dob-day" max="31" min="1" placeholder="DD" type="number" value="14"/>
+</div>
+<!-- Month Segment -->
+<div class="flex flex-col bg-[#141A18] border border-[#273530] rounded-xl px-2.5 py-1.5 focus-within:border-brand-coral/60 transition-colors">
+<span class="text-[8px] uppercase tracking-wider text-brand-muted font-semibold">Month</span>
+<select class="w-full bg-transparent p-0 text-[14px] font-semibold text-brand-headingWhite focus:outline-none focus:ring-0 border-0 appearance-none cursor-pointer" id="dob-month">
+<option class="bg-[#161D1A] text-brand-headingWhite" value="1">Jan</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="2">Feb</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="3">Mar</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="4">Apr</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="5">May</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="6">Jun</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="7">Jul</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="8">Aug</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="9">Sep</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" selected="" value="10">Oct</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="11">Nov</option>
+<option class="bg-[#161D1A] text-brand-headingWhite" value="12">Dec</option>
+</select>
+</div>
+<!-- Year Segment -->
+<div class="flex flex-col bg-[#141A18] border border-[#273530] rounded-xl px-2.5 py-1.5 focus-within:border-brand-coral/60 transition-colors">
+<span class="text-[8px] uppercase tracking-wider text-brand-muted font-semibold">Year</span>
+<input class="w-full bg-transparent p-0 text-[14px] font-semibold text-brand-headingWhite focus:outline-none focus:ring-0 border-0 placeholder:text-brand-muted" id="dob-year" max="2006" min="1930" placeholder="YYYY" type="number" value="2002"/>
+</div>
+</div>
+<!-- Calculated Age Confirmation -->
+<div class="flex items-center justify-between px-1 pt-0.5">
+<div class="flex items-center gap-1.5 text-brand-muted">
+<span class="material-symbols-outlined text-[14px] text-brand-coral">event_available</span>
+<span class="text-[11px] font-medium text-brand-mutedLight" id="dob-preview">14 Oct 2002</span>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-[#18342B] border border-[#235849] text-[#78D6B4] text-[10px] font-semibold flex items-center gap-1" id="dob-badge">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+                22 yrs old · Verified Adult
+              </span>
+</div>
+</div>
+<!-- Micro-guarantee -->
+<div class="flex items-center gap-1.5 px-1 pt-0.5">
+<span class="material-symbols-outlined text-brand-coral text-[13px] shrink-0">verified_user</span>
+<p class="text-[10.5px] text-brand-muted leading-snug">
+              UR-Heart is exclusively for adults 18 and over. Age is permanently locked upon entry.
+            </p>
+</div>
+</div>
+<!-- Credentials Input Pods (Dark luxury card style) -->
+<div class="flex flex-col gap-2 pt-0.5">
+<!-- Email Input -->
+<div class="relative bg-brand-subcard border border-brand-subcardBorder rounded-2xl px-3.5 py-2 flex items-center gap-2.5 focus-within:border-brand-coral/60 transition-all shadow-subcard-inner">
+<span class="material-symbols-outlined text-brand-muted text-[18px]">mail</span>
+<div class="flex flex-col flex-1 min-w-0">
+<span class="text-[8px] uppercase tracking-wider text-brand-muted font-semibold leading-none">Email address</span>
+<input class="w-full bg-transparent p-0 pt-0.5 text-[13px] font-medium text-brand-headingWhite placeholder:text-brand-muted focus:outline-none focus:ring-0 border-0 truncate" placeholder="you@domain.com" type="email" value="alexandra.v@domain.com"/>
+</div>
+</div>
+<!-- Password Input -->
+<div class="relative bg-brand-subcard border border-brand-subcardBorder rounded-2xl px-3.5 py-2 flex items-center gap-2.5 focus-within:border-brand-coral/60 transition-all shadow-subcard-inner">
+<span class="material-symbols-outlined text-brand-muted text-[18px]">lock</span>
+<div class="flex flex-col flex-1 min-w-0">
+<span class="text-[8px] uppercase tracking-wider text-brand-muted font-semibold leading-none">Password</span>
+<input class="w-full bg-transparent p-0 pt-0.5 text-[13px] font-medium text-brand-headingWhite placeholder:text-brand-muted focus:outline-none focus:ring-0 border-0" id="pwd-input" placeholder="Create secure keyphrase" type="password" value="MindfulHeart2025"/>
+</div>
+<button class="text-brand-muted hover:text-brand-headingWhite p-1 flex items-center justify-center transition-colors" id="pwd-toggle" type="button">
+<span class="material-symbols-outlined text-[18px]" id="pwd-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Primary CTA: Terracotta Glowing Button (Matching Reference IMAGE_16 Dark & SCREEN_10) -->
+<button class="w-full py-3.5 px-6 rounded-full bg-brand-coral hover:bg-[#E07A5F] text-brand-softDark font-bold text-[14.5px] shadow-glow-coral flex items-center justify-center gap-2 active:scale-[0.98] transition-all duration-200 mt-1" type="submit">
+<span>Enter Sanctuary</span>
+<svg class="w-4 h-4 font-bold stroke-current" fill="none" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</form>
+<!-- Divider -->
+<div class="flex items-center gap-3">
+<span class="flex-1 h-[1px] bg-brand-cardBorder"></span>
+<span class="font-editorial text-[12px] italic text-brand-muted">or quietly with</span>
+<span class="flex-1 h-[1px] bg-brand-cardBorder"></span>
+</div>
+<!-- Google Button -->
+<button class="w-full py-2.5 px-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-brand-headingWhite flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all" type="button">
+<svg class="w-4 h-4 shrink-0" viewbox="0 0 24 24">
+<path d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z" fill="#4285F4"></path>
+<path d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.4 7.33 24 12 24z" fill="#34A853"></path>
+<path d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.13z" fill="#FBBC05"></path>
+<path d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.6 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z" fill="#EA4335"></path>
+</svg>
+<span class="text-[12.5px] font-semibold text-brand-headingWhite">Continue with Google</span>
+</button>
+<!-- Terms & Privacy -->
+<p class="text-[10px] text-center text-brand-muted leading-relaxed px-2">
+        By continuing, you agree to our 
+        <a class="text-brand-coral underline decoration-brand-coral/40 font-medium hover:text-brand-headingWhite transition-colors" href="#">Terms</a> 
+        and 
+        <a class="text-brand-coral underline decoration-brand-coral/40 font-medium hover:text-brand-headingWhite transition-colors" href="#">Privacy Policy</a>.
+      </p>
+</section>
+<!-- END: Elevated Main Dark Card Container -->
+<!-- BEGIN: Bottom Poetic Tagline & Carousel Indicators (Matching IMAGE_16 Dark & SCREEN_10) -->
+<footer class="relative z-10 px-8 pt-4 pb-2 flex justify-between items-end w-full">
+<!-- Poetic Tagline Bottom Left -->
+<div class="font-editorial italic text-brand-muted/70 text-[12px] leading-tight flex flex-col">
+<span>Real</span>
+<span>Connections</span>
+<span>Brighter Days</span>
+<span class="w-3.5 h-[1px] bg-brand-muted/40 mt-1"></span>
+</div>
+<!-- Carousel Pagination Pill Dots Bottom Right -->
+<div aria-label="Step indicators" class="flex items-center space-x-1.5 pb-1">
+<!-- Active Glowing Terracotta Pill -->
+<span class="w-5 h-1.5 rounded-full bg-brand-coral shadow-[0_0_8px_rgba(238,138,112,0.6)]"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-white/20"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-white/20"></span>
+</div>
+</footer>
+<!-- END: Bottom Poetic Tagline & Carousel Indicators -->
+<!-- iOS Home Indicator Pill -->
+<div aria-hidden="true" class="w-full flex justify-center pb-2 pt-1">
+<div class="w-32 h-1 bg-white/30 rounded-full"></div>
+</div>
+</div>
+<!-- Interactive JavaScript logic -->
+<script>
+    (function() {
+      // DOB & Verification Logic
+      const dayInput = document.getElementById('dob-day');
+      const monthSelect = document.getElementById('dob-month');
+      const yearInput = document.getElementById('dob-year');
+      const preview = document.getElementById('dob-preview');
+      const badge = document.getElementById('dob-badge');
+
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+      function calculateAge() {
+        const d = parseInt(dayInput.value) || 1;
+        const m = parseInt(monthSelect.value) || 1;
+        const y = parseInt(yearInput.value) || 2002;
+
+        preview.textContent = `${d} ${monthNames[m - 1]} ${y}`;
+
+        const today = new Date();
+        let age = today.getFullYear() - y;
+        const monthDiff = today.getMonth() + 1 - m;
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) {
+          age--;
+        }
+
+        if (age >= 18) {
+          badge.className = "px-2.5 py-0.5 rounded-full bg-[#18342B] border border-[#235849] text-[#78D6B4] text-[10px] font-semibold flex items-center gap-1";
+          badge.innerHTML = `<span class="material-symbols-outlined text-[12px]">check_circle</span> ${age} yrs old · Verified Adult`;
+        } else {
+          badge.className = "px-2.5 py-0.5 rounded-full bg-brand-coral/20 border border-brand-coral/40 text-brand-coral text-[10px] font-semibold flex items-center gap-1";
+          badge.innerHTML = `<span class="material-symbols-outlined text-[12px]">cancel</span> ${age} yrs old (18+ required)`;
+        }
+      }
+
+      if (dayInput && monthSelect && yearInput) {
+        dayInput.addEventListener('input', calculateAge);
+        monthSelect.addEventListener('change', calculateAge);
+        yearInput.addEventListener('input', calculateAge);
+      }
+
+      // Password Visibility Toggle
+      const pwdInput = document.getElementById('pwd-input');
+      const pwdToggle = document.getElementById('pwd-toggle');
+      const pwdIcon = document.getElementById('pwd-icon');
+
+      if (pwdToggle && pwdInput && pwdIcon) {
+        pwdToggle.addEventListener('click', function() {
+          const isPassword = pwdInput.getAttribute('type') === 'password';
+          pwdInput.setAttribute('type', isPassword ? 'text' : 'password');
+          pwdIcon.textContent = isPassword ? 'visibility_off' : 'visibility';
+        });
+      }
+
+      // Tab Switching
+      const tabCreate = document.getElementById('tab-create');
+      const tabSignIn = document.getElementById('tab-signin');
+
+      if (tabCreate && tabSignIn) {
+        tabCreate.addEventListener('click', function() {
+          tabCreate.className = "flex-1 py-1.5 rounded-full bg-white/10 text-brand-headingWhite text-[12px] font-semibold shadow-sm transition-all text-center";
+          tabSignIn.className = "flex-1 py-1.5 rounded-full text-brand-muted text-[12px] font-medium hover:text-brand-headingWhite transition-all text-center";
+        });
+        tabSignIn.addEventListener('click', function() {
+          tabSignIn.className = "flex-1 py-1.5 rounded-full bg-white/10 text-brand-headingWhite text-[12px] font-semibold shadow-sm transition-all text-center";
+          tabCreate.className = "flex-1 py-1.5 rounded-full text-brand-muted text-[12px] font-medium hover:text-brand-headingWhite transition-all text-center";
+        });
+      }
+    })();
+  </script>
+</main>
+<!-- END: PhoneShellContainer -->
+</body></html>
