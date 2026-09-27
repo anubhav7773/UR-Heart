@@ -13,7 +13,11 @@ Future<void> main() async {
     // Graceful fallback for environments without google-services.json
   }
 
-  const sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+  const sentryDsn = String.fromEnvironment(
+    'SENTRY_DSN',
+    defaultValue:
+        'https://6535a0577cdc513bca0276bec7ca55b6@o4511946639015936.ingest.us.sentry.io/4512159339642880',
+  );
 
   if (sentryDsn.isNotEmpty) {
     await SentryFlutter.init(

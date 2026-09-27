@@ -5,13 +5,15 @@ class SentryService {
   SentryService._();
 
   static const double tracesSampleRate = 0.10; // 10% sampling to conserve free tier quota
+  static const String defaultDsn =
+      'https://6535a0577cdc513bca0276bec7ca55b6@o4511946639015936.ingest.us.sentry.io/4512159339642880';
 
   static Future<void> initialize({
     required AppRunner appRunner,
     String? dsn,
   }) async {
     final effectiveDsn = dsn ??
-        const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+        const String.fromEnvironment('SENTRY_DSN', defaultValue: defaultDsn);
 
     if (effectiveDsn.isEmpty) {
       // Local/Test mode without external Sentry connection
