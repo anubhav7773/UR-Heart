@@ -11,6 +11,7 @@ import '../../../feed/presentation/screens/feed_screen.dart';
 import '../../../profile/presentation/screens/my_persona_screen.dart';
 import '../../../resonances/presentation/screens/resonances_screen.dart';
 import '../../../rewards/presentation/screens/growth_hub_screen.dart';
+import '../widgets/whatsapp_notification_banner.dart';
 
 /// Global Navigation Index State Provider for Tab Switching
 final navigationIndexProvider = StateProvider<int>((ref) => 0);
@@ -42,6 +43,7 @@ class _SanctuaryNavigationShellState
   int _unreadResonanceCount = 0;
   int _unreadChatCount = 0;
   final Set<String> _seenNotificationIds = {};
+  OverlayEntry? _activeNotificationOverlay;
 
   @override
   void initState() {
@@ -74,11 +76,15 @@ class _SanctuaryNavigationShellState
 
         if (unreadList.isNotEmpty && mounted) {
           final isDark = ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
+          // Mark all unread notifications as seen in memory to strictly prevent duplicate notifications
           for (final notif in unreadList) {
             final notifId = notif['id']?.toString();
             if (notifId != null) _seenNotificationIds.add(notifId);
-            _showNotificationBanner(notif, isDark);
           }
+
+          // Show strictly only the single latest notification as an ultra-premium WhatsApp banner
+          final latestNotif = unreadList.last;
+          _showWhatsAppNotification(latestNotif, isDark);
 
           setState(() {
             _unreadResonanceCount = notifications
@@ -95,6 +101,7 @@ class _SanctuaryNavigationShellState
 
   void _handleNotificationNavigation(Map<String, dynamic> notif) {
     if (!mounted) return;
+    _dismissActiveNotification();
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
@@ -194,103 +201,75 @@ class _SanctuaryNavigationShellState
     ref.read(navigationIndexProvider.notifier).state = 1;
   }
 
-  void _showNotificationBanner(Map<String, dynamic> notif, bool isDark) {
-    final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
-    final title = notif['title']?.toString() ?? 'Sanctuary Resonance';
-    final message = notif['message']?.toString() ?? '';
-    final notifId = notif['id']?.toString();
-
-    IconData icon = Icons.notifications_active;
-    Color iconColor = const Color(0xFFE58B68);
-
-    if (notifType.contains('like') || notifType.contains('resonate')) {
-      icon = Icons.favorite_rounded;
-      iconColor = const Color(0xFFE58B68);
-    } else if (notifType.contains('message') || notifType.contains('chat')) {
-      icon = Icons.chat_bubble_rounded;
-      iconColor = const Color(0xFF4E9F76);
-    } else if (notifType.contains('match')) {
-      icon = Icons.auto_awesome;
-      iconColor = const Color(0xFFD4AF37);
-    } else if (notifType.contains('referral') || notifType.contains('reward')) {
-      icon = Icons.stars_rounded;
-      iconColor = const Color(0xFFD4AF37);
+  void _dismissActiveNotification() {
+    if (_activeNotificationOverlay != null) {
+      try {
+        _activeNotificationOverlay?.remove();
+      } catch (_) {}
+      _activeNotificationOverlay = null;
     }
+  }
 
+  void _showWhatsAppNotification(Map<String, dynamic> notif, bool isDark) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: isDark ? const Color(0xFF1E2B23) : const Color(0xFFFFFFFF),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 10, left: 16, right: 16, bottom: 20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: iconColor.withOpacity(0.5), width: 1.2),
-        ),
-        elevation: 6,
-        duration: const Duration(seconds: 4),
-        content: InkWell(
-          onTap: () => _handleNotificationNavigation(notif),
-          borderRadius: BorderRadius.circular(12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: iconColor.withOpacity(0.15),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: isDark ? Colors.white : const Color(0xFF1A2621),
-                      ),
-                    ),
-                    Text(
-                      message,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFFA0AEC0) : const Color(0xFF718096),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        action: SnackBarAction(
-          label: 'Open ➔',
-          textColor: iconColor,
-          onPressed: () => _handleNotificationNavigation(notif),
-        ),
-      ),
-    );
+    // Immediately remove any active banner so there is strictly NO duplicate banner
+    _dismissActiveNotification();
 
-    // Mark as read on backend
+    final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
+    final rawTitle = notif['title']?.toString() ?? 'Sanctuary Resonance';
+    final message = notif['message']?.toString() ?? notif['body']?.toString() ?? '';
+    final notifId = notif['id']?.toString();
+    final notifData = notif['data'] as Map<String, dynamic>? ?? {};
+
+    // Format WhatsApp-style display title and sender initials
+    String displayTitle = rawTitle;
+    if (notifType.contains('message') || notifType.contains('chat')) {
+      final rawSenderName = notifData['sender_name']?.toString() ??
+          rawTitle.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
+      displayTitle = rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
+    }
+
+    final avatarUrl = notifData['sender_avatar']?.toString() ??
+        notifData['avatar_url']?.toString();
+
+    // Mark as read on backend asynchronously
     if (notifId != null) {
       try {
         final apiClient = ref.read(apiClientProvider);
-        apiClient.dio.post<dynamic>('/api/v1/notifications/mark-read', data: {'notification_ids': [notifId]});
+        apiClient.dio.post<dynamic>(
+          '/api/v1/notifications/mark-read',
+          data: {'notification_ids': [notifId], 'notification_id': notifId},
+        );
       } catch (_) {}
     }
+
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+
+    _activeNotificationOverlay = OverlayEntry(
+      builder: (context) => WhatsAppNotificationBanner(
+        title: displayTitle,
+        message: message,
+        type: notifType,
+        avatarUrl: avatarUrl,
+        isDark: isDark,
+        onTap: () {
+          _dismissActiveNotification();
+          _handleNotificationNavigation(notif);
+        },
+        onDismiss: () {
+          _dismissActiveNotification();
+        },
+      ),
+    );
+
+    overlay.insert(_activeNotificationOverlay!);
   }
 
   @override
   void dispose() {
+    _dismissActiveNotification();
     _notificationPoller?.cancel();
     super.dispose();
   }
