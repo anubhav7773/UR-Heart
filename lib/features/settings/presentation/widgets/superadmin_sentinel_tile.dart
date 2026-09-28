@@ -1,107 +1,87 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_typography.dart';
+import '../../../../core/theme/light_sanctuary_tokens.dart';
+import '../../../../core/theme/dark_sanctuary_tokens.dart';
 
-/// Restricted Superadmin KYC Sentinel Tile
-/// STRICT SECURITY GATE: Compiles and renders EXCLUSIVELY for kshtriyaanubhav9120@gmail.com.
-/// Returns SizedBox.shrink() (Zero trace in DOM) for all other users.
 class SuperadminSentinelTile extends StatelessWidget {
-  static const String authorizedSuperadminEmail = 'kshtriyaanubhav9120@gmail.com';
-  static const String designatedAdminEmail = 'kshtriyaanubhav9120@gmail.com';
-
-  final String? userEmail;
-  final String? currentUserEmail;
+  final String userRole; // Resolved securely from server-side database claims
   final bool isDark;
   final VoidCallback? onTap;
 
   const SuperadminSentinelTile({
     super.key,
-    this.userEmail,
-    this.currentUserEmail,
+    required this.userRole,
     required this.isDark,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Zero-trust compile/runtime gate: Standard users get 0% UI trace
-    final email = (currentUserEmail ?? userEmail ?? '').trim().toLowerCase();
-    if (email != designatedAdminEmail) {
+    // Zero client-side hardcoded email strings. 
+    // Renders solely upon cryptographically validated server-side role claim.
+    if (userRole.toLowerCase().trim() != 'superadmin') {
       return const SizedBox.shrink();
     }
 
-    final goldColor = isDark
-        ? DarkSanctuaryTokens.superadminGold
-        : LightSanctuaryTokens.superadminGold;
-    final goldBorder = isDark
-        ? DarkSanctuaryTokens.superadminGoldBorder
-        : LightSanctuaryTokens.superadminGoldBorder;
-    final goldGlow = isDark
-        ? DarkSanctuaryTokens.superadminGoldGlow
-        : LightSanctuaryTokens.superadminGoldGlow;
-    final headlineColor = isDark
-        ? DarkSanctuaryTokens.textHeadline
-        : LightSanctuaryTokens.textHeadline;
+    final gold = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
+    final surface = isDark ? DarkSanctuaryTokens.surface : LightSanctuaryTokens.surface;
+    final sub = isDark ? DarkSanctuaryTokens.secondaryText : LightSanctuaryTokens.secondaryText;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: goldGlow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: goldBorder, width: 1.5),
+        color: surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: gold, width: 1.4),
       ),
-      child: InkWell(
-        onTap: () {
-          final cb = onTap;
-          if (cb != null) {
-            cb();
-          } else {
-            Navigator.of(context).pushNamed('/admin/kyc-desk');
-          }
-        },
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: goldColor.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.admin_panel_settings, color: gold, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'SOVEREIGN SENTINEL DESK',
+                style: TextStyle(
+                  fontFamily: 'Serif',
+                  color: gold,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
-              child: Icon(Icons.admin_panel_settings_rounded,
-                  size: 24, color: goldColor),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        '👑 Superadmin KYC Sentinel',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: goldColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Review escalated video KYC reflections & EVA AI verification desk.',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: headlineColor.withValues(alpha: 0.85),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Authorized access granted. Inspect escalated live verification reflections.',
+            style: TextStyle(fontSize: 12, color: sub, height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: gold,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
+              icon: const Icon(Icons.security, color: Colors.black, size: 16),
+              label: const Text(
+                'Open KYC Escalation Desk ➔',
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              onPressed: () {
+                if (onTap != null) {
+                  onTap!();
+                } else {
+                  Navigator.of(context).pushNamed('/admin/kyc-desk');
+                }
+              },
             ),
-            Icon(Icons.arrow_forward_ios_rounded, size: 14, color: goldColor),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

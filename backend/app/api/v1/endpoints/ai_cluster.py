@@ -30,9 +30,11 @@ async def generate_icebreakers(payload: IcebreakerRequest):
 
 
 @router.post("/bio-polish", response_model=BioPolishResponse, status_code=status.HTTP_200_OK)
+@router.post("/polish-bio", response_model=BioPolishResponse, status_code=status.HTTP_200_OK)
 async def polish_bio(payload: BioPolishRequest):
     """
     Elevates user profile bio poetically without modifying factual personality traits.
+    Sanitized within strict XML boundary tags against prompt injection.
     """
     polished = await GroqAiService.polish_bio(
         payload.raw_bio,
@@ -42,6 +44,7 @@ async def polish_bio(payload: BioPolishRequest):
         polished_bio=polished,
         original_bio=payload.raw_bio
     )
+
 
 
 @router.post("/kyc-liveness", response_model=LivenessCheckResponse, status_code=status.HTTP_200_OK)

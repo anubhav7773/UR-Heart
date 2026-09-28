@@ -6,6 +6,7 @@ class SanctuarySettings {
   final bool isIncognito;
   final String activeKeyFingerprint;
   final String userEmail;
+  final String userRole;
 
   const SanctuarySettings({
     this.masterResonance = true,
@@ -14,6 +15,7 @@ class SanctuarySettings {
     this.isIncognito = false,
     this.activeKeyFingerprint = 'CURVE25519-7F3A-89BE-4402',
     this.userEmail = '',
+    this.userRole = 'user',
   });
 
   SanctuarySettings copyWith({
@@ -23,6 +25,7 @@ class SanctuarySettings {
     bool? isIncognito,
     String? activeKeyFingerprint,
     String? userEmail,
+    String? userRole,
   }) {
     return SanctuarySettings(
       masterResonance: masterResonance ?? this.masterResonance,
@@ -31,6 +34,8 @@ class SanctuarySettings {
       isIncognito: isIncognito ?? this.isIncognito,
       activeKeyFingerprint: activeKeyFingerprint ?? this.activeKeyFingerprint,
       userEmail: userEmail ?? this.userEmail,
+      userRole: userRole ?? this.userRole,
     );
   }
 }
+

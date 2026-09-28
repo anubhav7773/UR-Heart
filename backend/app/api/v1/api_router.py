@@ -15,9 +15,12 @@ from app.api.v1.endpoints import (
     resonances,
     telemetry,
     underage_quarantine,
+    ws_ticket,
+    kyc_verification,
 )
 
 api_router = APIRouter()
+
 
 
 # 0. Live Activity Telemetry (Immediate Render Stream)
@@ -65,4 +68,11 @@ api_router.include_router(account_incinerator.router)
 
 # 14. Hardware-Level Underage Quarantine Engine (SEC-08)
 api_router.include_router(underage_quarantine.router)
+
+# 15. Ephemeral WSS Handshake Ticket (SEC-13)
+api_router.include_router(ws_ticket.router)
+
+# 16. Secure Fail-Closed KYC Verification (SEC-11)
+api_router.include_router(kyc_verification.router)
+
 

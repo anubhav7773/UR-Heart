@@ -105,14 +105,15 @@ class SanctuarySettingsScreen extends ConsumerWidget {
                 onIncognitoChanged: notifier.toggleIncognito,
                 onRotateKey: notifier.rotateKey,
               ),
-              // Superadmin Sentinel Tile: Only renders for kshtriyaanubhav9120@gmail.com
+              // Superadmin Sentinel Tile: Strictly renders via server-side role resolution claim
               SuperadminSentinelTile(
-                userEmail: state.settings.userEmail,
+                userRole: state.settings.userRole,
                 isDark: isDark,
                 onTap: () {
                   Navigator.of(context).pushNamed('/admin/kyc-desk');
                 },
               ),
+
               SovereignControlSection(
                 isDark: isDark,
                 isIncinerating: state.isIncinerating,
