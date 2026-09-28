@@ -148,3 +148,52 @@ class GroqAiService:
             except Exception:
                 pass
         return f"{raw_bio.strip()} · Walking mindfully through the quiet sanctuary."
+
+    @classmethod
+    async def moderate_image_vision(cls, image_bytes_b64: str) -> Dict[str, Any]:
+        """
+        Multimodal visual content safety check using Groq Llama-3.2-11b-vision-preview.
+        Strictly enforces sanctuary policy:
+        - Rejects shirtless / bare torso / bare chest photos (for any gender).
+        - Rejects bikini / swimwear / underwear / lingerie / bra / panties / toplessness / excessive cleavage.
+        - Rejects explicit nudity / sexually suggestive poses / bedroom intimacy.
+        - Rejects abusive gestures / weapons / violence.
+        """
+        prompt = (
+            "You are the Content Safety Sentinel for UR-Heart, a mindful, respectful dating sanctuary. "
+            "Analyze this user profile photo strictly for policy violations:\n"
+            "1. SHIRTLESS OR UNCLOTHED: Is the person shirtless, bare-chested, or showing an exposed torso/abdomen/chest?\n"
+            "2. INTIMATE/UNDERWEAR: Is the person wearing swimwear, a bikini, bra, underwear, lingerie, or showing extreme cleavage/toplessness?\n"
+            "3. EXPLICIT/SEXUAL: Any sexual gestures, bedroom/bed selfies in provocative poses, or pornographic content?\n"
+            "4. ABUSIVE/VIOLENCE: Any middle finger gestures, weapons, or hate symbols?\n\n"
+            "UR-Heart enforces a strict clothed sanctuary standard. If ANY of the above are TRUE, the photo is strictly NOT safe.\n"
+            "Respond ONLY with a valid JSON object in this exact format:\n"
+            "{\"is_safe\": false, \"category\": \"shirtless\"|\"intimate\"|\"abusive\", \"reason\": \"Photo Rejected: Shirtless, swimwear, lingerie, or excessive exposed skin is strictly prohibited in UR-Heart sanctuary.\"}\n"
+            "If the person is appropriately clothed and the photo is respectful:\n"
+            "{\"is_safe\": true, \"category\": \"safe\", \"reason\": \"\"}"
+        )
+
+        payload = {
+            "model": GROQ_VISION_MODEL,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_bytes_b64}"}}
+                ]
+            }],
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"}
+        }
+
+        if settings.GROQ_API_KEY:
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    res = await client.post(GROQ_ENDPOINT, headers=cls._headers(), json=payload)
+                    if res.status_code == 200:
+                        content = res.json()["choices"][0]["message"]["content"]
+                        return json.loads(content)
+            except Exception as e:
+                logger.warning("Groq Vision moderation exception: %s", str(e))
+
+        return {"is_safe": True, "category": "safe", "reason": ""}

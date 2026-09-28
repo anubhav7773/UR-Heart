@@ -14,6 +14,7 @@ import '../../features/legal_vault/presentation/screens/vault_legal_screen.dart'
 import '../../features/settings/presentation/screens/sanctuary_settings_screen.dart';
 import '../../features/settings/presentation/screens/superadmin_kyc_desk_screen.dart';
 import '../../features/rewards/presentation/screens/growth_hub_screen.dart';
+import '../../features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
 import '../theme/theme_controller.dart';
@@ -40,16 +41,17 @@ class URHeartApp extends ConsumerWidget {
         AgeGateAuthScreen.routeName: (context) => const AgeGateAuthScreen(),
         MagicLinkScreen.routeName: (context) => const MagicLinkScreen(),
         ProfileSetupScreen.routeName: (context) => const ProfileSetupScreen(),
-        FeedScreen.routeName: (context) => const FeedScreen(),
+        SanctuaryNavigationShell.routeName: (context) => const SanctuaryNavigationShell(),
+        FeedScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 0),
+        ResonancesScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 1),
+        ChatsListScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 2),
+        GrowthHubScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 3),
+        MyPersonaScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 4),
         IgnoredProfilesScreen.routeName: (context) => const IgnoredProfilesScreen(),
-        ResonancesScreen.routeName: (context) => const ResonancesScreen(),
-        ChatsListScreen.routeName: (context) => const ChatsListScreen(),
         ChatDialogueScreen.routeName: (context) => const ChatDialogueScreen(),
-        MyPersonaScreen.routeName: (context) => const MyPersonaScreen(),
         VaultLegalScreen.routeName: (context) => const VaultLegalScreen(),
         SanctuarySettingsScreen.routeName: (context) => const SanctuarySettingsScreen(),
         SuperadminKycDeskScreen.routeName: (context) => const SuperadminKycDeskScreen(),
-        GrowthHubScreen.routeName: (context) => const GrowthHubScreen(),
       },
     );
   }

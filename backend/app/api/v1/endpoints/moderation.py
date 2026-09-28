@@ -19,7 +19,9 @@ class ChatModerationResponse(BaseModel):
 @router.post("/photo", status_code=status.HTTP_200_OK)
 async def moderate_photo(file: UploadFile = File(...)):
     """
-    Early-exit OpenCV QR & Tesseract OCR photo moderation gatekeeper.
+    Dual-stage AI & CV photo moderation gatekeeper:
+    1. Early-exit OpenCV QR, Tesseract OCR & Torso Skin ratio
+    2. Groq Llama-3.2 Vision multimodal intimacy/shirtless detection
     Returns 200 with status or rejection message.
     """
     contents = await file.read()
@@ -29,7 +31,7 @@ async def moderate_photo(file: UploadFile = File(...)):
             detail="Empty image payload provided."
         )
 
-    is_safe, message = PhotoModerationService.inspect_photo_bytes(contents)
+    is_safe, message = await PhotoModerationService.inspect_photo_bytes_with_ai(contents)
     if not is_safe:
         return {
             "status": "rejected",

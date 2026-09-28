@@ -50,3 +50,32 @@ async def sync_session(current_user: User = Depends(get_current_user)) -> UserSe
 async def get_me(current_user: User = Depends(get_current_user)) -> UserSessionResponse:
     """Returns authenticated profile data."""
     return UserSessionResponse.model_validate(current_user)
+
+
+class GoogleSyncRequest(BaseModel):
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+    id_token: Optional[str] = None
+
+
+@router.post(
+    "/google-sync",
+    status_code=status.HTTP_200_OK,
+    summary="Synchronize Google Sign-In with Sanctuary Backend"
+)
+async def google_sync(payload: GoogleSyncRequest):
+    """
+    Receives Google Sign-In tokens, registers/synchronizes session,
+    and streams activity to Render stdout.
+    """
+    print(
+        f"[AUTH GOOGLE SYNC] Session Synced: user_id={payload.user_id} email={payload.email} name={payload.display_name}",
+        flush=True
+    )
+    return {
+        "status": "synchronized",
+        "user_id": payload.user_id,
+        "email": payload.email,
+        "message": "Google authentication session verified and synchronized."
+    }

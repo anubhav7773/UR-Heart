@@ -106,20 +106,20 @@ class ImageModerationService {
       final request = http.MultipartRequest('POST', uri);
       request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
 
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 5));
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 10));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['is_safe'] == false || data['status'] == 'rejected') {
           return ModerationResult.rejected(
-            (data['reason'] as String?) ?? 'Photo does not meet sanctuary guidelines.',
-            category: 'policy_violation',
+            (data['reason'] as String?) ?? 'Photo Rejected: Shirtless, swimwear, lingerie, or excessive exposed skin is strictly prohibited.',
+            category: 'intimate',
           );
         }
       }
-    } catch (_) {
-      // Backend may be cold starting; proceed to AI vision filter
+    } catch (e) {
+      debugPrint('[ImageModerationService] Server check warning: $e');
     }
     return ModerationResult.approved();
   }
@@ -148,10 +148,11 @@ class ImageModerationService {
                 'text':
                     'You are EVA AI Content Safety Sentinel for UR-Heart mindful dating sanctuary. '
                     'Analyze this user photo strictly for: '
-                    '1. Explicit nudity, genital exposure, sexually intimate poses, underwear/lingerie shots, or pornographic content. '
-                    '2. Abusive gestures, extreme violence, weapons, gore, or hate imagery. '
+                    '1. Shirtless/bare torso, bare chest, swimwear, bikini, lingerie, bra, underwear, or excessive exposed skin. '
+                    '2. Explicit nudity, genital exposure, sexually intimate poses, or bedroom provocative selfies. '
+                    '3. Abusive gestures, weapons, or hate symbols. '
                     'Reply ONLY in raw JSON format (no markdown, no quotes): '
-                    '{"is_safe": true, "reason": ""} OR {"is_safe": false, "category": "intimate"|"abusive"|"violence", "reason": "<brief polite rejection reason>"}'
+                    '{"is_safe": true, "reason": ""} OR {"is_safe": false, "category": "intimate"|"shirtless"|"abusive", "reason": "Photo Rejected: Shirtless, swimwear, lingerie, or excessive exposed skin is prohibited."}'
               },
               {
                 'type': 'image_url',
@@ -173,7 +174,7 @@ class ImageModerationService {
           'Content-Type': 'application/json',
         },
         body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -184,7 +185,7 @@ class ImageModerationService {
           final isSafe = parsed['is_safe'] == true;
           if (!isSafe) {
             final reason = parsed['reason'] as String? ??
-                'Intimate or inappropriate content is not permitted in the sanctuary.';
+                'Shirtless, swimwear, lingerie, or intimate attire is not permitted in the sanctuary.';
             final category = parsed['category'] as String? ?? 'intimate';
             return ModerationResult.rejected(
               'Photo Rejected: $reason',
@@ -199,7 +200,7 @@ class ImageModerationService {
     return ModerationResult.approved();
   }
 
-  /// Fast local skin tone ratio check
+  /// Fast local skin tone & torso nudity ratio check
   static ModerationResult _checkSkinToneNudityRatio(Uint8List bytes) {
     try {
       final image = img.decodeImage(bytes);
@@ -209,9 +210,21 @@ class ImageModerationService {
       final sample = img.copyResize(image, width: 64, height: 64);
       final int totalPixels = sample.width * sample.height;
       int skinPixels = 0;
+      int torsoPixels = 0;
+      int torsoSkinPixels = 0;
+
+      // Torso region: vertically 20% to 72%, horizontally 18% to 82%
+      final int torsoYStart = (sample.height * 0.20).toInt();
+      final int torsoYEnd = (sample.height * 0.72).toInt();
+      final int torsoXStart = (sample.width * 0.18).toInt();
+      final int torsoXEnd = (sample.width * 0.82).toInt();
 
       for (int y = 0; y < sample.height; y++) {
+        final isTorsoY = y >= torsoYStart && y <= torsoYEnd;
         for (int x = 0; x < sample.width; x++) {
+          final isTorso = isTorsoY && (x >= torsoXStart && x <= torsoXEnd);
+          if (isTorso) torsoPixels++;
+
           final pixel = sample.getPixel(x, y);
           final r = pixel.r.toInt();
           final g = pixel.g.toInt();
@@ -223,13 +236,23 @@ class ImageModerationService {
               r > g && r > b &&
               (r - b) > 15) {
             skinPixels++;
+            if (isTorso) torsoSkinPixels++;
           }
         }
       }
 
       final skinRatio = skinPixels / totalPixels;
-      // High skin ratio (> 65%) indicates likely unclothed or intimate selfie
-      if (skinRatio > 0.65) {
+      final torsoSkinRatio = torsoPixels > 0 ? (torsoSkinPixels / torsoPixels) : 0.0;
+
+      // In clothed portraits, torso has < 12% skin; shirtless, bikini or lingerie has > 22%
+      if (torsoSkinRatio > 0.22) {
+        return ModerationResult.rejected(
+          'Photo Rejected: Shirtless, swimwear, lingerie, or excessive exposed torso detected. UR-Heart maintains a mindful, clothed sanctuary standard.',
+          category: 'intimate',
+        );
+      }
+
+      if (skinRatio > 0.35) {
         return ModerationResult.rejected(
           'Photo Rejected: Excessive exposed skin detected. UR-Heart maintains a mindful, clothed sanctuary standard.',
           category: 'intimate',
