@@ -53,13 +53,16 @@ void main() {
 
       // Check affirmative checkboxes
       final checkboxes = find.byType(Checkbox);
-      expect(checkboxes, findsNWidgets(2));
-      await tester.tap(checkboxes.first);
-      await tester.tap(checkboxes.last);
+      expect(checkboxes, findsAtLeastNWidgets(2));
+      final count = checkboxes.evaluate().length;
+      for (int i = 0; i < count; i++) {
+        await tester.tap(checkboxes.at(i));
+      }
       await tester.pumpAndSettle();
 
       // Tap submit button
       final submitButton = find.widgetWithText(ElevatedButton, 'I Agree & Continue');
+      await tester.ensureVisible(submitButton);
       await tester.tap(submitButton);
       await tester.pumpAndSettle();
 

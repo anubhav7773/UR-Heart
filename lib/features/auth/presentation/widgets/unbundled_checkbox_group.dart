@@ -92,12 +92,14 @@ class UnbundledCheckboxGroup extends ConsumerWidget {
           width: 1.0,
         ),
       ),
-      child: CheckboxListTile(
-        value: value,
-        onChanged: onChanged,
-        activeColor: activeColor,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        controlAffinity: ListTileControlAffinity.leading,
+      child: Material(
+        color: Colors.transparent,
+        child: CheckboxListTile(
+          value: value,
+          onChanged: onChanged,
+          activeColor: activeColor,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          controlAffinity: ListTileControlAffinity.leading,
         title: Text(
           title,
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor),
@@ -110,6 +112,7 @@ class UnbundledCheckboxGroup extends ConsumerWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }
