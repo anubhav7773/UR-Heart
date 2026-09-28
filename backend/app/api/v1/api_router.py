@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     ai_cluster,
     auth,
     billing_webhook,
+    billing_verification,
     chat_api,
     crypto_registry,
     feed,
@@ -45,6 +46,7 @@ api_router.include_router(ads_ssv.router)
 
 # 6. Billing, IAP & Store Webhooks
 api_router.include_router(billing_webhook.router)
+api_router.include_router(billing_verification.router)
 
 # 7. Authentication Router (Including Google Sync)
 api_router.include_router(auth.router)

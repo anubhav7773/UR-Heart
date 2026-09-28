@@ -18,6 +18,13 @@ class UserProfile {
   final double maxAgePref;
   final String avatarUrl;
   final List<String> momentPhotos;
+  final String referralCode;
+  final int swipesRemaining;
+  final int directLettersCount;
+  final bool isAdFree;
+  final bool nightSlumber;
+  final String subscriptionTier;
+  final int rewardBalance;
 
   const UserProfile({
     required this.id,
@@ -38,6 +45,13 @@ class UserProfile {
     required this.maxAgePref,
     required this.avatarUrl,
     required this.momentPhotos,
+    this.referralCode = '',
+    this.swipesRemaining = 25,
+    this.directLettersCount = 1,
+    this.isAdFree = false,
+    this.nightSlumber = false,
+    this.subscriptionTier = 'free',
+    this.rewardBalance = 0,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -60,6 +74,13 @@ class UserProfile {
       maxAgePref: (json['preferred_age_max'] as num?)?.toDouble() ?? 35.0,
       avatarUrl: json['avatar_url'] as String? ?? (json['photos'] is List && (json['photos'] as List).isNotEmpty ? (json['photos'] as List).first as String : ''),
       momentPhotos: List<String>.from(json['photos'] as List? ?? json['moment_photos'] as List? ?? []),
+      referralCode: json['referral_code'] as String? ?? '',
+      swipesRemaining: json['swipes_remaining'] as int? ?? 25,
+      directLettersCount: json['direct_letters_count'] as int? ?? 1,
+      isAdFree: json['is_ad_free'] as bool? ?? false,
+      nightSlumber: json['night_slumber'] as bool? ?? false,
+      subscriptionTier: json['subscription_tier'] as String? ?? 'free',
+      rewardBalance: json['reward_balance'] as int? ?? 0,
     );
   }
 
@@ -82,6 +103,13 @@ class UserProfile {
     double? maxAgePref,
     String? avatarUrl,
     List<String>? momentPhotos,
+    String? referralCode,
+    int? swipesRemaining,
+    int? directLettersCount,
+    bool? isAdFree,
+    bool? nightSlumber,
+    String? subscriptionTier,
+    int? rewardBalance,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -102,6 +130,13 @@ class UserProfile {
       maxAgePref: maxAgePref ?? this.maxAgePref,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       momentPhotos: momentPhotos ?? this.momentPhotos,
+      referralCode: referralCode ?? this.referralCode,
+      swipesRemaining: swipesRemaining ?? this.swipesRemaining,
+      directLettersCount: directLettersCount ?? this.directLettersCount,
+      isAdFree: isAdFree ?? this.isAdFree,
+      nightSlumber: nightSlumber ?? this.nightSlumber,
+      subscriptionTier: subscriptionTier ?? this.subscriptionTier,
+      rewardBalance: rewardBalance ?? this.rewardBalance,
     );
   }
 

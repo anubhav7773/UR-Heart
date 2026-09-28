@@ -5,6 +5,7 @@ import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../widgets/incoming_like_card.dart';
 import '../widgets/mutual_connection_tile.dart';
+import '../widgets/unlock_resonances_banner.dart';
 import '../controllers/resonances_controller.dart';
 
 class ResonancesScreen extends ConsumerStatefulWidget {
@@ -75,33 +76,41 @@ class _ResonancesScreenState extends ConsumerState<ResonancesScreen> with Single
             // Tab 1: Liked You Grid
             resonancesState.incomingLikes.isEmpty
                 ? Center(child: Text('No new resonances yet. Your presence is radiating quietly.', style: TextStyle(color: subText)))
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 14,
-                      childAspectRatio: 0.95,
-                    ),
-                    itemCount: resonancesState.incomingLikes.length,
-                    itemBuilder: (context, index) {
-                      final item = resonancesState.incomingLikes[index];
-                      final senderId = item is Map
-                          ? (item['user_id'] as String? ?? item['id'] as String? ?? '')
-                          : (item.senderId as String? ?? item.id as String? ?? '');
+                : Column(
+                    children: [
+                      if (!resonancesState.isSovereignUser)
+                        UnlockResonancesBanner(incomingCount: resonancesState.incomingLikes.length),
+                      Expanded(
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 14,
+                            mainAxisSpacing: 14,
+                            childAspectRatio: 0.95,
+                          ),
+                          itemCount: resonancesState.incomingLikes.length,
+                          itemBuilder: (context, index) {
+                            final item = resonancesState.incomingLikes[index];
+                            final senderId = item is Map
+                                ? (item['user_id'] as String? ?? item['id'] as String? ?? '')
+                                : (item.senderId as String? ?? item.id as String? ?? '');
 
-                      return IncomingLikeCard(
-                        likeData: item,
-                        isDark: isDark,
-                        isSovereignUser: resonancesState.isSovereignUser,
-                        onChatTriggered: () async {
-                          final matchId = await ref.read(resonancesControllerProvider.notifier).createMutualMatch(senderId);
-                          if (matchId != null && context.mounted) {
-                            _navigateToChat(context, matchId);
-                          }
-                        },
-                      );
-                    },
+                            return IncomingLikeCard(
+                              likeData: item,
+                              isDark: isDark,
+                              isSovereignUser: resonancesState.isSovereignUser,
+                              onChatTriggered: () async {
+                                final matchId = await ref.read(resonancesControllerProvider.notifier).createMutualMatch(senderId);
+                                if (matchId != null && context.mounted) {
+                                  _navigateToChat(context, matchId);
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
             // Tab 2: Mutual Connections
             resonancesState.mutualConnections.isEmpty
