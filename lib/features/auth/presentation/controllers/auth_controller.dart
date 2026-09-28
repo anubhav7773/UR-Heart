@@ -311,6 +311,25 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(isMagicLinkVerified: true);
   }
 
+  /// Verifies magic link token with repository (ACT-01)
+  Future<bool> verifyMagicLink(String token) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final success = await _repository.verifyMagicLinkToken(token);
+      state = state.copyWith(
+        isLoading: false,
+        isMagicLinkVerified: success,
+      );
+      return success;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Magic link verification failed.',
+      );
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

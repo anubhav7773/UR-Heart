@@ -64,6 +64,9 @@ class FeedController extends StateNotifier<FeedState> {
     }
   }
 
+  /// Alias for refresh and external callers (ACT-23)
+  Future<void> loadFeed() => loadDiscoveryFeed();
+
   /// Handles Pass swipe (Left swipe)
   Future<bool> swipePass() async {
     if (state.swipesRemaining <= 0) {

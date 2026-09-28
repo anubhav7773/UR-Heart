@@ -50,6 +50,40 @@ class SettingsRepository {
     }
   }
 
+  /// Persists slumber mode to backend database via PATCH /api/v1/profile/slumber-mode (ACT-06)
+  Future<bool> updateSlumberMode(bool isActive) async {
+    _settings = _settings.copyWith(nightSanctuarySlumber: isActive);
+    try {
+      final response = await _dio.patch<dynamic>(
+        '/api/v1/profile/slumber-mode',
+        data: {'is_slumber_active': isActive},
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Persists incognito and discreet mode via PUT /api/v1/user/preferences (ACT-15 & ACT-16)
+  Future<bool> updateUserPreferences({bool? isIncognito, bool? isDiscreet}) async {
+    _settings = _settings.copyWith(
+      isIncognito: isIncognito ?? _settings.isIncognito,
+      discreetMode: isDiscreet ?? _settings.discreetMode,
+    );
+    try {
+      final response = await _dio.put<dynamic>(
+        '/api/v1/user/preferences',
+        data: {
+          if (isIncognito != null) 'is_incognito': isIncognito,
+          if (isDiscreet != null) 'discreet_mode': isDiscreet,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Backward-compatible updateSettings
   Future<SanctuarySettings> updateSettings({
     bool? masterResonance,

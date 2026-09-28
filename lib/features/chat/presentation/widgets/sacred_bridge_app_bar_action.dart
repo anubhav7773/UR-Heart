@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
+import '../../data/chat_websocket_service.dart';
 
-/// Progress badge & multi-platform deep-linker for Sacred Contact Bridge
+/// Progress badge & multi-platform deep-linker for Sacred Contact Bridge (ACT-03 Fix)
 class SacredBridgeAppBarAction extends StatelessWidget {
   final String matchId;
   final bool isDark;
   final Map<String, dynamic> bridgeData;
+  final ChatWebSocketService? wsService;
 
   const SacredBridgeAppBarAction({
     super.key,
     required this.matchId,
     required this.isDark,
     required this.bridgeData,
+    this.wsService,
   });
 
   @override
@@ -58,26 +61,25 @@ class SacredBridgeAppBarAction extends StatelessWidget {
     }
 
     if (!isUnlocked) {
-      // Locked Progress Pill: Triggers Enclave Reveal Modal
       return Center(
         child: InkWell(
-          borderRadius: BorderRadius.circular(14.0),
-          onTap: () => _showRevealProgressDialog(context),
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _showProgressionDialog(context),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: surfaceMuted,
-              borderRadius: BorderRadius.circular(14.0),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: gold.withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.lock_outline, size: 12.0, color: gold),
-                const SizedBox(width: 4.0),
+                Icon(Icons.lock_outline, size: 12, color: gold),
+                const SizedBox(width: 4),
                 Text(
                   'Bridge ($userStep/3)',
-                  style: TextStyle(color: gold, fontSize: 11.0, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: gold, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -86,43 +88,52 @@ class SacredBridgeAppBarAction extends StatelessWidget {
       );
     }
 
-    // Unlocked Glowing Native Intent Launcher Button
-    final platformDisplay = platform.isNotEmpty
-        ? '${platform[0].toUpperCase()}${platform.substring(1)}'
-        : 'Bridge';
-
     return Center(
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: pine,
           elevation: 0,
           visualDensity: VisualDensity.compact,
-          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.0)),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
-        icon: const Icon(Icons.open_in_new, color: Colors.white, size: 12.0),
+        icon: const Icon(Icons.open_in_new, color: Colors.white, size: 12),
         label: Text(
-          'Open $platformDisplay',
-          style: const TextStyle(color: Colors.white, fontSize: 11.0, fontWeight: FontWeight.bold),
+          'Open ${platform.isNotEmpty ? platform[0].toUpperCase() + platform.substring(1) : "Bridge"}',
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
         ),
         onPressed: () => _launchSacredBridgeIntent(platform, bridgeData['handle'] as String? ?? ''),
       ),
     );
   }
 
-  void _showRevealProgressDialog(BuildContext context) {
+  void _showProgressionDialog(BuildContext context) {
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Sacred Enclave Bridge', style: TextStyle(fontFamily: 'Serif')),
         content: const Text(
-          'Both participants complete a 3-step ritual to unmask chosen contact bridges. '
-          'Alternatively, unmask instantly via an Instant Contact Key in the Growth Hub.',
+          'Step forward in mutual trust. Proposing bridge progression signals readiness to reveal your chosen contact enclave.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // ACT-03 FIX: Real WebSocket Stage Advance Event
+              wsService?.sendJsonPayload({
+                'type': 'STAGE_ADVANCE_REQUEST',
+                'match_id': matchId,
+                'requested_at': DateTime.now().toIso8601String(),
+              });
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Bridge progression proposed to your peer.')),
+              );
+            },
+            child: const Text('Propose Step Progression ➔'),
           ),
         ],
       ),

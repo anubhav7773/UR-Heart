@@ -1,113 +1,157 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_typography.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/theme/dark_sanctuary_tokens.dart';
+import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/magic_link_passage_card.dart';
 
-/// Screen 3: Magic Link Verification Passage
-/// Guides user through mindful email verification with cooldown protection
-class MagicLinkScreen extends ConsumerWidget {
-  const MagicLinkScreen({super.key});
+/// Screen 3: Magic Link Verification Passage (ACT-01 Fix)
+/// Guides user through genuine deep link verification with native mailto: launcher,
+/// listening to urheart://auth/verify?token=... before proceeding to /profile-setup.
+class MagicLinkScreen extends ConsumerStatefulWidget {
+  final String? email;
+
+  const MagicLinkScreen({super.key, this.email});
 
   static const String routeName = '/verify-email';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MagicLinkScreen> createState() => _MagicLinkScreenState();
+}
+
+class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
+  late final AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
+  bool _isVerifying = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinkListener();
+  }
+
+  void _initDeepLinkListener() {
+    _appLinks = AppLinks();
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      (uri) async {
+        if (uri.scheme == 'urheart' && uri.host == 'auth' && uri.path == '/verify') {
+          final token = uri.queryParameters['token'];
+          if (token != null && token.isNotEmpty) {
+            await _verifyMagicLinkToken(token);
+          }
+        }
+      },
+      onError: (_) {
+        if (mounted) setState(() => _errorMessage = 'Deep link listener interrupted.');
+      },
+    );
+  }
+
+  Future<void> _verifyMagicLinkToken(String token) async {
+    setState(() {
+      _isVerifying = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final isSuccess = await ref.read(authControllerProvider.notifier).verifyMagicLink(token);
+      if (isSuccess && mounted) {
+        Navigator.of(context).pushReplacementNamed('/profile-setup');
+      } else if (mounted) {
+        setState(() {
+          _isVerifying = false;
+          _errorMessage = 'Invalid or expired magic link. Please request a new link.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+          _errorMessage = 'Verification failed: ${e.toString()}';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
-    final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
+    final themeState = ref.watch(themeControllerProvider);
+    final isDark = themeState.mode == SanctuaryThemeMode.dark;
+    final surface = isDark ? DarkSanctuaryTokens.surface : LightSanctuaryTokens.surface;
+    final primary = isDark ? DarkSanctuaryTokens.primaryText : LightSanctuaryTokens.primaryText;
+    final sub = isDark ? DarkSanctuaryTokens.secondaryText : LightSanctuaryTokens.secondaryText;
+    final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
 
-    final bgColor = isDark
-        ? DarkSanctuaryTokens.background
-        : LightSanctuaryTokens.background;
-
-    final titleColor = isDark
-        ? DarkSanctuaryTokens.textHeadline
-        : LightSanctuaryTokens.textHeadline;
-
-    final cardBg = isDark
-        ? DarkSanctuaryTokens.surfaceCard
-        : LightSanctuaryTokens.surfaceCard;
-
-    final cardBorder = isDark
-        ? DarkSanctuaryTokens.surfaceCardBorder
-        : LightSanctuaryTokens.surfaceCardBorder;
-
-    final accentColor = isDark
-        ? DarkSanctuaryTokens.primaryCoral
-        : LightSanctuaryTokens.primaryPine;
-
-    final mutedColor = isDark
-        ? DarkSanctuaryTokens.textMuted
-        : LightSanctuaryTokens.textMuted;
-
-    final emailToDisplay =
-        authState.email.isEmpty ? 'your sanctuary inbox' : authState.email;
+    final targetEmail = widget.email ?? (authState.email.isNotEmpty ? authState.email : 'your sanctuary inbox');
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: isDark ? DarkSanctuaryTokens.background : LightSanctuaryTokens.background,
       appBar: AppBar(
-        backgroundColor: bgColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: titleColor),
+          icon: Icon(Icons.arrow_back, color: primary),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 12.0),
-              // Glowing Letter Icon
               Container(
-                width: 80.0,
-                height: 80.0,
+                width: 72,
+                height: 72,
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.12),
                   shape: BoxShape.circle,
-                  border: Border.all(color: accentColor.withOpacity(0.3), width: 1.5),
+                  color: pine.withValues(alpha: 0.12),
                 ),
-                child: Center(
-                  child: Icon(Icons.mark_email_unread_outlined, size: 36.0, color: accentColor),
-                ),
+                child: Icon(Icons.mark_email_read_outlined, color: pine, size: 36),
               ),
-              const SizedBox(height: 16.0),
+              const SizedBox(height: 20),
               Text(
-                'Almost home.',
-                textAlign: TextAlign.center,
-                style: AppTypography.titleH2.copyWith(color: titleColor),
+                'Sacred Passage Dispatched',
+                style: TextStyle(fontFamily: 'Serif', fontSize: 22, fontWeight: FontWeight.bold, color: primary),
               ),
+              const SizedBox(height: 8),
               Text(
-                'Verify your sanctuary.',
+                'A single-use mindful link was transmitted to:\n$targetEmail\nTap the link in your mailbox to enter.',
                 textAlign: TextAlign.center,
-                style: AppTypography.titleH1Italic.copyWith(
-                  fontSize: 22.0,
-                  color: isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent,
-                ),
+                style: TextStyle(fontSize: 13, color: sub, height: 1.45),
               ),
-              const SizedBox(height: 20.0),
+              const SizedBox(height: 20),
               // Email Summary Card with Edit Action
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                 decoration: BoxDecoration(
-                  color: cardBg,
+                  color: surface,
                   borderRadius: BorderRadius.circular(16.0),
-                  border: Border.all(color: cardBorder),
+                  border: Border.all(color: sub.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.mail_outline, size: 18.0, color: mutedColor),
+                    Icon(Icons.mail_outline, size: 18.0, color: sub),
                     const SizedBox(width: 10.0),
                     Expanded(
                       child: Text(
-                        emailToDisplay,
-                        style: AppTypography.bodySmall.copyWith(
-                          color: titleColor,
+                        targetEmail,
+                        style: TextStyle(
+                          color: primary,
                           fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -116,45 +160,62 @@ class MagicLinkScreen extends ConsumerWidget {
                       onPressed: () => Navigator.of(context).pop(),
                       child: Text(
                         'Edit',
-                        style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 13.0),
+                        style: TextStyle(color: pine, fontWeight: FontWeight.bold, fontSize: 13.0),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20.0),
-              // 3-Step Passage Card
+              const SizedBox(height: 20),
               const MagicLinkPassageCard(),
-              const SizedBox(height: 24.0),
-              // Primary Button
-              SizedBox(
-                width: double.infinity,
-                height: 52.0,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26.0)),
-                  ),
-                  onPressed: () {
-                    // Simulates opening email app & confirms deep link passage
-                    ref.read(authControllerProvider.notifier).simulateMagicLinkConfirmation();
-                    Navigator.of(context).pushNamed('/profile-setup');
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Open Email App', style: AppTypography.buttonPrimary.copyWith(color: Colors.white)),
-                      const SizedBox(width: 8.0),
-                      const Icon(Icons.arrow_forward, color: Colors.white, size: 18.0),
-                    ],
+              const SizedBox(height: 24),
+              if (_errorMessage != null) ...[
+                Text(
+                  _errorMessage ?? '',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? DarkSanctuaryTokens.dangerBorder : LightSanctuaryTokens.dangerBorder,
+                    fontSize: 12,
                   ),
                 ),
+                const SizedBox(height: 16),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: pine,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: _isVerifying
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.mail_outline, color: Colors.white, size: 18),
+                  label: Text(
+                    _isVerifying ? 'Verifying Passage...' : 'Open Email App ➔',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: _isVerifying ? null : _launchNativeEmailClient,
+                ),
               ),
-              const SizedBox(height: 16.0),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _launchNativeEmailClient() async {
+    final emailUri = Uri(scheme: 'mailto');
+    if (await canLaunchUrl(emailUri)) {
+      await launchUrl(emailUri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please open your mail client manually.')),
+        );
+      }
+    }
   }
 }

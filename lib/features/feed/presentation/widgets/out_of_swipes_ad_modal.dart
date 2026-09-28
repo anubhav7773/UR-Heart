@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/theme_controller.dart';
-import '../controllers/feed_controller.dart';
+import 'feed_action_handlers.dart';
 import 'out_of_swipes_modal.dart';
 
-/// Modal triggered when user exhausts daily swipes quota
+/// Modal triggered when user exhausts daily swipes quota (ACT-02 Fix)
 class OutOfSwipesAdModal extends ConsumerWidget {
-  const OutOfSwipesAdModal({super.key});
+  final String userId;
+
+  const OutOfSwipesAdModal({super.key, this.userId = 'current_user'});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
-    final feedNotifier = ref.read(feedControllerProvider.notifier);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -21,7 +22,13 @@ class OutOfSwipesAdModal extends ConsumerWidget {
         child: OutOfSwipesModal(
           isDark: isDark,
           onWatchAdTriggered: () {
-            feedNotifier.replenishSwipes(10);
+            Navigator.of(context).pop();
+            FeedActionHandlers.handleOutOfSwipesReward(
+              context: context,
+              ref: ref,
+              userId: userId,
+              isDark: isDark,
+            );
           },
         ),
       ),

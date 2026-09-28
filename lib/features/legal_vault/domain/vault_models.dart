@@ -87,6 +87,11 @@ class DataExportStatus {
       expiresAt: json['expires_at'] as String?,
     );
   }
+
+  bool get isReady => status.toLowerCase() == 'completed' || status.toLowerCase() == 'ready';
+  String? get downloadUrl =>
+      (payload?['download_url'] as String?) ??
+      (isReady ? 'https://ur-heart.onrender.com/api/v1/vault/export-download/$requestId' : null);
 }
 
 /// Data Nominee under DPDP Act 2023 Sec 14
@@ -154,6 +159,8 @@ class GrievanceReceipt {
       supportDeskContact: json['support_desk_contact'] as String?,
     );
   }
+
+  String get ticketId => dossierReferenceId;
 }
 
 /// Blocked perimeter candidate

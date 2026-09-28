@@ -447,6 +447,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                               ),
                             );
                             Navigator.of(context).pushReplacementNamed('/feed');
+                          } else if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Unable to complete sanctuary profile. Please check requirements and retry.', style: AppTypography.bodySmall.copyWith(color: Colors.white)),
+                                backgroundColor: const Color(0xFFC94A29),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           }
                         },
                   child: state.isSubmitting

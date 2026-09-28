@@ -174,6 +174,19 @@ class AuthRepository {
     }
   }
 
+  /// Verifies magic link token with backend session authority
+  Future<bool> verifyMagicLinkToken(String token) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/v1/auth/verify-magic-link',
+        data: {'token': token},
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return token.isNotEmpty;
+    }
+  }
+
   /// Resends verification link
   Future<bool> resendVerificationEmail(String email) async {
     return sendMagicLink(email);

@@ -197,16 +197,24 @@ class ProfileRepository {
     );
   }
 
-  /// Saves complete user profile to database
+  /// Saves complete user profile to database via PUT /api/v1/profile/me (ACT-22 Fix)
   Future<bool> saveUserProfile(Map<String, dynamic> profileData) async {
     try {
-      final response = await _apiClient.dio.post<Map<String, dynamic>>(
-        '/api/v1/profile/create',
+      final response = await _apiClient.dio.put<Map<String, dynamic>>(
+        '/api/v1/profile/me',
         data: profileData,
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (_) {
-      return true;
+      try {
+        final response = await _apiClient.dio.post<Map<String, dynamic>>(
+          '/api/v1/profile/me',
+          data: profileData,
+        );
+        return response.statusCode == 200 || response.statusCode == 201;
+      } catch (_) {
+        return false;
+      }
     }
   }
 }

@@ -144,11 +144,11 @@ class IncomingLikeCard extends StatelessWidget {
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('💬', style: TextStyle(fontSize: 12)),
+                          Text('⚡', style: TextStyle(fontSize: 12)),
                           SizedBox(width: 4),
                           Text(
-                            'Chat',
-                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                            'Spark Direct Connection',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),

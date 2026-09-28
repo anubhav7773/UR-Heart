@@ -4,6 +4,7 @@ import '../../../../core/services/flutter_windowmanager.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../data/chat_repository.dart';
 import '../controllers/chat_dialogue_controller.dart';
 import '../widgets/ai_icebreaker_chips_row.dart';
 import '../widgets/chat_detail_action_bar.dart';
@@ -181,7 +182,12 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
               );
             },
           ),
-          SacredBridgeAppBarAction(matchId: mId, isDark: isDark, bridgeData: bridgeData),
+          SacredBridgeAppBarAction(
+            matchId: mId,
+            isDark: isDark,
+            bridgeData: bridgeData,
+            wsService: ref.watch(chatWebSocketServiceProvider),
+          ),
           const SizedBox(width: 8),
         ],
       ),

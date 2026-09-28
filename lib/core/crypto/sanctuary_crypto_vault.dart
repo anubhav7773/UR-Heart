@@ -126,4 +126,16 @@ class SanctuaryCryptoVault {
     final pubKey = await keyPair.extractPublicKey();
     return base64Encode(pubKey.bytes);
   }
+
+  /// Generates a brand new X25519 keypair, stores it, and returns Base64 public key (ACT-17)
+  Future<String> rotateLocalKeyPair() async {
+    final newKeyPair = await _x25519.newKeyPair();
+    final privateKey = await newKeyPair.extractPrivateKeyBytes();
+    final publicKey = await newKeyPair.extractPublicKey();
+
+    await _secureStorage.write(key: _privKeyStorageKey, value: base64Encode(privateKey));
+    await _secureStorage.write(key: _pubKeyStorageKey, value: base64Encode(publicKey.bytes));
+
+    return base64Encode(publicKey.bytes);
+  }
 }
