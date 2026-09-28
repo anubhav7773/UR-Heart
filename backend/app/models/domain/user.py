@@ -59,6 +59,7 @@ class User(Base):
     passport_city = Column(String(100), nullable=True)
 
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+    role = Column(String(20), nullable=False, default="user")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

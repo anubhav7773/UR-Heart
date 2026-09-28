@@ -39,6 +39,7 @@ api_router.include_router(billing_webhook.router)
 
 # 7. Authentication Router (Including Google Sync)
 api_router.include_router(auth.router)
+api_router.include_router(auth.users_router)
 
 # 8. User Profile Creation & Management
 api_router.include_router(profile.router)

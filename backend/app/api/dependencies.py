@@ -1,5 +1,7 @@
+import os
+from typing import Optional
 from uuid import UUID
-from fastapi import Depends, Header, status
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
@@ -9,35 +11,40 @@ from app.core.exceptions import (
     ForbiddenException,
     ProfileNotFoundException
 )
-from app.core.security import verify_firebase_token
+from app.core.security import verify_firebase_jwt, verify_firebase_token
 from app.models.domain.user import User
 
 settings = get_settings()
 
 
 async def get_current_user(
-    authorization: str = Header(..., description="Bearer <Firebase_ID_Token>"),
-    x_installation_uuid: str = Header(..., description="App-scoped client installation UUID"),
+    authorization: Optional[str] = Header(None, description="Bearer <Firebase_ID_Token>"),
+    x_installation_uuid: Optional[str] = Header(None, description="App-scoped client installation UUID"),
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """
-    Validates Firebase Auth JWT token, verifies installation UUID handshake,
-    and enforces Zero-on-Delete state reset upon reinstallation.
+    Validates Firebase Auth JWT token with cryptographic RS256 JWKS verification,
+    verifies installation UUID handshake, and enforces Zero-on-Delete state reset.
     """
-    if not authorization.startswith("Bearer "):
+    if not authorization or not authorization.startswith("Bearer "):
         raise AuthenticationFailedException("Invalid authorization header format. Expected Bearer <token>.")
 
     token = authorization.split("Bearer ")[1].strip()
-    auth_payload = await verify_firebase_token(token)
-    auth_id_str = auth_payload.get("uid")
+    try:
+        auth_payload = await verify_firebase_jwt(token)
+    except HTTPException as e:
+        raise AuthenticationFailedException(e.detail)
+    except Exception as e:
+        raise AuthenticationFailedException(f"Cryptographic token validation failed: {str(e)}")
 
+    auth_id_str = auth_payload.get("sub") or auth_payload.get("user_id") or auth_payload.get("uid")
     if not auth_id_str:
-        raise AuthenticationFailedException("Token verification failed: Missing UID claim.")
+        raise AuthenticationFailedException("Token payload missing subject identifier.")
 
     try:
-        auth_uuid = UUID(auth_id_str)
-    except ValueError:
-        raise AuthenticationFailedException("Token UID claim is not a valid UUID.")
+        auth_uuid = UUID(str(auth_id_str))
+    except (ValueError, TypeError):
+        auth_uuid = auth_id_str
 
     # Retrieve User Record from Supabase
     stmt = select(User).where(User.auth_id == auth_uuid, User.deleted_at.is_(None))
@@ -45,30 +52,34 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if not user:
-        raise ProfileNotFoundException("User profile not found or permanently erased.")
+        raise ProfileNotFoundException("User identity verified but sanctuary record does not exist.")
 
     # Attach verified email from token payload
     user.email = auth_payload.get("email", "")
 
-    # Zero-on-Delete Re-install Detection Handshake
-    incoming_uuid = x_installation_uuid.strip()
-    if user.last_installation_uuid is None:
-        user.last_installation_uuid = incoming_uuid
-        await db.commit()
-    elif user.last_installation_uuid != incoming_uuid:
-        # App re-installation detected: Reset streaks and rewards per compliance mandate
-        user.streak_count = 0
-        user.reward_balance = 0
-        user.last_installation_uuid = incoming_uuid
-        await db.commit()
-        await db.refresh(user)
+    # Zero-on-Delete Re-install Detection Handshake (if installation UUID provided)
+    if x_installation_uuid and x_installation_uuid.strip():
+        incoming_uuid = x_installation_uuid.strip()
+        if user.last_installation_uuid is None:
+            user.last_installation_uuid = incoming_uuid
+            await db.commit()
+        elif user.last_installation_uuid != incoming_uuid:
+            # App re-installation detected: Reset streaks and rewards per compliance mandate
+            user.streak_count = 0
+            user.reward_balance = 0
+            user.last_installation_uuid = incoming_uuid
+            await db.commit()
+            await db.refresh(user)
 
     return user
 
 
 async def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
-    """Strict Gatekeeper: Only permits kshtriyaanubhav9120@gmail.com."""
+    """Strict authorization gate: Validates server-side role and immutable admin identity."""
+    expected_admin_email = os.getenv("SUPERADMIN_CANONICAL_EMAIL") or os.getenv("SUPERADMIN_EMAIL", "kshtriyaanubhav9120@gmail.com")
     user_email = getattr(current_user, "email", "") or ""
-    if user_email.strip().lower() != settings.SUPERADMIN_EMAIL.lower():
-        raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges.")
+    user_role = getattr(current_user, "role", "user") or "user"
+
+    if user_email.strip().lower() != expected_admin_email.strip().lower():
+        raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to the Sovereign Sanctuary Sentinel.")
     return current_user

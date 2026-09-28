@@ -1,59 +1,174 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-import jwt
-from fastapi import status
-from app.core.config import get_settings
-from app.core.exceptions import AuthenticationFailedException
+import os
+import time
+from typing import Optional, Dict, Any
+from uuid import UUID
+import httpx
+from jose import jwt, JWTError
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-settings = get_settings()
+from app.core.database import get_db
+from app.models.domain.user import User
+
+security_scheme = HTTPBearer(auto_error=True)
+
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "ur-heart-44b46")
+FIREBASE_ISSUER = f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"
+GOOGLE_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+
+# In-memory public key cache to avoid fetching Google certs on every single request
+_public_keys_cache: Dict[str, str] = {}
+_cache_expiry: float = 0.0
+
+
+async def get_google_public_keys() -> Dict[str, str]:
+    """Fetches and caches Google's public x509 certificates for RS256 token verification."""
+    global _public_keys_cache, _cache_expiry
+    current_time = time.time()
+
+    if _public_keys_cache and current_time < _cache_expiry:
+        return _public_keys_cache
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        response = await client.get(GOOGLE_CERTS_URL)
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to verify security credentials with identity provider."
+            )
+        
+        # Cache control header parsing
+        cache_control = response.headers.get("cache-control", "")
+        max_age = 3600
+        for part in cache_control.split(","):
+            if "max-age=" in part:
+                try:
+                    max_age = int(part.split("=")[1].strip())
+                except ValueError:
+                    max_age = 3600
+
+        _public_keys_cache = response.json()
+        _cache_expiry = current_time + max_age
+        return _public_keys_cache
+
+
+async def verify_firebase_jwt(token: str) -> Dict[str, Any]:
+    """Cryptographically verifies incoming JWT. Enforces signature, aud, iss, and exp."""
+    try:
+        # 1. Decode header without verification to retrieve Key ID (kid)
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get("kid")
+        if not kid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token header: Missing Key ID (kid)."
+            )
+
+        # 2. Match Key ID with Google's public certificates
+        keys = await get_google_public_keys()
+        certificate = keys.get(kid)
+        if not certificate:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token certificate expired or unknown Key ID."
+            )
+
+        # 3. Cryptographically verify signature, audience, and issuer (RS256)
+        payload = jwt.decode(
+            token,
+            certificate,
+            algorithms=["RS256"],
+            audience=FIREBASE_PROJECT_ID,
+            issuer=FIREBASE_ISSUER,
+            options={
+                "verify_signature": True,
+                "verify_aud": True,
+                "verify_iss": True,
+                "verify_exp": True,
+            }
+        )
+        return payload
+
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Cryptographic token validation failed: {str(e)}"
+        )
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Dependency: Verifies token and returns authenticated User entity."""
+    token = credentials.credentials
+    payload = await verify_firebase_jwt(token)
+    
+    auth_uid = payload.get("sub") or payload.get("user_id")
+    if not auth_uid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token payload missing subject identifier."
+        )
+
+    # Fetch user from database using auth_id
+    try:
+        auth_uuid = UUID(str(auth_uid))
+    except (ValueError, TypeError):
+        auth_uuid = auth_uid
+
+    stmt = select(User).where(User.auth_id == auth_uuid, User.deleted_at.is_(None))
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User identity verified but sanctuary record does not exist."
+        )
+
+    # Attach runtime email from token claims
+    user.email = payload.get("email", "")
+    return user
+
+
+async def require_superadmin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Strict authorization gate: Validates server-side role and immutable admin identity."""
+    expected_admin_email = os.getenv("SUPERADMIN_CANONICAL_EMAIL") or os.getenv("SUPERADMIN_EMAIL", "kshtriyaanubhav9120@gmail.com")
+    
+    # Check both verified email and database role claim
+    user_email = getattr(current_user, "email", "") or ""
+    user_role = getattr(current_user, "role", "user") or "user"
+    if user_email.strip().lower() != expected_admin_email.strip().lower() or user_role != "superadmin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access strictly restricted to the Sovereign Sanctuary Sentinel."
+        )
+    return current_user
 
 
 async def verify_firebase_token(token: str) -> Dict[str, Any]:
-    """
-    Decodes and validates Firebase Auth JWT ID Token.
-    Returns decoded token dictionary containing 'uid', 'email', etc.
-    """
-    if not token or not token.strip():
-        raise AuthenticationFailedException("Token is empty or missing.")
-
-    try:
-        # In production with firebase_admin initialized, verify_id_token is called.
-        # Here we provide standard unverified decode fallback for testing/local validation
-        # while validating JWT header, structure and claims.
-        unverified_header = jwt.get_unverified_header(token)
-        claims = jwt.decode(
-            token,
-            options={
-                "verify_signature": False,
-                "verify_aud": False,
-                "verify_exp": False
-            }
-        )
-
-        uid = claims.get("uid") or claims.get("user_id") or claims.get("sub")
-        if not uid:
-            raise AuthenticationFailedException("Token missing user ID claim.")
-
-        return {
-            "uid": str(uid),
-            "email": claims.get("email", ""),
-            "email_verified": claims.get("email_verified", False),
-            "claims": claims
-        }
-    except jwt.PyJWTError as e:
-        raise AuthenticationFailedException(f"Invalid authentication token: {str(e)}")
-    except Exception as e:
-        raise AuthenticationFailedException(f"Token validation failed: {str(e)}")
+    """Compatibility bridge that delegates to cryptographically verified verify_firebase_jwt."""
+    payload = await verify_firebase_jwt(token)
+    return {
+        "uid": str(payload.get("sub") or payload.get("user_id")),
+        "email": payload.get("email", ""),
+        "email_verified": payload.get("email_verified", False),
+        "claims": payload
+    }
 
 
 def verify_ws_ticket(ticket: str) -> Optional[str]:
-    """
-    Validates ephemeral WebSocket handshake tickets.
-    Returns user_id string if ticket is valid.
-    """
+    """Validates ephemeral WebSocket handshake tickets."""
     if not ticket:
         return None
     try:
+        from app.core.config import get_settings
+        settings = get_settings()
         payload = jwt.decode(
             ticket,
             key=settings.SUPABASE_SERVICE_ROLE_KEY or "sanctuary_secret",

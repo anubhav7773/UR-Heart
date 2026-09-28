@@ -52,6 +52,20 @@ async def get_me(current_user: User = Depends(get_current_user)) -> UserSessionR
     return UserSessionResponse.model_validate(current_user)
 
 
+users_router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@users_router.get(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    response_model=UserSessionResponse,
+    summary="Get Current User Profile"
+)
+async def get_users_me(current_user: User = Depends(get_current_user)) -> UserSessionResponse:
+    """Returns authenticated profile data for /api/v1/users/me."""
+    return UserSessionResponse.model_validate(current_user)
+
+
 from app.api.v1.endpoints.profile import COMPLETED_PROFILES
 
 
