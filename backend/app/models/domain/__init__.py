@@ -5,6 +5,8 @@ from app.models.domain.kyc_escalation import AdminKycEscalation
 from app.models.domain.ad_transaction import ProcessedAdTransaction
 from app.models.domain.in_app_purchase import InAppPurchase
 
+from app.models.domain.ad_reward import AdRewardLedger
+
 __all__ = [
     "User",
     "Match",
@@ -12,4 +14,5 @@ __all__ = [
     "AdminKycEscalation",
     "ProcessedAdTransaction",
     "InAppPurchase",
+    "AdRewardLedger",
 ]

@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     # Ad Network SSV Secrets
     APPLOVIN_SDK_KEY: str = "demo_applovin_sdk_key_ur_heart"
     ADMOB_VERIFIER_KEYS_URL: str = "https://www.gstatic.com/admob/reward/verifier-keys.json"
+    INMOBI_SSV_SECRET: str = "inmobi_ssv_secret_sanctuary_2026"
+    META_AUDIENCE_SSV_SECRET: str = "meta_ssv_secret_sanctuary_2026"
+    UNITY_ADS_SSV_SECRET: str = "unity_ssv_secret_sanctuary_2026"
+    APPLOVIN_SSV_SECRET: str = "applovin_ssv_secret_sanctuary_2026"
+
+    # Billing & Store Webhook Secrets
+    REVENUECAT_WEBHOOK_SECRET: str = "rc_webhook_secret_sanctuary_2026"
+    RAZORPAY_WEBHOOK_SECRET: str = "rzp_webhook_secret_sanctuary_2026"
+    STRIPE_WEBHOOK_SECRET: str = "stripe_webhook_secret_sanctuary_2026"
 
     # Superadmin Sentinel Gate
     SUPERADMIN_EMAIL: str = "kshtriyaanubhav9120@gmail.com"

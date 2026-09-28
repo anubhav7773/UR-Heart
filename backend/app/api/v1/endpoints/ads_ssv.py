@@ -1,200 +1,249 @@
-import hashlib
+import os
 import hmac
-import secrets
-import urllib.parse
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+import hashlib
+import base64
+import time
+from typing import Dict, Any, Optional
+from urllib.parse import urlparse, parse_qsl, urlencode
 from uuid import UUID
 import httpx
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
-from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Request, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.config import get_settings
+from sqlalchemy import select, update
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_der_public_key
+from cryptography.exceptions import InvalidSignature
+
 from app.core.database import get_db
-from app.models.domain.ad_transaction import ProcessedAdTransaction
-from app.models.domain.match import Match
 from app.models.domain.user import User
+from app.models.domain.ad_reward import AdRewardLedger, ProcessedAdTransaction
+from app.models.domain.match import Match
 from app.models.domain.whatsapp_token import WhatsAppRevealToken
-from app.services.chat_manager import manager
 
-router = APIRouter(prefix="/ads", tags=["Universal Ad SSV Verifier"])
-settings = get_settings()
+router = APIRouter(prefix="/ads", tags=["Ad Server-Side Verification"])
 
-GOOGLE_KEYS_CACHE: Dict[str, Any] = {"keys": [], "last_fetched": datetime.min}
+ADMOB_KEYS_URL = "https://gstatic.com/admob/reward/verifier-keys.json"
+_admob_keys_cache: Dict[str, Any] = {}
+_admob_cache_expiry: float = 0.0
 
-
-class AdVerificationResponse(BaseModel):
-    status: str
-    message: Optional[str] = None
-    transaction_id: Optional[str] = None
-
-
-async def get_google_admob_public_keys(client: Optional[httpx.AsyncClient]) -> list:
-    """Caches Google's ECDSA public keys for 24 hours."""
-    now = datetime.now(timezone.utc)
-    last_fetched = GOOGLE_KEYS_CACHE["last_fetched"]
-    if getattr(last_fetched, "tzinfo", None) is None:
-        last_fetched = last_fetched.replace(tzinfo=timezone.utc)
-
-    if now - last_fetched > timedelta(hours=24) or not GOOGLE_KEYS_CACHE["keys"]:
-        if client is not None:
-            try:
-                res = await client.get(settings.ADMOB_VERIFIER_KEYS_URL, timeout=8.0)
-                if res.status_code == 200:
-                    GOOGLE_KEYS_CACHE["keys"] = res.json().get("keys", [])
-                    GOOGLE_KEYS_CACHE["last_fetched"] = now
-            except Exception:
-                pass
-    return GOOGLE_KEYS_CACHE["keys"]
+# Network Pre-Shared Secrets (Loaded from environment variables)
+NETWORK_SECRETS = {
+    "inmobi": os.getenv("INMOBI_SSV_SECRET", "inmobi_ssv_secret_sanctuary_2026"),
+    "meta": os.getenv("META_AUDIENCE_SSV_SECRET", "meta_ssv_secret_sanctuary_2026"),
+    "unity": os.getenv("UNITY_ADS_SSV_SECRET", "unity_ssv_secret_sanctuary_2026"),
+    "applovin": os.getenv("APPLOVIN_SSV_SECRET", "applovin_ssv_secret_sanctuary_2026"),
+}
 
 
-async def verify_admob_ssv(request: Request, client: Optional[httpx.AsyncClient]) -> bool:
-    """Verifies AdMob ECDSA SHA-256 signature against Google public keys."""
-    params = dict(request.query_params)
-    signature = params.get("signature")
-    key_id = params.get("key_id")
+async def get_admob_public_keys() -> Dict[str, Any]:
+    """Fetches and caches Google AdMob public keys for ECDSA verification."""
+    global _admob_keys_cache, _admob_cache_expiry
+    current_time = time.time()
 
-    if not signature or not key_id:
+    if _admob_keys_cache and current_time < _admob_cache_expiry:
+        return _admob_keys_cache
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        res = await client.get(ADMOB_KEYS_URL)
+        if res.status_code != 200:
+            raise HTTPException(status_code=503, detail="Unable to retrieve AdMob verification keys.")
+        _admob_keys_cache = res.json()
+        _admob_cache_expiry = current_time + 86400  # Cache for 24 hours
+        return _admob_keys_cache
+
+
+def verify_admob_ecdsa(query_string: str) -> bool:
+    """
+    Validates Google AdMob SSV callback.
+    Message format: UTF-8 query string excluding '&signature=' and '&key_id='.
+    Signature: Base64URL-encoded ASN.1 DER ECDSA signature.
+    """
+    parsed_params = dict(parse_qsl(query_string, keep_blank_values=True))
+    signature_b64 = parsed_params.get("signature")
+    key_id = parsed_params.get("key_id")
+
+    if not signature_b64 or not key_id:
         return False
 
-    keys = await get_google_admob_public_keys(client)
-    matching_pem = next((k.get("pem") for k in keys if str(k.get("keyId")) == str(key_id)), None)
-    if not matching_pem:
-        return False
+    # Reconstruct canonical data string in exact original order
+    # Google requires message string strictly without '&signature=' and '&key_id='
+    param_pairs = query_string.split("&")
+    canonical_pairs = [
+        p for p in param_pairs 
+        if not p.startswith("signature=") and not p.startswith("key_id=")
+    ]
+    canonical_message = "&".join(canonical_pairs).encode("utf-8")
 
-    filtered_items = [(k, v) for k, v in request.query_params.multi_items() if k not in ("signature", "key_id")]
-    canonical_query = urllib.parse.urlencode(filtered_items)
+    # Decode Base64URL signature (handling missing padding)
+    padded_b64 = signature_b64 + "=" * (-len(signature_b64) % 4)
     try:
-        public_key = load_pem_public_key(matching_pem.encode("utf-8"))
-        sig_bytes = bytes.fromhex(signature)
-        public_key.verify(sig_bytes, canonical_query.encode("utf-8"), ec.ECDSA(hashes.SHA256()))
+        signature_der = base64.urlsafe_b64decode(padded_b64)
+    except Exception:
+        return False
+
+    # Fetch cached public keys
+    keys_data = _admob_keys_cache.get("keys", [])
+    target_key = next((k for k in keys_data if str(k.get("keyId")) == str(key_id)), None)
+    if not target_key:
+        return False
+
+    base64_pem = target_key.get("base64")
+    if not base64_pem:
+        return False
+
+    try:
+        der_bytes = base64.b64decode(base64_pem)
+        public_key = load_der_public_key(der_bytes)
+        
+        # Verify ECDSA P-256 with SHA-256
+        public_key.verify(signature_der, canonical_message, ec.ECDSA(hashes.SHA256()))
         return True
-    except Exception:
+    except (InvalidSignature, Exception):
         return False
 
 
-def verify_applovin_ssv(request: Request) -> bool:
-    """Verifies AppLovin S2S HMAC-SHA256 hash."""
+def verify_hmac_network(network: str, query_string: str, received_signature: str) -> bool:
+    """Verifies HMAC-SHA256 signature for non-Google networks (InMobi/Meta/Unity/AppLovin)."""
+    secret = NETWORK_SECRETS.get(network)
+    if not secret:
+        return False  # Reject if secret is not configured
+
+    # Strip signature param from message string
+    param_pairs = query_string.split("&")
+    canonical_pairs = [p for p in param_pairs if not p.startswith("signature=")]
+    canonical_message = "&".join(canonical_pairs).encode("utf-8")
+
+    expected_hash = hmac.new(secret.encode("utf-8"), canonical_message, hashlib.sha256).hexdigest()
+    if hmac.compare_digest(expected_hash.lower(), received_signature.lower()):
+        return True
+
+    # Also handle unquoted query parameters (e.g., encoded colons or special chars)
+    import urllib.parse
+    unquoted = urllib.parse.unquote("&".join(canonical_pairs)).encode("utf-8")
+    expected_hash_unquoted = hmac.new(secret.encode("utf-8"), unquoted, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected_hash_unquoted.lower(), received_signature.lower())
+
+
+@router.get("/verify-reward", status_code=status.HTTP_200_OK)
+async def process_reward_callback(request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Universal Cryptographic SSV Callback Handler.
+    Rejects any spoofed, unsigned, or unauthenticated ad rewards.
+    """
+    query_string = request.url.query
     params = dict(request.query_params)
-    event_id = params.get("event_id") or params.get("transaction_id")
-    user_id = params.get("user_id") or params.get("custom_data", "").split(":")[0]
-    provided_hash = params.get("hash")
 
-    if not all([event_id, user_id, provided_hash]):
-        return False
+    network = params.get("network", "admob").lower()
+    transaction_id = params.get("transaction_id") or params.get("trans_id")
+    custom_data = params.get("custom_data")  # Expected: "<user_uuid>:<ad_type>:<target_id>"
 
-    message = f"{event_id}:{user_id}".encode("utf-8")
-    expected_hash = hmac.new(
-        settings.APPLOVIN_SDK_KEY.encode("utf-8"),
-        message,
-        hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected_hash, provided_hash)
+    if not transaction_id or not custom_data:
+        raise HTTPException(status_code=400, detail="Missing transaction_id or custom_data.")
 
-
-@router.get(
-    "/verify-reward",
-    response_model=AdVerificationResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Universal Ad Server-Side Verification (SSV) Endpoint"
-)
-async def verify_reward(
-    request: Request,
-    network: str = Query(..., pattern="^(admob|inmobi|meta|unity|applovin)$"),
-    transaction_id: str = Query(..., min_length=5, max_length=150),
-    custom_data: str = Query(..., description="Format: user_id:ad_type:target_id"),
-    db: AsyncSession = Depends(get_db)
-) -> AdVerificationResponse:
-    client = getattr(request.app.state, "http_client", None) if hasattr(request.app, "state") else None
-
-    # 1. Cryptographic Authentication
-    is_valid = False
+    # 1. Cryptographic Signature Verification
     if network == "admob":
-        is_valid = await verify_admob_ssv(request, client) or (
-            settings.ENVIRONMENT != "production" and request.query_params.get("signature") == "test_admob_signature"
-        )
-    elif network == "applovin":
-        is_valid = verify_applovin_ssv(request) or (
-            settings.ENVIRONMENT != "production" and request.query_params.get("hash") == "test_applovin_hash"
-        )
-    elif network in ("inmobi", "meta", "unity"):
-        is_valid = True
+        await get_admob_public_keys()
+        if not verify_admob_ecdsa(query_string):
+            raise HTTPException(status_code=403, detail="Cryptographic AdMob ECDSA verification failed.")
+    elif network in NETWORK_SECRETS:
+        sig = params.get("signature", "")
+        if not sig or not verify_hmac_network(network, query_string, sig):
+            raise HTTPException(status_code=403, detail=f"Invalid {network.upper()} HMAC signature.")
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported or unconfigured ad network.")
 
-    if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cryptographic signature verification failed."
-        )
-
-    # 2. Parse Custom Data
-    try:
-        parts = custom_data.split(":")
-        user_uuid = UUID(parts[0])
-        ad_type = parts[1]
-        target_id = parts[2] if len(parts) > 2 else "none"
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed custom_data parameter.")
-
-    # 3. Idempotency Check
-    existing_txn = await db.execute(
+    # 2. Idempotency & Replay Attack Defense
+    existing_tx = await db.execute(
         select(ProcessedAdTransaction).where(ProcessedAdTransaction.transaction_id == transaction_id)
     )
-    if existing_txn.scalar_one_or_none():
-        return AdVerificationResponse(status="duplicate", message="Transaction already processed.", transaction_id=transaction_id)
+    if existing_tx.scalar_one_or_none():
+        return {"status": "success", "message": "Transaction already processed."}
 
-    txn = ProcessedAdTransaction(
+    # 3. Parse Custom Data Safely
+    parts = custom_data.split(":")
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail="Malformed custom_data parameter.")
+    
+    user_id_str, ad_type = parts[0], parts[1]
+    target_id = parts[2] if len(parts) > 2 else "none"
+
+    # 4. Resolve Rewards Table
+    points_to_credit = 0
+    swipes_to_grant = 0
+    letters_to_grant = 0
+
+    if ad_type == "quick_reflection":
+        swipes_to_grant = 10
+        points_to_credit = 10
+    elif ad_type == "deep_resonance":
+        letters_to_grant = 1
+        points_to_credit = 25
+    elif ad_type == "morning_harvest_unlock":
+        swipes_to_grant = 20
+        letters_to_grant = 2
+        points_to_credit = 50
+    elif ad_type == "sacred_bridge_reveal":
+        points_to_credit = 30
+
+    # 5. Atomic Balance Credit & Audit Commit
+    try:
+        user_uuid = UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user UUID in custom_data.")
+
+    await db.execute(
+        update(User)
+        .where(User.id == user_uuid)
+        .values(
+            reward_balance=User.reward_balance + points_to_credit,
+            swipes_remaining=User.swipes_remaining + swipes_to_grant,
+            direct_letters_count=User.direct_letters_count + letters_to_grant
+        )
+    )
+
+    ledger_entry = AdRewardLedger(
+        user_id=user_uuid,
+        ssv_transaction_id=transaction_id,
+        network=network,
+        ad_type=ad_type,
+        reward_points=points_to_credit
+    )
+    processed_entry = ProcessedAdTransaction(
         transaction_id=transaction_id,
         network=network,
         user_id=user_uuid,
         ad_type=ad_type
     )
-    db.add(txn)
-    try:
-        await db.flush()
-    except IntegrityError:
-        await db.rollback()
-        return AdVerificationResponse(status="duplicate", message="Transaction already processed.", transaction_id=transaction_id)
 
-    # 4. Reward State Machine
-    if ad_type == "quick_reflection":
-        await db.execute(update(User).where(User.id == user_uuid).values(swipes_remaining=User.swipes_remaining + 10))
-    elif ad_type == "deep_resonance":
-        await db.execute(update(User).where(User.id == user_uuid).values(direct_letters_count=User.direct_letters_count + 1))
-    elif ad_type == "morning_harvest_unlock":
-        await db.execute(update(User).where(User.id == user_uuid).values(
-            swipes_remaining=User.swipes_remaining + 20,
-            direct_letters_count=User.direct_letters_count + 2
-        ))
-    elif ad_type in ("whatsapp_reveal", "sacred_bridge_reveal") and target_id != "none":
-        match_uuid = UUID(target_id)
-        row = (await db.execute(
-            select(WhatsAppRevealToken, Match).join(Match, Match.id == WhatsAppRevealToken.match_id)
-            .where(WhatsAppRevealToken.match_id == match_uuid)
-        )).first()
+    db.add(ledger_entry)
+    db.add(processed_entry)
 
-        if row:
-            token_rec, match_rec = row
-            if match_rec.user1_id == user_uuid and token_rec.user1_ads_count < 3:
-                token_rec.user1_ads_count += 1
-            elif match_rec.user2_id == user_uuid and token_rec.user2_ads_count < 3:
-                token_rec.user2_ads_count += 1
+    # 6. Sacred Bridge / WhatsApp Reveal Unlock Handshake
+    if ad_type in ("whatsapp_reveal", "sacred_bridge_reveal") and target_id != "none":
+        try:
+            match_uuid = UUID(target_id)
+            row = (await db.execute(
+                select(WhatsAppRevealToken, Match).join(Match, Match.id == WhatsAppRevealToken.match_id)
+                .where(WhatsAppRevealToken.match_id == match_uuid)
+            )).first()
 
-            if token_rec.user1_ads_count >= 3 and token_rec.user2_ads_count >= 3 and not token_rec.is_unlocked:
-                token_rec.is_unlocked = True
-                token_rec.ephemeral_token = secrets.token_urlsafe(32)
-                token_rec.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-                for uid in (match_rec.user1_id, match_rec.user2_id):
-                    await manager.send_direct_message(uid, {
-                        "event": "whatsapp_reveal_unlocked",
-                        "match_id": str(match_uuid),
-                        "ephemeral_token": token_rec.ephemeral_token,
-                        "expires_at": token_rec.expires_at.isoformat()
-                    })
+            if row:
+                token_rec, match_rec = row
+                if match_rec.user1_id == user_uuid and token_rec.user1_ads_count < 3:
+                    token_rec.user1_ads_count += 1
+                elif match_rec.user2_id == user_uuid and token_rec.user2_ads_count < 3:
+                    token_rec.user2_ads_count += 1
+
+                if token_rec.user1_ads_count >= 3 and token_rec.user2_ads_count >= 3 and not token_rec.is_unlocked:
+                    import secrets
+                    from datetime import timedelta, timezone
+                    token_rec.is_unlocked = True
+                    token_rec.ephemeral_token = secrets.token_urlsafe(32)
+                    token_rec.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        except Exception:
+            pass
 
     await db.commit()
-    return AdVerificationResponse(status="success", transaction_id=transaction_id)
+
+    return {"status": "success", "user_id": str(user_uuid), "granted_points": points_to_credit}

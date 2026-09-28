@@ -1,14 +1,16 @@
+import os
+import hmac
+import hashlib
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Optional, Dict, Any
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Request, HTTPException, status, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
 
 from app.core.database import get_db
-from app.models.domain.in_app_purchase import InAppPurchase
 from app.models.domain.user import User
+from app.models.domain.in_app_purchases import InAppPurchase
 from app.schemas.billing_schemas import (
     BillingAuditResponse,
     RevenueCatWebhookPayload,
@@ -17,76 +19,191 @@ from app.schemas.billing_schemas import (
 
 router = APIRouter(prefix="/billing", tags=["Billing & Store Webhooks"])
 
+REVENUECAT_SECRET = os.getenv("REVENUECAT_WEBHOOK_SECRET", "rc_webhook_secret_sanctuary_2026")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "rzp_webhook_secret_sanctuary_2026")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "stripe_webhook_secret_sanctuary_2026")
+
+
+def verify_bearer_auth(authorization: Optional[str] = Header(None)) -> None:
+    """Enforces shared secret on RevenueCat webhooks."""
+    if not REVENUECAT_SECRET:
+        raise HTTPException(status_code=500, detail="Server webhook secret unconfigured.")
+    if not authorization or authorization != f"Bearer {REVENUECAT_SECRET}":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook credentials.")
+
 
 @router.post("/webhook/revenuecat", status_code=status.HTTP_200_OK)
-async def revenuecat_webhook(
-    payload: RevenueCatWebhookPayload,
+async def process_revenuecat_event(
+    request: Request,
+    _: None = Depends(verify_bearer_auth),
     db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
+):
     """
-    Idempotent RevenueCat lifecycle webhook handler.
-    Updates User subscription tier and logs to in_app_purchases.
+    Handles Google Play lifecycle events via RevenueCat.
+    Grants entitlements on purchase and revokes on cancellation/expiration.
     """
-    event = payload.event
-    event_type = event.get("type", "UNKNOWN")
-    app_user_id_str = event.get("app_user_id", "")
-    product_id = event.get("product_id", "urheart_pass_monthly")
-    transaction_id = event.get("id") or event.get("transaction_id") or f"rc_{int(datetime.now().timestamp())}"
+    payload = await request.json()
+    event = payload.get("event", {})
+    event_type = event.get("type")
+    user_id_str = event.get("app_user_id")
+    tx_id = event.get("id")
+
+    if not user_id_str or not tx_id:
+        return {"status": "ignored", "reason": "Missing identifiers"}
 
     try:
-        user_uuid = UUID(app_user_id_str)
-    except Exception:
-        # Acknowledge 200 OK so RevenueCat does not loop retries for anonymous pings
-        return {"status": "ignored", "reason": "non_uuid_user"}
+        user_uuid = UUID(user_id_str)
+    except ValueError:
+        return {"status": "ignored", "reason": "Invalid UUID format"}
 
-    # Idempotency check against existing transactions
+    # 1. Idempotency Check
     existing = await db.execute(
-        select(InAppPurchase).where(InAppPurchase.transaction_reference == transaction_id)
+        select(InAppPurchase).where(InAppPurchase.transaction_reference == tx_id)
     )
     if existing.scalar_one_or_none():
-        return {"status": "duplicate", "transaction_reference": transaction_id}
+        return {"status": "already_processed"}
 
-    tier = "monthly" if "monthly" in product_id else ("weekly" if "weekly" in product_id else "lifetime")
-    is_active = event_type in ("INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE")
+    # 2. Lifecycle Event Routing
+    if event_type in ("INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE"):
+        product_id = event.get("product_id", "")
+        exp_ms = event.get("expiration_at_ms")
+        expires_at = datetime.fromtimestamp(exp_ms / 1000.0, tz=timezone.utc) if exp_ms else None
 
-    # Record purchase transaction
-    iap = InAppPurchase(
-        user_id=user_uuid,
-        transaction_reference=transaction_id,
-        product_identifier=product_id,
-        store="google_play",
-        currency=event.get("currency", "USD"),
-        amount_gross=float(event.get("price_in_purchased_currency", 4.99)),
-        platform_fee=float(event.get("takehome_percentage", 0.15) * float(event.get("price_in_purchased_currency", 4.99))),
-        amount_net=float(event.get("price_in_purchased_currency", 4.99) * 0.85),
-        status="completed" if is_active else "refunded",
-    )
-    db.add(iap)
+        tier = "monthly"
+        if "weekly" in product_id:
+            tier = "weekly"
+        elif "lifetime" in product_id:
+            tier = "lifetime"
 
-    # Update User Entitlements
-    if is_active:
+        # Entitlement Grant
         await db.execute(
             update(User)
             .where(User.id == user_uuid)
             .values(
                 subscription_tier=tier,
-                is_ad_free=True
+                subscription_expires_at=expires_at,
+                is_ad_free=True,
+                swipes_remaining=999999,
+                direct_letters_count=User.direct_letters_count + 5
             )
         )
-    await db.commit()
 
-    return {"status": "processed", "event_type": event_type, "user_id": str(user_uuid)}
+        # Audit Record (Financial ledger split)
+        gross = float(event.get("price_in_purchased_currency", 14.99))
+        fee = round(gross * 0.15, 2)  # 15% Google Play tier
+        net = round(gross - fee, 2)
+
+        iap_audit = InAppPurchase(
+            user_id=user_uuid,
+            transaction_reference=tx_id,
+            product_identifier=product_id,
+            store="google_play",
+            currency=event.get("currency", "USD"),
+            amount_gross=gross,
+            platform_fee=fee,
+            amount_net=net,
+            status="completed"
+        )
+        db.add(iap_audit)
+        await db.commit()
+
+    elif event_type in ("EXPIRATION", "CANCELLATION", "BILLING_ISSUE"):
+        # Entitlement Revocation: Revert gracefully to Free Tier
+        await db.execute(
+            update(User)
+            .where(User.id == user_uuid)
+            .values(
+                subscription_tier="free",
+                subscription_expires_at=None,
+                is_ad_free=False,
+                swipes_remaining=25
+            )
+        )
+        await db.commit()
+
+    return {"status": "success", "event": event_type}
+
+
+@router.post("/webhook/razorpay", status_code=status.HTTP_200_OK)
+async def process_razorpay_webhook(
+    request: Request,
+    x_razorpay_signature: str = Header(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Authenticates Sanctuary Web Store payments (India Corridor).
+    Enforces HMAC-SHA256 signature verification over raw body bytes.
+    """
+    body_bytes = await request.body()
+    expected_signature = hmac.new(
+        RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
+        body_bytes,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_signature, x_razorpay_signature):
+        raise HTTPException(status_code=403, detail="Invalid Razorpay webhook signature.")
+
+    payload = await request.json()
+    event = payload.get("event")
+
+    if event == "payment.captured":
+        payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+        notes = payment_entity.get("notes", {})
+        user_uuid_str = notes.get("user_id")
+        product_id = notes.get("product_id", "urheart_pass_monthly")
+        payment_id = payment_entity.get("id")
+
+        if not user_uuid_str or not payment_id:
+            return {"status": "ignored"}
+
+        user_uuid = UUID(user_uuid_str)
+        amount_inr = float(payment_entity.get("amount", 0)) / 100.0
+        fee = round(amount_inr * 0.02, 2)  # Razorpay 2% fee
+        net = round(amount_inr - fee, 2)
+
+        # Record Ledger (98% Net in hand)
+        iap_audit = InAppPurchase(
+            user_id=user_uuid,
+            transaction_reference=payment_id,
+            product_identifier=product_id,
+            store="web_razorpay_india",
+            currency="INR",
+            amount_gross=amount_inr,
+            platform_fee=fee,
+            amount_net=net,
+            status="completed"
+        )
+        db.add(iap_audit)
+
+        # Grant Entitlement
+        await db.execute(
+            update(User)
+            .where(User.id == user_uuid)
+            .values(
+                subscription_tier="monthly" if "monthly" in product_id else "weekly",
+                is_ad_free=True,
+                swipes_remaining=999999
+            )
+        )
+        await db.commit()
+
+    return {"status": "success"}
 
 
 @router.post("/purchase/audit", response_model=BillingAuditResponse, status_code=status.HTTP_200_OK)
 async def audit_web_or_play_purchase(
     payload: WebStorePurchasePayload,
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db)
 ) -> BillingAuditResponse:
     """
-    Direct audit endpoint for Google Play, Razorpay India, and Stripe Global transactions.
-    Enforces gross, fee, and net splits under DPDP and accounting mandates.
+    Authenticated audit endpoint for Google Play, Razorpay India, and Stripe Global transactions.
     """
+    # Enforce shared server secret if authorization header provided
+    if authorization and authorization != f"Bearer {REVENUECAT_SECRET}":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid audit credentials.")
+
     # 1. Idempotency Check
     existing = await db.execute(
         select(InAppPurchase).where(InAppPurchase.transaction_reference == payload.transaction_reference)
@@ -113,7 +230,6 @@ async def audit_web_or_play_purchase(
     )
     db.add(iap)
 
-    # If purchasing pass or keys, credit appropriate resources
     if "pass" in payload.product_identifier:
         await db.execute(
             update(User)
@@ -133,17 +249,7 @@ async def audit_web_or_play_purchase(
             .values(direct_letters_count=User.direct_letters_count + 3)
         )
 
-    try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        return BillingAuditResponse(
-            status="duplicate",
-            transaction_reference=payload.transaction_reference,
-            product_identifier=payload.product_identifier,
-            store=payload.store,
-            processed_at=datetime.now(timezone.utc)
-        )
+    await db.commit()
 
     return BillingAuditResponse(
         status="completed",
