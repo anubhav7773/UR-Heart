@@ -98,6 +98,20 @@ async def verify_firebase_jwt(token: str) -> Dict[str, Any]:
         )
 
 
+def resolve_auth_uuid(raw_id: str) -> UUID:
+    """
+    Deterministically maps any auth identifier (Firebase string UID, Supabase UUID, or OAuth sub)
+    to a valid RFC-4122 UUID to prevent asyncpg UUID decoding failures.
+    """
+    if isinstance(raw_id, UUID):
+        return raw_id
+    try:
+        return UUID(str(raw_id))
+    except (ValueError, TypeError):
+        import uuid as _uuid
+        return _uuid.uuid5(_uuid.NAMESPACE_URL, f"firebase:{raw_id}")
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
     db: AsyncSession = Depends(get_db)
@@ -113,43 +127,44 @@ async def get_current_user(
             detail="Token payload missing subject identifier."
         )
 
-    # Fetch user from database using auth_id
-    try:
-        auth_uuid = UUID(str(auth_uid))
-    except (ValueError, TypeError):
-        auth_uuid = auth_uid
+    # 1. Safely resolve auth_id to valid deterministic UUID
+    auth_uuid = resolve_auth_uuid(auth_uid)
 
     stmt = select(User).where(User.auth_id == auth_uuid, User.deleted_at.is_(None))
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
-    # Fallback: check by email from verified token
+    # 2. Fallback: check by email from verified token
     token_email = (payload.get("email") or "").strip().lower()
     if not user and token_email:
         stmt = select(User).where(User.email == token_email, User.deleted_at.is_(None))
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
+        # If user found by email and auth_id was a placeholder/different, sync auth_id
+        if user and user.auth_id != auth_uuid:
+            try:
+                user.auth_id = auth_uuid
+                await db.commit()
+                await db.refresh(user)
+            except Exception:
+                await db.rollback()
 
-    # Auto-provision user shell if identity is cryptographically verified
+    # 3. Auto-provision user shell if identity is cryptographically verified
     if not user:
         import uuid as _uuid
         from datetime import date as _date
         name = payload.get("name") or payload.get("display_name") or "Sanctuary Seeker"
-        try:
-            valid_auth_id = UUID(str(auth_uid))
-        except Exception:
-            valid_auth_id = _uuid.uuid4()
 
         user = User(
             id=_uuid.uuid4(),
-            auth_id=valid_auth_id,
+            auth_id=auth_uuid,
             full_name=name,
             dob=_date(2000, 1, 1),
             gender="Unspecified",
             interested_in="Everyone",
             contact_bridge_type="whatsapp",
             contact_bridge_encrypted="",
-            location_name="Acquiring GPS...",
+            location_name="Saket, Ayodhya",
             referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
             is_profile_completed=False,
             email=token_email,

@@ -100,13 +100,23 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
     if clean_email:
         res = await db.execute(select(User).where(User.email == clean_email))
         user_row = res.scalar_one_or_none()
+        from app.core.security import resolve_auth_uuid
+        desired_auth_id = resolve_auth_uuid(payload.user_id) if payload.user_id else None
+
         if user_row is not None:
             is_completed = bool(user_row.is_profile_completed)
+            if desired_auth_id and user_row.auth_id != desired_auth_id:
+                try:
+                    user_row.auth_id = desired_auth_id
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
         else:
             # Auto-provision user shell in Supabase
+            auth_uuid = desired_auth_id or _uuid.uuid4()
             new_user = User(
                 id=_uuid.uuid4(),
-                auth_id=_uuid.uuid4(),
+                auth_id=auth_uuid,
                 email=clean_email,
                 full_name=payload.display_name or "Sanctuary Seeker",
                 dob=_date(2000, 1, 1),

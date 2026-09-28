@@ -11,7 +11,7 @@ from app.core.exceptions import (
     ForbiddenException,
     ProfileNotFoundException
 )
-from app.core.security import verify_firebase_jwt, verify_firebase_token
+from app.core.security import verify_firebase_jwt, verify_firebase_token, resolve_auth_uuid
 from app.models.domain.user import User
 
 settings = get_settings()
@@ -41,15 +41,26 @@ async def get_current_user(
     if not auth_id_str:
         raise AuthenticationFailedException("Token payload missing subject identifier.")
 
-    try:
-        auth_uuid = UUID(str(auth_id_str))
-    except (ValueError, TypeError):
-        auth_uuid = auth_id_str
+    auth_uuid = resolve_auth_uuid(auth_id_str)
 
     # Retrieve User Record from Supabase
     stmt = select(User).where(User.auth_id == auth_uuid, User.deleted_at.is_(None))
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
+
+    # Fallback: check by email from verified token
+    token_email = (auth_payload.get("email") or "").strip().lower()
+    if not user and token_email:
+        stmt = select(User).where(User.email == token_email, User.deleted_at.is_(None))
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user and user.auth_id != auth_uuid:
+            try:
+                user.auth_id = auth_uuid
+                await db.commit()
+                await db.refresh(user)
+            except Exception:
+                await db.rollback()
 
     if not user:
         raise ProfileNotFoundException("User identity verified but sanctuary record does not exist.")
