@@ -22,6 +22,9 @@ class UserSessionResponse(BaseModel):
     is_incognito: bool
     discreet_mode: bool
     night_slumber: bool
+    is_profile_completed: bool = False
+    public_encryption_key: Optional[str] = None
+    push_notifications_enabled: bool = True
     last_installation_uuid: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -66,6 +69,9 @@ async def get_users_me(current_user: User = Depends(get_current_user)) -> UserSe
     return UserSessionResponse.model_validate(current_user)
 
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.core.database import get_db
 from app.api.v1.endpoints.profile import COMPLETED_PROFILES
 
 
@@ -81,17 +87,22 @@ class GoogleSyncRequest(BaseModel):
     status_code=status.HTTP_200_OK,
     summary="Synchronize Google Sign-In with Sanctuary Backend"
 )
-async def google_sync(payload: GoogleSyncRequest):
+async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get_db)):
     """
     Receives Google Sign-In tokens, registers/synchronizes session,
     and streams activity to Render stdout.
     """
     is_completed = False
-    if payload.email and payload.email.strip().lower() in COMPLETED_PROFILES:
-        is_completed = True
-    elif payload.user_id and payload.user_id.strip().lower() in COMPLETED_PROFILES:
-        is_completed = True
-    elif payload.display_name and payload.display_name.strip().lower() in COMPLETED_PROFILES:
+    clean_email = payload.email.strip().lower() if payload.email else ""
+    if clean_email:
+        res = await db.execute(select(User.is_profile_completed).where(User.email == clean_email))
+        val = res.scalar_one_or_none()
+        if val is not None:
+            is_completed = bool(val)
+        elif clean_email in COMPLETED_PROFILES:
+            is_completed = True
+    elif (payload.user_id and payload.user_id.strip().lower() in COMPLETED_PROFILES) or \
+         (payload.display_name and payload.display_name.strip().lower() in COMPLETED_PROFILES):
         is_completed = True
 
     print(
@@ -118,12 +129,18 @@ class LoginRequest(BaseModel):
     status_code=status.HTTP_200_OK,
     summary="User Email/Password Authentication"
 )
-async def login(payload: LoginRequest):
+async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Authenticates user and returns profile setup status.
     """
     clean_email = payload.email.strip().lower()
-    is_completed = clean_email in COMPLETED_PROFILES
+    res = await db.execute(select(User.is_profile_completed).where(User.email == clean_email))
+    val = res.scalar_one_or_none()
+    if val is not None:
+        is_completed = bool(val)
+    else:
+        is_completed = clean_email in COMPLETED_PROFILES
+
     print(f"[AUTH LOGIN] User logged in: email={clean_email} is_profile_completed={is_completed}", flush=True)
     return {
         "status": "authenticated",

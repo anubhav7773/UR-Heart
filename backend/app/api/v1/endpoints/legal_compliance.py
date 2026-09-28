@@ -165,13 +165,27 @@ async def check_export_status(
 
 
 # ---------------------------------------------------------------------------
-# 2. DPDP ACT SEC 14: DATA NOMINEE DESIGNATION (SEC-09 FIX)
+# 2. DPDP ACT SEC 14: DATA NOMINEE DESIGNATION (SEC-09 & DIS-10 FIX)
 # ---------------------------------------------------------------------------
 
 class NomineePayload(BaseModel):
-    nominee_name: str = Field(min_length=2, max_length=60)
-    nominee_contact: str = Field(min_length=8, max_length=30)
+    nominee_name: Optional[str] = None
+    name: Optional[str] = None  # Client fallback key
+    nominee_contact: Optional[str] = None
+    phone: Optional[str] = None # Client fallback key
     relationship: str = Field(min_length=2, max_length=30)
+
+    def resolve_name(self) -> str:
+        resolved = (self.nominee_name or self.name or "").strip()
+        if not resolved or len(resolved) < 2:
+            raise ValueError("Nominee name is required.")
+        return resolved
+
+    def resolve_contact(self) -> str:
+        resolved = (self.nominee_contact or self.phone or "").strip()
+        if not resolved or len(resolved) < 8:
+            raise ValueError("Nominee contact is required.")
+        return resolved
 
 
 @router.post("/nominee", status_code=status.HTTP_200_OK)
@@ -181,19 +195,25 @@ async def register_or_update_nominee(
     db: AsyncSession = Depends(get_db)
 ):
     """DPDP Act 2023 Section 14: Designates trusted nominee for account governance."""
+    try:
+        resolved_name = payload.resolve_name()
+        resolved_contact = payload.resolve_contact()
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     stmt = select(DataNominee).where(DataNominee.user_id == current_user.id)
     existing = (await db.execute(stmt)).scalar_one_or_none()
 
     if existing:
-        existing.nominee_name = payload.nominee_name.strip()
-        existing.nominee_contact = payload.nominee_contact.strip()
+        existing.nominee_name = resolved_name
+        existing.nominee_contact = resolved_contact
         existing.relationship = payload.relationship.strip()
         existing.updated_at = datetime.utcnow()
     else:
         new_nominee = DataNominee(
             user_id=current_user.id,
-            nominee_name=payload.nominee_name.strip(),
-            nominee_contact=payload.nominee_contact.strip(),
+            nominee_name=resolved_name,
+            nominee_contact=resolved_contact,
             relationship=payload.relationship.strip()
         )
         db.add(new_nominee)
@@ -223,13 +243,28 @@ async def fetch_designated_nominee(
 
 
 # ---------------------------------------------------------------------------
-# 3. IT RULES 2021 RULE 3(2): GRIEVANCE REDRESSAL DOSSIER (SEC-09 FIX)
+# 3. IT RULES 2021 RULE 3(2): GRIEVANCE REDRESSAL DOSSIER (SEC-09 & DIS-11 FIX)
 # ---------------------------------------------------------------------------
 
 class GrievancePayload(BaseModel):
-    reported_user_id: UUID
-    violation_category: str = Field(pattern=r"^(harassment|explicit_content|impersonation|underage|offplatform_leak)$")
-    evidence_text: str = Field(default="", max_length=500)
+    reported_user_id: Optional[UUID] = None
+    target_user_id: Optional[UUID] = None
+    violation_category: Optional[str] = None
+    category: Optional[str] = None
+    evidence_text: Optional[str] = None
+    evidence: Optional[str] = None
+    dossier_id: Optional[str] = None
+
+    def resolve_reported_id(self) -> Optional[UUID]:
+        return self.reported_user_id or self.target_user_id
+
+    def resolve_category(self) -> str:
+        cat = (self.violation_category or self.category or "").strip().lower()
+        valid = {"harassment", "explicit_content", "impersonation", "underage", "offplatform_leak"}
+        return cat if cat in valid else "harassment"
+
+    def resolve_evidence(self) -> str:
+        return (self.evidence_text or self.evidence or "").strip()[:500]
 
 
 @router.post("/grievance", status_code=status.HTTP_201_CREATED)
@@ -242,14 +277,18 @@ async def submit_grievance_dossier(
     IT Rules 2021 Rule 3(2): Formal grievance filing.
     Emits formal 24h statutory acknowledgment and establishes 15-day resolution clock.
     """
-    if payload.reported_user_id == current_user.id:
+    reported_id = payload.resolve_reported_id()
+    if reported_id and reported_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot file grievance against yourself.")
+
+    # Fallback to current_user.id or report against platform if none specified
+    target_id = reported_id if reported_id else current_user.id
 
     dossier = GrievanceDossier(
         reporter_id=current_user.id,
-        reported_user_id=payload.reported_user_id,
-        violation_category=payload.violation_category,
-        evidence_text=payload.evidence_text.strip(),
+        reported_user_id=target_id,
+        violation_category=payload.resolve_category(),
+        evidence_text=payload.resolve_evidence(),
         status="under_review",
         acknowledgment_sent_at=datetime.utcnow(),
         statutory_resolution_due_at=datetime.utcnow() + timedelta(days=15)

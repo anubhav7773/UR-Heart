@@ -52,6 +52,9 @@ class User(Base):
     is_incognito = Column(Boolean, nullable=False, default=False)
     discreet_mode = Column(Boolean, nullable=False, default=False)
     night_slumber = Column(Boolean, nullable=False, default=False)
+    is_profile_completed = Column(Boolean, nullable=False, default=False)
+    public_encryption_key = Column(String(64), nullable=True, default=None)
+    push_notifications_enabled = Column(Boolean, nullable=False, default=True)
 
     subscription_tier = Column(String(20), nullable=False, default="free")
     subscription_expires_at = Column(DateTime(timezone=True), nullable=True)

@@ -7,10 +7,12 @@ from app.api.v1.endpoints import (
     auth,
     billing_webhook,
     chat_api,
+    crypto_registry,
     feed,
     health,
     legal_compliance,
     moderation,
+    preferences,
     profile,
     resonances,
     telemetry,
@@ -50,6 +52,12 @@ api_router.include_router(auth.users_router)
 
 # 8. User Profile Creation & Management
 api_router.include_router(profile.router)
+
+# 8b. User Preferences & Privacy Settings (DIS-04 FIX)
+api_router.include_router(preferences.router)
+
+# 8c. Cryptographic Key Registry (DIS-05 FIX)
+api_router.include_router(crypto_registry.router)
 
 # 9. Discovery Feed & Swipes Actions
 api_router.include_router(feed.router)
