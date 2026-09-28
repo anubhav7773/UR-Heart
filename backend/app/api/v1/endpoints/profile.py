@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -15,14 +15,24 @@ COMPLETED_PROFILES: set[str] = set()
 
 
 class ProfileUpdateRequest(BaseModel):
+    full_name: Optional[str] = Field(None, max_length=60)
+    gender: Optional[str] = Field(None, max_length=20)
     bio: Optional[str] = Field(None, max_length=500)
     profession: Optional[str] = Field(None, max_length=80)
     education: Optional[str] = Field(None, max_length=100)
+    location: Optional[str] = Field(None, max_length=100)
     location_name: Optional[str] = Field(None, max_length=100)
     latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
     longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    contact_bridge_type: Optional[str] = Field(None, max_length=30)
+    contact_bridge_handle: Optional[str] = None
+    is_kyc_verified: Optional[bool] = None
+    photo_slots_count: Optional[int] = None
     preferred_age_min: Optional[int] = Field(None, ge=18, le=100)
     preferred_age_max: Optional[int] = Field(None, ge=18, le=100)
+    email: Optional[str] = None
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class SlumberToggleRequest(BaseModel):
@@ -65,6 +75,7 @@ async def get_my_authenticated_profile(
 
 
 @router.put("/me", status_code=status.HTTP_200_OK)
+@router.post("/me", status_code=status.HTTP_200_OK)
 async def update_my_profile(
     payload: ProfileUpdateRequest,
     current_user: User = Depends(get_current_user),
@@ -72,7 +83,7 @@ async def update_my_profile(
 ):
     """
     DIS-03 Fix: Live profile editor route.
-    Updates bio, profession, education, location and age preferences in database.
+    Updates bio, profession, education, location, name, and preferences in database.
     """
     update_data = payload.model_dump(exclude_unset=True)
 
@@ -83,6 +94,23 @@ async def update_my_profile(
         if payload.preferred_age_min > payload.preferred_age_max:
             raise HTTPException(status_code=422, detail="Minimum preferred age cannot exceed maximum age.")
 
+    # Remap field aliases to User table columns
+    if "location" in update_data and "location_name" not in update_data:
+        update_data["location_name"] = update_data.pop("location")
+    else:
+        update_data.pop("location", None)
+
+    if "contact_bridge_handle" in update_data:
+        handle = update_data.pop("contact_bridge_handle")
+        if handle:
+            update_data["contact_bridge_encrypted"] = str(handle)
+
+    if "is_kyc_verified" in update_data:
+        update_data["kyc_status"] = update_data.pop("is_kyc_verified")
+
+    update_data.pop("photo_slots_count", None)
+    email_val = update_data.pop("email", None)
+
     # Mark profile completed in database (Fixes DUM-17 volatile memory set)
     update_data["is_profile_completed"] = True
 
@@ -92,6 +120,13 @@ async def update_my_profile(
         .values(**update_data)
     )
     await db.commit()
+
+    if getattr(current_user, "email", None):
+        COMPLETED_PROFILES.add(current_user.email.strip().lower())
+    if email_val:
+        COMPLETED_PROFILES.add(email_val.strip().lower())
+    if payload.full_name:
+        COMPLETED_PROFILES.add(payload.full_name.strip().lower())
 
     return {"status": "success", "message": "Profile updated and persisted successfully."}
 
@@ -125,6 +160,7 @@ class ProfileCreateRequest(BaseModel):
     looking_for: Optional[str] = None
     bridge_platform: Optional[str] = None
     bridge_value: Optional[str] = None
+    location: Optional[str] = None
     location_name: Optional[str] = None
     bio: Optional[str] = None
     profession: Optional[str] = None
@@ -132,6 +168,8 @@ class ProfileCreateRequest(BaseModel):
     is_kyc: Optional[bool] = False
     photos: Optional[list] = None
     email: Optional[str] = None
+
+    model_config = ConfigDict(extra="ignore")
 
 
 @router.post(
@@ -147,6 +185,8 @@ async def create_or_update_profile(
     Saves completed user profile parameters to Sanctuary database
     and logs the creation event to Render console.
     """
+    loc_name = payload.location_name or payload.location
+
     if payload.full_name:
         COMPLETED_PROFILES.add(payload.full_name.strip().lower())
     if payload.email:
@@ -154,17 +194,37 @@ async def create_or_update_profile(
 
     if payload.email:
         clean_email = payload.email.strip().lower()
+        up_vals: Dict[str, Any] = {"is_profile_completed": True}
+        if payload.full_name:
+            up_vals["full_name"] = payload.full_name
+        if payload.gender:
+            up_vals["gender"] = payload.gender
+        if payload.bio:
+            up_vals["bio"] = payload.bio
+        if payload.profession:
+            up_vals["profession"] = payload.profession
+        if payload.education:
+            up_vals["education"] = payload.education
+        if loc_name:
+            up_vals["location_name"] = loc_name
+        if payload.is_kyc is not None:
+            up_vals["kyc_status"] = payload.is_kyc
+        if payload.bridge_platform:
+            up_vals["contact_bridge_type"] = payload.bridge_platform
+        if payload.bridge_value:
+            up_vals["contact_bridge_encrypted"] = payload.bridge_value
+
         await db.execute(
             update(User)
             .where(User.email == clean_email)
-            .values(is_profile_completed=True)
+            .values(**up_vals)
         )
         await db.commit()
 
     print(
         f"[PROFILE PERSISTENCE] Profile Created/Updated: name={payload.full_name} "
         f"gender={payload.gender} looking_for={payload.looking_for} "
-        f"location={payload.location_name} kyc={payload.is_kyc}",
+        f"location={loc_name} kyc={payload.is_kyc}",
         flush=True
     )
     return {
@@ -174,7 +234,7 @@ async def create_or_update_profile(
         "message": "Sanctuary profile saved and verified successfully.",
         "profile": {
             "full_name": payload.full_name,
-            "location_name": payload.location_name,
+            "location_name": loc_name,
             "is_kyc": payload.is_kyc,
         }
     }

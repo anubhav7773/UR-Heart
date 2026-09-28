@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/api_endpoints.dart';
@@ -198,24 +199,61 @@ class ProfileRepository {
   }
 
   /// Saves complete user profile to database via PUT /api/v1/profile/me (ACT-22 Fix)
+  /// with automatic fallback to POST /api/v1/profile/create
   Future<bool> saveUserProfile(Map<String, dynamic> profileData) async {
+    // 1. Try authenticated PUT /api/v1/profile/me
     try {
       final response = await _apiClient.dio.put<Map<String, dynamic>>(
         '/api/v1/profile/me',
         data: profileData,
       );
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (_) {
-      try {
-        final response = await _apiClient.dio.post<Map<String, dynamic>>(
-          '/api/v1/profile/me',
-          data: profileData,
-        );
-        return response.statusCode == 200 || response.statusCode == 201;
-      } catch (_) {
-        return false;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
       }
+    } catch (e) {
+      debugPrint('[ProfileRepository] PUT /profile/me error: $e');
     }
+
+    // 2. Try POST /api/v1/profile/me
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/v1/profile/me',
+        data: profileData,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ProfileRepository] POST /profile/me error: $e');
+    }
+
+    // 3. Resilient fallback to POST /api/v1/profile/create
+    try {
+      final createPayload = {
+        'full_name': profileData['full_name'],
+        'gender': profileData['gender'],
+        'location_name': profileData['location_name'] ?? profileData['location'],
+        'bio': profileData['bio'],
+        'profession': profileData['profession'],
+        'education': profileData['education'],
+        'is_kyc': profileData['is_kyc_verified'] ?? false,
+        'email': profileData['email'],
+        'bridge_platform': profileData['contact_bridge_type'],
+        'bridge_value': profileData['contact_bridge_handle'],
+      };
+
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/v1/profile/create',
+        data: createPayload,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ProfileRepository] POST /profile/create fallback error: $e');
+    }
+
+    return false;
   }
 }
 

@@ -31,6 +31,9 @@ class ProfileSetupState {
   final bool isSubmitting;
   final String? kycStatusMessage;
   final String? lastModerationError;
+  final bool isGpsVerified;
+  final bool isAcquiringGps;
+  final String? gpsError;
 
   const ProfileSetupState({
     this.photoSlots = const {},
@@ -54,11 +57,15 @@ class ProfileSetupState {
     this.isSubmitting = false,
     this.kycStatusMessage,
     this.lastModerationError,
+    this.isGpsVerified = false,
+    this.isAcquiringGps = false,
+    this.gpsError,
   });
 
   bool get isBioPolishing => isPolishingBio;
   bool get hasPrimaryAnchorPhoto => photoSlots.containsKey(1);
-  bool get canCompleteSetup => hasPrimaryAnchorPhoto && fullName.trim().isNotEmpty;
+  bool get canCompleteSetup =>
+      hasPrimaryAnchorPhoto && fullName.trim().isNotEmpty && isGpsVerified;
 
   ProfileSetupState copyWith({
     Map<int, String>? photoSlots,
@@ -82,6 +89,9 @@ class ProfileSetupState {
     bool? isSubmitting,
     String? kycStatusMessage,
     String? lastModerationError,
+    bool? isGpsVerified,
+    bool? isAcquiringGps,
+    String? gpsError,
   }) {
     return ProfileSetupState(
       photoSlots: photoSlots ?? this.photoSlots,
@@ -106,6 +116,9 @@ class ProfileSetupState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       kycStatusMessage: kycStatusMessage ?? this.kycStatusMessage,
       lastModerationError: lastModerationError,
+      isGpsVerified: isGpsVerified ?? this.isGpsVerified,
+      isAcquiringGps: isAcquiringGps ?? this.isAcquiringGps,
+      gpsError: gpsError,
     );
   }
 }
@@ -131,7 +144,9 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
           state.dobString;
 
       final savedGender = prefs.getString('profile_gender') ?? state.gender;
-      final savedLocation = prefs.getString('profile_location') ?? state.location;
+      final isGps = prefs.getBool('profile_gps_verified') ?? false;
+      final savedLocation = prefs.getString('profile_location') ??
+          (isGps ? state.location : 'Acquiring GPS...');
       final savedBio = prefs.getString('profile_bio') ?? state.bio;
       final savedProfession = prefs.getString('profile_profession') ?? state.profession;
       final savedEducation = prefs.getString('profile_education') ?? state.education;
@@ -157,6 +172,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         dobString: savedDob,
         gender: savedGender,
         location: savedLocation,
+        isGpsVerified: isGps,
         bio: savedBio,
         profession: savedProfession,
         education: savedEducation,
@@ -167,16 +183,38 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         maxAge: savedMaxAge,
         photoSlots: restoredSlots.isNotEmpty ? restoredSlots : state.photoSlots,
       );
+
+      // Auto-trigger GPS acquisition if not yet verified
+      if (!isGps) {
+        fetchRealGpsLocation();
+      }
     } catch (_) {}
   }
 
   /// Acquires real hardware GPS coordinates and reverse-geocodes locality
   Future<String> fetchRealGpsLocation() async {
+    state = state.copyWith(isAcquiringGps: true, gpsError: null);
     final result = await RealGpsLocationService.acquireRealHardwareGps();
     if (result.isSuccess) {
-      updateLocation(result.formattedLocation);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('profile_location', result.formattedLocation);
+      await prefs.setDouble('profile_gps_latitude', result.latitude);
+      await prefs.setDouble('profile_gps_longitude', result.longitude);
+      await prefs.setBool('profile_gps_verified', true);
+
+      state = state.copyWith(
+        location: result.formattedLocation,
+        isGpsVerified: true,
+        isAcquiringGps: false,
+        gpsError: null,
+      );
       return result.formattedLocation;
     } else {
+      state = state.copyWith(
+        isGpsVerified: false,
+        isAcquiringGps: false,
+        gpsError: result.errorMessage ?? 'Unable to acquire genuine GPS',
+      );
       return result.errorMessage ?? 'Unable to acquire genuine GPS';
     }
   }
@@ -375,11 +413,20 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     await prefs.setString('profile_contact_bridge_handle', state.contactBridgeHandle);
     await prefs.setBool('ur_heart_profile_setup_completed', true);
 
+    final email = prefs.getString('ur_heart_user_email') ?? '';
+    final lat = prefs.getDouble('profile_gps_latitude');
+    final lng = prefs.getDouble('profile_gps_longitude');
+
     await ActivityLogger.log(
       category: 'PROFILE',
       action: 'PROFILE_SETUP_COMPLETED',
       screen: 'ProfileSetupScreen',
-      details: {'name': state.fullName, 'is_kyc': state.isKycVerified},
+      details: {
+        'name': state.fullName,
+        'is_kyc': state.isKycVerified,
+        'location': state.location,
+        'is_gps_verified': state.isGpsVerified,
+      },
     );
 
     final success = await _repository.saveUserProfile({
@@ -389,10 +436,14 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'profession': state.profession,
       'education': state.education,
       'location': state.location,
+      'location_name': state.location,
+      'latitude': lat,
+      'longitude': lng,
       'contact_bridge_type': state.contactBridgePlatform,
       'contact_bridge_handle': state.contactBridgeHandle,
       'is_kyc_verified': state.isKycVerified,
       'photo_slots_count': state.photoSlots.length,
+      'email': email,
     });
 
     state = state.copyWith(isSubmitting: false);

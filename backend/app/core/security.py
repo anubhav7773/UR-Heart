@@ -123,6 +123,47 @@ async def get_current_user(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
+    # Fallback: check by email from verified token
+    token_email = (payload.get("email") or "").strip().lower()
+    if not user and token_email:
+        stmt = select(User).where(User.email == token_email, User.deleted_at.is_(None))
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+    # Auto-provision user shell if identity is cryptographically verified
+    if not user:
+        import uuid as _uuid
+        from datetime import date as _date
+        name = payload.get("name") or payload.get("display_name") or "Sanctuary Seeker"
+        try:
+            valid_auth_id = UUID(str(auth_uid))
+        except Exception:
+            valid_auth_id = _uuid.uuid4()
+
+        user = User(
+            id=_uuid.uuid4(),
+            auth_id=valid_auth_id,
+            full_name=name,
+            dob=_date(2000, 1, 1),
+            gender="Unspecified",
+            interested_in="Everyone",
+            contact_bridge_type="whatsapp",
+            contact_bridge_encrypted="",
+            location_name="Acquiring GPS...",
+            referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
+            is_profile_completed=False,
+            email=token_email,
+        )
+        db.add(user)
+        try:
+            await db.commit()
+            await db.refresh(user)
+        except Exception:
+            await db.rollback()
+            if token_email:
+                res = await db.execute(select(User).where(User.email == token_email))
+                user = res.scalar_one_or_none()
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -130,7 +171,7 @@ async def get_current_user(
         )
 
     # Attach runtime email from token claims
-    user.email = payload.get("email", "")
+    user.email = token_email
     return user
 
 

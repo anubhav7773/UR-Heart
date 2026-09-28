@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_endpoints.dart';
 import 'api_interceptors.dart';
 
@@ -28,5 +30,17 @@ class ApiClient {
 
 /// Global Riverpod Provider for API Client
 final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient();
+  return ApiClient(
+    authTokenProvider: () async {
+      try {
+        final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+        if (token != null && token.isNotEmpty) return token;
+      } catch (_) {}
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        return prefs.getString('ur_heart_auth_token');
+      } catch (_) {}
+      return null;
+    },
+  );
 });

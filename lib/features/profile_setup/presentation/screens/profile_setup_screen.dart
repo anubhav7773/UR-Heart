@@ -30,176 +30,20 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     super.initState();
     final initialName = ref.read(profileSetupControllerProvider).fullName;
     _nameController = TextEditingController(text: initialName);
+
+    // Auto-acquire real hardware GPS on screen entry if not yet verified
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(profileSetupControllerProvider);
+      if (!state.isGpsVerified && !state.isAcquiringGps) {
+        ref.read(profileSetupControllerProvider.notifier).fetchRealGpsLocation();
+      }
+    });
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
-  }
-
-  Future<void> _showLocationPicker(
-    BuildContext context,
-    String currentLocation,
-    Color cardBg,
-    Color textColor,
-    Color accentColor,
-    Color cardBorder,
-  ) async {
-    final notifier = ref.read(profileSetupControllerProvider.notifier);
-    final customController = TextEditingController(text: currentLocation);
-
-    final List<String> popularSanctuaries = [
-      'Bandra West, Mumbai (GPS Verified)',
-      'Indiranagar, Bengaluru',
-      'Koramangala, Bengaluru',
-      'Hauz Khas, New Delhi',
-      'Koregaon Park, Pune',
-      'Jubilee Hills, Hyderabad',
-      'Vasant Vihar, New Delhi',
-      'Anjuna / Assagao, Goa',
-      'C-Scheme, Jaipur',
-      'Alipore, Kolkata',
-    ];
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
-      ),
-      builder: (sheetCtx) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 20.0,
-              right: 20.0,
-              top: 16.0,
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 16.0,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Sanctuary Location',
-                  style: AppTypography.titleH2.copyWith(color: textColor, fontSize: 18),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.my_location, color: accentColor, size: 20),
-                  ),
-                  title: Text(
-                    'Detect via GPS Hardware',
-                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  subtitle: const Text('Accurate neighborhood resolution · Anti-Fraud Protected', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Acquiring real hardware GPS & verifying anti-fraud...'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                    final loc = await notifier.fetchRealGpsLocation();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('GPS Verified: $loc ✨'),
-                          backgroundColor: const Color(0xFF1B4332),
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                const Divider(),
-                const SizedBox(height: 6),
-                Text('POPULAR SANCTUARIES', style: AppTypography.caption.copyWith(color: Colors.grey, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  children: popularSanctuaries.take(6).map((city) {
-                    return ActionChip(
-                      backgroundColor: cardBg,
-                      side: BorderSide(color: cardBorder),
-                      label: Text(city, style: TextStyle(color: textColor, fontSize: 12)),
-                      onPressed: () {
-                        notifier.updateLocation(city);
-                        Navigator.of(sheetCtx).pop();
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 14),
-                Text('OR ENTER CUSTOM SANCTUARY', style: AppTypography.caption.copyWith(color: Colors.grey, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: cardBorder),
-                        ),
-                        child: TextField(
-                          controller: customController,
-                          style: TextStyle(color: textColor, fontSize: 13),
-                          decoration: const InputDecoration(
-                            hintText: 'e.g. South Mumbai, Colaba',
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: accentColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () {
-                        final entered = customController.text.trim();
-                        if (entered.isNotEmpty) {
-                          notifier.updateLocation(entered);
-                        }
-                        Navigator.of(sheetCtx).pop();
-                      },
-                      child: const Text('Set', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -303,39 +147,151 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               const SizedBox(height: 16.0),
               const OrientationSelectorPills(),
               const SizedBox(height: 16.0),
-              // Sanctuary Location with Interactive Selection
+              // Sanctuary Location (Hardware GPS Only - Pure Satellite Lock)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('SANCTUARY LOCATION', style: AppTypography.accordionCategory.copyWith(color: mutedColor)),
-                  TextButton.icon(
-                    onPressed: () => _showLocationPicker(context, state.location, cardBg, titleColor, verifiedTeal, cardBorder),
-                    icon: Icon(Icons.my_location, size: 13.0, color: verifiedTeal),
-                    label: Text('Update Via GPS', style: TextStyle(color: verifiedTeal, fontSize: 11.5, fontWeight: FontWeight.bold)),
-                  ),
+                  Text('SANCTUARY LOCATION (HARDWARE GPS ONLY)', style: AppTypography.accordionCategory.copyWith(color: mutedColor)),
+                  if (state.isGpsVerified)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+                      decoration: BoxDecoration(
+                        color: verifiedTeal.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(color: verifiedTeal.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle, size: 12.0, color: verifiedTeal),
+                          const SizedBox(width: 4.0),
+                          Text('GPS VERIFIED', style: TextStyle(fontSize: 10.0, fontWeight: FontWeight.bold, color: verifiedTeal, letterSpacing: 0.5)),
+                        ],
+                      ),
+                    ),
                 ],
               ),
-              InkWell(
-                borderRadius: BorderRadius.circular(12.0),
-                onTap: () => _showLocationPicker(context, state.location, cardBg, titleColor, verifiedTeal, cardBorder),
-                child: Container(
-                  height: 44.0,
-                  padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                  decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(12.0), border: Border.all(color: cardBorder)),
-                  child: Row(
-                    children: [
-                      Icon(Icons.place_outlined, size: 16.0, color: mutedColor),
-                      const SizedBox(width: 8.0),
-                      Expanded(
-                        child: Text(
-                          state.location,
-                          style: AppTypography.bodySmall.copyWith(color: titleColor),
-                          overflow: TextOverflow.ellipsis,
+              const SizedBox(height: 6.0),
+              Container(
+                padding: const EdgeInsets.all(14.0),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(14.0),
+                  border: Border.all(
+                    color: state.isGpsVerified
+                        ? verifiedTeal.withOpacity(0.55)
+                        : (state.gpsError != null
+                            ? const Color(0xFFC94A29).withOpacity(0.55)
+                            : cardBorder),
+                    width: state.isGpsVerified ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            color: state.isGpsVerified
+                                ? verifiedTeal.withOpacity(0.12)
+                                : (state.gpsError != null
+                                    ? const Color(0xFFC94A29).withOpacity(0.12)
+                                    : primaryButtonBg.withOpacity(0.08)),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            state.isGpsVerified
+                                ? Icons.my_location
+                                : (state.isAcquiringGps
+                                    ? Icons.satellite_alt
+                                    : (state.gpsError != null ? Icons.location_off : Icons.gps_not_fixed)),
+                            size: 20.0,
+                            color: state.isGpsVerified
+                                ? verifiedTeal
+                                : (state.gpsError != null ? const Color(0xFFC94A29) : mutedColor),
+                          ),
+                        ),
+                        const SizedBox(width: 12.0),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                state.isGpsVerified
+                                    ? state.location
+                                    : (state.isAcquiringGps
+                                        ? 'Acquiring authentic hardware GPS...'
+                                        : (state.gpsError ?? 'GPS Verification Required')),
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: titleColor,
+                                  fontWeight: state.isGpsVerified ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2.0),
+                              Text(
+                                state.isGpsVerified
+                                    ? 'Authentic device GPS locked · Anti-Fraud Protected'
+                                    : (state.isAcquiringGps
+                                        ? 'Connecting to hardware satellites...'
+                                        : 'Manual entry disabled · Real GPS required to proceed'),
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  color: state.isGpsVerified
+                                      ? verifiedTeal
+                                      : (state.gpsError != null ? const Color(0xFFC94A29) : mutedColor),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (state.isAcquiringGps)
+                          const SizedBox(
+                            width: 18.0,
+                            height: 18.0,
+                            child: CircularProgressIndicator(strokeWidth: 2.0),
+                          )
+                        else
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => notifier.fetchRealGpsLocation(),
+                            child: Text(
+                              state.isGpsVerified ? 'Refresh' : 'Verify GPS',
+                              style: TextStyle(
+                                color: verifiedTeal,
+                                fontSize: 12.0,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (state.gpsError != null) ...[
+                      const SizedBox(height: 10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38.0,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: verifiedTeal,
+                            side: BorderSide(color: verifiedTeal.withOpacity(0.5)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+                          ),
+                          onPressed: () => notifier.fetchRealGpsLocation(),
+                          icon: const Icon(Icons.gps_fixed, size: 16.0),
+                          label: const Text('Retry Hardware GPS Acquisition',
+                              style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.bold)),
                         ),
                       ),
-                      Icon(Icons.keyboard_arrow_down, size: 16.0, color: mutedColor),
                     ],
-                  ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16.0),
@@ -434,6 +390,28 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
+                            return;
+                          }
+
+                          // GPS VERIFICATION MANDATORY GATEKEEPER
+                          // User directive: jbtk gps verified na ho jye tb tk profile aage na badhe
+                          if (!state.isGpsVerified) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Hardware GPS verification is mandatory. Please verify genuine device GPS before proceeding.',
+                                  style: AppTypography.bodySmall.copyWith(color: Colors.white),
+                                ),
+                                backgroundColor: const Color(0xFFC94A29),
+                                behavior: SnackBarBehavior.floating,
+                                action: SnackBarAction(
+                                  label: 'VERIFY GPS',
+                                  textColor: Colors.white,
+                                  onPressed: () => notifier.fetchRealGpsLocation(),
+                                ),
+                              ),
+                            );
+                            notifier.fetchRealGpsLocation();
                             return;
                           }
 

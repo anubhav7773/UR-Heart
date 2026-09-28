@@ -19,9 +19,9 @@ class RewardedAdManager {
   String? lastCustomDataTransmitted;
   AdRewardEvent? lastRewardEvent;
 
-  // Production Google AdMob Rewarded Ad Unit IDs
-  static const String _adUnitIdAndroid = 'ca-app-pub-4981239847129384/8923481234';
-  static const String _adUnitIdIos = 'ca-app-pub-4981239847129384/1928374650';
+  // Official Google AdMob Sample Rewarded Ad Unit IDs for Android and iOS
+  static const String _adUnitIdAndroid = 'ca-app-pub-3940256099942544/5224354917';
+  static const String _adUnitIdIos = 'ca-app-pub-3940256099942544/1712485313';
 
   String get _adUnitId => defaultTargetPlatform == TargetPlatform.iOS ? _adUnitIdIos : _adUnitIdAndroid;
 
@@ -42,7 +42,10 @@ class RewardedAdManager {
   void initializePreloader() {
     _primaryBufferAd ??= RewardedAdInstance(network: 'admob');
     _secondaryBufferAd ??= RewardedAdInstance(network: 'admob');
-    _loadNextBufferSlot();
+    // Lazy buffer loading protected against premature SDK calls
+    try {
+      _loadNextBufferSlot();
+    } catch (_) {}
   }
 
   Future<void> _loadNextBufferSlot() async {
