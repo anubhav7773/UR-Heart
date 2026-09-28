@@ -135,8 +135,9 @@ class ProfileRepository {
         if (text != null && text.trim().isNotEmpty) {
           return text.trim().replaceAll('"', '');
         }
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
+  }
 
     return _generateEvaPolishedBio(cleaned);
   }

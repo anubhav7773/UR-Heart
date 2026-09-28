@@ -233,10 +233,11 @@ class ProfileRepository {
             return cleaned;
           }
         }
-      } catch (err) {
-        debugPrint('[ProfileRepository] Direct Groq API error: $err');
       }
+    } catch (err) {
+      debugPrint('[ProfileRepository] Direct Groq API error: $err');
     }
+  }
 
     return '$rawText · Mindfully present, cherishing authentic conversation and intentional depth.';
   }
