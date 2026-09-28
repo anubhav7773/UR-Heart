@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../legal_vault/data/vault_repository.dart';
+import '../../../ai_sanctuary/presentation/widgets/ai_grievance_assistant_sheet.dart';
 
 /// Modal for Reporting or Blocking a user in Direct DM
 class ChatSafetyDialog {
@@ -185,7 +186,46 @@ class ChatSafetyDialog {
                     'Statutory filing under IT Rules 2021 Rule 3(2). All reports are reviewed by our Grievance Officer within 24 hours.',
                     style: TextStyle(color: mutedColor, fontSize: 12, height: 1.3),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () {
+                      AiGrievanceAssistantSheet.show(
+                        context: context,
+                        offenderName: recipientName,
+                        isDark: isDark,
+                        onCategorySuggested: (cat) {
+                          setState(() => selectedCategory = cat);
+                        },
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_awesome, size: 16, color: accentColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Confused? Ask Eva to help write & categorize your report',
+                              style: TextStyle(
+                                color: headlineColor,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, size: 16, color: accentColor),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   Text(
                     'Reason for Report',
                     style: TextStyle(color: headlineColor, fontWeight: FontWeight.w600, fontSize: 13),

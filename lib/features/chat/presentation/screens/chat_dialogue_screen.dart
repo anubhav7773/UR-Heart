@@ -14,6 +14,7 @@ import '../widgets/nlp_warning_dialog.dart';
 import '../widgets/sacred_bridge_app_bar_action.dart';
 import '../widgets/shared_context_prompt_card.dart';
 import '../widgets/text_only_chat_input_bar.dart';
+import '../../../ai_sanctuary/presentation/widgets/ai_dialogue_coach_sheet.dart';
 
 class ChatDialogueArguments {
   final String matchId, recipientId, recipientName, sharedContextQuote;
@@ -194,6 +195,35 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
             isDark: isDark,
             bridgeData: bridgeData,
             wsService: ref.watch(chatWebSocketServiceProvider),
+          ),
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    DarkSanctuaryTokens.primaryCoral,
+                    const Color(0xFF4E9F76),
+                  ],
+                ),
+              ),
+              child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+            ),
+            tooltip: 'Eva Dialogue Wingman',
+            onPressed: () {
+              final rName = args?.recipientName ?? (peer['full_name'] as String? ?? 'Seeker');
+              final lastMsg = dialogueState.messages.isNotEmpty
+                  ? dialogueState.messages.last.text
+                  : 'Start a thoughtful, slow dialogue.';
+              AiDialogueCoachSheet.show(
+                context: context,
+                partnerName: rName,
+                lastIncomingMessage: lastMsg,
+                isDark: isDark,
+                onApplyReply: (_) {},
+              );
+            },
           ),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert_rounded, color: primaryText),

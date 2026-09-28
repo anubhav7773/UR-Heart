@@ -11,6 +11,7 @@ import '../../../feed/presentation/screens/feed_screen.dart';
 import '../../../profile/presentation/screens/my_persona_screen.dart';
 import '../../../resonances/presentation/screens/resonances_screen.dart';
 import '../../../rewards/presentation/screens/growth_hub_screen.dart';
+import '../../../ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
 import '../widgets/whatsapp_notification_banner.dart';
 
 /// Global Navigation Index State Provider for Tab Switching
@@ -336,6 +337,48 @@ class _SanctuaryNavigationShellState
             GrowthHubScreen(),
             MyPersonaScreen(),
           ],
+        ),
+        floatingActionButton: Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          height: 44,
+          child: FloatingActionButton.extended(
+            heroTag: 'eva_sanctuary_fab',
+            elevation: 6,
+            backgroundColor: isDark ? const Color(0xFF1E2B23) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+              side: BorderSide(
+                color: activeColor.withOpacity(0.5),
+                width: 1.2,
+              ),
+            ),
+            icon: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    DarkSanctuaryTokens.primaryCoral,
+                    const Color(0xFF4E9F76),
+                  ],
+                ),
+              ),
+              child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+            ),
+            label: Text(
+              'Eva AI',
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF1A2621),
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.3,
+              ),
+            ),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.of(context).pushNamed(EvaSanctuaryScreen.routeName);
+            },
+          ),
         ),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(

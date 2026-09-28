@@ -16,6 +16,7 @@ import '../../features/settings/presentation/screens/sanctuary_settings_screen.d
 import '../../features/settings/presentation/screens/superadmin_kyc_desk_screen.dart';
 import '../../features/rewards/presentation/screens/growth_hub_screen.dart';
 import '../../features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
+import '../../features/ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
 import '../theme/theme_controller.dart';
@@ -58,6 +59,7 @@ class URHeartApp extends ConsumerWidget {
         VaultLegalScreen.routeName: (context) => const VaultLegalScreen(),
         SanctuarySettingsScreen.routeName: (context) => const SanctuarySettingsScreen(),
         SuperadminKycDeskScreen.routeName: (context) => const SuperadminKycDeskScreen(),
+        EvaSanctuaryScreen.routeName: (context) => const EvaSanctuaryScreen(),
       },
     );
   }
