@@ -68,18 +68,17 @@ class AgeGateAuthScreen extends ConsumerWidget {
               const SizedBox(height: 6.0),
               Text('Connection starts with showing up as yourself.',
                   style: AppTypography.bodySmall.copyWith(color: subtitleColor)),
-              const SizedBox(height: 20.0),
+              const SizedBox(height: 16.0),
+              // Strict 18+ Global Gatekeeper (Mandatory for ALL users)
+              const NeutralDobWheel(),
+              const VerifiedAdultBadge(),
+              const SizedBox(height: 18.0),
               AuthTabSwitcher(
                 isSignIn: authState.isSignInTab,
                 isDark: isDark,
                 onChanged: (val) => authNotifier.setAuthTab(isSignIn: val),
               ),
-              const SizedBox(height: 20.0),
-              if (!authState.isSignInTab) ...[
-                const NeutralDobWheel(),
-                const VerifiedAdultBadge(),
-                const SizedBox(height: 16.0),
-              ],
+              const SizedBox(height: 18.0),
               AuthCredentialField(
                 label: 'EMAIL ADDRESS',
                 hintText: 'Enter your email',
@@ -133,14 +132,43 @@ class AgeGateAuthScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(26.0),
                     ),
                   ),
-                  onPressed: authState.canSubmit && !authState.isLoading
-                      ? () async {
+                  onPressed: authState.isLoading
+                      ? null
+                      : () async {
+                          // Strict 18+ Gatekeeper Validation
+                          if (!authState.hasSelectedFullDob || !authState.isAdult) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Strict 18+ Age Gate: Please select your Date of Birth above and confirm you are 18+ to proceed.',
+                                  style: AppTypography.bodySmall.copyWith(color: Colors.white),
+                                ),
+                                backgroundColor: const Color(0xFFC94A29),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (!authState.canSubmit) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Please enter a valid email and minimum 6-character password.',
+                                  style: AppTypography.bodySmall.copyWith(color: Colors.white),
+                                ),
+                                backgroundColor: const Color(0xFFC94A29),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+
                           final success = await authNotifier.submitRegistration();
                           if (success && context.mounted) {
                             Navigator.of(context).pushNamed('/verify-email');
                           }
-                        }
-                      : null,
+                        },
                   child: authState.isLoading
                       ? const SizedBox(
                           width: 20,
@@ -158,6 +186,21 @@ class AgeGateAuthScreen extends ConsumerWidget {
                 isDark: isDark,
                 isLoading: authState.isGoogleLoading,
                 onPressed: () async {
+                  // Strict 18+ Gatekeeper Validation for One Tap / Google Sign In
+                  if (!authState.hasSelectedFullDob || !authState.isAdult) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Strict 18+ Age Gate: Please select your Date of Birth above and confirm you are 18+ before continuing with Google.',
+                          style: AppTypography.bodySmall.copyWith(color: Colors.white),
+                        ),
+                        backgroundColor: const Color(0xFFC94A29),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
                   final result = await authNotifier.signInWithGoogle();
                   if (result.isSuccess && context.mounted) {
                     if (result.displayName != null &&
@@ -166,6 +209,12 @@ class AgeGateAuthScreen extends ConsumerWidget {
                           .read(profileSetupControllerProvider.notifier)
                           .setFullName(result.displayName!);
                     }
+                    await ref
+                        .read(profileSetupControllerProvider.notifier)
+                        .loadSavedProfile();
+
+                    if (!context.mounted) return;
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(

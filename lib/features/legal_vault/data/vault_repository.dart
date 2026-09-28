@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/error/sanctuary_exceptions.dart';
 import '../../../core/network/dio_client.dart';
 import '../domain/vault_models.dart';
@@ -127,12 +128,44 @@ class VaultRepository {
     }
   }
 
+  /// Adds user to blocked perimeter in database and local cache
+  Future<bool> blockUser(String blockedUserId, {String reason = 'unspecified'}) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/api/v1/vault/blocked',
+        data: {
+          'blocked_user_id': blockedUserId,
+          'reason': reason,
+        },
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final prefs = await SharedPreferences.getInstance();
+        final blockedList = prefs.getStringList('ur_heart_blocked_user_ids') ?? [];
+        if (!blockedList.contains(blockedUserId)) {
+          blockedList.add(blockedUserId);
+          await prefs.setStringList('ur_heart_blocked_user_ids', blockedList);
+        }
+        return true;
+      }
+      return false;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Removes user from blocked perimeter in database
   Future<bool> unblockUser(String blockedUserId) async {
     try {
       final response = await _dio.delete<dynamic>('/api/v1/vault/blocked/$blockedUserId');
       if (response.statusCode == 200) {
         _blockedList.removeWhere((item) => item.id == blockedUserId);
+        final prefs = await SharedPreferences.getInstance();
+        final blockedList = prefs.getStringList('ur_heart_blocked_user_ids') ?? [];
+        blockedList.remove(blockedUserId);
+        await prefs.setStringList('ur_heart_blocked_user_ids', blockedList);
         return true;
       }
       return false;

@@ -66,14 +66,11 @@ class AuthState {
   }
 
   bool get canSubmit {
-    if (isSignInTab) {
-      return email.isNotEmpty && password.length >= 6;
+    // Strict 18+ Age Gate: Mandatory across both Create Sanctuary and Sign In tabs
+    if (!hasSelectedFullDob || !isAdult || isUnderageBlocked) {
+      return false;
     }
-    return hasSelectedFullDob &&
-        isAdult &&
-        email.isNotEmpty &&
-        password.length >= 6 &&
-        !isUnderageBlocked;
+    return email.isNotEmpty && password.length >= 6;
   }
 
   AuthState copyWith({
@@ -212,7 +209,18 @@ class AuthController extends StateNotifier<AuthState> {
       }
     }
 
-    // 2. Set loading state
+    // 2. Strict 18+ Gatekeeper Check: User MUST select DOB & be 18+
+    if (!state.hasSelectedFullDob || !state.isAdult || state.isUnderageBlocked) {
+      state = state.copyWith(
+        errorMessage:
+            'Strict 18+ Age Gate: Please select your Date of Birth above and confirm you are 18+ before proceeding with Google Sign-In.',
+      );
+      return AuthResult.failure(
+        'Age verification required: You must be 18+ to enter UR-Heart.',
+      );
+    }
+
+    // 3. Set loading state
     state = state.copyWith(isGoogleLoading: true, errorMessage: null);
 
     try {
@@ -239,6 +247,14 @@ class AuthController extends StateNotifier<AuthState> {
         authenticatedPhotoUrl: result.photoUrl,
         errorMessage: null,
       );
+
+      final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final mName = (state.selectedMonth != null && state.selectedMonth! >= 1 && state.selectedMonth! <= 12)
+          ? monthNames[state.selectedMonth! - 1]
+          : 'Jan';
+      final formattedDob = '${state.selectedDay} $mName ${state.selectedYear}';
+      await prefs.setString('ur_heart_selected_dob', formattedDob);
+      await prefs.setString('profile_dob', formattedDob);
 
       return result;
     } catch (e) {

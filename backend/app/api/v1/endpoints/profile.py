@@ -214,12 +214,48 @@ async def create_or_update_profile(
         if payload.bridge_value:
             up_vals["contact_bridge_encrypted"] = payload.bridge_value
 
-        await db.execute(
-            update(User)
-            .where(User.email == clean_email)
-            .values(**up_vals)
-        )
-        await db.commit()
+        res = await db.execute(select(User).where(User.email == clean_email))
+        existing_user = res.scalar_one_or_none()
+        if existing_user:
+            await db.execute(
+                update(User)
+                .where(User.email == clean_email)
+                .values(**up_vals)
+            )
+        else:
+            import uuid as _uuid
+            from datetime import date as _date
+            parsed_dob = _date(2000, 1, 1)
+            if payload.date_of_birth:
+                try:
+                    parsed_dob = _date.fromisoformat(payload.date_of_birth)
+                except Exception:
+                    pass
+
+            new_user = User(
+                id=_uuid.uuid4(),
+                auth_id=_uuid.uuid4(),
+                email=clean_email,
+                full_name=payload.full_name or "Sanctuary Seeker",
+                dob=parsed_dob,
+                gender=payload.gender or "Unspecified",
+                interested_in=payload.looking_for or "Everyone",
+                bio=payload.bio or "",
+                profession=payload.profession or "",
+                education=payload.education or "",
+                contact_bridge_type=payload.bridge_platform or "whatsapp",
+                contact_bridge_encrypted=payload.bridge_value or "",
+                location_name=loc_name or "Saket, Ayodhya",
+                referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
+                kyc_status=bool(payload.is_kyc),
+                is_profile_completed=True,
+            )
+            db.add(new_user)
+        try:
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            print(f"[PROFILE PERSISTENCE] Commit error: {e}", flush=True)
 
     print(
         f"[PROFILE PERSISTENCE] Profile Created/Updated: name={payload.full_name} "

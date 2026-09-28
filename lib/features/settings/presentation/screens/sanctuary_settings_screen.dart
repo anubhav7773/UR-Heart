@@ -5,6 +5,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../controllers/settings_controller.dart';
 import '../widgets/alerts_toggle_group.dart';
+import '../widgets/atmosphere_theme_card.dart';
 import '../widgets/discovery_privacy_card.dart';
 import '../widgets/irrevocable_erasure_modal.dart';
 import '../widgets/superadmin_sentinel_tile.dart';
@@ -91,6 +92,13 @@ class SanctuarySettingsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              AtmosphereThemeCard(
+                activeMode: themeState.activeTheme,
+                isDark: isDark,
+                onThemeChanged: (newMode) async {
+                  await ref.read(themeProvider.notifier).setTheme(newMode);
+                },
+              ),
               AlertsToggleGroup(
                 settings: state.settings,
                 isDark: isDark,

@@ -66,5 +66,4 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    # Transient runtime attribute injected from Auth ID token
-    email: Optional[str] = None
+    email = Column(String(255), unique=True, nullable=True, index=True)

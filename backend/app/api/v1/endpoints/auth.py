@@ -90,16 +90,42 @@ class GoogleSyncRequest(BaseModel):
 async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get_db)):
     """
     Receives Google Sign-In tokens, registers/synchronizes session,
-    and streams activity to Render stdout.
+    and provisions user entity in Supabase PostgreSQL database.
     """
+    import uuid as _uuid
+    from datetime import date as _date
+
     is_completed = False
     clean_email = payload.email.strip().lower() if payload.email else ""
     if clean_email:
-        res = await db.execute(select(User.is_profile_completed).where(User.email == clean_email))
-        val = res.scalar_one_or_none()
-        if val is not None:
-            is_completed = bool(val)
-        elif clean_email in COMPLETED_PROFILES:
+        res = await db.execute(select(User).where(User.email == clean_email))
+        user_row = res.scalar_one_or_none()
+        if user_row is not None:
+            is_completed = bool(user_row.is_profile_completed)
+        else:
+            # Auto-provision user shell in Supabase
+            new_user = User(
+                id=_uuid.uuid4(),
+                auth_id=_uuid.uuid4(),
+                email=clean_email,
+                full_name=payload.display_name or "Sanctuary Seeker",
+                dob=_date(2000, 1, 1),
+                gender="Unspecified",
+                interested_in="Everyone",
+                contact_bridge_type="whatsapp",
+                contact_bridge_encrypted="",
+                location_name="Saket, Ayodhya",
+                referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
+                is_profile_completed=False,
+            )
+            db.add(new_user)
+            try:
+                await db.commit()
+            except Exception as e:
+                await db.rollback()
+                print(f"[AUTH GOOGLE SYNC] Auto-provision warning: {e}", flush=True)
+
+        if clean_email in COMPLETED_PROFILES:
             is_completed = True
     elif (payload.user_id and payload.user_id.strip().lower() in COMPLETED_PROFILES) or \
          (payload.display_name and payload.display_name.strip().lower() in COMPLETED_PROFILES):
@@ -131,14 +157,39 @@ class LoginRequest(BaseModel):
 )
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
-    Authenticates user and returns profile setup status.
+    Authenticates user, provisions shell if new, and returns profile setup status.
     """
+    import uuid as _uuid
+    from datetime import date as _date
+
     clean_email = payload.email.strip().lower()
-    res = await db.execute(select(User.is_profile_completed).where(User.email == clean_email))
-    val = res.scalar_one_or_none()
-    if val is not None:
-        is_completed = bool(val)
+    res = await db.execute(select(User).where(User.email == clean_email))
+    user_row = res.scalar_one_or_none()
+    if user_row is not None:
+        is_completed = bool(user_row.is_profile_completed)
     else:
+        # Auto-provision user shell in Supabase
+        new_user = User(
+            id=_uuid.uuid4(),
+            auth_id=_uuid.uuid4(),
+            email=clean_email,
+            full_name="Sanctuary Seeker",
+            dob=_date(2000, 1, 1),
+            gender="Unspecified",
+            interested_in="Everyone",
+            contact_bridge_type="whatsapp",
+            contact_bridge_encrypted="",
+            location_name="Saket, Ayodhya",
+            referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
+            is_profile_completed=False,
+        )
+        db.add(new_user)
+        try:
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            print(f"[AUTH LOGIN] Auto-provision warning: {e}", flush=True)
+
         is_completed = clean_email in COMPLETED_PROFILES
 
     print(f"[AUTH LOGIN] User logged in: email={clean_email} is_profile_completed={is_completed}", flush=True)

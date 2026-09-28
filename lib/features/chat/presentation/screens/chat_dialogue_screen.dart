@@ -8,6 +8,7 @@ import '../../data/chat_repository.dart';
 import '../controllers/chat_dialogue_controller.dart';
 import '../widgets/ai_icebreaker_chips_row.dart';
 import '../widgets/chat_detail_action_bar.dart';
+import '../widgets/chat_safety_dialog.dart';
 import '../widgets/dialogue_message_bubble.dart';
 import '../widgets/nlp_warning_dialog.dart';
 import '../widgets/sacred_bridge_app_bar_action.dart';
@@ -188,7 +189,80 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
             bridgeData: bridgeData,
             wsService: ref.watch(chatWebSocketServiceProvider),
           ),
-          const SizedBox(width: 8),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert_rounded, color: primaryText),
+            color: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tooltip: 'Safety & Protection',
+            onSelected: (val) {
+              final rId = args?.recipientId ?? (peer['id'] as String? ?? peer['user_id'] as String? ?? 'peer_seeker');
+              final rName = args?.recipientName ?? (peer['full_name'] as String? ?? 'Seeker');
+              if (val == 'report') {
+                ChatSafetyDialog.showReportSheet(
+                  context: context,
+                  ref: ref,
+                  recipientId: rId,
+                  recipientName: rName,
+                  isDark: isDark,
+                  onUserBlocked: () {
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                );
+              } else if (val == 'block') {
+                ChatSafetyDialog.showBlockConfirmation(
+                  context: context,
+                  ref: ref,
+                  recipientId: rId,
+                  recipientName: rName,
+                  isDark: isDark,
+                  onUserBlocked: () {
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                );
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem<String>(
+                value: 'report',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.flag_outlined,
+                      size: 20,
+                      color: isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Report Profile',
+                      style: TextStyle(color: primaryText, fontSize: 13.5),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'block',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.block_rounded,
+                      size: 20,
+                      color: isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Block User',
+                      style: TextStyle(
+                        color: isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(

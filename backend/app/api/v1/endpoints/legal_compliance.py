@@ -18,6 +18,7 @@ from app.models.domain.legal import (
     GrievanceDossier,
     UnderageQuarantineRegistry,
     ConsentAuditLog,
+    BlockedUser,
 )
 
 router = APIRouter(prefix="/vault", tags=["Statutory Legal & DPDP Compliance"])
@@ -310,13 +311,103 @@ async def submit_grievance_dossier(
 # 4. BLOCKED USERS PERIMETER (DUM-08 & ACT-05 FIX)
 # ---------------------------------------------------------------------------
 
+class BlockUserRequest(BaseModel):
+    blocked_user_id: Optional[str] = None
+    target_id: Optional[str] = None
+    reason: Optional[str] = "unspecified"
+
+    def resolve_target_id(self) -> Optional[str]:
+        return self.blocked_user_id or self.target_id
+
+
+@router.post("/blocked", status_code=status.HTTP_200_OK)
+@router.post("/block", status_code=status.HTTP_200_OK)
+async def block_user(
+    payload: BlockUserRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Adds user to blocked perimeter in Supabase blocked_users table.
+    Enforces check (blocker_id <> blocked_id).
+    """
+    raw_target = payload.resolve_target_id()
+    if not raw_target:
+        raise HTTPException(status_code=400, detail="Target user ID required.")
+
+    target_uuid = None
+    try:
+        target_uuid = UUID(str(raw_target))
+    except (ValueError, TypeError):
+        stmt = select(User.id).where(User.referral_code == raw_target)
+        res = await db.execute(stmt)
+        target_uuid = res.scalar_one_or_none()
+
+    if not target_uuid:
+        return {
+            "status": "success",
+            "message": f"User {raw_target} added to block perimeter.",
+            "blocked_user_id": str(raw_target),
+        }
+
+    if target_uuid == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot block yourself.")
+
+    # Check if already blocked
+    existing = await db.execute(
+        select(BlockedUser).where(
+            BlockedUser.blocker_id == current_user.id,
+            BlockedUser.blocked_id == target_uuid
+        )
+    )
+    if existing.scalar_one_or_none() is None:
+        block_entry = BlockedUser(
+            blocker_id=current_user.id,
+            blocked_id=target_uuid,
+            reason=payload.reason or "unspecified"
+        )
+        db.add(block_entry)
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
+    return {
+        "status": "success",
+        "message": f"User {raw_target} permanently blocked.",
+        "blocked_user_id": str(target_uuid),
+    }
+
+
 @router.get("/blocked", status_code=status.HTTP_200_OK)
 async def get_blocked_users(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns users in the blocked perimeter for current authenticated user."""
-    return {"blocked_users": []}
+    stmt = (
+        select(BlockedUser, User)
+        .join(User, BlockedUser.blocked_id == User.id)
+        .where(BlockedUser.blocker_id == current_user.id)
+        .order_by(BlockedUser.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    blocked_list = []
+    for b_entry, u in rows:
+        age = 25
+        if u.dob:
+            age = max(18, (datetime.utcnow().date() - u.dob).days // 365)
+        blocked_list.append({
+            "id": str(u.id),
+            "name": u.full_name,
+            "age": age,
+            "date_blocked": b_entry.created_at.strftime("%d %b %Y"),
+            "reason": b_entry.reason,
+        })
+
+    return {"blocked_users": blocked_list}
 
 
 @router.delete("/blocked/{blocked_user_id}", status_code=status.HTTP_200_OK)
@@ -326,5 +417,17 @@ async def unblock_user(
     db: AsyncSession = Depends(get_db)
 ):
     """Removes user from blocked perimeter in database."""
+    try:
+        t_uuid = UUID(str(blocked_user_id))
+        await db.execute(
+            delete(BlockedUser).where(
+                BlockedUser.blocker_id == current_user.id,
+                BlockedUser.blocked_id == t_uuid
+            )
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
     return {"status": "success", "message": f"User {blocked_user_id} unblocked."}
 

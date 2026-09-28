@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/chat_repository.dart';
 
 class ChatsListState {
@@ -66,10 +67,16 @@ class ChatsListController extends StateNotifier<ChatsListState> {
     state = state.copyWith(isLoading: true);
     final convs = await _repo.getConversations();
     final sparks = await _repo.getRecentSparks();
+
+    final prefs = await SharedPreferences.getInstance();
+    final blockedIds = (prefs.getStringList('ur_heart_blocked_user_ids') ?? []).toSet();
+    final activeConvs = convs.where((c) => !blockedIds.contains(c.recipientId) && !blockedIds.contains(c.matchId)).toList();
+    final activeSparks = sparks.where((s) => !blockedIds.contains(s.id)).toList();
+
     state = state.copyWith(
-      allConversations: convs,
-      filteredConversations: _filterList(convs, state.searchQuery),
-      sparks: sparks,
+      allConversations: activeConvs,
+      filteredConversations: _filterList(activeConvs, state.searchQuery),
+      sparks: activeSparks,
       isLoading: false,
     );
   }

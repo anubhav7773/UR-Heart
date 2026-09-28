@@ -98,6 +98,20 @@ class ThemeController extends StateNotifier<ThemeState> {
     await lockThemePermanently();
   }
 
+  Future<void> setTheme(SanctuaryThemeMode newMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeKey, newMode.name);
+    await prefs.setString(legacyThemeKey, newMode.name);
+    state = state.copyWith(mode: newMode);
+  }
+
+  Future<void> toggleTheme() async {
+    final next = state.mode == SanctuaryThemeMode.light
+        ? SanctuaryThemeMode.dark
+        : SanctuaryThemeMode.light;
+    await setTheme(next);
+  }
+
   Future<void> resetThemeLock() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_themeKey);

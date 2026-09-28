@@ -91,3 +91,15 @@ class ConsentAuditLog(Base):
     ip_hash = Column(String(64), nullable=False)
     installation_uuid = Column(String(64), nullable=False)
     consented_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class BlockedUser(Base):
+    __tablename__ = "blocked_users"
+    __table_args__ = {"schema": "public"}
+    __allow_unmapped__ = True
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    blocker_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="CASCADE"), nullable=False, index=True)
+    blocked_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason = Column(String(100), nullable=True, default="unspecified")
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
