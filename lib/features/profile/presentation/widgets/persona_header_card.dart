@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -16,6 +17,19 @@ class PersonaHeaderCard extends StatelessWidget {
     required this.onEditAvatar,
   });
 
+  ImageProvider? _resolveAvatarProvider() {
+    final avatar = profile.avatarUrl.trim();
+    if (avatar.isEmpty) return null;
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return NetworkImage(avatar);
+    }
+    final file = File(avatar);
+    if (file.existsSync()) {
+      return FileImage(file);
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cardBg = isDark
@@ -33,6 +47,7 @@ class PersonaHeaderCard extends StatelessWidget {
     final crestColor = isDark
         ? DarkSanctuaryTokens.verifiedBadge
         : LightSanctuaryTokens.verifiedBadge;
+    final avatarProvider = _resolveAvatarProvider();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -45,27 +60,32 @@ class PersonaHeaderCard extends StatelessWidget {
       child: Row(
         children: [
           // Circular Avatar with Edit Pencil Badge
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 38,
-                backgroundColor: isDark
-                    ? DarkSanctuaryTokens.secondaryPine
-                    : LightSanctuaryTokens.chipBackground,
-                child: Text(
-                  profile.fullName.isNotEmpty ? profile.fullName[0] : 'U',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: headlineColor,
-                  ),
+          GestureDetector(
+            onTap: onEditAvatar,
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 38,
+                  backgroundColor: isDark
+                      ? DarkSanctuaryTokens.secondaryPine
+                      : LightSanctuaryTokens.chipBackground,
+                  backgroundImage: avatarProvider,
+                  child: avatarProvider == null
+                      ? Text(
+                          profile.fullName.isNotEmpty
+                              ? profile.fullName[0].toUpperCase()
+                              : 'U',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: headlineColor,
+                          ),
+                        )
+                      : null,
                 ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: onEditAvatar,
+                Positioned(
+                  bottom: 0,
+                  right: 0,
                   child: Container(
                     padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
@@ -73,6 +93,12 @@ class PersonaHeaderCard extends StatelessWidget {
                           ? DarkSanctuaryTokens.primaryCoral
                           : LightSanctuaryTokens.terracottaAccent,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Icons.edit_rounded,
@@ -81,8 +107,8 @@ class PersonaHeaderCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(width: 16),
           // Name, Age, Crest & Join Date

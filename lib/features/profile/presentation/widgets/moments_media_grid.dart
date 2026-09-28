@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -76,64 +77,98 @@ class MomentsMediaGrid extends StatelessWidget {
             ),
             itemBuilder: (context, index) {
               final hasPhoto = index < photos.length && photos[index].isNotEmpty;
-              return Container(
-                decoration: BoxDecoration(
-                  color: slotBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark
-                        ? DarkSanctuaryTokens.inputBorder
-                        : LightSanctuaryTokens.inputBorder,
-                    width: 1,
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            hasPhoto
-                                ? Icons.photo_library_outlined
-                                : Icons.add_photo_alternate_outlined,
-                            size: 28,
-                            color: mutedColor,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Moment #${index + 1}',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: mutedColor,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
+              final photo = hasPhoto ? photos[index] : '';
+
+              return GestureDetector(
+                onTap: () => onReplaceSlot(index),
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: slotBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? DarkSanctuaryTokens.inputBorder
+                          : LightSanctuaryTokens.inputBorder,
+                      width: 1,
                     ),
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: () => onReplaceSlot(index),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (hasPhoto)
+                        _buildPhotoView(photo, mutedColor, index)
+                      else
+                        _buildPlaceholder(mutedColor, index),
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: accentColor,
                             shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 4,
+                              ),
+                            ],
                           ),
-                          child: const Icon(
-                            Icons.edit_rounded,
-                            size: 13,
+                          child: Icon(
+                            hasPhoto ? Icons.edit_rounded : Icons.add_rounded,
+                            size: 14,
                             color: Colors.white,
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoView(String pathOrUrl, Color mutedColor, int index) {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return Image.network(
+        pathOrUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPlaceholder(mutedColor, index),
+      );
+    }
+    final file = File(pathOrUrl);
+    if (file.existsSync()) {
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPlaceholder(mutedColor, index),
+      );
+    }
+    return _buildPlaceholder(mutedColor, index);
+  }
+
+  Widget _buildPlaceholder(Color mutedColor, int index) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.add_photo_alternate_outlined,
+            size: 28,
+            color: mutedColor,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Moment #${index + 1}',
+            style: AppTypography.bodySmall.copyWith(
+              color: mutedColor,
+              fontSize: 11,
+            ),
           ),
         ],
       ),

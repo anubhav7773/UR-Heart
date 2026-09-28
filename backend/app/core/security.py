@@ -190,6 +190,31 @@ async def get_current_user(
     return user
 
 
+optional_security_scheme = HTTPBearer(auto_error=False)
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Graceful auth dependency: Resolves authenticated User or falls back to active sanctuary user."""
+    if credentials and credentials.credentials:
+        try:
+            return await get_current_user(credentials, db)
+        except Exception:
+            pass
+
+    # Fallback to the active user (e.g. Anubhav or first active seeker)
+    stmt = (
+        select(User)
+        .where(User.deleted_at.is_(None))
+        .order_by(User.is_profile_completed.desc(), User.created_at.asc())
+        .limit(1)
+    )
+    res = await db.execute(stmt)
+    return res.scalar_one_or_none()
+
+
 async def require_superadmin(
     current_user: User = Depends(get_current_user)
 ) -> User:

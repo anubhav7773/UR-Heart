@@ -13,7 +13,7 @@ from sqlalchemy import (
     Text,
     func
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from app.core.database import Base
 
 
@@ -67,3 +67,5 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     email = Column(String(255), unique=True, nullable=True, index=True)
+    photos = Column(ARRAY(String), default=[])
+    avatar_url = Column(String(500), nullable=True)

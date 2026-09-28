@@ -424,7 +424,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
-                            Navigator.of(context).pushReplacementNamed('/feed');
+                            Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
                           } else if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(

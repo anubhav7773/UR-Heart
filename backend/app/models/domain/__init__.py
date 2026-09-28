@@ -1,5 +1,7 @@
 from app.models.domain.user import User
 from app.models.domain.match import Match
+from app.models.domain.swipe import Swipe
+from app.models.domain.message import Message
 from app.models.domain.whatsapp_token import WhatsAppRevealToken
 from app.models.domain.kyc_escalation import AdminKycEscalation
 from app.models.domain.ad_transaction import ProcessedAdTransaction
@@ -16,6 +18,8 @@ from app.models.domain.legal import (
 __all__ = [
     "User",
     "Match",
+    "Swipe",
+    "Message",
     "WhatsAppRevealToken",
     "AdminKycEscalation",
     "ProcessedAdTransaction",
@@ -27,4 +31,3 @@ __all__ = [
     "UnderageQuarantineRegistry",
     "ConsentAuditLog",
 ]
-

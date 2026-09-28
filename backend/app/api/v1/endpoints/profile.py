@@ -14,9 +14,19 @@ router = APIRouter(prefix="/profile", tags=["User Profile Engine"])
 COMPLETED_PROFILES: set[str] = set()
 
 
+from datetime import date
+
+def _calculate_age(dob: Optional[date]) -> int:
+    if not dob:
+        return 24
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+
 class ProfileUpdateRequest(BaseModel):
     full_name: Optional[str] = Field(None, max_length=60)
     gender: Optional[str] = Field(None, max_length=20)
+    interested_in: Optional[str] = Field(None, max_length=20)
     bio: Optional[str] = Field(None, max_length=500)
     profession: Optional[str] = Field(None, max_length=80)
     education: Optional[str] = Field(None, max_length=100)
@@ -28,6 +38,8 @@ class ProfileUpdateRequest(BaseModel):
     contact_bridge_handle: Optional[str] = None
     is_kyc_verified: Optional[bool] = None
     photo_slots_count: Optional[int] = None
+    photos: Optional[List[str]] = None
+    avatar_url: Optional[str] = None
     preferred_age_min: Optional[int] = Field(None, ge=18, le=100)
     preferred_age_max: Optional[int] = Field(None, ge=18, le=100)
     email: Optional[str] = None
@@ -47,6 +59,7 @@ async def get_my_authenticated_profile(
     return {
         "id": str(current_user.id),
         "full_name": current_user.full_name,
+        "age": _calculate_age(current_user.dob),
         "dob": current_user.dob.isoformat() if current_user.dob else None,
         "gender": current_user.gender,
         "interested_in": current_user.interested_in,
@@ -70,7 +83,12 @@ async def get_my_authenticated_profile(
             current_user.contact_bridge_encrypted[:4] + "****"
             if current_user.contact_bridge_encrypted
             else ""
-        )
+        ),
+        "photos": current_user.photos or [],
+        "avatar_url": current_user.avatar_url or "",
+        "preferred_age_min": current_user.preferred_age_min,
+        "preferred_age_max": current_user.preferred_age_max,
+        "contact_bridge_handle": current_user.contact_bridge_encrypted
     }
 
 

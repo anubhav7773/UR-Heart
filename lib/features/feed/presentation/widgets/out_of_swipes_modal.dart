@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
+import '../../../navigation/presentation/screens/sanctuary_navigation_shell.dart';
 
-class OutOfSwipesModal extends StatelessWidget {
+class OutOfSwipesModal extends ConsumerWidget {
   final bool isDark;
   final VoidCallback onWatchAdTriggered;
 
@@ -13,7 +15,7 @@ class OutOfSwipesModal extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final surface = isDark
         ? DarkSanctuaryTokens.surface
         : LightSanctuaryTokens.surface;
@@ -123,7 +125,7 @@ class OutOfSwipesModal extends StatelessWidget {
               ),
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context).pushNamed('/growth');
+                ref.read(navigationIndexProvider.notifier).state = 3;
               },
             ),
           ),

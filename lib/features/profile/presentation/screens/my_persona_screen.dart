@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -43,11 +45,22 @@ class MyPersonaScreen extends ConsumerWidget {
         );
         notifier.clearBanner();
       }
+      if (next.errorMessage != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.errorMessage ?? ''),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        notifier.clearBanner();
+      }
     });
 
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: bgColor,
         elevation: 0,
         title: Text(
@@ -76,13 +89,14 @@ class MyPersonaScreen extends ConsumerWidget {
               PersonaHeaderCard(
                 profile: state.profile,
                 isDark: isDark,
-                onEditAvatar: () => _showPhotoUploadModal(context, isDark, 0),
+                onEditAvatar: () =>
+                    _showPhotoUploadModal(context, ref, isDark, 0, isAvatar: true),
               ),
               MomentsMediaGrid(
                 photos: state.profile.momentPhotos,
                 isDark: isDark,
                 onReplaceSlot: (slot) =>
-                    _showPhotoUploadModal(context, isDark, slot),
+                    _showPhotoUploadModal(context, ref, isDark, slot, isAvatar: false),
               ),
               LockedCredentialsCard(
                 profile: state.profile,
@@ -109,7 +123,13 @@ class MyPersonaScreen extends ConsumerWidget {
     );
   }
 
-  void _showPhotoUploadModal(BuildContext context, bool isDark, int slotIndex) {
+  void _showPhotoUploadModal(
+    BuildContext context,
+    WidgetRef ref,
+    bool isDark,
+    int slotIndex, {
+    required bool isAvatar,
+  }) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: isDark
@@ -125,7 +145,9 @@ class MyPersonaScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Replace Photo Slot #${slotIndex + 1}',
+                isAvatar
+                    ? 'Update Sanctuary Avatar'
+                    : 'Replace Sacred Moment #${slotIndex + 1}',
                 style: AppTypography.titleH2.copyWith(
                   fontSize: 18,
                   color: isDark
@@ -147,17 +169,70 @@ class MyPersonaScreen extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.photo_camera_rounded),
                 title: const Text('Capture with Camera'),
-                onTap: () => Navigator.of(ctx).pop(),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickAndProcessPhoto(
+                    context,
+                    ref,
+                    ImageSource.camera,
+                    isAvatar: isAvatar,
+                    slotIndex: slotIndex,
+                  );
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded),
                 title: const Text('Select from Gallery'),
-                onTap: () => Navigator.of(ctx).pop(),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickAndProcessPhoto(
+                    context,
+                    ref,
+                    ImageSource.gallery,
+                    isAvatar: isAvatar,
+                    slotIndex: slotIndex,
+                  );
+                },
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _pickAndProcessPhoto(
+    BuildContext context,
+    WidgetRef ref,
+    ImageSource source, {
+    required bool isAvatar,
+    int slotIndex = 0,
+  }) async {
+    final picker = ImagePicker();
+    try {
+      final XFile? file = await picker.pickImage(
+        source: source,
+        maxWidth: 1080,
+        maxHeight: 1350,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+
+      final notifier = ref.read(personaControllerProvider.notifier);
+      if (isAvatar) {
+        await notifier.updateAvatarFile(File(file.path));
+      } else {
+        await notifier.updateMomentSlotFile(slotIndex, File(file.path));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not access image: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 }

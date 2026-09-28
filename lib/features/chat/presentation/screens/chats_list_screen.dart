@@ -39,6 +39,7 @@ class ChatsListScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: bgColor,
         elevation: 0,
         title: Text(

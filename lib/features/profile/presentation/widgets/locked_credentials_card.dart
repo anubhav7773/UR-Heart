@@ -110,14 +110,18 @@ class LockedCredentialsCard extends StatelessWidget {
             children: [
               _buildPill(
                 icon: Icons.person_outline,
-                label: profile.gender,
+                label: profile.gender.trim().isNotEmpty
+                    ? profile.gender.trim()
+                    : 'Sanctuary Seeker',
                 chipBg: chipBg,
                 textColor: headlineColor,
               ),
               const SizedBox(width: 8),
               _buildPill(
                 icon: Icons.favorite_border_rounded,
-                label: 'Interested in ${profile.interestedIn}',
+                label: profile.interestedIn.trim().isNotEmpty
+                    ? 'Interested in ${profile.interestedIn.trim()}'
+                    : 'Seeking Resonances',
                 chipBg: chipBg,
                 textColor: headlineColor,
               ),
@@ -147,7 +151,9 @@ class LockedCredentialsCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    profile.maskedWhatsApp,
+                    profile.maskedWhatsApp.trim().isNotEmpty
+                        ? profile.maskedWhatsApp.trim()
+                        : 'Enclave Shield Active',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,

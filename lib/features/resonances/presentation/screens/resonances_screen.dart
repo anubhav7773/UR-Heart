@@ -50,6 +50,7 @@ class _ResonancesScreenState extends ConsumerState<ResonancesScreen> with Single
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(

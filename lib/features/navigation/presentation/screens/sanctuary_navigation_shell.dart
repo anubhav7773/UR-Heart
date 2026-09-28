@@ -34,6 +34,8 @@ class SanctuaryNavigationShell extends ConsumerStatefulWidget {
 
 class _SanctuaryNavigationShellState
     extends ConsumerState<SanctuaryNavigationShell> {
+  DateTime? _lastBackPressTime;
+
   @override
   void initState() {
     super.initState();
@@ -65,12 +67,40 @@ class _SanctuaryNavigationShellState
         ? const Color(0xFF718096)
         : const Color(0xFF8C9B90);
 
-    return Scaffold(
-      backgroundColor: isDark
-          ? DarkSanctuaryTokens.background
-          : LightSanctuaryTokens.background,
-      body: IndexedStack(
-        index: currentIndex,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        final currentIdx = ref.read(navigationIndexProvider);
+        if (currentIdx != 0) {
+          // Switch back to Discovery feed tab if on another tab
+          ref.read(navigationIndexProvider.notifier).state = 0;
+          return;
+        }
+
+        // On Discovery tab: double back press to exit safely
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Press back again to exit Sanctuary'),
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+
+        SystemNavigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: isDark
+            ? DarkSanctuaryTokens.background
+            : LightSanctuaryTokens.background,
+        body: IndexedStack(
+          index: currentIndex,
         children: const [
           FeedScreen(),
           ResonancesScreen(),
@@ -155,8 +185,9 @@ class _SanctuaryNavigationShellState
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildNavItem({
     required int index,

@@ -57,6 +57,16 @@ class _PreferencesSliderCardState extends State<PreferencesSliderCard> {
     if (widget.profile.bio != _bioController.text) {
       _bioController.text = widget.profile.bio;
     }
+    if (widget.profile.profession != _profController.text) {
+      _profController.text = widget.profile.profession;
+    }
+    if (widget.profile.education != _eduController.text) {
+      _eduController.text = widget.profile.education;
+    }
+    if (oldWidget.profile.minAgePref != widget.profile.minAgePref ||
+        oldWidget.profile.maxAgePref != widget.profile.maxAgePref) {
+      _ageRange = RangeValues(widget.profile.minAgePref, widget.profile.maxAgePref);
+    }
   }
 
   @override

@@ -403,6 +403,10 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     state = state.copyWith(isSubmitting: true);
 
     final prefs = await SharedPreferences.getInstance();
+    final interestedInStr = state.interestedIn.isNotEmpty
+        ? state.interestedIn.join(', ')
+        : 'Everyone';
+    await prefs.setString('profile_interested_in', interestedInStr);
     await prefs.setString('profile_full_name', state.fullName);
     await prefs.setString('profile_gender', state.gender);
     await prefs.setString('profile_bio', state.bio);
@@ -432,6 +436,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     final success = await _repository.saveUserProfile({
       'full_name': state.fullName,
       'gender': state.gender,
+      'interested_in': interestedInStr,
       'bio': state.bio,
       'profession': state.profession,
       'education': state.education,
@@ -439,10 +444,19 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'location_name': state.location,
       'latitude': lat,
       'longitude': lng,
+      'preferred_age_min': state.minAge.toInt(),
+      'preferred_age_max': state.maxAge.toInt(),
       'contact_bridge_type': state.contactBridgePlatform,
       'contact_bridge_handle': state.contactBridgeHandle,
       'is_kyc_verified': state.isKycVerified,
       'photo_slots_count': state.photoSlots.length,
+      'photos': [
+        state.photoSlots[2] ?? '',
+        state.photoSlots[3] ?? '',
+        state.photoSlots[4] ?? '',
+        state.photoSlots[5] ?? '',
+      ],
+      'avatar_url': state.photoSlots[1] ?? '',
       'email': email,
     });
 

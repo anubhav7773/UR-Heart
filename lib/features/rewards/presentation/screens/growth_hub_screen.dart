@@ -81,9 +81,9 @@ class _GrowthHubScreenState extends ConsumerState<GrowthHubScreen> with SingleTi
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: BackButton(color: primaryText),
         title: Text(
           'Growth PRO · REWARDS HUB',
           style: TextStyle(fontFamily: 'Serif', fontSize: 16.0, fontWeight: FontWeight.bold, color: primaryText),

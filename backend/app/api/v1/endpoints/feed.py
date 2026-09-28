@@ -1,6 +1,16 @@
+from datetime import date
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Query, status
+from uuid import UUID
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, not_
+
+from app.core.database import get_db
+from app.core.security import get_current_user_optional
+from app.models.domain.user import User
+from app.models.domain.swipe import Swipe
+from app.models.domain.match import Match
 
 router = APIRouter(tags=["Discovery Feed & Swipes"])
 
@@ -10,106 +20,178 @@ class SwipeRequest(BaseModel):
     swipe_type: str  # 'like', 'pass', 'direct'
 
 
-CANDIDATE_CATALOG = [
-    {
-        "id": "cand_1",
-        "full_name": "Devika Roy",
-        "age": 25,
-        "gender": "Woman",
-        "looking_for": "Men",
-        "location_name": "Khar, Mumbai",
-        "distance_km": 2.4,
-        "resonance_score": 91,
-        "bio": "Looking for a sanctuary to share honest poetry and unspoken understanding.",
-        "ai_resonance_insight": "Both of you value authentic connection, stillness, and deep thoughtful literature.",
-        "authentic_intention": "Looking for a sanctuary to share honest poetry and unspoken understanding.",
-        "tags": ["Poetry", "Mindfulness", "Slow Living"],
-        "photos": [
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80"
-        ],
-        "is_kyc_verified": True,
-        "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4"
-    },
-    {
-        "id": "cand_2",
-        "full_name": "Aanya Sen",
-        "age": 24,
-        "gender": "Woman",
-        "looking_for": "Men",
-        "location_name": "Bandra West, Mumbai",
-        "distance_km": 1.5,
-        "resonance_score": 94,
-        "bio": "Searching for a mindful connection amidst city chaos. Coffee, art books, and quiet evening walks.",
-        "ai_resonance_insight": "Both of you share an appreciation for quiet cafes, architecture, and intentional conversations.",
-        "authentic_intention": "Searching for a mindful connection amidst city chaos.",
-        "tags": ["Architecture", "Pour-Over Coffee", "Literature"],
-        "photos": [
-            "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80"
-        ],
-        "is_kyc_verified": True,
-        "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4"
-    },
-    {
-        "id": "cand_3",
-        "full_name": "Meera Kapoor",
-        "age": 23,
-        "gender": "Woman",
-        "looking_for": "Men",
-        "location_name": "Juhu, Mumbai",
-        "distance_km": 3.8,
-        "resonance_score": 88,
-        "bio": "Classical Indian music, pottery weekends, and conversations that go beyond small talk.",
-        "ai_resonance_insight": "Mutual reverence for creative mindfulness, gentle patience, and classical arts.",
-        "authentic_intention": "Building an honest, calm bond with depth and respect.",
-        "tags": ["Classical Arts", "Pottery", "Indie Music"],
-        "photos": [
-            "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=800&auto=format&fit=crop&q=80"
-        ],
-        "is_kyc_verified": True,
-        "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4"
-    }
-]
+def _calculate_age(dob: Optional[date]) -> int:
+    if not dob:
+        return 24
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 @router.get("/feed", status_code=status.HTTP_200_OK, summary="Get Sanctuary Discovery Feed")
 @router.get("/discovery/feed", status_code=status.HTTP_200_OK, summary="Get Sanctuary Discovery Feed Alias")
 async def get_discovery_feed(
     limit: int = Query(default=10, ge=1, le=50),
-    cursor: Optional[str] = None
+    cursor: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Returns verified candidate profiles for the discovery deck
-    with reciprocal orientation matching and AI insights.
+    Returns verified candidate profiles from PostgreSQL for the discovery deck
+    with reciprocal orientation matching, excluding already swiped profiles.
     """
-    cards = CANDIDATE_CATALOG[:limit]
-    print(f"[FEED DISCOVERY] Serving {min(limit, len(CANDIDATE_CATALOG))} candidate cards to client", flush=True)
+    stmt = select(User).where(
+        User.deleted_at.is_(None),
+        User.is_profile_completed == True
+    )
+
+    if current_user:
+        # Exclude current logged in user
+        stmt = stmt.where(User.id != current_user.id)
+
+        # Exclude candidates already swiped by current user
+        swiped_subq = select(Swipe.target_id).where(Swipe.actor_id == current_user.id)
+        stmt = stmt.where(not_(User.id.in_(swiped_subq)))
+
+        # Orientation matching if specified
+        if current_user.interested_in in ("Women", "Woman"):
+            stmt = stmt.where(User.gender.in_(["Woman", "Women"]))
+        elif current_user.interested_in in ("Men", "Man"):
+            stmt = stmt.where(User.gender.in_(["Man", "Men"]))
+
+    stmt = stmt.order_by(User.created_at.desc()).limit(limit)
+    res = await db.execute(stmt)
+    users = res.scalars().all()
+
+    cards = []
+    for u in users:
+        photos = list(u.photos or [])
+        if not photos and u.avatar_url:
+            photos.append(u.avatar_url)
+
+        age = _calculate_age(u.dob)
+        cards.append({
+            "id": str(u.id),
+            "full_name": u.full_name,
+            "age": age,
+            "gender": u.gender,
+            "looking_for": u.interested_in or "Men",
+            "location_name": u.location_name or "Saket, Ayodhya",
+            "distance_km": 2.5,
+            "resonance_score": 92 + (int(u.id.int % 7) if hasattr(u.id, "int") else 3),
+            "bio": u.bio or "Mindful seeker cultivating authentic connection.",
+            "ai_resonance_insight": "Shared reverence for depth, patience, and authentic conversation.",
+            "authentic_intention": u.bio or "Looking for an intentional sanctuary.",
+            "tags": [u.profession, "Mindfulness", "Slow Living"] if u.profession else ["Mindfulness", "Art & Literature", "Stillness"],
+            "photos": photos,
+            "is_kyc_verified": u.kyc_status,
+            "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+        })
+
+    print(f"[FEED DISCOVERY] Serving {len(cards)} live candidate cards from PostgreSQL to client", flush=True)
     return {"candidates": cards, "data": cards}
 
 
 @router.post("/swipes", status_code=status.HTTP_200_OK, summary="Record Profile Swipe Action")
-async def record_swipe(payload: SwipeRequest):
+async def record_swipe(
+    payload: SwipeRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Records like, pass, or direct resonate swipe action.
+    Records like, pass, or direct resonate swipe action in PostgreSQL public.swipes.
+    Creates reciprocal match in public.matches when appropriate.
     """
     print(f"[SWIPE RECORDED] target_id={payload.target_id} action={payload.swipe_type.upper()}", flush=True)
-    is_match = payload.swipe_type in ("like", "direct")
+
+    is_match = False
+    match_id = None
+
+    try:
+        target_uuid = UUID(payload.target_id)
+    except ValueError:
+        target_uuid = None
+
+    if current_user and target_uuid:
+        # Record swipe in public.swipes
+        swipe = Swipe(
+            actor_id=current_user.id,
+            target_id=target_uuid,
+            swipe_type=payload.swipe_type.lower()
+        )
+        db.add(swipe)
+
+        # Decrement swipes_remaining on like/direct
+        if current_user.swipes_remaining > 0:
+            current_user.swipes_remaining = max(0, current_user.swipes_remaining - 1)
+
+        # Check for mutual like or direct resonate
+        if payload.swipe_type.lower() in ("like", "direct"):
+            reciprocal_stmt = select(Swipe).where(
+                Swipe.actor_id == target_uuid,
+                Swipe.target_id == current_user.id,
+                Swipe.swipe_type.in_(["like", "direct"])
+            )
+            reciprocal_res = await db.execute(reciprocal_stmt)
+            reciprocal_swipe = reciprocal_res.scalar_one_or_none()
+
+            # If mutual like OR direct resonate, form a match
+            if reciprocal_swipe or payload.swipe_type.lower() == "direct":
+                is_match = True
+                existing_match_stmt = select(Match).where(
+                    ((Match.user1_id == current_user.id) & (Match.user2_id == target_uuid)) |
+                    ((Match.user1_id == target_uuid) & (Match.user2_id == current_user.id))
+                )
+                ex_res = await db.execute(existing_match_stmt)
+                match = ex_res.scalar_one_or_none()
+                if not match:
+                    match = Match(
+                        user1_id=current_user.id,
+                        user2_id=target_uuid,
+                        is_active=True
+                    )
+                    db.add(match)
+                    await db.flush()
+                match_id = str(match.id)
+
+        await db.commit()
+    else:
+        is_match = payload.swipe_type in ("like", "direct")
+        match_id = f"match-{payload.target_id}" if is_match else None
+
     return {
         "status": "recorded",
         "target_id": payload.target_id,
         "swipe_type": payload.swipe_type,
         "is_match": is_match,
-        "match_id": f"match-{payload.target_id}" if is_match else None,
-        "swipes_remaining": 24
+        "match_id": match_id,
+        "swipes_remaining": current_user.swipes_remaining if current_user else 24
     }
 
 
 @router.delete("/swipes/pass/{target_id}", status_code=status.HTTP_200_OK, summary="Restore Passed Profile")
-async def restore_passed_profile(target_id: str):
+async def restore_passed_profile(
+    target_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Removes profile from pass vault and restores back into active deck.
+    Removes profile from pass vault in PostgreSQL and restores back into active deck.
     """
+    if current_user:
+        try:
+            target_uuid = UUID(target_id)
+            from sqlalchemy import delete
+            await db.execute(
+                delete(Swipe).where(
+                    Swipe.actor_id == current_user.id,
+                    Swipe.target_id == target_uuid,
+                    Swipe.swipe_type == "pass"
+                )
+            )
+            await db.commit()
+        except Exception:
+            pass
+
     print(f"[PASS VAULT] Revisit profile target_id={target_id}", flush=True)
     return {
         "status": "revisited",

@@ -79,6 +79,7 @@ class ProfileRepository {
       final savedAge = prefs.getInt('profile_age') ??
           prefs.getInt('ur_heart_user_age');
       final savedGender = prefs.getString('profile_gender');
+      final savedInterestedIn = prefs.getString('profile_interested_in');
       final savedLocation = prefs.getString('profile_location');
       final savedBio = prefs.getString('profile_bio');
       final savedProfession = prefs.getString('profile_profession');
@@ -116,7 +117,12 @@ class ProfileRepository {
             : _currentProfile.fullName,
         age: savedAge ?? _currentProfile.age,
         dobVerificationPill: pillText,
-        gender: savedGender ?? _currentProfile.gender,
+        gender: (savedGender != null && savedGender.isNotEmpty)
+            ? savedGender
+            : _currentProfile.gender,
+        interestedIn: (savedInterestedIn != null && savedInterestedIn.isNotEmpty)
+            ? savedInterestedIn
+            : _currentProfile.interestedIn,
         location: (savedLocation != null && savedLocation.isNotEmpty)
             ? savedLocation
             : _currentProfile.location,
@@ -159,6 +165,8 @@ class ProfileRepository {
           'location_name': updated.location,
           'preferred_age_min': updated.minAgePref.toInt(),
           'preferred_age_max': updated.maxAgePref.toInt(),
+          'photos': updated.momentPhotos,
+          'avatar_url': updated.avatarUrl,
         },
       );
 

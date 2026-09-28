@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../navigation/presentation/screens/sanctuary_navigation_shell.dart';
 
 /// Top horizontal tab switcher between Persona, Growth PRO, and Vault & Legal
-class PersonaTabsHeader extends StatelessWidget {
+class PersonaTabsHeader extends ConsumerWidget {
   final int activeIndex;
   final bool isDark;
 
@@ -13,7 +15,7 @@ class PersonaTabsHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final activeBg = isDark
         ? DarkSanctuaryTokens.secondaryPine
         : LightSanctuaryTokens.primaryPine;
@@ -37,7 +39,9 @@ class PersonaTabsHeader extends StatelessWidget {
             inactiveBg: inactiveBg,
             activeText: activeText,
             inactiveText: inactiveText,
-            onTap: () {},
+            onTap: () {
+              ref.read(navigationIndexProvider.notifier).state = 4;
+            },
           ),
           const SizedBox(width: 8),
           _buildTab(
@@ -48,7 +52,7 @@ class PersonaTabsHeader extends StatelessWidget {
             activeText: activeText,
             inactiveText: inactiveText,
             onTap: () {
-              Navigator.of(context).pushNamed('/growth');
+              ref.read(navigationIndexProvider.notifier).state = 3;
             },
           ),
           const SizedBox(width: 8),
