@@ -15,11 +15,10 @@ from app.api.v1.api_router import api_router as api_v1_router
 from app.api.v1.endpoints.chat_websocket import ws_router
 from app.core.config import get_settings
 from app.core.exceptions import SanctuaryException
+from app.core.limiter import limiter
 
 settings = get_settings()
 
-# 1. SlowAPI Gateway Rate Limiter (Default 120 req/min per IP)
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 
 # 2. Strict Security Headers Middleware (Checklist Points 18 & 19)
@@ -125,7 +124,9 @@ app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
 @app.api_route("/", methods=["GET", "HEAD"], tags=["Render Health"])
 @app.api_route("/health", methods=["GET", "HEAD"], tags=["Render Health"])
+@limiter.limit("120/minute")
 async def root_health_probe(request: Request):
+
     """Zero-overhead root health probe for Render / UptimeRobot."""
     return JSONResponse(
         content={

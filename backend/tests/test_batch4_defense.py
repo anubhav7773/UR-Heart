@@ -155,3 +155,24 @@ async def test_sec15_http_security_headers():
         assert headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
         assert "Content-Security-Policy" in headers
         assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
+
+
+@pytest.mark.asyncio
+async def test_sec15_gateway_rate_limiting():
+    """
+    Test 4: Gateway Rate Limiting Assertion (SEC-15 Test)
+    Verifies that requests exceeding 120/min from a single IP are throttled with HTTP 429 Too Many Requests.
+    """
+    from starlette.testclient import TestClient
+    from app.core.limiter import limiter
+
+    client = TestClient(app)
+    # Burst requests using unique test client IP
+    test_ip = f"198.51.100.{uuid.uuid4().int % 250 + 1}"
+    statuses = [
+        client.get("/api/v1/health", headers={"x-forwarded-for": test_ip}).status_code
+        for _ in range(125)
+    ]
+    assert 429 in statuses
+    assert statuses[-1] == 429
+
