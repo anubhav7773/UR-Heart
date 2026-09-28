@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/auth/presentation/screens/age_gate_auth_screen.dart';
 import '../../features/auth/presentation/screens/consent_screen.dart';
 import '../../features/auth/presentation/screens/magic_link_screen.dart';
@@ -22,7 +23,9 @@ import '../theme/theme_controller.dart';
 /// Root Application Widget wrapped in Riverpod Consumer
 /// Dynamically updates between Light Sanctuary and Dark Sanctuary ThemeData
 class URHeartApp extends ConsumerWidget {
-  const URHeartApp({super.key});
+  final String? initialRoute;
+
+  const URHeartApp({super.key, this.initialRoute});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,13 +38,16 @@ class URHeartApp extends ConsumerWidget {
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
-      initialRoute: ConsentScreen.routeName,
+      initialRoute: initialRoute,
+      home: initialRoute == null ? const SanctuaryAppGateway() : null,
       routes: {
         ConsentScreen.routeName: (context) => const ConsentScreen(),
         AgeGateAuthScreen.routeName: (context) => const AgeGateAuthScreen(),
         MagicLinkScreen.routeName: (context) => const MagicLinkScreen(),
+        '/magic-link': (context) => const MagicLinkScreen(),
         ProfileSetupScreen.routeName: (context) => const ProfileSetupScreen(),
         SanctuaryNavigationShell.routeName: (context) => const SanctuaryNavigationShell(),
+        '/sanctuary': (context) => const SanctuaryNavigationShell(),
         FeedScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 0),
         ResonancesScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 1),
         ChatsListScreen.routeName: (context) => const SanctuaryNavigationShell(initialIndex: 2),
@@ -102,6 +108,87 @@ class URHeartApp extends ConsumerWidget {
         bodyLarge: AppTypography.bodyStandard,
         bodyMedium: AppTypography.bodyMedium,
         bodySmall: AppTypography.bodySmall,
+      ),
+    );
+  }
+}
+
+/// Lightweight intelligent startup gateway widget
+/// Evaluates session persistence instantly without screen flicker
+class SanctuaryAppGateway extends StatefulWidget {
+  const SanctuaryAppGateway({super.key});
+
+  @override
+  State<SanctuaryAppGateway> createState() => _SanctuaryAppGatewayState();
+}
+
+class _SanctuaryAppGatewayState extends State<SanctuaryAppGateway> {
+  Widget? _targetScreen;
+
+  @override
+  void initState() {
+    super.initState();
+    _determineStartupTarget();
+  }
+
+  Future<void> _determineStartupTarget() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isProfileSetupDone = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
+      final hasAuth = (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
+                      (prefs.getString('auth_token')?.isNotEmpty ?? false) ||
+                      (prefs.getString('ur_heart_user_email')?.isNotEmpty ?? false);
+      final isConsentGiven = (prefs.getBool('urheart_theme_permanently_locked') ?? false) ||
+                             (prefs.getBool('ur_heart_theme_locked') ?? false) ||
+                             (prefs.getBool('ur_heart_consent_given') ?? false);
+
+      if (!mounted) return;
+      setState(() {
+        if (hasAuth && isProfileSetupDone) {
+          _targetScreen = const SanctuaryNavigationShell();
+        } else if (hasAuth && !isProfileSetupDone) {
+          _targetScreen = const ProfileSetupScreen();
+        } else if (isConsentGiven) {
+          _targetScreen = const AgeGateAuthScreen();
+        } else {
+          _targetScreen = const ConsentScreen();
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _targetScreen = const ConsentScreen();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_targetScreen != null) {
+      return _targetScreen!;
+    }
+
+    return const Scaffold(
+      backgroundColor: Color(0xFF0F1512),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.favorite_rounded, color: Color(0xFF4E9F76), size: 48),
+            SizedBox(height: 16),
+            Text(
+              'UR-Heart',
+              style: TextStyle(
+                fontFamily: 'Serif',
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFF3F5F4),
+                letterSpacing: 2.0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

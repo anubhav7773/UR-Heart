@@ -8,6 +8,7 @@ from urllib.parse import urlparse, parse_qsl, urlencode
 from uuid import UUID
 import httpx
 from fastapi import APIRouter, Request, HTTPException, status, Depends
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from cryptography.hazmat.primitives.asymmetric import ec

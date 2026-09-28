@@ -60,10 +60,29 @@ class ProfileRepository {
       final response = await dio.get<dynamic>('/api/v1/profile/me');
       final profile = UserPersonaModel.fromJson(response.data as Map<String, dynamic>);
       _currentProfile = profile;
+      if (profile.referralCode.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profile_referral_code', profile.referralCode);
+        await prefs.setString('ur_heart_user_referral_code', profile.referralCode);
+      }
       return profile;
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
+    }
+  }
+
+  /// Redeems friend's referral code with backend
+  Future<Map<String, dynamic>> redeemReferralCode(String code) async {
+    try {
+      final response = await dio.post<dynamic>(
+        '/api/v1/profile/referral/redeem',
+        data: {'referral_code': code.trim().toUpperCase()},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final detail = e.response?.data?['detail'] ?? 'Failed to redeem referral code.';
+      throw Exception(detail);
     }
   }
 
@@ -320,7 +339,9 @@ class ProfileRepository {
       throw const NetworkUnavailableException();
     }
     if (e.response?.statusCode == 401) throw const UnauthorizedException();
-    throw ServerException(e.response?.data?['detail'] as String? ?? 'Profile synchronization failed.');
+    final data = e.response?.data;
+    final message = data is Map ? (data['detail']?.toString() ?? 'Profile synchronization failed.') : (data?.toString() ?? 'Profile synchronization failed.');
+    throw ServerException(message);
   }
 }
 

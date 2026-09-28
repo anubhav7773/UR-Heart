@@ -63,7 +63,9 @@ class ResonancesRepository {
       throw const NetworkUnavailableException();
     }
     if (e.response?.statusCode == 401) throw const UnauthorizedException();
-    throw ServerException(e.response?.data?['detail'] as String? ?? 'Failed to synchronize resonances.');
+    final data = e.response?.data;
+    final message = data is Map ? (data['detail']?.toString() ?? 'Failed to synchronize resonances.') : (data?.toString() ?? 'Failed to synchronize resonances.');
+    throw ServerException(message);
   }
 }
 

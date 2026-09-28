@@ -25,11 +25,25 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final prefs = await SharedPreferences.getInstance();
-      final isSetupDone = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
-      if (isSetupDone && mounted) {
-        Navigator.of(context).pushReplacementNamed('/main');
-      }
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final isSetupDone = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
+        final hasAuth = (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
+                        (prefs.getString('auth_token')?.isNotEmpty ?? false) ||
+                        (prefs.getString('ur_heart_user_email')?.isNotEmpty ?? false);
+        final isConsentGiven = (prefs.getBool('urheart_theme_permanently_locked') ?? false) ||
+                               (prefs.getBool('ur_heart_theme_locked') ?? false) ||
+                               (prefs.getBool('ur_heart_consent_given') ?? false);
+
+        if (!mounted) return;
+        if (hasAuth && isSetupDone) {
+          Navigator.of(context).pushReplacementNamed('/main');
+        } else if (hasAuth && !isSetupDone) {
+          Navigator.of(context).pushReplacementNamed('/profile-setup');
+        } else if (isConsentGiven) {
+          Navigator.of(context).pushReplacementNamed('/auth');
+        }
+      } catch (_) {}
     });
   }
 

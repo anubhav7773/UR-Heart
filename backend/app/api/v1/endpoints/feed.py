@@ -133,7 +133,12 @@ async def record_swipe(
                 notif_type="direct_letter" if swipe_type_clean in ("direct", "superlike") else "like",
                 title="Direct Resonate Spark ✨" if swipe_type_clean in ("direct", "superlike") else "New Resonance ✨",
                 body=f"{current_user.full_name} sent you a Direct Sanctuary Letter." if swipe_type_clean in ("direct", "superlike") else f"{current_user.full_name} resonated with your profile.",
-                data={"actor_id": str(current_user.id), "swipe_type": swipe_type_clean}
+                data={
+                    "actor_id": str(current_user.id),
+                    "actor_name": current_user.full_name,
+                    "swipe_type": swipe_type_clean,
+                    "target_route": "/resonances"
+                }
             )
 
             reciprocal_stmt = select(Swipe).where(
@@ -173,14 +178,24 @@ async def record_swipe(
                     notif_type="match",
                     title="Sacred Match Ignited 💫",
                     body=f"You and {target_name} have mutually resonated! Begin your mindful dialogue.",
-                    data={"match_id": match_id, "partner_id": str(target_uuid)}
+                    data={
+                        "match_id": match_id,
+                        "partner_id": str(target_uuid),
+                        "partner_name": target_name,
+                        "target_route": "/chat-dialogue"
+                    }
                 )
                 push_notification(
                     user_id=str(target_uuid),
                     notif_type="match",
                     title="Sacred Match Ignited 💫",
                     body=f"You and {current_user.full_name} have mutually resonated! Begin your mindful dialogue.",
-                    data={"match_id": match_id, "partner_id": str(current_user.id)}
+                    data={
+                        "match_id": match_id,
+                        "partner_id": str(current_user.id),
+                        "partner_name": current_user.full_name,
+                        "target_route": "/chat-dialogue"
+                    }
                 )
 
         await db.commit()

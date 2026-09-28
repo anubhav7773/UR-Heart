@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../profile/data/profile_repository.dart';
@@ -93,6 +94,15 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
 
   /// DUM-11 FIX: Binds directly to authenticated database user profile
   Future<void> syncUserData() async {
+    // 1. Instant local fallback
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('profile_referral_code') ?? prefs.getString('ur_heart_user_referral_code');
+      if (cached != null && cached.isNotEmpty && state.referralCode.isEmpty) {
+        state = state.copyWith(referralCode: cached);
+      }
+    } catch (_) {}
+
     if (_profileRepo == null) return;
     try {
       final profile = await _profileRepo!.fetchMyProfile();
@@ -108,6 +118,16 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
         isSlumberActive: profile.nightSlumber,
       );
     } catch (_) {}
+  }
+
+  /// Submits friend's referral code to backend for 20 reflections bonus
+  Future<String> redeemReferralCode(String code) async {
+    if (_profileRepo == null) {
+      throw Exception('Sanctuary profile service unavailable');
+    }
+    final res = await _profileRepo!.redeemReferralCode(code);
+    await syncUserData();
+    return res['message']?.toString() ?? 'Referral code redeemed successfully!';
   }
 
   void syncBalances({String? userId}) {

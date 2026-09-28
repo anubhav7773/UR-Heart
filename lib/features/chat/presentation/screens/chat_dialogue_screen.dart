@@ -24,10 +24,10 @@ class ChatDialogueArguments {
     required this.matchId,
     required this.recipientId,
     required this.recipientName,
-    required this.recipientAge,
-    required this.isOnline,
-    required this.hasWaKey,
-    required this.sharedContextQuote,
+    this.recipientAge = 25,
+    this.isOnline = true,
+    this.hasWaKey = true,
+    this.sharedContextQuote = 'Sacred Mindful Dialogue',
   });
 }
 
@@ -49,6 +49,12 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
     if (explicitId != null && explicitId.isNotEmpty) return explicitId;
     final routeArgs = ModalRoute.of(context)?.settings.arguments;
     if (routeArgs is ChatDialogueArguments) return routeArgs.matchId;
+    if (routeArgs is Map<String, dynamic>) {
+      return routeArgs['match_id']?.toString() ?? 'match-aarav-1';
+    }
+    if (routeArgs is String && routeArgs.isNotEmpty) {
+      return routeArgs;
+    }
     return 'match-aarav-1';
   }
 

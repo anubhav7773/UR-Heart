@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../chat/presentation/screens/chats_list_screen.dart';
+import '../../../chat/presentation/screens/chat_dialogue_screen.dart';
 import '../../../feed/presentation/screens/feed_screen.dart';
 import '../../../profile/presentation/screens/my_persona_screen.dart';
 import '../../../resonances/presentation/screens/resonances_screen.dart';
@@ -92,6 +93,107 @@ class _SanctuaryNavigationShellState
     } catch (_) {}
   }
 
+  void _handleNotificationNavigation(Map<String, dynamic> notif) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
+    final title = notif['title']?.toString() ?? 'Sanctuary Resonance';
+    final notifData = notif['data'] as Map<String, dynamic>? ?? {};
+
+    // 1. Direct 1:1 Message / Chat -> Direct jump into ChatDialogueScreen
+    if (notifType.contains('message') || notifType.contains('chat')) {
+      final matchId = notifData['match_id']?.toString() ?? notif['match_id']?.toString();
+      final senderId = notifData['sender_id']?.toString() ?? notif['sender_id']?.toString() ?? 'user_peer';
+      final rawSenderName = notifData['sender_name']?.toString() ??
+          title.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
+      final senderName = rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
+
+      ref.read(navigationIndexProvider.notifier).state = 2;
+
+      if (matchId != null && matchId.isNotEmpty) {
+        Navigator.of(context).pushNamed(
+          ChatDialogueScreen.routeName,
+          arguments: ChatDialogueArguments(
+            matchId: matchId,
+            recipientId: senderId,
+            recipientName: senderName,
+            recipientAge: 25,
+            isOnline: true,
+            hasWaKey: true,
+            sharedContextQuote: 'Deep Mindful Connection',
+          ),
+        );
+      }
+      return;
+    }
+
+    // 2. Sacred Match Ignited -> Direct jump to ChatDialogueScreen
+    if (notifType.contains('match')) {
+      final matchId = notifData['match_id']?.toString() ?? notif['match_id']?.toString();
+      final partnerId = notifData['partner_id']?.toString() ?? notif['partner_id']?.toString() ?? 'partner_user';
+      final rawPartnerName = notifData['partner_name']?.toString() ??
+          title.replaceAll('Sacred Match Ignited', '').replaceAll('💫', '').trim();
+      final partnerName = rawPartnerName.isNotEmpty ? rawPartnerName : 'Soul Seeker';
+
+      ref.read(navigationIndexProvider.notifier).state = 2;
+
+      if (matchId != null && matchId.isNotEmpty) {
+        Navigator.of(context).pushNamed(
+          ChatDialogueScreen.routeName,
+          arguments: ChatDialogueArguments(
+            matchId: matchId,
+            recipientId: partnerId,
+            recipientName: partnerName,
+            recipientAge: 25,
+            isOnline: true,
+            hasWaKey: true,
+            sharedContextQuote: 'Mutual Resonance Ignited',
+          ),
+        );
+      }
+      return;
+    }
+
+    // 3. New incoming like / direct resonate letter -> Jump to Resonances screen (tab 1)
+    if (notifType.contains('like') || notifType.contains('direct') || notifType.contains('resonate')) {
+      ref.read(navigationIndexProvider.notifier).state = 1;
+      return;
+    }
+
+    // 4. Kinship referral reward / ad reward -> Jump to Growth PRO hub (tab 3)
+    if (notifType.contains('referral') || notifType.contains('reward') || notifType.contains('growth') || notifType.contains('ad')) {
+      ref.read(navigationIndexProvider.notifier).state = 3;
+      return;
+    }
+
+    // 5. KYC / Persona / Profile status notification -> Jump to Persona (tab 4)
+    if (notifType.contains('kyc') || notifType.contains('profile') || notifType.contains('persona')) {
+      ref.read(navigationIndexProvider.notifier).state = 4;
+      return;
+    }
+
+    // 6. Custom route if specified
+    final targetRoute = notifData['target_route']?.toString();
+    if (targetRoute != null && targetRoute.isNotEmpty) {
+      if (targetRoute == '/chats' || targetRoute == '/dialogues') {
+        ref.read(navigationIndexProvider.notifier).state = 2;
+      } else if (targetRoute == '/resonances') {
+        ref.read(navigationIndexProvider.notifier).state = 1;
+      } else if (targetRoute == '/growth') {
+        ref.read(navigationIndexProvider.notifier).state = 3;
+      } else if (targetRoute == '/persona' || targetRoute == '/profile') {
+        ref.read(navigationIndexProvider.notifier).state = 4;
+      } else {
+        Navigator.of(context).pushNamed(targetRoute);
+      }
+      return;
+    }
+
+    // Fallback: switch to Resonances
+    ref.read(navigationIndexProvider.notifier).state = 1;
+  }
+
   void _showNotificationBanner(Map<String, dynamic> notif, bool isDark) {
     final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
     final title = notif['title']?.toString() ?? 'Sanctuary Resonance';
@@ -100,20 +202,19 @@ class _SanctuaryNavigationShellState
 
     IconData icon = Icons.notifications_active;
     Color iconColor = const Color(0xFFE58B68);
-    int targetTab = 1;
 
     if (notifType.contains('like') || notifType.contains('resonate')) {
       icon = Icons.favorite_rounded;
       iconColor = const Color(0xFFE58B68);
-      targetTab = 1;
     } else if (notifType.contains('message') || notifType.contains('chat')) {
       icon = Icons.chat_bubble_rounded;
       iconColor = const Color(0xFF4E9F76);
-      targetTab = 2;
     } else if (notifType.contains('match')) {
       icon = Icons.auto_awesome;
       iconColor = const Color(0xFFD4AF37);
-      targetTab = 1;
+    } else if (notifType.contains('referral') || notifType.contains('reward')) {
+      icon = Icons.stars_rounded;
+      iconColor = const Color(0xFFD4AF37);
     }
 
     if (!mounted) return;
@@ -129,50 +230,52 @@ class _SanctuaryNavigationShellState
         ),
         elevation: 6,
         duration: const Duration(seconds: 4),
-        content: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: iconColor.withOpacity(0.15),
+        content: InkWell(
+          onTap: () => _handleNotificationNavigation(notif),
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: iconColor.withOpacity(0.15),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
               ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: isDark ? Colors.white : const Color(0xFF1A2621),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: isDark ? Colors.white : const Color(0xFF1A2621),
+                      ),
                     ),
-                  ),
-                  Text(
-                    message,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? const Color(0xFFA0AEC0) : const Color(0xFF718096),
+                    Text(
+                      message,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFFA0AEC0) : const Color(0xFF718096),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         action: SnackBarAction(
-          label: 'View',
+          label: 'Open ➔',
           textColor: iconColor,
-          onPressed: () {
-            ref.read(navigationIndexProvider.notifier).state = targetTab;
-          },
+          onPressed: () => _handleNotificationNavigation(notif),
         ),
       ),
     );

@@ -53,9 +53,19 @@ class SlumberToggleRequest(BaseModel):
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 async def get_my_authenticated_profile(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Fetches verified persona for Screen 11 without PII leakage."""
+    import uuid as _uuid
+    if not current_user.referral_code:
+        current_user.referral_code = f"UR-{_uuid.uuid4().hex[:6].upper()}"
+        try:
+            await db.commit()
+            await db.refresh(current_user)
+        except Exception:
+            await db.rollback()
+
     return {
         "id": str(current_user.id),
         "full_name": current_user.full_name,
@@ -90,6 +100,66 @@ async def get_my_authenticated_profile(
         "preferred_age_max": current_user.preferred_age_max,
         "contact_bridge_handle": current_user.contact_bridge_encrypted,
         "role": current_user.role or ("superadmin" if current_user.email == "kshtriyaanubhav9120@gmail.com" else "user")
+    }
+
+
+class RedeemReferralRequest(BaseModel):
+    referral_code: str = Field(..., min_length=4, max_length=30)
+
+
+@router.post("/referral/redeem", status_code=status.HTTP_200_OK)
+async def redeem_referral_code(
+    payload: RedeemReferralRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Validates a referral code against PostgreSQL users table.
+    Credits 20 reflections and 5 swipes to both referrer and referee.
+    Enqueues real in-app notification to the referrer.
+    """
+    code_clean = payload.referral_code.strip().upper()
+    if not code_clean:
+        raise HTTPException(status_code=400, detail="Referral code cannot be empty.")
+
+    if current_user.referral_code and current_user.referral_code.upper() == code_clean:
+        raise HTTPException(status_code=400, detail="You cannot redeem your own referral code.")
+
+    # Find the referrer user in the database
+    res = await db.execute(select(User).where(User.referral_code == code_clean))
+    referrer = res.scalar_one_or_none()
+    if not referrer:
+        raise HTTPException(status_code=404, detail="Invalid referral code. No matching sanctuary seeker found.")
+
+    # Credit rewards to referee (current_user)
+    current_user.reward_balance = (current_user.reward_balance or 0) + 20
+    current_user.swipes_remaining = (current_user.swipes_remaining or 25) + 5
+    current_user.direct_letters_count = (current_user.direct_letters_count or 1) + 1
+
+    # Credit rewards to referrer
+    referrer.reward_balance = (referrer.reward_balance or 0) + 20
+    referrer.swipes_remaining = (referrer.swipes_remaining or 25) + 5
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    # Push real in-app notification to the referrer
+    from app.api.v1.endpoints.notifications import push_notification
+    push_notification(
+        user_id=str(referrer.id),
+        notif_type="referral_reward",
+        title="Sacred Kinship Reward 🌟",
+        body=f"{current_user.full_name} entered the sanctuary with your referral code! +20 Reflections added to your balance.",
+        data={"target_route": "/growth", "referee_name": current_user.full_name}
+    )
+
+    return {
+        "status": "success",
+        "message": f"Successfully redeemed! You and {referrer.full_name} both received 20 bonus reflections.",
+        "reward_balance": current_user.reward_balance,
+        "swipes_remaining": current_user.swipes_remaining,
+        "direct_letters_count": current_user.direct_letters_count,
+        "referrer_name": referrer.full_name,
     }
 
 

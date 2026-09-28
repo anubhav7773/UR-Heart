@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict

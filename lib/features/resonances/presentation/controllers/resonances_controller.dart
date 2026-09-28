@@ -56,13 +56,17 @@ class ResonancesController extends StateNotifier<ResonancesState> {
 
   Future<void> loadResonances() async {
     state = state.copyWith(isLoading: true);
-    final likes = await _repository.fetchIncomingLikes();
-    final connections = await _repository.fetchMutualConnections();
-    state = state.copyWith(
-      incomingLikes: likes,
-      mutualConnections: connections,
-      isLoading: false,
-    );
+    try {
+      final likes = await _repository.fetchIncomingLikes();
+      final connections = await _repository.fetchMutualConnections();
+      state = state.copyWith(
+        incomingLikes: likes,
+        mutualConnections: connections,
+        isLoading: false,
+      );
+    } catch (_) {
+      state = state.copyWith(isLoading: false);
+    }
   }
 
   /// Converts incoming like to mutual match upon "💬 Chat" CTA tap

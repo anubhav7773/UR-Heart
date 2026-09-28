@@ -213,6 +213,8 @@ class ChatRepository {
       throw const NetworkUnavailableException();
     }
     if (e.response?.statusCode == 401) throw const UnauthorizedException();
-    throw ServerException(e.response?.data?['detail'] as String? ?? 'Chat synchronization failed.');
+    final data = e.response?.data;
+    final message = data is Map ? (data['detail']?.toString() ?? 'Chat synchronization failed.') : (data?.toString() ?? 'Chat synchronization failed.');
+    throw ServerException(message);
   }
 }

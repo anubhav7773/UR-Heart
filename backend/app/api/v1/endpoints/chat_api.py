@@ -224,7 +224,12 @@ async def send_chat_message(
                 notif_type="message",
                 title=f"Message from {current_user.full_name} 💬",
                 body=text_content[:80],
-                data={"match_id": str(match_uuid), "sender_id": str(current_user.id)}
+                data={
+                    "match_id": str(match_uuid),
+                    "sender_id": str(current_user.id),
+                    "sender_name": current_user.full_name,
+                    "target_route": "/chat-dialogue",
+                }
             )
     except Exception as e:
         print(f"[CHAT MESSAGE NOTIF] Notice: {e}", flush=True)

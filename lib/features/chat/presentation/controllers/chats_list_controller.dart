@@ -73,20 +73,24 @@ class ChatsListController extends StateNotifier<ChatsListState> {
 
   Future<void> loadHubData() async {
     state = state.copyWith(isLoading: true);
-    final convs = await _repo.getConversations();
-    final sparks = await _repo.getRecentSparks();
+    try {
+      final convs = await _repo.getConversations();
+      final sparks = await _repo.getRecentSparks();
 
-    final prefs = await SharedPreferences.getInstance();
-    final blockedIds = (prefs.getStringList('ur_heart_blocked_user_ids') ?? []).toSet();
-    final activeConvs = convs.where((c) => !blockedIds.contains(c.recipientId) && !blockedIds.contains(c.matchId)).toList();
-    final activeSparks = sparks.where((s) => !blockedIds.contains(s.id)).toList();
+      final prefs = await SharedPreferences.getInstance();
+      final blockedIds = (prefs.getStringList('ur_heart_blocked_user_ids') ?? []).toSet();
+      final activeConvs = convs.where((c) => !blockedIds.contains(c.recipientId) && !blockedIds.contains(c.matchId)).toList();
+      final activeSparks = sparks.where((s) => !blockedIds.contains(s.id)).toList();
 
-    state = state.copyWith(
-      allConversations: activeConvs,
-      filteredConversations: _filterList(activeConvs, state.searchQuery, state.activeFilter),
-      sparks: activeSparks,
-      isLoading: false,
-    );
+      state = state.copyWith(
+        allConversations: activeConvs,
+        filteredConversations: _filterList(activeConvs, state.searchQuery, state.activeFilter),
+        sparks: activeSparks,
+        isLoading: false,
+      );
+    } catch (_) {
+      state = state.copyWith(isLoading: false);
+    }
   }
 
   void updateSearchQuery(String query) {

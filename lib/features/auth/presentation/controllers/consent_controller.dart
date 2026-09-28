@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/theme_controller.dart';
 
 /// Immutable state for Screen 1 Mindful Consent
@@ -65,6 +66,10 @@ class ConsentController extends StateNotifier<ConsentState> {
     }
     // Lock current theme permanently upon onboarding consent
     await _ref.read(themeProvider.notifier).lockCurrentThemePermanently();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('ur_heart_consent_given', true);
+    } catch (_) {}
     return true;
   }
 
