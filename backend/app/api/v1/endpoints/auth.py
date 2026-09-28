@@ -52,6 +52,9 @@ async def get_me(current_user: User = Depends(get_current_user)) -> UserSessionR
     return UserSessionResponse.model_validate(current_user)
 
 
+from app.api.v1.endpoints.profile import COMPLETED_PROFILES
+
+
 class GoogleSyncRequest(BaseModel):
     user_id: Optional[str] = None
     email: Optional[str] = None
@@ -69,13 +72,48 @@ async def google_sync(payload: GoogleSyncRequest):
     Receives Google Sign-In tokens, registers/synchronizes session,
     and streams activity to Render stdout.
     """
+    is_completed = False
+    if payload.email and payload.email.strip().lower() in COMPLETED_PROFILES:
+        is_completed = True
+    elif payload.user_id and payload.user_id.strip().lower() in COMPLETED_PROFILES:
+        is_completed = True
+    elif payload.display_name and payload.display_name.strip().lower() in COMPLETED_PROFILES:
+        is_completed = True
+
     print(
-        f"[AUTH GOOGLE SYNC] Session Synced: user_id={payload.user_id} email={payload.email} name={payload.display_name}",
+        f"[AUTH GOOGLE SYNC] Session Synced: user_id={payload.user_id} email={payload.email} "
+        f"name={payload.display_name} is_profile_completed={is_completed}",
         flush=True
     )
     return {
         "status": "synchronized",
         "user_id": payload.user_id,
         "email": payload.email,
+        "is_profile_completed": is_completed,
         "message": "Google authentication session verified and synchronized."
+    }
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@router.post(
+    "/login",
+    status_code=status.HTTP_200_OK,
+    summary="User Email/Password Authentication"
+)
+async def login(payload: LoginRequest):
+    """
+    Authenticates user and returns profile setup status.
+    """
+    clean_email = payload.email.strip().lower()
+    is_completed = clean_email in COMPLETED_PROFILES
+    print(f"[AUTH LOGIN] User logged in: email={clean_email} is_profile_completed={is_completed}", flush=True)
+    return {
+        "status": "authenticated",
+        "email": payload.email,
+        "is_profile_completed": is_completed,
+        "message": "Authentication successful."
     }

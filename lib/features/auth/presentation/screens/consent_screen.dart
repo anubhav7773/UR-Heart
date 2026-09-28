@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -10,13 +11,30 @@ import '../widgets/unbundled_checkbox_group.dart';
 
 /// Screen 1: Mindful Consent & Statutory Legal Gateway
 /// Features bilingual DPDP Act 2023 unbundled consent and permanent theme locking
-class ConsentScreen extends ConsumerWidget {
+class ConsentScreen extends ConsumerStatefulWidget {
   const ConsentScreen({super.key});
 
   static const String routeName = '/consent';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ConsentScreen> createState() => _ConsentScreenState();
+}
+
+class _ConsentScreenState extends ConsumerState<ConsentScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final isSetupDone = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
+      if (isSetupDone && mounted) {
+        Navigator.of(context).pushReplacementNamed('/main');
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final consentState = ref.watch(consentProvider);
     final themeState = ref.watch(themeProvider);
     final isDark = themeState.activeTheme == SanctuaryTheme.dark;

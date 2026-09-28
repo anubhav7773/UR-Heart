@@ -178,7 +178,15 @@ class AgeGateAuthScreen extends ConsumerWidget {
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
-                    Navigator.of(context).pushNamed('/profile-setup');
+                    // Route returning users directly to main app
+                    if (result.isProfileCompleted) {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/main',
+                        (route) => false,
+                      );
+                    } else {
+                      Navigator.of(context).pushNamed('/profile-setup');
+                    }
                   }
                 },
               ),

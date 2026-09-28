@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import 'google_auth_service.dart';
 
@@ -9,6 +10,7 @@ class AuthResult {
   final bool isCancelled;
   final String? errorMessage;
   final bool isUnderageQuarantined;
+  final bool isProfileCompleted;
   final String? userId;
   final String? email;
   final String? displayName;
@@ -19,6 +21,7 @@ class AuthResult {
     this.isCancelled = false,
     this.errorMessage,
     this.isUnderageQuarantined = false,
+    this.isProfileCompleted = false,
     this.userId,
     this.email,
     this.displayName,
@@ -30,6 +33,7 @@ class AuthResult {
     String? email,
     String? displayName,
     String? photoUrl,
+    bool isProfileCompleted = false,
   }) =>
       AuthResult(
         isSuccess: true,
@@ -37,6 +41,7 @@ class AuthResult {
         email: email,
         displayName: displayName,
         photoUrl: photoUrl,
+        isProfileCompleted: isProfileCompleted,
       );
 
   factory AuthResult.cancelled() => const AuthResult(
@@ -114,9 +119,10 @@ class AuthRepository {
       return AuthResult.failure(result.errorMessage ?? 'Google sign-in failed');
     }
 
-    // Attempt to register/sync with backend
+    // Attempt to register/sync with backend and check profile completion status
+    bool isProfileCompleted = false;
     try {
-      await _apiClient.dio.post<Map<String, dynamic>>(
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
         '/api/v1/auth/google-sync',
         data: {
           'user_id': result.userId,
@@ -125,8 +131,19 @@ class AuthRepository {
           'id_token': result.idToken,
         },
       );
+      if (response.data != null) {
+        isProfileCompleted = response.data!['is_profile_completed'] == true;
+      }
     } catch (_) {
       // Offline/local tolerance - proceed with verified Google identity
+    }
+
+    // Also check local SharedPreferences as a fallback
+    if (!isProfileCompleted) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        isProfileCompleted = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
+      } catch (_) {}
     }
 
     return AuthResult.success(
@@ -134,6 +151,7 @@ class AuthRepository {
       email: result.email,
       displayName: result.displayName,
       photoUrl: result.photoUrl,
+      isProfileCompleted: isProfileCompleted,
     );
   }
 
