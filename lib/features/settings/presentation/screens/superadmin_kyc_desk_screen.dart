@@ -4,7 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/theme_controller.dart';
 
-/// Screen for Superadmin KYC Video Verification & Groq AI Escalations
+/// Screen for Superadmin KYC Video Verification & EVA AI Escalations
 class SuperadminKycDeskScreen extends ConsumerWidget {
   static const String routeName = '/admin/kyc-desk';
 
@@ -107,7 +107,7 @@ class SuperadminKycDeskScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Zero pending escalations. Groq AI vision engine processed all recent admissions.',
+                          'Zero pending escalations. EVA AI vision engine processed all recent admissions.',
                           style: AppTypography.bodySmall.copyWith(color: mutedColor),
                           textAlign: TextAlign.center,
                         ),

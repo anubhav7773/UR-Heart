@@ -3,14 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../profile_setup/presentation/controllers/profile_setup_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_credential_field.dart';
 import '../widgets/auth_tab_switcher.dart';
+import '../widgets/google_sign_in_button.dart';
 import '../widgets/neutral_dob_wheel.dart';
 import '../widgets/verified_adult_badge.dart';
 
 /// Screen 2: Sanctuary Age Gate & Authentication
 /// Strictly enforces Google Play minor exclusion (18+) via neutral DOB selection
+/// and provides 100% production-grade Google One Tap / Sign-In.
 class AgeGateAuthScreen extends ConsumerWidget {
   const AgeGateAuthScreen({super.key});
 
@@ -151,17 +154,33 @@ class AgeGateAuthScreen extends ConsumerWidget {
               const SizedBox(height: 16.0),
               Center(child: Text('or quietly with', style: AppTypography.caption.copyWith(color: mutedColor))),
               const SizedBox(height: 12.0),
-              SizedBox(
-                width: double.infinity,
-                height: 48.0,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: inputBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
-                  ),
-                  onPressed: () {},
-                  child: Text('Continue with Google', style: AppTypography.bodyMedium.copyWith(color: titleColor)),
-                ),
+              GoogleSignInButton(
+                isDark: isDark,
+                isLoading: authState.isGoogleLoading,
+                onPressed: () async {
+                  final result = await authNotifier.signInWithGoogle();
+                  if (result.isSuccess && context.mounted) {
+                    if (result.displayName != null &&
+                        result.displayName!.isNotEmpty) {
+                      ref
+                          .read(profileSetupControllerProvider.notifier)
+                          .setFullName(result.displayName!);
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Welcome, ${result.displayName ?? "Soul Seeker"} ✨',
+                          style: AppTypography.bodySmall
+                              .copyWith(color: Colors.white),
+                        ),
+                        backgroundColor: const Color(0xFF1B4332),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    Navigator.of(context).pushNamed('/profile-setup');
+                  }
+                },
               ),
               const SizedBox(height: 20.0),
             ],

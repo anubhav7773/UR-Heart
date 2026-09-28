@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/app/ur_heart_app.dart';
+import 'core/services/activity_logger_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,9 @@ Future<void> main() async {
   } catch (_) {
     // Graceful fallback for environments without google-services.json
   }
+
+  // Stream app initialization event to Render Live Logs
+  ActivityLogger.logAppStartup();
 
   const sentryDsn = String.fromEnvironment(
     'SENTRY_DSN',

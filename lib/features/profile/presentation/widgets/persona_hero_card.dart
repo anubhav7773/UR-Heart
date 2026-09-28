@@ -27,7 +27,7 @@ class PersonaHeroCard extends StatelessWidget {
       fullName: 'Aarav Sharma',
       email: 'aarav@sanctuary.internal',
       age: 23,
-      dobVerificationPill: '14 Oct 2002 · LOCKED & VERIFIED',
+      dobVerificationPill: 'VERIFIED AGE · ADULT',
       gender: 'Male',
       interestedIn: 'Women',
       maskedWhatsApp: '+91 98765 ***** · ENCRYPTED',

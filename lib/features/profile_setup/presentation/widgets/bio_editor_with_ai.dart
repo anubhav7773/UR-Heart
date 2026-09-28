@@ -63,7 +63,7 @@ class _BioEditorWithAiState extends ConsumerState<BioEditorWithAi> {
                       if (_controller.text.trim().isEmpty) return;
                       final polished = await ref
                           .read(profileSetupControllerProvider.notifier)
-                          .polishBioWithGroq(_controller.text.trim());
+                          .polishBioWithEvaAi(_controller.text.trim());
                       if (polished != null && mounted) {
                         setState(() => _controller.text = polished);
                       }

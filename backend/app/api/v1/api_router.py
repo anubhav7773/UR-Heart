@@ -7,9 +7,13 @@ from app.api.v1.endpoints import (
     billing_webhook,
     health,
     moderation,
+    telemetry,
 )
 
 api_router = APIRouter()
+
+# 0. Live Activity Telemetry (Immediate Render Stream)
+api_router.include_router(telemetry.router)
 
 # 1. Health & Sleepless Keep-Alive Router
 api_router.include_router(health.router)

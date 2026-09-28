@@ -3,10 +3,10 @@
 class ApiEndpoints {
   const ApiEndpoints._();
 
-  // Base API URL injected via environment or defaulting to secure backend
+  // Base API URL injected via environment or defaulting to secure Render backend
   static const String defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'https://ur-heart.onrender.com',
   );
 
   // Core API Routes
@@ -18,6 +18,14 @@ class ApiEndpoints {
   static const String adminKycPending = '/api/v1/admin/kyc/pending';
   static const String adminKycAction = '/api/v1/admin/kyc/action';
 
+  // Real-Time Render Activity Telemetry & Logging
+  static const String telemetryActivity = '/api/v1/telemetry/activity';
+
+  // AI Suite & Moderation Routes
+  static const String aiPolishBio = '/api/v1/ai/bio-polish';
+  static const String aiKycLiveness = '/api/v1/ai/kyc-liveness';
+  static const String photoModeration = '/api/v1/moderation/photo';
+
   // Phase 8: Profile, Vault & Governance Routes
   static const String incinerateAccount = '/api/v1/auth/incinerate-account';
   static const String vaultExportData = '/api/v1/vault/export-data';
@@ -27,7 +35,6 @@ class ApiEndpoints {
   static const String userPreferences = '/api/v1/user/preferences';
   static const String userProfile = '/api/v1/user/profile';
   static const String rotateEncryptionKey = '/api/v1/crypto/rotate-key';
-  static const String aiPolishBio = '/api/v1/ai/polish-bio';
 
   // R2 Storage Hierarchy Configuration
   static const int maxPhotoSlots = 5;

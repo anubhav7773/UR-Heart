@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/activity_logger_service.dart';
 import '../../data/auth_repository.dart';
+import 'age_gate_controller.dart';
 
 /// Immutable state for Age Gate and Auth
 class AuthState {
@@ -12,10 +15,14 @@ class AuthState {
   final String password;
   final bool isPasswordVisible;
   final bool isLoading;
+  final bool isGoogleLoading;
   final String? errorMessage;
   final bool isUnderageBlocked;
   final int resendCooldownSeconds;
   final bool isMagicLinkVerified;
+  final String? authenticatedUserId;
+  final String? authenticatedDisplayName;
+  final String? authenticatedPhotoUrl;
 
   const AuthState({
     this.isSignInTab = false,
@@ -26,10 +33,14 @@ class AuthState {
     this.password = '',
     this.isPasswordVisible = false,
     this.isLoading = false,
+    this.isGoogleLoading = false,
     this.errorMessage,
     this.isUnderageBlocked = false,
     this.resendCooldownSeconds = 45,
     this.isMagicLinkVerified = false,
+    this.authenticatedUserId,
+    this.authenticatedDisplayName,
+    this.authenticatedPhotoUrl,
   });
 
   bool get hasSelectedFullDob =>
@@ -74,10 +85,14 @@ class AuthState {
     String? password,
     bool? isPasswordVisible,
     bool? isLoading,
+    bool? isGoogleLoading,
     String? errorMessage,
     bool? isUnderageBlocked,
     int? resendCooldownSeconds,
     bool? isMagicLinkVerified,
+    String? authenticatedUserId,
+    String? authenticatedDisplayName,
+    String? authenticatedPhotoUrl,
   }) {
     return AuthState(
       isSignInTab: isSignInTab ?? this.isSignInTab,
@@ -88,16 +103,22 @@ class AuthState {
       password: password ?? this.password,
       isPasswordVisible: isPasswordVisible ?? this.isPasswordVisible,
       isLoading: isLoading ?? this.isLoading,
+      isGoogleLoading: isGoogleLoading ?? this.isGoogleLoading,
       errorMessage: errorMessage,
       isUnderageBlocked: isUnderageBlocked ?? this.isUnderageBlocked,
       resendCooldownSeconds:
           resendCooldownSeconds ?? this.resendCooldownSeconds,
       isMagicLinkVerified: isMagicLinkVerified ?? this.isMagicLinkVerified,
+      authenticatedUserId: authenticatedUserId ?? this.authenticatedUserId,
+      authenticatedDisplayName:
+          authenticatedDisplayName ?? this.authenticatedDisplayName,
+      authenticatedPhotoUrl:
+          authenticatedPhotoUrl ?? this.authenticatedPhotoUrl,
     );
   }
 }
 
-/// Controller coordinating Neutral Age Gate, Auth validation, and Cooldown timer
+/// Controller coordinating Neutral Age Gate, Auth validation, Google One Tap, and Cooldown timer
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _repository;
   Timer? _timer;
@@ -107,6 +128,11 @@ class AuthController extends StateNotifier<AuthState> {
   void setAuthTab({required bool isSignIn}) {
     state = state.copyWith(isSignInTab: isSignIn, errorMessage: null);
   }
+
+  static const List<String> _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
 
   void setDateOfBirth({
     required int day,
@@ -120,6 +146,9 @@ class AuthController extends StateNotifier<AuthState> {
     }
 
     final isUnderage = age < 18;
+    final mName = (month >= 1 && month <= 12) ? _monthNames[month - 1] : 'Jan';
+    final formattedDob = '$day $mName $year';
+
     state = state.copyWith(
       selectedDay: day,
       selectedMonth: month,
@@ -128,6 +157,29 @@ class AuthController extends StateNotifier<AuthState> {
       errorMessage: isUnderage
           ? 'Underage Access Denied: UR-Heart is strictly for verified adults (18+).'
           : null,
+    );
+
+    // Persist real selected DOB & age immediately to SharedPreferences
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('ur_heart_selected_dob', formattedDob);
+      prefs.setString('profile_dob', formattedDob);
+      prefs.setInt('profile_age', age);
+      prefs.setInt('ur_heart_user_age', age);
+      prefs.setInt('ur_heart_dob_day', day);
+      prefs.setInt('ur_heart_dob_month', month);
+      prefs.setInt('ur_heart_dob_year', year);
+    });
+
+    // Stream activity to Render backend
+    ActivityLogger.log(
+      category: 'AUTH',
+      action: 'DATE_OF_BIRTH_SELECTED',
+      screen: 'AgeGateAuthScreen',
+      details: {
+        'formatted_dob': formattedDob,
+        'calculated_age': age,
+        'is_adult': !isUnderage,
+      },
     );
   }
 
@@ -141,6 +193,61 @@ class AuthController extends StateNotifier<AuthState> {
 
   void togglePasswordVisibility() {
     state = state.copyWith(isPasswordVisible: !state.isPasswordVisible);
+  }
+
+  /// Triggers 100% Production-Grade Google One Tap / Sign-In Flow
+  Future<AuthResult> signInWithGoogle() async {
+    // 1. Minor Safety Quarantine Pre-Check
+    final prefs = await SharedPreferences.getInstance();
+    final millis = prefs.getInt(AgeGateController.quarantineKey);
+    if (millis != null) {
+      final expiry = DateTime.fromMillisecondsSinceEpoch(millis);
+      if (DateTime.now().isBefore(expiry)) {
+        state = state.copyWith(
+          isUnderageBlocked: true,
+          errorMessage:
+              'Access Denied: Device is currently under minor safety quarantine.',
+        );
+        return AuthResult.underageBlocked();
+      }
+    }
+
+    // 2. Set loading state
+    state = state.copyWith(isGoogleLoading: true, errorMessage: null);
+
+    try {
+      final result = await _repository.signInWithGoogle();
+
+      if (result.isCancelled) {
+        state = state.copyWith(isGoogleLoading: false);
+        return result;
+      }
+
+      if (!result.isSuccess) {
+        state = state.copyWith(
+          isGoogleLoading: false,
+          errorMessage: result.errorMessage ?? 'Google Sign-In failed.',
+        );
+        return result;
+      }
+
+      state = state.copyWith(
+        isGoogleLoading: false,
+        email: result.email ?? state.email,
+        authenticatedUserId: result.userId,
+        authenticatedDisplayName: result.displayName,
+        authenticatedPhotoUrl: result.photoUrl,
+        errorMessage: null,
+      );
+
+      return result;
+    } catch (e) {
+      state = state.copyWith(
+        isGoogleLoading: false,
+        errorMessage: 'An unexpected error occurred during Google Sign-In.',
+      );
+      return AuthResult.failure(e.toString());
+    }
   }
 
   Future<bool> submitRegistration() async {

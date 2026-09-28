@@ -40,7 +40,14 @@ class PersonaController extends StateNotifier<PersonaState> {
   final ProfileRepository _repo;
 
   PersonaController(this._repo)
-      : super(PersonaState(profile: _repo.getProfile()));
+      : super(PersonaState(profile: _repo.getProfile())) {
+    _loadInitialProfile();
+  }
+
+  Future<void> _loadInitialProfile() async {
+    final profile = await _repo.loadProfileFromStorage();
+    state = state.copyWith(profile: profile);
+  }
 
   void updateBio(String newBio) {
     state = state.copyWith(profile: state.profile.copyWith(bio: newBio));
@@ -60,19 +67,21 @@ class PersonaController extends StateNotifier<PersonaState> {
     );
   }
 
-  Future<void> polishBioWithGroq() async {
+  Future<void> polishBioWithEvaAi() async {
     state = state.copyWith(isPolishing: true);
     try {
-      final polished = await _repo.polishBioWithGroq(state.profile.bio);
+      final polished = await _repo.polishBioWithEvaAi(state.profile.bio);
       state = state.copyWith(
         profile: state.profile.copyWith(bio: polished),
         isPolishing: false,
-        successMessage: 'Bio refined with mindful nuance ✨',
+        successMessage: 'Bio refined with EVA AI mindful nuance ✨',
       );
     } catch (_) {
       state = state.copyWith(isPolishing: false, errorMessage: 'Could not polish bio.');
     }
   }
+
+  Future<void> polishBioWithGroq() => polishBioWithEvaAi();
 
   Future<void> refreshLocation() async {
     final loc = await _repo.refreshGpsLocation();

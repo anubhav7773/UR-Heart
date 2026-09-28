@@ -5,7 +5,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../controllers/profile_setup_controller.dart';
 
-/// Mindful Bio Editor featuring Groq AI Polish button, Profession, and Education
+/// Mindful Bio Editor featuring EVA AI Polish button, Profession, and Education
 class MindfulBioEditor extends ConsumerStatefulWidget {
   const MindfulBioEditor({super.key});
 
@@ -41,7 +41,7 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
     final notifier = ref.read(profileSetupControllerProvider.notifier);
     final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
 
-    // Sync if state updated by Groq polish
+    // Sync if state updated by EVA AI polish
     if (_bioController.text != profileState.bio && !profileState.isPolishingBio) {
       _bioController.text = profileState.bio;
     }
@@ -78,7 +78,7 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
               onPressed: profileState.isPolishingBio
                   ? null
                   : () async {
-                      await notifier.polishBioWithGroq();
+                      await notifier.polishBioWithEvaAi(_bioController.text.trim());
                     },
               icon: profileState.isPolishingBio
                   ? SizedBox(
@@ -88,7 +88,7 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
                     )
                   : Icon(Icons.auto_awesome, size: 14.0, color: accentColor),
               label: Text(
-                'Mindful Polish ✨',
+                'EVA AI Polish ✨',
                 style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.bold, color: accentColor),
               ),
             ),
@@ -121,6 +121,7 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
             Expanded(
               child: _buildShortField(
                 label: 'PROFESSION',
+                hintText: 'e.g. Architect, Designer',
                 controller: _professionController,
                 inputBg: inputBg,
                 inputBorder: inputBorder,
@@ -133,6 +134,7 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
             Expanded(
               child: _buildShortField(
                 label: 'EDUCATION',
+                hintText: 'e.g. Design Institute / Self-taught',
                 controller: _educationController,
                 inputBg: inputBg,
                 inputBorder: inputBorder,
@@ -149,6 +151,7 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
 
   Widget _buildShortField({
     required String label,
+    required String hintText,
     required TextEditingController controller,
     required Color inputBg,
     required Color inputBorder,
@@ -171,9 +174,11 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
           child: TextField(
             controller: controller,
             style: TextStyle(color: textColor, fontSize: 13.0),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: TextStyle(color: mutedColor.withOpacity(0.6), fontSize: 12.0),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
             ),
             onChanged: onChanged,
           ),

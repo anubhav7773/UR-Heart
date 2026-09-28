@@ -90,7 +90,7 @@ class SuperadminSentinelTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Review escalated video KYC reflections & Groq AI verification desk.',
+                    'Review escalated video KYC reflections & EVA AI verification desk.',
                     style: AppTypography.bodySmall.copyWith(
                       color: headlineColor.withValues(alpha: 0.85),
                       fontSize: 11,

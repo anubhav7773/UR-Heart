@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 class FlutterWindowManager {
   FlutterWindowManager._();
 
+  // ignore: constant_identifier_names
   static const int FLAG_SECURE = 8192;
   static const MethodChannel _channel = MethodChannel('flutter_windowmanager');
 

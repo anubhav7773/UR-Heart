@@ -129,7 +129,7 @@ class _PreferencesSliderCardState extends State<PreferencesSliderCard> {
                     ? const SizedBox(
                         width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.auto_awesome, size: 14),
-                label: Text(widget.isPolishing ? 'Refining...' : 'Groq AI Polish ✨',
+                label: Text(widget.isPolishing ? 'Refining...' : 'EVA AI Polish ✨',
                     style: const TextStyle(fontSize: 12)),
               ),
             ],

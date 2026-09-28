@@ -37,6 +37,34 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def live_render_request_logger(request: Request, call_next):
+    """
+    Guarantees every single request, path, method, and client IP is immediately
+    logged to Render's live stdout log console with flush=True.
+    """
+    import time
+    start = time.time()
+    client_ip = request.client.host if request.client else "unknown"
+    try:
+        response = await call_next(request)
+        elapsed_ms = (time.time() - start) * 1000
+        print(
+            f"[RENDER HTTP] {request.method} {request.url.path} -> "
+            f"Status: {response.status_code} | IP: {client_ip} | Took: {elapsed_ms:.1f}ms",
+            flush=True
+        )
+        return response
+    except Exception as exc:
+        elapsed_ms = (time.time() - start) * 1000
+        print(
+            f"[RENDER HTTP ERROR] {request.method} {request.url.path} -> "
+            f"Exception: {str(exc)} | IP: {client_ip} | Took: {elapsed_ms:.1f}ms",
+            flush=True
+        )
+        raise exc
+
+
 @app.exception_handler(SanctuaryException)
 async def sanctuary_exception_handler(request: Request, exc: SanctuaryException):
     return JSONResponse(

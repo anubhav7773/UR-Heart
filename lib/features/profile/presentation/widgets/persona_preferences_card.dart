@@ -36,7 +36,7 @@ class _PersonaPreferencesCardState extends State<PersonaPreferencesCard> {
         fullName: 'Aarav Sharma',
         email: 'aarav@sanctuary.internal',
         age: 23,
-        dobVerificationPill: '14 Oct 2002 · LOCKED & VERIFIED',
+        dobVerificationPill: 'VERIFIED AGE · ADULT',
         gender: 'Male',
         interestedIn: 'Women',
         maskedWhatsApp: '+91 98765 ***** · ENCRYPTED',
@@ -103,7 +103,7 @@ class _PersonaPreferencesCardState extends State<PersonaPreferencesCard> {
                 style: AppTypography.titleH2.copyWith(fontSize: 16, color: headlineColor),
               ),
               Text(
-                'Groq AI LPU Polish ✨',
+                'EVA AI Polish ✨',
                 style: TextStyle(fontSize: 11, color: coralColor, fontWeight: FontWeight.bold),
               ),
             ],
