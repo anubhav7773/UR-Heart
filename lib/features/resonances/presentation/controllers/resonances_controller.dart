@@ -68,16 +68,17 @@ class ResonancesController extends StateNotifier<ResonancesState> {
   /// Converts incoming like to mutual match upon "💬 Chat" CTA tap
   Future<String?> createMutualMatch(String senderId) async {
     state = state.copyWith(creatingMatchId: senderId);
-    final success = await _repository.createMutualMatch(senderId);
+    try {
+      final matchIdResult = await _repository.createMutualMatch(senderId);
 
-    if (success) {
-      final updatedLikes = List<dynamic>.from(state.incomingLikes)..removeWhere((l) {
-        final id = l is Map ? (l['user_id'] ?? l['sender_id'] ?? l['id']) : (l.senderId ?? l.id);
-        return id == senderId;
-      });
+      if (matchIdResult.isNotEmpty) {
+        final updatedLikes = List<dynamic>.from(state.incomingLikes)..removeWhere((l) {
+          final id = l is Map ? (l['user_id'] ?? l['sender_id'] ?? l['id']) : (l.senderId ?? l.id);
+          return id == senderId;
+        });
 
-      final matchId = 'match_$senderId';
-      final newConnection = MutualConnection(
+        final matchId = matchIdResult;
+        final newConnection = MutualConnection(
         id: 'conn_${DateTime.now().millisecondsSinceEpoch}',
         matchId: matchId,
         partnerId: senderId,
@@ -93,12 +94,16 @@ class ResonancesController extends StateNotifier<ResonancesState> {
 
       final updatedConnections = [newConnection, ...state.mutualConnections];
 
-      state = state.copyWith(
-        incomingLikes: updatedLikes,
-        mutualConnections: updatedConnections,
-        creatingMatchId: null,
-      );
-      return matchId;
+        state = state.copyWith(
+          incomingLikes: updatedLikes,
+          mutualConnections: updatedConnections,
+          creatingMatchId: null,
+        );
+        return matchId;
+      }
+    } catch (_) {
+      state = state.copyWith(creatingMatchId: null);
+      return null;
     }
 
     state = state.copyWith(creatingMatchId: null);

@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/vault_repository.dart';
-import '../../domain/vault_models.dart';
 
 class VaultState {
   final DataExportRecord? activeExport;

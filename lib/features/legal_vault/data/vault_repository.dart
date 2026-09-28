@@ -1,118 +1,161 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
-import '../../../core/network/api_client.dart';
+import '../../../core/error/sanctuary_exceptions.dart';
+import '../../../core/network/dio_client.dart';
 import '../domain/vault_models.dart';
+
+export '../domain/vault_models.dart';
 
 /// Repository orchestrating statutory DPDP exports, nominee records & grievance filings
 class VaultRepository {
-  final ApiClient? _apiClient;
-  final _uuid = const Uuid();
+  final Dio _dio;
 
   DataExportRecord? _activeExport;
   DataNominee _nominee = const DataNominee();
   final List<BlockedProfile> _blockedList = [];
 
-  VaultRepository([this._apiClient]) {
-    _initializeBlockedList();
-  }
-
-  void _initializeBlockedList() {
-    _blockedList.addAll([
-      const BlockedProfile(id: 'blk-1', name: 'Vikram', age: 31, dateBlocked: '12 Sep 2024'),
-      const BlockedProfile(id: 'blk-2', name: 'Karan', age: 29, dateBlocked: '18 Sep 2024'),
-      const BlockedProfile(id: 'blk-3', name: 'Aryan', age: 27, dateBlocked: '22 Sep 2024'),
-      const BlockedProfile(id: 'blk-4', name: 'Rishi', age: 32, dateBlocked: '01 Oct 2024'),
-      const BlockedProfile(id: 'blk-5', name: 'Sameer', age: 28, dateBlocked: '05 Oct 2024'),
-      const BlockedProfile(id: 'blk-6', name: 'Tushar', age: 30, dateBlocked: '10 Oct 2024'),
-      const BlockedProfile(id: 'blk-7', name: 'Nakul', age: 26, dateBlocked: '12 Oct 2024'),
-      const BlockedProfile(id: 'blk-8', name: 'Gaurav', age: 33, dateBlocked: '14 Oct 2024'),
-      const BlockedProfile(id: 'blk-9', name: 'Harsh', age: 29, dateBlocked: '15 Oct 2024'),
-      const BlockedProfile(id: 'blk-10', name: 'Yash', age: 27, dateBlocked: '16 Oct 2024'),
-      const BlockedProfile(id: 'blk-11', name: 'Manav', age: 28, dateBlocked: '17 Oct 2024'),
-      const BlockedProfile(id: 'blk-12', name: 'Kunal', age: 30, dateBlocked: '18 Oct 2024'),
-      const BlockedProfile(id: 'blk-13', name: 'Aditya', age: 29, dateBlocked: '19 Oct 2024'),
-      const BlockedProfile(id: 'blk-14', name: 'Pranav', age: 31, dateBlocked: '20 Oct 2024'),
-    ]);
-  }
+  VaultRepository([Dio? dio]) : _dio = dio ?? Dio();
 
   DataExportRecord? getActiveExport() => _activeExport;
   DataNominee getNominee() => _nominee;
   List<BlockedProfile> getBlockedList() => List.unmodifiable(_blockedList);
 
+  /// DPDP Sec 11: Initiates data portability export. Zero fake zip generation.
   Future<DataExportRecord> requestDataExport() async {
-    final exportId = _uuid.v4();
     try {
-      await _apiClient?.dio.post<dynamic>(
-        '/api/v1/vault/export-data',
-        data: {'export_id': exportId},
-      );
-    } catch (_) {}
+      final response = await _dio.post<dynamic>('/api/v1/vault/export-data');
+      final data = response.data as Map<String, dynamic>;
+      final ticket = DataExportTicket.fromJson(data);
 
-    final record = DataExportRecord(
-      id: exportId,
-      status: ExportStatus.ready,
-      requestedAt: DateTime.now(),
-      downloadUrl: 'https://vault.urheart.app/exports/$exportId.zip',
-    );
-    _activeExport = record;
-    return record;
+      final record = DataExportRecord(
+        id: ticket.requestId,
+        status: ExportStatus.processing,
+        requestedAt: DateTime.now(),
+        downloadUrl: null,
+        expiresText: 'Valid for ${ticket.validDays} days upon completion',
+      );
+      _activeExport = record;
+      return record;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
   }
 
+  /// Polls async export compilation status
+  Future<DataExportStatus> checkExportStatus(String requestId) async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/vault/export-status/$requestId');
+      return DataExportStatus.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
+  /// DPDP Sec 14: Persists legal nominee to Supabase public.data_nominees
   Future<DataNominee> designateNominee({
     required String name,
     required String contact,
     required String relationship,
   }) async {
     try {
-      await _apiClient?.dio.post<dynamic>(
+      final response = await _dio.post<dynamic>(
         '/api/v1/vault/nominee',
         data: {
-          'nominee_name': name,
-          'nominee_contact': contact,
-          'relationship': relationship,
+          'name': name.trim(),
+          'phone': contact.trim(),
+          'relationship': relationship.trim(),
         },
       );
-    } catch (_) {}
-
-    _nominee = DataNominee(
-      name: name,
-      contact: contact,
-      relationship: relationship,
-      isDesignated: true,
-    );
-    return _nominee;
+      if (response.statusCode == 200) {
+        _nominee = DataNominee(
+          name: name.trim(),
+          contact: contact.trim(),
+          relationship: relationship.trim(),
+          isDesignated: true,
+        );
+        return _nominee;
+      }
+      throw const ServerException('Failed to designate data nominee.');
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
   }
 
-  Future<GrievanceRecord> fileGrievanceDossier({
-    required String category,
-    required String evidenceText,
+  /// IT Rules 2021 Rule 3(2): Files statutory grievance ticket into database
+  Future<GrievanceReceipt> fileGrievanceDossier({
+    String? reportedUserId,
+    String? category,
+    String? violationCategory,
+    String? evidenceText,
+    String? evidence,
   }) async {
-    final id = _uuid.v4();
     try {
-      await _apiClient?.dio.post<dynamic>(
+      final response = await _dio.post<dynamic>(
         '/api/v1/vault/grievance',
         data: {
-          'dossier_id': id,
-          'category': category,
-          'evidence': evidenceText,
+          if (reportedUserId != null) 'reported_user_id': reportedUserId,
+          'violation_category': violationCategory ?? category ?? 'harassment',
+          'evidence_text': (evidenceText ?? evidence ?? '').trim(),
         },
       );
-    } catch (_) {}
+      return GrievanceReceipt.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
 
-    return GrievanceRecord(
-      id: id,
-      category: category,
-      evidenceText: evidenceText,
-      submittedAt: DateTime.now(),
-    );
+  /// Fetches real blocked users perimeter from Supabase
+  Future<List<BlockedUserProfile>> fetchBlockedUsers() async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/vault/blocked');
+      final dynamic body = response.data;
+      final List<dynamic> list = body is Map<String, dynamic>
+          ? (body['blocked_users'] as List<dynamic>? ?? [])
+          : (body as List<dynamic>? ?? []);
+      final parsed = list.map((json) => BlockedUserProfile.fromJson(json as Map<String, dynamic>)).toList();
+      _blockedList
+        ..clear()
+        ..addAll(parsed);
+      return parsed;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
+  /// Removes user from blocked perimeter in database
+  Future<bool> unblockUser(String blockedUserId) async {
+    try {
+      final response = await _dio.delete<dynamic>('/api/v1/vault/blocked/$blockedUserId');
+      if (response.statusCode == 200) {
+        _blockedList.removeWhere((item) => item.id == blockedUserId);
+        return true;
+      }
+      return false;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
   }
 
   void unblockProfile(String id) {
-    _blockedList.removeWhere((item) => item.id == id);
+    unblockUser(id);
+  }
+
+  void _handleDioError(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+      throw const NetworkUnavailableException();
+    }
+    if (e.response?.statusCode == 401) throw const UnauthorizedException();
+    throw ServerException(e.response?.data?['detail'] as String? ?? 'Statutory vault error.');
   }
 }
 
 final vaultRepositoryProvider = Provider<VaultRepository>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return VaultRepository(client);
+  final dioClient = ref.watch(dioClientProvider);
+  return VaultRepository(dioClient.dio);
 });

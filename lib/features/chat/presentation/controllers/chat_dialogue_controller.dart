@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/chat_repository.dart';
-import '../../domain/chat_models.dart';
 import '../../domain/nlp_chat_sanitizer.dart';
 
 /// State representation for 1:1 Encrypted Dialogue (Screen 9)

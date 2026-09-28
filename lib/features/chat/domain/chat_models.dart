@@ -27,6 +27,28 @@ class ChatMessage {
     required this.isMe,
   });
 
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    return ChatMessage(
+      id: json['id'] as String? ?? 'msg_${DateTime.now().millisecondsSinceEpoch}',
+      matchId: json['match_id'] as String? ?? '',
+      senderId: json['sender_id'] as String? ?? '',
+      recipientId: json['recipient_id'] as String? ?? '',
+      text: json['text'] as String? ?? json['message'] as String? ?? '',
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      status: _parseDeliveryStatus(json['status']),
+      isMe: json['is_me'] as bool? ?? false,
+    );
+  }
+
+  static MessageDeliveryStatus _parseDeliveryStatus(dynamic status) {
+    final s = status?.toString().toLowerCase();
+    if (s == 'read') return MessageDeliveryStatus.read;
+    if (s == 'delivered') return MessageDeliveryStatus.delivered;
+    return MessageDeliveryStatus.sent;
+  }
+
   ChatMessage copyWith({
     String? id,
     String? matchId,
@@ -82,6 +104,26 @@ class ChatConversation {
     required this.sharedContextQuote,
   });
 
+  factory ChatConversation.fromJson(Map<String, dynamic> json) {
+    return ChatConversation(
+      matchId: json['match_id'] as String? ?? json['id'] as String? ?? '',
+      recipientId: json['recipient_id'] as String? ?? json['partner_id'] as String? ?? '',
+      recipientName: json['recipient_name'] as String? ?? json['full_name'] as String? ?? 'Sanctuary Seeker',
+      recipientAge: json['recipient_age'] as int? ?? json['age'] as int? ?? 24,
+      recipientAvatarUrl: json['recipient_avatar_url'] as String? ?? json['avatar_url'] as String? ?? '',
+      isOnline: json['is_online'] as bool? ?? false,
+      hasWaKey: json['has_wa_key'] as bool? ?? false,
+      lastMessageText: json['last_message_text'] as String? ?? json['last_message'] as String? ?? '',
+      lastMessageTimestamp: json['last_message_timestamp'] != null
+          ? DateTime.tryParse(json['last_message_timestamp'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      lastMessageStatus: ChatMessage._parseDeliveryStatus(json['last_message_status']),
+      unreadCount: json['unread_count'] as int? ?? 0,
+      categoryTag: json['category_tag'] as String? ?? 'Mutual Spark',
+      sharedContextQuote: json['shared_context_quote'] as String? ?? '',
+    );
+  }
+
   ChatConversation copyWith({
     String? matchId,
     String? recipientId,
@@ -115,6 +157,8 @@ class ChatConversation {
   }
 }
 
+typedef ConversationThread = ChatConversation;
+
 /// Entity representing a spark candidate in the Screen 8 carousel
 class SparkProfile {
   final String id;
@@ -132,4 +176,15 @@ class SparkProfile {
     required this.isOnline,
     required this.matchType,
   });
+
+  factory SparkProfile.fromJson(Map<String, dynamic> json) {
+    return SparkProfile(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? json['full_name'] as String? ?? 'Seeker',
+      age: json['age'] as int? ?? 24,
+      avatarUrl: json['avatar_url'] as String? ?? json['photo_url'] as String? ?? '',
+      isOnline: json['is_online'] as bool? ?? true,
+      matchType: json['match_type'] as String? ?? 'MUTUAL',
+    );
+  }
 }

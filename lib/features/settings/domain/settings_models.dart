@@ -39,3 +39,20 @@ class SanctuarySettings {
   }
 }
 
+class UserPreferences {
+  final bool? isIncognito;
+  final bool? discreetMode;
+  final bool? pushNotificationsEnabled;
+
+  const UserPreferences({
+    this.isIncognito,
+    this.discreetMode,
+    this.pushNotificationsEnabled,
+  });
+
+  Map<String, dynamic> toJson() => {
+    if (isIncognito != null) 'is_incognito': isIncognito,
+    if (discreetMode != null) 'discreet_mode': discreetMode,
+    if (pushNotificationsEnabled != null) 'push_notifications_enabled': pushNotificationsEnabled,
+  };
+}

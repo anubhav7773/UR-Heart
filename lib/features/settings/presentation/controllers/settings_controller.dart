@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/settings_repository.dart';
-import '../../domain/settings_models.dart';
 
 class SettingsState {
   final SanctuarySettings settings;

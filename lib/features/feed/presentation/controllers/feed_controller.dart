@@ -9,6 +9,7 @@ class FeedState {
   final int directLettersCount;
   final bool isLoading;
   final bool isOutOfSwipesModalVisible;
+  final String? errorMessage;
 
   const FeedState({
     this.candidates = const [],
@@ -17,6 +18,7 @@ class FeedState {
     this.directLettersCount = 1,
     this.isLoading = false,
     this.isOutOfSwipesModalVisible = false,
+    this.errorMessage,
   });
 
   CandidateProfile? get currentCandidate =>
@@ -29,6 +31,7 @@ class FeedState {
     int? directLettersCount,
     bool? isLoading,
     bool? isOutOfSwipesModalVisible,
+    String? errorMessage,
   }) {
     return FeedState(
       candidates: candidates ?? this.candidates,
@@ -38,6 +41,7 @@ class FeedState {
       isLoading: isLoading ?? this.isLoading,
       isOutOfSwipesModalVisible:
           isOutOfSwipesModalVisible ?? this.isOutOfSwipesModalVisible,
+      errorMessage: errorMessage,
     );
   }
 }
@@ -51,9 +55,13 @@ class FeedController extends StateNotifier<FeedState> {
   }
 
   Future<void> loadDiscoveryFeed() async {
-    state = state.copyWith(isLoading: true);
-    final profiles = await _repository.getDiscoveryFeed();
-    state = state.copyWith(candidates: profiles, isLoading: false);
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final profiles = await _repository.getDiscoveryFeed();
+      state = state.copyWith(candidates: profiles, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    }
   }
 
   /// Handles Pass swipe (Left swipe)
@@ -65,8 +73,7 @@ class FeedController extends StateNotifier<FeedState> {
     final candidate = state.currentCandidate;
     if (candidate == null) return false;
 
-    await _repository.recordSwipe(targetId: candidate.id, swipeType: 'pass');
-
+    // Optimistic removal
     final updatedCandidates = List<CandidateProfile>.from(state.candidates)
       ..removeAt(0);
     final updatedPassed = List<CandidateProfile>.from(state.passedProfiles)
@@ -75,9 +82,20 @@ class FeedController extends StateNotifier<FeedState> {
     state = state.copyWith(
       candidates: updatedCandidates,
       passedProfiles: updatedPassed,
-      swipesRemaining: state.swipesRemaining - 1,
     );
-    return true;
+
+    try {
+      final remaining = await _repository.recordSwipe(
+        targetUserId: candidate.id,
+        swipeType: 'pass',
+      );
+      state = state.copyWith(swipesRemaining: remaining);
+      return true;
+    } catch (e) {
+      // Revert if error
+      await loadDiscoveryFeed();
+      return false;
+    }
   }
 
   /// Handles Like swipe (Right swipe)
@@ -89,16 +107,25 @@ class FeedController extends StateNotifier<FeedState> {
     final candidate = state.currentCandidate;
     if (candidate == null) return false;
 
-    await _repository.recordSwipe(targetId: candidate.id, swipeType: 'like');
-
+    // Optimistic removal
     final updatedCandidates = List<CandidateProfile>.from(state.candidates)
       ..removeAt(0);
 
     state = state.copyWith(
       candidates: updatedCandidates,
-      swipesRemaining: state.swipesRemaining - 1,
     );
-    return true;
+
+    try {
+      final remaining = await _repository.recordSwipe(
+        targetUserId: candidate.id,
+        swipeType: 'like',
+      );
+      state = state.copyWith(swipesRemaining: remaining);
+      return true;
+    } catch (e) {
+      await loadDiscoveryFeed();
+      return false;
+    }
   }
 
   /// Handles Direct Letter (Up swipe)
@@ -109,8 +136,6 @@ class FeedController extends StateNotifier<FeedState> {
     final candidate = state.currentCandidate;
     if (candidate == null) return false;
 
-    await _repository.recordSwipe(targetId: candidate.id, swipeType: 'superlike');
-
     final updatedCandidates = List<CandidateProfile>.from(state.candidates)
       ..removeAt(0);
 
@@ -118,7 +143,18 @@ class FeedController extends StateNotifier<FeedState> {
       candidates: updatedCandidates,
       directLettersCount: state.directLettersCount - 1,
     );
-    return true;
+
+    try {
+      final remaining = await _repository.recordSwipe(
+        targetUserId: candidate.id,
+        swipeType: 'superlike',
+      );
+      state = state.copyWith(swipesRemaining: remaining);
+      return true;
+    } catch (e) {
+      await loadDiscoveryFeed();
+      return false;
+    }
   }
 
   /// Prepend restored profile back to the top of the feed deck from Screen 6

@@ -42,14 +42,36 @@ SAMPLE_MESSAGES = [
 
 
 @router.get("/threads", status_code=status.HTTP_200_OK, summary="Get Active Dialogue Threads")
-async def get_dialogue_threads() -> List[Dict[str, Any]]:
+async def get_dialogue_threads():
     """Returns active dialogue threads with delivery indicators."""
     print(f"[CHAT THREADS] Serving {len(CHAT_THREADS)} active conversation threads", flush=True)
-    return CHAT_THREADS
+    return {"threads": CHAT_THREADS, "data": CHAT_THREADS}
+
+
+@router.get("/sparks", status_code=status.HTTP_200_OK, summary="Get Active Exploration Sparks")
+async def get_active_sparks():
+    """Returns active sparks under exploration timer."""
+    sparks = [
+        {
+            "id": "spark_1",
+            "name": "Devika Roy",
+            "age": 25,
+            "avatar_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
+            "is_online": True,
+            "match_type": "MUTUAL"
+        }
+    ]
+    return {"sparks": sparks, "data": sparks}
 
 
 @router.get("/messages/{match_id}", status_code=status.HTTP_200_OK, summary="Get Messages for Dialogue")
-async def get_dialogue_messages(match_id: str) -> List[Dict[str, Any]]:
+async def get_dialogue_messages(match_id: str):
     """Returns chronologically ordered messages for match dialogue."""
     print(f"[CHAT MESSAGES] Serving messages for match_id={match_id}", flush=True)
     return SAMPLE_MESSAGES
+
+
+@router.get("/threads/{match_id}/messages", status_code=status.HTTP_200_OK, summary="Get Thread Messages")
+async def get_thread_messages(match_id: str):
+    """Returns chronologically ordered messages for match dialogue thread."""
+    return {"messages": SAMPLE_MESSAGES, "data": SAMPLE_MESSAGES}

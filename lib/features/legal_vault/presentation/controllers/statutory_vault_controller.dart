@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/vault_repository.dart';
-import '../../domain/vault_models.dart';
 import '../widgets/nominee_designation_modal.dart';
 
 /// State representation for Statutory Vault & Governance (< 170 lines)

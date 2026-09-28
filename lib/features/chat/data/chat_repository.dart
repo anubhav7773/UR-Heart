@@ -1,9 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import '../../../core/network/api_client.dart';
+import '../../../core/error/sanctuary_exceptions.dart';
+import '../../../core/network/dio_client.dart';
 import '../domain/chat_models.dart';
-import 'chat_seed_data.dart';
 import 'chat_websocket_service.dart';
+
+export '../domain/chat_models.dart';
 
 /// Riverpod Providers for Chat Data Layer
 final chatWebSocketServiceProvider = Provider<ChatWebSocketService>((ref) {
@@ -14,49 +17,43 @@ final chatWebSocketServiceProvider = Provider<ChatWebSocketService>((ref) {
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   final ws = ref.watch(chatWebSocketServiceProvider);
-  final apiClient = ref.watch(apiClientProvider);
-  return ChatRepository(ws, apiClient);
+  final dioClient = ref.watch(dioClientProvider);
+  return ChatRepository(dioClient.dio, ws);
 });
 
 final conversationsProvider = FutureProvider<List<ChatConversation>>((ref) async {
   final repo = ref.watch(chatRepositoryProvider);
-  return repo.getConversations();
+  return repo.fetchConversations();
 });
 
 final recentSparksProvider = FutureProvider<List<SparkProfile>>((ref) async {
   final repo = ref.watch(chatRepositoryProvider);
-  return repo.getRecentSparks();
+  return repo.fetchActiveSparks();
 });
 
 final chatMessagesProvider =
     FutureProvider.family<List<ChatMessage>, String>((ref, matchId) async {
   final repo = ref.watch(chatRepositoryProvider);
-  return repo.getMessagesForMatch(matchId);
+  return repo.fetchThreadMessages(matchId);
 });
 
 /// Repository orchestrating active conversations, recent sparks, and message delivery
 class ChatRepository {
-  final ChatWebSocketService _wsService;
-  final ApiClient? _apiClient;
+  final Dio _dio;
+  final ChatWebSocketService? _wsService;
   final _uuid = const Uuid();
 
   final List<ChatConversation> _conversations = [];
   final Map<String, List<ChatMessage>> _messagesByMatch = {};
   final List<SparkProfile> _sparks = [];
 
-  ChatRepository(this._wsService, [this._apiClient]) {
-    _initializeSeedData();
+  ChatRepository([Dio? dio, this._wsService])
+      : _dio = dio ?? Dio() {
     _subscribeToWebSocketEvents();
   }
 
-  void _initializeSeedData() {
-    _sparks.addAll(ChatSeedData.getInitialSparks());
-    _conversations.addAll(ChatSeedData.getInitialConversations());
-    _messagesByMatch.addAll(ChatSeedData.getInitialMessages());
-  }
-
   void _subscribeToWebSocketEvents() {
-    _wsService.eventStream.listen((event) {
+    _wsService?.eventStream.listen((event) {
       final action = event['action'];
       if (action == 'status_update') {
         final matchId = event['match_id'] as String?;
@@ -84,34 +81,68 @@ class ChatRepository {
     }
   }
 
-  Future<List<ChatConversation>> getConversations() async =>
-      List.unmodifiable(_conversations);
-
-  Future<List<SparkProfile>> getRecentSparks() async =>
-      List.unmodifiable(_sparks);
-
-  Future<List<ChatMessage>> getMessagesForMatch(String matchId) async {
-    final msgs = _messagesByMatch[matchId] ?? [];
-    return List.unmodifiable(msgs);
-  }
-
-  /// REST fallback: GET /api/v1/chat/threads
-  Future<void> fetchRemoteThreadsFallback() async {
+  /// Fetches dynamic spark carousel candidates under active exploration timer.
+  Future<List<SparkProfile>> fetchActiveSparks() async {
     try {
-      await _apiClient?.dio.get<dynamic>('/api/v1/chat/threads');
-    } catch (_) {
-      // Fallback silently degrades gracefully in offline mode
+      final response = await _dio.get<dynamic>('/api/v1/chat/sparks');
+      final dynamic body = response.data;
+      final List<dynamic> list = body is Map<String, dynamic>
+          ? (body['sparks'] as List<dynamic>? ?? [])
+          : (body as List<dynamic>? ?? []);
+      final sparks = list.map((json) => SparkProfile.fromJson(json as Map<String, dynamic>)).toList();
+      _sparks
+        ..clear()
+        ..addAll(sparks);
+      return sparks;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
     }
   }
 
-  /// REST fallback: GET /api/v1/chat/messages/{match_id}
-  Future<void> fetchRemoteMessagesFallback(String matchId) async {
+  /// Fetches real conversation dialogue threads from PostgreSQL.
+  Future<List<ConversationThread>> fetchConversations() async {
     try {
-      await _apiClient?.dio.get<dynamic>('/api/v1/chat/messages/$matchId');
-    } catch (_) {
-      // Fallback silently degrades gracefully in offline mode
+      final response = await _dio.get<dynamic>('/api/v1/chat/threads');
+      final dynamic body = response.data;
+      final List<dynamic> list = body is Map<String, dynamic>
+          ? (body['threads'] as List<dynamic>? ?? [])
+          : (body as List<dynamic>? ?? []);
+      final threads = list.map((json) => ConversationThread.fromJson(json as Map<String, dynamic>)).toList();
+      _conversations
+        ..clear()
+        ..addAll(threads);
+      return threads;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
     }
   }
+
+  /// Fetches historical encrypted message payloads for a thread.
+  Future<List<ChatMessage>> fetchThreadMessages(String matchId, {int limit = 50}) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/api/v1/chat/threads/$matchId/messages',
+        queryParameters: {'limit': limit},
+      );
+      final dynamic body = response.data;
+      final List<dynamic> list = body is Map<String, dynamic>
+          ? (body['messages'] as List<dynamic>? ?? [])
+          : (body as List<dynamic>? ?? []);
+      final msgs = list.map((json) => ChatMessage.fromJson(json as Map<String, dynamic>)).toList();
+      _messagesByMatch[matchId] = msgs;
+      return msgs;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
+  // Backwards-compatible aliases
+  Future<List<ChatConversation>> getConversations() => fetchConversations();
+  Future<List<SparkProfile>> getRecentSparks() => fetchActiveSparks();
+  Future<List<ChatMessage>> getMessagesForMatch(String matchId) => fetchThreadMessages(matchId);
 
   Future<ChatMessage> sendMessage({
     required String matchId,
@@ -132,7 +163,6 @@ class ChatRepository {
     final currentList = _messagesByMatch.putIfAbsent(matchId, () => []);
     currentList.add(message);
 
-    // Update conversation last message preview
     final convIdx = _conversations.indexWhere((c) => c.matchId == matchId);
     if (convIdx != -1) {
       _conversations[convIdx] = _conversations[convIdx].copyWith(
@@ -142,8 +172,7 @@ class ChatRepository {
       );
     }
 
-    // Transmit over WebSocket wire protocol
-    _wsService.sendJson({
+    _wsService?.sendJson({
       'action': 'send_message',
       'match_id': matchId,
       'recipient_id': recipientId,
@@ -161,7 +190,7 @@ class ChatRepository {
       for (int i = 0; i < list.length; i++) {
         if (!list[i].isMe && list[i].status != MessageDeliveryStatus.read) {
           list[i] = list[i].copyWith(status: MessageDeliveryStatus.read);
-          _wsService.sendJson({
+          _wsService?.sendJson({
             'action': 'ack_read',
             'match_id': matchId,
             'message_id': list[i].id,
@@ -174,5 +203,13 @@ class ChatRepository {
     if (convIdx != -1) {
       _conversations[convIdx] = _conversations[convIdx].copyWith(unreadCount: 0);
     }
+  }
+
+  void _handleDioError(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+      throw const NetworkUnavailableException();
+    }
+    if (e.response?.statusCode == 401) throw const UnauthorizedException();
+    throw ServerException(e.response?.data?['detail'] as String? ?? 'Chat synchronization failed.');
   }
 }

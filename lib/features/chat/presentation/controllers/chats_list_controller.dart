@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/chat_repository.dart';
-import '../../domain/chat_models.dart';
 
 class ChatsListState {
   final List<ChatConversation> allConversations;

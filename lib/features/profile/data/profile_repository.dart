@@ -1,51 +1,71 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/api_endpoints.dart';
+import '../../../core/error/sanctuary_exceptions.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/services/activity_logger_service.dart';
 import '../../../core/services/real_gps_location_service.dart';
 import '../domain/user_profile_model.dart';
 
+export '../domain/user_profile_model.dart';
+
 /// Repository handling Profile retrieval, updates, EVA AI bio polish, and Real Hardware GPS
 class ProfileRepository {
   final ApiClient? _apiClient;
+  final Dio? _dio;
   UserProfile _currentProfile;
 
   static const String _groqApiKey =
       String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
 
-  ProfileRepository([this._apiClient])
-      : _currentProfile = _defaultProfile() {
+  ProfileRepository([this._apiClient, this._dio])
+      : _currentProfile = _emptyInitialProfile() {
     loadProfileFromStorage();
   }
 
-  static UserProfile _defaultProfile() => const UserProfile(
-        id: 'user-self',
-        fullName: 'Aanya Sharma',
-        email: 'aanya.sharma@sanctuary.in',
-        age: 22,
-        dobVerificationPill: '14 Oct 2002 · LOCKED & VERIFIED',
-        gender: 'Woman',
-        interestedIn: 'Men',
-        maskedWhatsApp: '+91 98765 ***** · ENCRYPTED',
-        memberSinceText: 'Sanctuary Member since Oct 2024',
-        hasVerifiedCrest: true,
-        location: 'Bandra West, Mumbai',
-        bio:
-            'Architect passionate about quiet libraries, analog film, and pour-over coffee. Searching for slow, honest conversations that transcend algorithms.',
-        profession: 'Architectural Conservator',
-        education: 'CEPT University, Ahmedabad',
-        minAgePref: 21.0,
-        maxAgePref: 29.0,
+  Dio get dio => _dio ?? _apiClient?.dio ?? Dio();
+
+  static UserProfile _emptyInitialProfile() => const UserProfile(
+        id: '',
+        fullName: '',
+        email: '',
+        age: 18,
+        dobVerificationPill: '',
+        gender: '',
+        interestedIn: '',
+        maskedWhatsApp: '',
+        memberSinceText: '',
+        hasVerifiedCrest: false,
+        location: '',
+        bio: '',
+        profession: '',
+        education: '',
+        minAgePref: 18.0,
+        maxAgePref: 35.0,
         avatarUrl: '',
         momentPhotos: ['', '', '', ''],
       );
 
   UserProfile getProfile() => _currentProfile;
+
+  /// Fetches authenticated user's persona directly from PostgreSQL.
+  Future<UserPersonaModel> fetchMyProfile() async {
+    try {
+      final response = await dio.get<dynamic>('/api/v1/profile/me');
+      final profile = UserPersonaModel.fromJson(response.data as Map<String, dynamic>);
+      _currentProfile = profile;
+      return profile;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
 
   /// Restores user profile and DOB accurately from SharedPreferences
   Future<UserProfile> loadProfileFromStorage() async {
@@ -63,12 +83,11 @@ class ProfileRepository {
       final savedBio = prefs.getString('profile_bio');
       final savedProfession = prefs.getString('profile_profession');
       final savedEducation = prefs.getString('profile_education');
-      final isKyc = prefs.getBool('profile_is_kyc_verified') ?? true;
+      final isKyc = prefs.getBool('profile_is_kyc_verified') ?? false;
       final savedBridgePlatform =
           prefs.getString('profile_contact_bridge_platform');
       final savedBridgeHandle = prefs.getString('profile_contact_bridge_handle');
 
-      // Photos from slots
       final List<String> moments = ['', '', '', ''];
       String avatar = '';
       final slot1 = prefs.getString('profile_photo_slot_1');
@@ -121,6 +140,7 @@ class ProfileRepository {
     return _currentProfile;
   }
 
+  /// Persists edits directly to public.users table via PUT /api/v1/profile/me.
   Future<UserProfile> updateProfile(UserProfile updated) async {
     _currentProfile = updated;
     try {
@@ -130,27 +150,32 @@ class ProfileRepository {
       await prefs.setString('profile_education', updated.education);
       await prefs.setString('profile_location', updated.location);
 
-      await _apiClient?.dio.put<dynamic>(
-        ApiEndpoints.userProfile,
+      final response = await dio.put<dynamic>(
+        '/api/v1/profile/me',
         data: {
           'bio': updated.bio,
           'profession': updated.profession,
           'education': updated.education,
-          'location': updated.location,
-          'min_age_pref': updated.minAgePref.toInt(),
-          'max_age_pref': updated.maxAgePref.toInt(),
+          'location_name': updated.location,
+          'preferred_age_min': updated.minAgePref.toInt(),
+          'preferred_age_max': updated.maxAgePref.toInt(),
         },
       );
+
+      if (response.statusCode != 200) {
+        throw const ServerException('Profile update failed.');
+      }
 
       await ActivityLogger.log(
         category: 'PROFILE',
         action: 'PROFILE_UPDATED',
         details: {'name': updated.fullName, 'location': updated.location},
       );
-    } catch (_) {
-      // Graceful offline fallback
+      return _currentProfile;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
     }
-    return _currentProfile;
   }
 
   /// Refines bio using real EVA AI on Render via Groq LPU with direct Groq Cloud failover
@@ -168,14 +193,14 @@ class ProfileRepository {
 
     // Primary: Call Render Backend AI cluster
     try {
-      final res = await _apiClient?.dio.post<Map<String, dynamic>>(
+      final res = await dio.post<Map<String, dynamic>>(
         ApiEndpoints.aiPolishBio,
         data: {
           'raw_bio': rawText,
           'intent': 'mindful',
         },
       );
-      final polished = res?.data?['polished_bio'] as String?;
+      final polished = res.data?['polished_bio'] as String?;
       if (polished != null && polished.isNotEmpty) {
         await ActivityLogger.log(
           category: 'EVA_AI',
@@ -198,46 +223,46 @@ class ProfileRepository {
             'Authorization': 'Bearer $_groqApiKey',
             'Content-Type': 'application/json',
           },
-        body: jsonEncode({
-          'model': 'llama-3.3-70b-versatile',
-          'messages': [
-            {
-              'role': 'system',
-              'content':
-                  'You are EVA AI, the poetic and mindful AI companion for UR-Heart dating sanctuary. '
-                  'Rewrite the user bio with elegance, mindfulness, and authenticity. '
-                  'Keep the user core interests unchanged. Return ONLY the polished bio text, no explanations.'
-            },
-            {
-              'role': 'user',
-              'content': 'Please polish this dating bio: "$rawText"'
-            }
-          ],
-          'temperature': 0.7,
-          'max_tokens': 120,
-        }),
-      ).timeout(const Duration(seconds: 8));
+          body: jsonEncode({
+            'model': 'llama-3.3-70b-versatile',
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are EVA AI, the poetic and mindful AI companion for UR-Heart dating sanctuary. '
+                    'Rewrite the user bio with elegance, mindfulness, and authenticity. '
+                    'Keep the user core interests unchanged. Return ONLY the polished bio text, no explanations.'
+              },
+              {
+                'role': 'user',
+                'content': 'Please polish this dating bio: "$rawText"'
+              }
+            ],
+            'temperature': 0.7,
+            'max_tokens': 120,
+          }),
+        ).timeout(const Duration(seconds: 8));
 
-      if (groqResponse.statusCode == 200) {
-        final data = jsonDecode(groqResponse.body) as Map<String, dynamic>;
-        final choices = data['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          final content = choices[0]['message']?['content'] as String?;
-          if (content != null && content.trim().isNotEmpty) {
-            final cleaned = content.trim().replaceAll('"', '');
-            await ActivityLogger.log(
-              category: 'EVA_AI',
-              action: 'BIO_POLISHED_GROQ_DIRECT_SUCCESS',
-              details: {'output_length': cleaned.length},
-            );
-            return cleaned;
+        if (groqResponse.statusCode == 200) {
+          final data = jsonDecode(groqResponse.body) as Map<String, dynamic>;
+          final choices = data['choices'] as List<dynamic>?;
+          if (choices != null && choices.isNotEmpty) {
+            final content = choices[0]['message']?['content'] as String?;
+            if (content != null && content.trim().isNotEmpty) {
+              final cleaned = content.trim().replaceAll('"', '');
+              await ActivityLogger.log(
+                category: 'EVA_AI',
+                action: 'BIO_POLISHED_GROQ_DIRECT_SUCCESS',
+                details: {'output_length': cleaned.length},
+              );
+              return cleaned;
+            }
           }
         }
+      } catch (err) {
+        debugPrint('[ProfileRepository] Direct Groq API error: $err');
       }
-    } catch (err) {
-      debugPrint('[ProfileRepository] Direct Groq API error: $err');
     }
-  }
 
     return '$rawText · Mindfully present, cherishing authentic conversation and intentional depth.';
   }
@@ -263,9 +288,18 @@ class ProfileRepository {
       _currentProfile = _currentProfile.copyWith(momentPhotos: list);
     }
   }
+
+  void _handleDioError(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+      throw const NetworkUnavailableException();
+    }
+    if (e.response?.statusCode == 401) throw const UnauthorizedException();
+    throw ServerException(e.response?.data?['detail'] as String? ?? 'Profile synchronization failed.');
+  }
 }
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   final client = ref.watch(apiClientProvider);
-  return ProfileRepository(client);
+  final dioClient = ref.watch(dioClientProvider);
+  return ProfileRepository(client, dioClient.dio);
 });

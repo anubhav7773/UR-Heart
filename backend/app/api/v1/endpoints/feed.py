@@ -74,16 +74,18 @@ CANDIDATE_CATALOG = [
 
 
 @router.get("/feed", status_code=status.HTTP_200_OK, summary="Get Sanctuary Discovery Feed")
+@router.get("/discovery/feed", status_code=status.HTTP_200_OK, summary="Get Sanctuary Discovery Feed Alias")
 async def get_discovery_feed(
     limit: int = Query(default=10, ge=1, le=50),
     cursor: Optional[str] = None
-) -> List[Dict[str, Any]]:
+):
     """
     Returns verified candidate profiles for the discovery deck
     with reciprocal orientation matching and AI insights.
     """
+    cards = CANDIDATE_CATALOG[:limit]
     print(f"[FEED DISCOVERY] Serving {min(limit, len(CANDIDATE_CATALOG))} candidate cards to client", flush=True)
-    return CANDIDATE_CATALOG[:limit]
+    return {"candidates": cards, "data": cards}
 
 
 @router.post("/swipes", status_code=status.HTTP_200_OK, summary="Record Profile Swipe Action")
@@ -98,7 +100,8 @@ async def record_swipe(payload: SwipeRequest):
         "target_id": payload.target_id,
         "swipe_type": payload.swipe_type,
         "is_match": is_match,
-        "match_id": f"match-{payload.target_id}" if is_match else None
+        "match_id": f"match-{payload.target_id}" if is_match else None,
+        "swipes_remaining": 24
     }
 
 

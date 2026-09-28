@@ -47,14 +47,15 @@ MUTUAL_CONNECTIONS = [
 
 
 @router.get("/incoming", status_code=status.HTTP_200_OK, summary="Get Incoming Likes")
-async def get_incoming_likes() -> List[Dict[str, Any]]:
+@router.get("/likes", status_code=status.HTTP_200_OK, summary="Get Incoming Likes Alias")
+async def get_incoming_likes():
     """Returns incoming admirers who liked the user profile."""
     print(f"[RESONANCES] Serving {len(INCOMING_LIKES)} incoming likes", flush=True)
-    return INCOMING_LIKES
+    return {"likes": INCOMING_LIKES, "data": INCOMING_LIKES}
 
 
 @router.get("/mutual", status_code=status.HTTP_200_OK, summary="Get Mutual Connections")
-async def get_mutual_connections() -> List[Dict[str, Any]]:
+async def get_mutual_connections():
     """Returns mutual matches eligible for 1:1 dialogue."""
     print(f"[RESONANCES] Serving {len(MUTUAL_CONNECTIONS)} mutual connections", flush=True)
-    return MUTUAL_CONNECTIONS
+    return {"connections": MUTUAL_CONNECTIONS, "data": MUTUAL_CONNECTIONS}

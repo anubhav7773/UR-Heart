@@ -40,6 +40,29 @@ class UserProfile {
     required this.momentPhotos,
   });
 
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      id: json['id'] as String? ?? '',
+      fullName: json['full_name'] as String? ?? 'Seeker',
+      email: json['email'] as String? ?? '',
+      age: json['age'] as int? ?? 24,
+      dobVerificationPill: json['dob'] as String? ?? 'Verified via DigiLocker',
+      gender: json['gender'] as String? ?? 'Seeker',
+      interestedIn: json['interested_in'] as String? ?? 'Everyone',
+      maskedWhatsApp: json['contact_bridge_masked'] as String? ?? '+91 **** ****',
+      memberSinceText: 'Member of Sanctuary',
+      hasVerifiedCrest: json['kyc_status'] as bool? ?? true,
+      location: json['location_name'] as String? ?? json['location'] as String? ?? 'Ayodhya, UP',
+      bio: json['bio'] as String? ?? '',
+      profession: json['profession'] as String? ?? '',
+      education: json['education'] as String? ?? '',
+      minAgePref: (json['preferred_age_min'] as num?)?.toDouble() ?? 18.0,
+      maxAgePref: (json['preferred_age_max'] as num?)?.toDouble() ?? 35.0,
+      avatarUrl: json['avatar_url'] as String? ?? (json['photos'] is List && (json['photos'] as List).isNotEmpty ? (json['photos'] as List).first as String : ''),
+      momentPhotos: List<String>.from(json['photos'] as List? ?? json['moment_photos'] as List? ?? []),
+    );
+  }
+
   UserProfile copyWith({
     String? id,
     String? fullName,
@@ -88,3 +111,5 @@ class UserProfile {
   String get sacredBridgeHandle => maskedWhatsApp;
   String get locationCity => location;
 }
+
+typedef UserPersonaModel = UserProfile;

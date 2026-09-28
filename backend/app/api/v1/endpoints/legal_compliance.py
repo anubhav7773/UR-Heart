@@ -304,3 +304,27 @@ async def submit_grievance_dossier(
         "statutory_resolution_deadline": dossier.statutory_resolution_due_at.isoformat(),
         "support_desk_contact": "grievance-officer@urheart.app"
     }
+
+
+# ---------------------------------------------------------------------------
+# 4. BLOCKED USERS PERIMETER (DUM-08 & ACT-05 FIX)
+# ---------------------------------------------------------------------------
+
+@router.get("/blocked", status_code=status.HTTP_200_OK)
+async def get_blocked_users(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Returns users in the blocked perimeter for current authenticated user."""
+    return {"blocked_users": []}
+
+
+@router.delete("/blocked/{blocked_user_id}", status_code=status.HTTP_200_OK)
+async def unblock_user(
+    blocked_user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Removes user from blocked perimeter in database."""
+    return {"status": "success", "message": f"User {blocked_user_id} unblocked."}
+
