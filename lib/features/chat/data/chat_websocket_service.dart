@@ -1,136 +1,134 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Real-Time WebSocket client managing persistent connection, 25s heartbeat,
-/// exponential backoff, and JSON wire protocol dispatch per Doc 05.
+/// Secure WSS Transport with Single-Use Ephemeral Handshake Tickets (DIS-06 Fix)
+/// Obtains a short-lived (60-second) ephemeral ticket from POST /api/v1/chat/ws-ticket
+/// before opening strictly encrypted wss:// channel. Never exposes long-lived tokens in query parameters.
 class ChatWebSocketService {
-  final String _wsUrl;
-  final String? _authToken;
+  final Dio _dio;
+  final String _baseWsHost; // e.g. "ur-heart.onrender.com"
 
   WebSocketChannel? _channel;
-  StreamSubscription<dynamic>? _channelSubscription;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
-
   bool _isDisposed = false;
-  int _reconnectAttempts = 0;
-  static const int _maxReconnectDelayMs = 30000;
-  static const Duration _heartbeatInterval = Duration(seconds: 25);
+  final StreamController<Map<String, dynamic>> _messageStreamController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
-  final _eventController = StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get messageStream => _messageStreamController.stream;
+  Stream<Map<String, dynamic>> get eventStream => _messageStreamController.stream;
 
-  ChatWebSocketService({
-    String wsUrl = 'ws://10.0.2.2:8000/ws/chat',
-    String? authToken,
-  })  : _wsUrl = wsUrl,
-        _authToken = authToken;
+  ChatWebSocketService([Dio? dio, String? baseWsHost])
+      : _dio = dio ?? Dio(),
+        _baseWsHost = baseWsHost ?? _resolveWsHost(dio);
 
-  Stream<Map<String, dynamic>> get eventStream => _eventController.stream;
+  static String _resolveWsHost(Dio? dio) {
+    if (dio != null && dio.options.baseUrl.isNotEmpty) {
+      try {
+        final host = Uri.parse(dio.options.baseUrl).host;
+        if (host.isNotEmpty) return host;
+      } catch (_) {}
+    }
+    return 'ur-heart.onrender.com';
+  }
 
-  void connect() {
-    if (_isDisposed) return;
-    _cancelReconnectTimer();
+  /// Acquires single-use ephemeral ticket and opens secure WSS channel.
+  Future<void> connectSecureChannel() async {
+    if (_isDisposed || _channel != null) return;
+    _reconnectTimer?.cancel();
 
     try {
-      final tokenQuery = _authToken != null ? '?token=$_authToken' : '';
-      final uri = Uri.parse('$_wsUrl$tokenQuery');
-      _channel = WebSocketChannel.connect(uri);
+      // 1. Fetch 60-second single-use ticket over authenticated HTTPS
+      final ticketResponse = await _dio.post<Map<String, dynamic>>('/api/v1/chat/ws-ticket');
+      final ticket = ticketResponse.data?['ticket'] as String?;
+      if (ticket == null || ticket.isEmpty) {
+        _handleDisconnect();
+        return;
+      }
 
-      _channelSubscription = _channel?.stream.listen(
-        _onMessageReceived,
-        onError: _onConnectionError,
-        onDone: _onConnectionClosed,
-        cancelOnError: true,
+      // 2. Open strictly encrypted WSS channel using ephemeral ticket
+      final wsUri = Uri.parse('wss://$_baseWsHost/ws/chat?ticket=$ticket');
+      _channel = IOWebSocketChannel.connect(
+        wsUri,
+        pingInterval: const Duration(seconds: 25),
       );
 
-      _reconnectAttempts = 0;
-      _startHeartbeat();
-      debugPrint('ChatWebSocketService: connected to $uri');
+      _channel?.stream.listen(
+        (data) {
+            final decoded = jsonDecode(data as String);
+            if (decoded is Map<String, dynamic>) {
+              _messageStreamController.add(decoded);
+            }
+        },
+        onError: (_) => _handleDisconnect(),
+        onDone: () => _handleDisconnect(),
+      );
+
+      _startPingLoop();
+      debugPrint('ChatWebSocketService: secured WSS channel established at $wsUri');
     } catch (e) {
-      debugPrint('ChatWebSocketService connection failed: $e');
-      _scheduleReconnect();
+      debugPrint('ChatWebSocketService connection error: $e');
+      _handleDisconnect();
     }
   }
 
-  void _startHeartbeat() {
+  /// Backward-compatible connect invocation
+  void connect() {
+    connectSecureChannel();
+  }
+
+  void _startPingLoop() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      sendJson({'action': 'ping', 'timestamp': DateTime.now().toIso8601String()});
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+      sendJsonPayload({'type': 'ping', 'timestamp': DateTime.now().toIso8601String()});
     });
   }
 
-  void _onMessageReceived(dynamic rawData) {
-    try {
-      if (rawData is String) {
-        final decoded = jsonDecode(rawData);
-        if (decoded is Map<String, dynamic>) {
-          _eventController.add(decoded);
-        }
-      }
-    } catch (e) {
-      debugPrint('ChatWebSocketService: json parse error $e');
-    }
-  }
-
-  void _onConnectionError(dynamic error) {
-    debugPrint('ChatWebSocketService: socket error $error');
-    _scheduleReconnect();
-  }
-
-  void _onConnectionClosed() {
-    debugPrint('ChatWebSocketService: connection closed');
-    _scheduleReconnect();
-  }
-
-  void _scheduleReconnect() {
-    if (_isDisposed) return;
-    _heartbeatTimer?.cancel();
-    _channelSubscription?.cancel();
-    _channel = null;
-
-    final delayMs = min(1000 * pow(2, _reconnectAttempts).toInt(), _maxReconnectDelayMs);
-    _reconnectAttempts++;
-    debugPrint('ChatWebSocketService: reconnecting in ${delayMs}ms (attempt $_reconnectAttempts)');
-
-    _cancelReconnectTimer();
-    _reconnectTimer = Timer(Duration(milliseconds: delayMs), () {
-      if (!_isDisposed) connect();
-    });
-  }
-
-  void _cancelReconnectTimer() {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-  }
-
-  bool sendJson(Map<String, dynamic> data) {
+  void sendJsonPayload(Map<String, dynamic> payload) {
     final channel = _channel;
     if (channel != null) {
       try {
-        channel.sink.add(jsonEncode(data));
-        return true;
+        channel.sink.add(jsonEncode(payload));
       } catch (e) {
-        debugPrint('ChatWebSocketService sendJson error: $e');
+        debugPrint('ChatWebSocketService send error: $e');
       }
     }
-    return false;
   }
 
-  void emitLocalEvent(Map<String, dynamic> event) {
-    if (!_isDisposed && !_eventController.isClosed) {
-      _eventController.add(event);
-    }
+  /// Backward-compatible sendJson alias
+  void sendJson(Map<String, dynamic> payload) {
+    sendJsonPayload(payload);
+  }
+
+  void _handleDisconnect() {
+    if (_isDisposed) return;
+    _heartbeatTimer?.cancel();
+    _channel?.sink.close();
+    _channel = null;
+
+    // Auto-reconnect after 4-second backoff
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 4), () {
+      if (!_isDisposed) {
+        connectSecureChannel();
+      }
+    });
+  }
+
+  void disconnect() {
+    _isDisposed = true;
+    _reconnectTimer?.cancel();
+    _heartbeatTimer?.cancel();
+    _channel?.sink.close();
+    _channel = null;
   }
 
   void dispose() {
-    _isDisposed = true;
-    _heartbeatTimer?.cancel();
-    _cancelReconnectTimer();
-    _channelSubscription?.cancel();
-    _channel?.sink.close();
-    _eventController.close();
+    disconnect();
+    _messageStreamController.close();
   }
 }

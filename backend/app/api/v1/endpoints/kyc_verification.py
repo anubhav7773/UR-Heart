@@ -14,6 +14,7 @@ router = APIRouter(prefix="/kyc", tags=["KYC Biometric Verification"])
 class VerifyLiveKycPayload(BaseModel):
     anchor_b64: str = Field(..., description="Base64 encoded anchor profile portrait")
     frames_b64: List[str] = Field(default_factory=list, description="Base64 encoded frames from live video")
+    video_b64: Optional[str] = Field(None, description="Base64 encoded video clip")
 
 
 @router.post("/verify-live", response_model=KycAiEvaluation, status_code=status.HTTP_200_OK)
@@ -27,10 +28,11 @@ async def verify_live_kyc(
     If corrupted or ambiguous, fails closed, sets status to pending_manual_review,
     and inserts row into admin_kyc_escalations table.
     """
+    frames = payload.frames_b64 if payload.frames_b64 else ([payload.video_b64] if payload.video_b64 else [])
     evaluation = await GroqAiService.verify_kyc_liveness_secure(
         user_id=current_user.id,
         anchor_b64=payload.anchor_b64,
-        frames_b64=payload.frames_b64,
+        frames_b64=frames,
         db_session=db
     )
     return evaluation

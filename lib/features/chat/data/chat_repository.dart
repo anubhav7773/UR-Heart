@@ -10,7 +10,10 @@ export '../domain/chat_models.dart';
 
 /// Riverpod Providers for Chat Data Layer
 final chatWebSocketServiceProvider = Provider<ChatWebSocketService>((ref) {
-  final service = ChatWebSocketService();
+  final dioClient = ref.watch(dioClientProvider);
+  final wsHost = Uri.parse(dioClient.dio.options.baseUrl).host;
+  final service = ChatWebSocketService(dioClient.dio, wsHost.isNotEmpty ? wsHost : 'ur-heart.onrender.com');
+  service.connectSecureChannel();
   ref.onDispose(() => service.dispose());
   return service;
 });

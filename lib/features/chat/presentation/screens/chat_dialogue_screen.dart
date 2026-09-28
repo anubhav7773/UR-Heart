@@ -6,6 +6,7 @@ import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../controllers/chat_dialogue_controller.dart';
 import '../widgets/ai_icebreaker_chips_row.dart';
+import '../widgets/chat_detail_action_bar.dart';
 import '../widgets/dialogue_message_bubble.dart';
 import '../widgets/nlp_warning_dialog.dart';
 import '../widgets/sacred_bridge_app_bar_action.dart';
@@ -166,6 +167,20 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
           ],
         ),
         actions: [
+          ChatDetailActionBar(
+            bridgeStage: dialogueState.bridgeStage,
+            isDark: isDark,
+            onStartAudioCall: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Initiating Sacred Audio Whisper connection...')),
+              );
+            },
+            onSendMedia: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Opening Encrypted Moments Media Vault...')),
+              );
+            },
+          ),
           SacredBridgeAppBarAction(matchId: mId, isDark: isDark, bridgeData: bridgeData),
           const SizedBox(width: 8),
         ],
