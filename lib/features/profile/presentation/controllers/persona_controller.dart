@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/media/media_compressor.dart';
+import '../../../../core/media/supabase_media_uploader.dart';
 import '../../../../core/services/image_moderation_service.dart';
 import '../../data/profile_repository.dart';
 
@@ -157,16 +158,28 @@ class PersonaController extends StateNotifier<PersonaState> {
         return false;
       }
 
-      final compressed = await MediaCompressorService.processProfilePhoto(
-        sourceFile: rawFile,
-        slotNumber: 1,
-      );
-      final finalPath = compressed?.compressedFile.path ?? rawFile.path;
-
+      final processed = await MediaCompressor.processPortraitPhoto(rawFile);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('profile_photo_slot_1', finalPath);
+      final userEmail = prefs.getString('ur_heart_user_email') ?? state.profile.email;
+      final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
 
-      final updatedProfile = state.profile.copyWith(avatarUrl: finalPath);
+      String finalUrl = rawFile.path;
+      if (processed != null) {
+        try {
+          final cloudUrl = await SupabaseMediaUploader.uploadProfileSlot(
+            userUuid: safeUserUuid.isNotEmpty ? safeUserUuid : 'seeker_1',
+            slotNumber: 1,
+            webpBytes: processed.webpBytes,
+          );
+          if (cloudUrl != null && cloudUrl.isNotEmpty) {
+            finalUrl = cloudUrl;
+          }
+        } catch (_) {}
+      }
+
+      await prefs.setString('profile_photo_slot_1', finalUrl);
+
+      final updatedProfile = state.profile.copyWith(avatarUrl: finalUrl);
       state = state.copyWith(
         profile: updatedProfile,
         isSaving: false,
@@ -198,21 +211,33 @@ class PersonaController extends StateNotifier<PersonaState> {
         return false;
       }
 
-      final compressed = await MediaCompressorService.processProfilePhoto(
-        sourceFile: rawFile,
-        slotNumber: slotIndex + 2,
-      );
-      final finalPath = compressed?.compressedFile.path ?? rawFile.path;
-
+      final processed = await MediaCompressor.processPortraitPhoto(rawFile);
       final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('ur_heart_user_email') ?? state.profile.email;
+      final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+
+      String finalUrl = rawFile.path;
+      if (processed != null) {
+        try {
+          final cloudUrl = await SupabaseMediaUploader.uploadProfileSlot(
+            userUuid: safeUserUuid.isNotEmpty ? safeUserUuid : 'seeker_1',
+            slotNumber: slotIndex + 2,
+            webpBytes: processed.webpBytes,
+          );
+          if (cloudUrl != null && cloudUrl.isNotEmpty) {
+            finalUrl = cloudUrl;
+          }
+        } catch (_) {}
+      }
+
       final prefKey = 'profile_photo_slot_${slotIndex + 2}';
-      await prefs.setString(prefKey, finalPath);
+      await prefs.setString(prefKey, finalUrl);
 
       final momentsList = List<String>.from(state.profile.momentPhotos);
       while (momentsList.length < 4) {
         momentsList.add('');
       }
-      momentsList[slotIndex] = finalPath;
+      momentsList[slotIndex] = finalUrl;
 
       final updatedProfile = state.profile.copyWith(momentPhotos: momentsList);
       state = state.copyWith(

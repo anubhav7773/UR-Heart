@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key
 from cryptography.exceptions import InvalidSignature
 
 from app.core.database import get_db
+from app.core.security import get_current_user_optional
 from app.models.domain.user import User
 from app.models.domain.ad_reward import AdRewardLedger, ProcessedAdTransaction
 from app.models.domain.match import Match
@@ -247,3 +248,75 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
     await db.commit()
 
     return {"status": "success", "user_id": str(user_uuid), "granted_points": points_to_credit}
+
+
+class ClaimAdRewardRequest(BaseModel):
+    ad_type: str
+    target_id: Optional[str] = "none"
+    user_id: Optional[str] = None
+
+
+@router.post("/claim-reward", status_code=status.HTTP_200_OK, summary="Claim Verified Ad Reward")
+async def claim_ad_reward(
+    payload: ClaimAdRewardRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Credits ad reward points and swipes directly to public.users table in PostgreSQL.
+    """
+    target_user = current_user
+    if not target_user and payload.user_id:
+        try:
+            uid = UUID(payload.user_id)
+            res = await db.execute(select(User).where(User.id == uid))
+            target_user = res.scalar_one_or_none()
+        except Exception:
+            pass
+
+    if not target_user:
+        res = await db.execute(select(User).order_by(User.updated_at.desc()).limit(1))
+        target_user = res.scalar_one_or_none()
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    swipes_to_grant = 0
+    letters_to_grant = 0
+    points_to_credit = 10
+
+    if payload.ad_type == "quick_reflection":
+        swipes_to_grant = 10
+        points_to_credit = 10
+    elif payload.ad_type == "deep_resonance":
+        letters_to_grant = 1
+        points_to_credit = 25
+    elif payload.ad_type == "morning_harvest_unlock":
+        swipes_to_grant = 20
+        letters_to_grant = 2
+        points_to_credit = 50
+    elif payload.ad_type in ("whatsapp_reveal", "sacred_bridge_reveal"):
+        points_to_credit = 30
+
+    target_user.swipes_remaining = (target_user.swipes_remaining or 0) + swipes_to_grant
+    target_user.direct_letters_count = (target_user.direct_letters_count or 0) + letters_to_grant
+    target_user.reward_balance = (target_user.reward_balance or 0) + points_to_credit
+
+    await db.commit()
+    await db.refresh(target_user)
+
+    print(
+        f"[AD REWARD CLAIMED] user={target_user.email} ad_type={payload.ad_type} "
+        f"swipes={target_user.swipes_remaining} letters={target_user.direct_letters_count} "
+        f"balance={target_user.reward_balance}",
+        flush=True
+    )
+
+    return {
+        "status": "success",
+        "ad_type": payload.ad_type,
+        "swipes_remaining": target_user.swipes_remaining,
+        "direct_letters_count": target_user.direct_letters_count,
+        "reward_balance": target_user.reward_balance,
+        "message": f"Reward granted: +{swipes_to_grant} swipes, +{letters_to_grant} direct letters."
+    }

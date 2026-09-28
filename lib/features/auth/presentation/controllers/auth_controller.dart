@@ -297,6 +297,8 @@ class AuthController extends StateNotifier<AuthState> {
     );
 
     if (result.isSuccess) {
+      // Dispatch real magic link & passkey to user's inbox
+      _repository.sendMagicLink(state.email);
       startCooldownTimer();
       return true;
     }
@@ -317,9 +319,10 @@ class AuthController extends StateNotifier<AuthState> {
     });
   }
 
-  Future<void> resendVerificationEmail() async {
+  Future<void> resendVerificationEmail([String? overrideEmail]) async {
     if (state.resendCooldownSeconds > 0) return;
-    await _repository.resendVerificationEmail(state.email);
+    final targetEmail = overrideEmail ?? state.email;
+    await _repository.sendMagicLink(targetEmail);
     startCooldownTimer();
   }
 
@@ -327,14 +330,16 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(isMagicLinkVerified: true);
   }
 
-  /// Verifies magic link token with repository (ACT-01)
-  Future<bool> verifyMagicLink(String token) async {
+  /// Verifies magic link token or 6-digit mindful passkey with repository (ACT-01)
+  Future<bool> verifyMagicLink(String tokenOrPasskey, {String? email}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final success = await _repository.verifyMagicLinkToken(token);
+      final res = await _repository.verifyMagicLinkToken(tokenOrPasskey, email: email ?? state.email);
+      final success = res != null;
       state = state.copyWith(
         isLoading: false,
         isMagicLinkVerified: success,
+        email: res?['email']?.toString() ?? (email ?? state.email),
       );
       return success;
     } catch (e) {

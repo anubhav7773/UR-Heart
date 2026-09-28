@@ -58,13 +58,38 @@ class VaultController extends StateNotifier<VaultState> {
       state = state.copyWith(
         activeExport: exportRecord,
         isExporting: false,
-        successMessage: 'Signed archive generated! Download ready for 7 days.',
+        successMessage: 'Signed archive generated! Ready for download / sharing.',
       );
     } catch (_) {
       state = state.copyWith(
         isExporting: false,
         errorMessage: 'Unable to request data archive. Try again later.',
       );
+    }
+  }
+
+  Future<void> downloadAndShareArchive() async {
+    state = state.copyWith(isExporting: true, errorMessage: null);
+    try {
+      final reqId = state.activeExport?.id ?? 'exp-statutory-current';
+      final ok = await _repo.downloadAndShareArchive(reqId);
+      state = state.copyWith(
+        isExporting: false,
+        successMessage: ok ? 'JSON archive downloaded & shared successfully.' : 'Unable to share archive.',
+      );
+    } catch (_) {
+      state = state.copyWith(
+        isExporting: false,
+        errorMessage: 'Failed to download data archive.',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>?> trackGrievance(String referenceId) async {
+    try {
+      return await _repo.trackGrievanceTicket(referenceId);
+    } catch (_) {
+      return null;
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/settings_repository.dart';
 
 class SettingsState {
@@ -43,12 +44,41 @@ class SettingsController extends StateNotifier<SettingsState> {
   final SettingsRepository _repo;
 
   SettingsController(this._repo)
-      : super(SettingsState(settings: _repo.getSettings()));
+      : super(SettingsState(settings: _repo.getSettings())) {
+    _loadUserRoleAndEmail();
+  }
+
+  Future<void> _loadUserRoleAndEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedEmail = prefs.getString('ur_heart_user_email') ??
+          prefs.getString('profile_email') ??
+          prefs.getString('email') ??
+          '';
+      final isSuper = savedEmail.trim().toLowerCase() == 'kshtriyaanubhav9120@gmail.com';
+      final savedRole = prefs.getString('user_role') ?? (isSuper ? 'superadmin' : null);
+
+      if (savedEmail.isNotEmpty || savedRole != null) {
+        final role = savedRole ?? (isSuper ? 'superadmin' : 'user');
+        state = state.copyWith(
+          settings: state.settings.copyWith(
+            userEmail: savedEmail,
+            userRole: role,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 
   void setUserEmail(String email) {
+    final clean = email.trim().toLowerCase();
+    final isSuper = clean == 'kshtriyaanubhav9120@gmail.com';
     _repo.setUserEmail(email);
     state = state.copyWith(
-      settings: state.settings.copyWith(userEmail: email),
+      settings: state.settings.copyWith(
+        userEmail: email,
+        userRole: isSuper ? 'superadmin' : state.settings.userRole,
+      ),
     );
   }
 

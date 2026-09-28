@@ -73,11 +73,15 @@ async def _purge_remote_user_storage(user_id_str: str) -> None:
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
-            await client.post(
-                f"{supabase_url}/storage/v1/object/sanctuary-media",
-                headers=headers,
-                json={"prefixes": slots}
-            )
+            for bucket in ["ur-heart-media", "sanctuary-media"]:
+                try:
+                    await client.post(
+                        f"{supabase_url}/storage/v1/object/{bucket}",
+                        headers=headers,
+                        json={"prefixes": slots}
+                    )
+                except Exception:
+                    pass
     except Exception as e:
         logger.warning(f"Error purging storage blobs for user {user_id_str}: {e}")
 

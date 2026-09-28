@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -77,6 +78,7 @@ class MomentsEditorGrid extends StatelessWidget {
             itemCount: 4,
             itemBuilder: (context, index) {
               final hasPhoto = index < effectivePhotos.length && effectivePhotos[index].isNotEmpty;
+              final photo = hasPhoto ? effectivePhotos[index] : '';
               return GestureDetector(
                 onTap: () => handleTap(index),
                 child: Container(
@@ -94,10 +96,28 @@ class MomentsEditorGrid extends StatelessWidget {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(11),
-                              child: Container(
-                                color: cardBorder,
-                                child: const Icon(Icons.image, size: 36, color: Colors.grey),
-                              ),
+                              child: photo.startsWith('http')
+                                  ? Image.network(
+                                      photo,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        color: cardBorder,
+                                        child: const Icon(Icons.broken_image_outlined, size: 28, color: Colors.grey),
+                                      ),
+                                    )
+                                  : (File(photo).existsSync()
+                                      ? Image.file(
+                                          File(photo),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            color: cardBorder,
+                                            child: const Icon(Icons.broken_image_outlined, size: 28, color: Colors.grey),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: cardBorder,
+                                          child: const Icon(Icons.broken_image_outlined, size: 28, color: Colors.grey),
+                                        )),
                             ),
                             Positioned(
                               top: 6,

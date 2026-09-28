@@ -352,7 +352,9 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
     required Color accentColor,
     required Color mutedColor,
   }) {
-    final hasValidImage = filePath != null && filePath.isNotEmpty && File(filePath).existsSync();
+    final isNetwork = filePath != null && (filePath.startsWith('http://') || filePath.startsWith('https://'));
+    final isLocal = filePath != null && !isNetwork && filePath.isNotEmpty && File(filePath).existsSync();
+    final hasValidImage = isNetwork || isLocal;
 
     return Container(
       height: height,
@@ -374,11 +376,17 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
                 ? Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.file(
-                        File(filePath),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
-                      ),
+                      isNetwork
+                          ? Image.network(
+                              filePath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
+                            )
+                          : Image.file(
+                              File(filePath),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
+                            ),
                       Positioned(
                         right: 6,
                         bottom: 6,

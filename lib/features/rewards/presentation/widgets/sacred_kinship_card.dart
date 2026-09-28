@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
@@ -83,9 +85,23 @@ class SacredKinshipCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 11.0),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
               ),
-              onPressed: () {
-                final text = Uri.encodeComponent('Join me in UR-Heart Sanctuary. Kinship code: $referralCode https://urheart.app/join');
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Opening WhatsApp invitation: https://wa.me/?text=$text')));
+              onPressed: () async {
+                final message = 'Join me in UR-Heart Sanctuary — A mindful dating sanctuary. Enter my kinship referral code: $referralCode https://urheart.app/join?ref=$referralCode';
+                final encodedText = Uri.encodeComponent(message);
+                final whatsappUri = Uri.parse('whatsapp://send?text=$encodedText');
+                final webUri = Uri.parse('https://api.whatsapp.com/send?text=$encodedText');
+
+                try {
+                  if (await canLaunchUrl(whatsappUri)) {
+                    await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+                  } else if (await canLaunchUrl(webUri)) {
+                    await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                  } else {
+                    await Share.share(message, subject: 'UR-Heart Sanctuary Invitation');
+                  }
+                } catch (_) {
+                  await Share.share(message, subject: 'UR-Heart Sanctuary Invitation');
+                }
               },
               icon: const Icon(Icons.chat_bubble_outline, size: 16.0),
               label: const Text('Invite via WhatsApp', style: TextStyle(color: Colors.white, fontSize: 13.0, fontWeight: FontWeight.bold)),

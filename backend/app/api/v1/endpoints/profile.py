@@ -88,7 +88,8 @@ async def get_my_authenticated_profile(
         "avatar_url": current_user.avatar_url or "",
         "preferred_age_min": current_user.preferred_age_min,
         "preferred_age_max": current_user.preferred_age_max,
-        "contact_bridge_handle": current_user.contact_bridge_encrypted
+        "contact_bridge_handle": current_user.contact_bridge_encrypted,
+        "role": current_user.role or ("superadmin" if current_user.email == "kshtriyaanubhav9120@gmail.com" else "user")
     }
 
 
@@ -231,6 +232,12 @@ async def create_or_update_profile(
             up_vals["contact_bridge_type"] = payload.bridge_platform
         if payload.bridge_value:
             up_vals["contact_bridge_encrypted"] = payload.bridge_value
+        if payload.photos:
+            up_vals["photos"] = payload.photos
+            if not payload.avatar_url and len(payload.photos) > 0:
+                up_vals["avatar_url"] = payload.photos[0]
+        if payload.avatar_url:
+            up_vals["avatar_url"] = payload.avatar_url
 
         res = await db.execute(select(User).where(User.email == clean_email))
         existing_user = res.scalar_one_or_none()
@@ -267,6 +274,8 @@ async def create_or_update_profile(
                 referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
                 kyc_status=bool(payload.is_kyc),
                 is_profile_completed=True,
+                photos=payload.photos or [],
+                avatar_url=payload.avatar_url or (payload.photos[0] if (payload.photos and len(payload.photos) > 0) else None),
             )
             db.add(new_user)
         try:

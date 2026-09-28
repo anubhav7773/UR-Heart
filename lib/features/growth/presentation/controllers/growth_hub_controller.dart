@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../profile/data/profile_repository.dart';
 import '../../../rewards/data/sanctuary_billing_service.dart';
 
@@ -175,6 +176,18 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       targetId: targetId,
       onRewardGranted: () async {
         applyReward(adType, targetId: targetId);
+        try {
+          await DioClient().dio.post<dynamic>(
+            '/api/v1/ads/claim-reward',
+            data: {
+              'ad_type': adType,
+              'target_id': targetId,
+              'user_id': effectiveUserId,
+            },
+          );
+        } catch (e) {
+          debugPrint('[GrowthHubController] Claim reward sync notice: $e');
+        }
         await syncUserData();
         if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

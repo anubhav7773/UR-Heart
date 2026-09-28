@@ -106,7 +106,13 @@ class VaultLegalScreen extends ConsumerWidget {
                 isExporting: state.isExporting,
                 nominee: state.nominee,
                 isDark: isDark,
-                onRequestExport: notifier.requestDataExport,
+                onRequestExport: () {
+                  if (state.activeExport != null && state.activeExport?.status == ExportStatus.ready) {
+                    notifier.downloadAndShareArchive();
+                  } else {
+                    notifier.requestDataExport();
+                  }
+                },
                 onOpenNomineeModal: () => _openNomineeModal(context, isDark, notifier),
               ),
               const SizedBox(height: 16),
@@ -114,6 +120,7 @@ class VaultLegalScreen extends ConsumerWidget {
                 blockedList: state.blockedList,
                 isDark: isDark,
                 onFileGrievance: () => _openGrievanceModal(context, isDark, notifier),
+                onTrackGrievance: () => _openTrackGrievanceModal(context, isDark, notifier),
                 onManageBlocked: () => _openBlockedList(context, isDark, state.blockedList, notifier),
               ),
               const SizedBox(height: 24),
@@ -170,6 +177,169 @@ class VaultLegalScreen extends ConsumerWidget {
         blockedList: list,
         isDark: isDark,
         onUnblock: notifier.unblockUser,
+      ),
+    );
+  }
+
+  void _openTrackGrievanceModal(BuildContext context, bool isDark, VaultController notifier) {
+    final controller = TextEditingController();
+    Map<String, dynamic>? ticketData;
+    bool isLoading = false;
+    String? error;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final surface = isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard;
+          final border = isDark ? DarkSanctuaryTokens.surfaceCardBorder : LightSanctuaryTokens.surfaceCardBorder;
+          final textHead = isDark ? DarkSanctuaryTokens.textHeadline : LightSanctuaryTokens.textHeadline;
+          final textSub = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
+          final coral = isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent;
+
+          return Container(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(color: border),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Track Statutory Grievance',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textHead),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: textSub, size: 20),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                Text(
+                  'IT Rules 2021 Rule 3(2) statutory status and SLA countdown monitor.',
+                  style: TextStyle(fontSize: 12, color: textSub),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        style: TextStyle(fontSize: 13, color: textHead),
+                        decoration: InputDecoration(
+                          hintText: 'Enter Reference ID (e.g. GRV-...)',
+                          hintStyle: TextStyle(fontSize: 12, color: textSub),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: coral,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              final refId = controller.text.trim();
+                              if (refId.isEmpty) return;
+                              setModalState(() {
+                                isLoading = true;
+                                error = null;
+                              });
+                              final res = await notifier.trackGrievance(refId);
+                              setModalState(() {
+                                isLoading = false;
+                                if (res != null) {
+                                  ticketData = res;
+                                } else {
+                                  error = 'Ticket not found or query error.';
+                                }
+                              });
+                            },
+                      child: isLoading
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Track ➔', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                ],
+                if (ticketData != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF16211C) : const Color(0xFFF6F8F7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              ticketData!['reference_id']?.toString() ?? 'TICKET',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: coral),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: coral.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                (ticketData!['status']?.toString() ?? 'PENDING').toUpperCase(),
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: coral),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Category: ${ticketData!['violation_category'] ?? "General"}',
+                          style: TextStyle(fontSize: 12, color: textHead),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'SLA Resolution Target: ${ticketData!['sla_resolution_target'] ?? "15 Days"}',
+                          style: TextStyle(fontSize: 12, color: textSub),
+                        ),
+                        if (ticketData!['officer_notes'] != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Grievance Officer: ${ticketData!['officer_notes']}',
+                            style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: textHead),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }

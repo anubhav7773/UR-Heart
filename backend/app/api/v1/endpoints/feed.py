@@ -125,17 +125,27 @@ async def record_swipe(
             current_user.swipes_remaining = max(0, current_user.swipes_remaining - 1)
 
         # Check for mutual like or direct resonate
-        if payload.swipe_type.lower() in ("like", "direct"):
+        swipe_type_clean = payload.swipe_type.lower()
+        if swipe_type_clean in ("like", "direct", "superlike"):
+            from app.api.v1.endpoints.notifications import push_notification
+            push_notification(
+                user_id=str(target_uuid),
+                notif_type="direct_letter" if swipe_type_clean in ("direct", "superlike") else "like",
+                title="Direct Resonate Spark ✨" if swipe_type_clean in ("direct", "superlike") else "New Resonance ✨",
+                body=f"{current_user.full_name} sent you a Direct Sanctuary Letter." if swipe_type_clean in ("direct", "superlike") else f"{current_user.full_name} resonated with your profile.",
+                data={"actor_id": str(current_user.id), "swipe_type": swipe_type_clean}
+            )
+
             reciprocal_stmt = select(Swipe).where(
                 Swipe.actor_id == target_uuid,
                 Swipe.target_id == current_user.id,
-                Swipe.swipe_type.in_(["like", "direct"])
+                Swipe.swipe_type.in_(["like", "direct", "superlike"])
             )
             reciprocal_res = await db.execute(reciprocal_stmt)
             reciprocal_swipe = reciprocal_res.scalar_one_or_none()
 
             # If mutual like OR direct resonate, form a match
-            if reciprocal_swipe or payload.swipe_type.lower() == "direct":
+            if reciprocal_swipe or swipe_type_clean in ("direct", "superlike"):
                 is_match = True
                 existing_match_stmt = select(Match).where(
                     ((Match.user1_id == current_user.id) & (Match.user2_id == target_uuid)) |
@@ -153,9 +163,29 @@ async def record_swipe(
                     await db.flush()
                 match_id = str(match.id)
 
+                # Push match notification to both users
+                target_user_res = await db.execute(select(User).where(User.id == target_uuid))
+                target_user = target_user_res.scalar_one_or_none()
+                target_name = target_user.full_name if target_user else "Seeker"
+
+                push_notification(
+                    user_id=str(current_user.id),
+                    notif_type="match",
+                    title="Sacred Match Ignited 💫",
+                    body=f"You and {target_name} have mutually resonated! Begin your mindful dialogue.",
+                    data={"match_id": match_id, "partner_id": str(target_uuid)}
+                )
+                push_notification(
+                    user_id=str(target_uuid),
+                    notif_type="match",
+                    title="Sacred Match Ignited 💫",
+                    body=f"You and {current_user.full_name} have mutually resonated! Begin your mindful dialogue.",
+                    data={"match_id": match_id, "partner_id": str(current_user.id)}
+                )
+
         await db.commit()
     else:
-        is_match = payload.swipe_type in ("like", "direct")
+        is_match = payload.swipe_type.lower() in ("like", "direct", "superlike")
         match_id = f"match-{payload.target_id}" if is_match else None
 
     return {

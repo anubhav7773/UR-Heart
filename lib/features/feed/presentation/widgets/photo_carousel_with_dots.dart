@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
@@ -57,13 +58,23 @@ class _PhotoCarouselWithDotsState extends State<PhotoCarouselWithDots> {
               return Container(
                 color: surfaceMuted,
                 child: photo.isNotEmpty
-                    ? Image.network(
-                        photo,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (_, __, ___) => _buildFallback(pine),
-                      )
+                    ? (photo.startsWith('http')
+                        ? Image.network(
+                            photo,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorBuilder: (_, __, ___) => _buildFallback(pine),
+                          )
+                        : (File(photo).existsSync()
+                            ? Image.file(
+                                File(photo),
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (_, __, ___) => _buildFallback(pine),
+                              )
+                            : _buildFallback(pine)))
                     : _buildFallback(pine),
               );
             },

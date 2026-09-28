@@ -20,6 +20,7 @@ from app.api.v1.endpoints import (
     underage_quarantine,
     ws_ticket,
     kyc_verification,
+    notifications,
 )
 
 api_router = APIRouter()
@@ -84,5 +85,8 @@ api_router.include_router(ws_ticket.router)
 
 # 16. Secure Fail-Closed KYC Verification (SEC-11)
 api_router.include_router(kyc_verification.router)
+
+# 17. In-App Notifications (Likes, Messages, Matches, Passes)
+api_router.include_router(notifications.router)
 
 

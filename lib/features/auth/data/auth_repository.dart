@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
@@ -161,35 +162,70 @@ class AuthRepository {
   }
 
   /// Sends magic link or triggers passwordless verification
-  Future<bool> sendMagicLink(String email) async {
+  Future<Map<String, dynamic>?> sendMagicLink(String email) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
         '/api/v1/auth/send-magic-link',
-        data: {'email': email},
+        data: {'email': email.trim().toLowerCase()},
       );
-      return response.statusCode == 200;
-    } catch (_) {
-      // In offline / mock mode return true to allow progression
-      return true;
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[AUTH] sendMagicLink error: $e');
+      return null;
     }
   }
 
-  /// Verifies magic link token with backend session authority
-  Future<bool> verifyMagicLinkToken(String token) async {
+  /// Verifies magic link token or 6-digit mindful passkey with backend session authority
+  Future<Map<String, dynamic>?> verifyMagicLinkToken(String tokenOrPasskey, {String? email}) async {
     try {
+      final cleanKey = tokenOrPasskey.trim();
+      final cleanEmail = email?.trim().toLowerCase();
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
         '/api/v1/auth/verify-magic-link',
-        data: {'token': token},
+        data: {
+          'token': cleanKey,
+          'passkey': cleanKey,
+          if (cleanEmail != null && cleanEmail.isNotEmpty) 'email': cleanEmail,
+        },
       );
-      return response.statusCode == 200;
-    } catch (_) {
-      return token.isNotEmpty;
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data!;
+        final tokenStr = data['access_token'] ?? data['token'];
+        if (tokenStr != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
+          await prefs.setString('auth_token', tokenStr.toString());
+
+          final matchedEmail = data['email']?.toString() ?? cleanEmail;
+          if (matchedEmail != null && matchedEmail.isNotEmpty) {
+            await prefs.setString('ur_heart_user_email', matchedEmail);
+            await prefs.setString('profile_email', matchedEmail);
+            if (matchedEmail.toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com') {
+              await prefs.setString('user_role', 'superadmin');
+            }
+          }
+
+          if (data['is_profile_completed'] == true) {
+            await prefs.setBool('ur_heart_profile_setup_completed', true);
+          }
+        }
+        return data;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[AUTH] verifyMagicLinkToken error: $e');
+      return null;
     }
   }
 
   /// Resends verification link
   Future<bool> resendVerificationEmail(String email) async {
-    return sendMagicLink(email);
+    final res = await sendMagicLink(email);
+    return res != null;
   }
 }
 

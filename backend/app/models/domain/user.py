@@ -43,8 +43,8 @@ class User(Base):
 
     streak_count = Column(SmallInteger, nullable=False, default=0)
     reward_balance = Column(Integer, nullable=False, default=0)
-    swipes_remaining = Column(SmallInteger, nullable=False, default=25)
-    direct_letters_count = Column(SmallInteger, nullable=False, default=1)
+    swipes_remaining = Column(Integer, nullable=False, default=25)
+    direct_letters_count = Column(Integer, nullable=False, default=1)
     last_installation_uuid = Column(String(64), nullable=True)
     referral_code = Column(String(16), unique=True, nullable=False)
 

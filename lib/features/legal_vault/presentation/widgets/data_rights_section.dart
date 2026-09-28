@@ -130,9 +130,11 @@ class DataRightsSection extends StatelessWidget {
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2),
                           )
-                        : const Text(
-                            'Request Export ➔',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        : Text(
+                            activeExport != null && activeExport?.status == ExportStatus.ready
+                                ? 'Download / Share Archive (.JSON) ➔'
+                                : 'Request Export ➔',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                   ),
                 ),

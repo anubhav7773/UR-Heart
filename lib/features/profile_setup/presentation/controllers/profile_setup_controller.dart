@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/media/media_compressor.dart';
-import '../../../../core/media/firebase_media_uploader.dart';
+import '../../../../core/media/supabase_media_uploader.dart';
 import '../../../../core/services/activity_logger_service.dart';
 import '../../../../core/services/image_moderation_service.dart';
 import '../../../../core/services/real_gps_location_service.dart';
@@ -243,27 +243,32 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
 
     try {
       final processed = await MediaCompressor.processPortraitPhoto(rawFile);
-      final finalPath = rawFile.path;
-
-      // Persist path locally
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('profile_photo_slot_$slotNumber', finalPath);
+      final userEmail = prefs.getString('ur_heart_user_email') ?? userId;
+      final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+
+      String finalUrl = rawFile.path;
+      if (processed != null) {
+        try {
+          final cloudUrl = await SupabaseMediaUploader.uploadProfileSlot(
+            userUuid: safeUserUuid,
+            slotNumber: slotNumber,
+            webpBytes: processed.webpBytes,
+          );
+          if (cloudUrl != null && cloudUrl.isNotEmpty) {
+            finalUrl = cloudUrl;
+          }
+        } catch (_) {}
+      }
+
+      await prefs.setString('profile_photo_slot_$slotNumber', finalUrl);
 
       final updatedSlots = Map<int, String>.from(state.photoSlots);
-      updatedSlots[slotNumber] = finalPath;
+      updatedSlots[slotNumber] = finalUrl;
 
       final updatedBlurHashes = Map<int, String>.from(state.blurHashes);
       if (processed != null) {
         updatedBlurHashes[slotNumber] = processed.blurHash;
-
-        // Background Firebase upload
-        try {
-          await FirebaseMediaUploader.uploadProfileSlot(
-            userUuid: userId,
-            slotNumber: slotNumber,
-            webpBytes: processed.webpBytes,
-          );
-        } catch (_) {}
       }
 
       state = state.copyWith(

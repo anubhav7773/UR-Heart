@@ -92,12 +92,12 @@ class ProfileRepository {
       final List<String> moments = ['', '', '', ''];
       String avatar = '';
       final slot1 = prefs.getString('profile_photo_slot_1');
-      if (slot1 != null && File(slot1).existsSync()) {
+      if (slot1 != null && (slot1.startsWith('http') || File(slot1).existsSync())) {
         avatar = slot1;
       }
       for (int i = 2; i <= 5; i++) {
         final slotPath = prefs.getString('profile_photo_slot_$i');
-        if (slotPath != null && File(slotPath).existsSync()) {
+        if (slotPath != null && (slotPath.startsWith('http') || File(slotPath).existsSync())) {
           moments[i - 2] = slotPath;
         }
       }
@@ -282,7 +282,25 @@ class ProfileRepository {
   Future<String> refreshGpsLocation() async {
     final result = await RealGpsLocationService.acquireRealHardwareGps();
     if (result.isSuccess) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('profile_location', result.formattedLocation);
+      await prefs.setDouble('profile_gps_latitude', result.latitude);
+      await prefs.setDouble('profile_gps_longitude', result.longitude);
+      await prefs.setBool('profile_gps_verified', true);
+
       _currentProfile = _currentProfile.copyWith(location: result.formattedLocation);
+
+      try {
+        await dio.put<dynamic>(
+          '/api/v1/profile/me',
+          data: {
+            'location_name': result.formattedLocation,
+            'latitude': result.latitude,
+            'longitude': result.longitude,
+          },
+        );
+      } catch (_) {}
+
       return result.formattedLocation;
     } else {
       return result.errorMessage ?? 'Unable to acquire genuine GPS';

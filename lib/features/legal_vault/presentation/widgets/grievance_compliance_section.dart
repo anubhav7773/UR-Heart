@@ -8,6 +8,7 @@ class GrievanceComplianceSection extends StatelessWidget {
   final List<BlockedProfile> blockedList;
   final bool isDark;
   final VoidCallback onFileGrievance;
+  final VoidCallback? onTrackGrievance;
   final VoidCallback onManageBlocked;
 
   const GrievanceComplianceSection({
@@ -15,6 +16,7 @@ class GrievanceComplianceSection extends StatelessWidget {
     required this.blockedList,
     required this.isDark,
     required this.onFileGrievance,
+    this.onTrackGrievance,
     required this.onManageBlocked,
   });
 
@@ -71,17 +73,29 @@ class GrievanceComplianceSection extends StatelessWidget {
                   style: AppTypography.bodySmall.copyWith(color: mutedColor),
                 ),
                 const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton(
-                    onPressed: onFileGrievance,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: accentColor),
-                      foregroundColor: accentColor,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (onTrackGrievance != null)
+                      TextButton.icon(
+                        onPressed: onTrackGrievance,
+                        icon: Icon(Icons.search, size: 16, color: accentColor),
+                        label: Text(
+                          'Track Status',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: accentColor),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: onFileGrievance,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: accentColor),
+                        foregroundColor: accentColor,
+                      ),
+                      child: const Text('File Dossier ➔',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                     ),
-                    child: const Text('File Dossier ➔',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  ),
+                  ],
                 ),
               ],
             ),

@@ -1,6 +1,8 @@
-import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/crypto/sanctuary_crypto_vault.dart';
 import '../../../core/error/sanctuary_exceptions.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/security/installation_service.dart';
@@ -134,12 +136,10 @@ class SettingsRepository {
     }
   }
 
-  /// Backward-compatible rotateEncryptionKey generator
+  /// Backward-compatible rotateEncryptionKey generator using real X25519 engine
   Future<String> rotateEncryptionKey() async {
-    // Generate valid 32-byte Base64 key
-    final random = Random.secure();
-    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
-    final base64Key = base64UrlEncode(bytes);
+    // Generate genuine X25519 keypair via hardware/secure vault
+    final base64Key = await SanctuaryCryptoVault.instance.rotateLocalKeyPair();
 
     try {
       final response = await _dio.post<dynamic>(
@@ -147,7 +147,7 @@ class SettingsRepository {
         data: {'public_key_base64': base64Key},
       );
       final data = response.data as Map<String, dynamic>;
-      final fp = data['key_fingerprint'] as String? ?? base64Key.substring(0, 8);
+      final fp = data['key_fingerprint'] as String? ?? (base64Key.length >= 8 ? base64Key.substring(0, 8) : 'ROTATED-X25519');
       _settings = _settings.copyWith(activeKeyFingerprint: fp);
       return fp;
     } on DioException catch (e) {
@@ -156,7 +156,7 @@ class SettingsRepository {
     }
   }
 
-  /// DPDP Sec 12: Transmits mandatory confirmation payload 'ERASE'.
+  /// DPDP Sec 12: Transmits mandatory confirmation payload 'ERASE' and purges local sandbox.
   Future<bool> incinerateAccountIrrevocably() async {
     try {
       final response = await _dio.delete<dynamic>(
@@ -171,7 +171,14 @@ class SettingsRepository {
       await InstallationService.resetInstallationUuid();
       InstallationService.clearMemoryCache();
 
-      // 2. Clear in-memory settings
+      // 2. Clear entire SharedPreferences sandbox
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      // 3. Purge all secure keystore storage
+      await const FlutterSecureStorage().deleteAll();
+
+      // 4. Clear in-memory settings
       _settings = const SanctuarySettings();
 
       return response.statusCode == 200;

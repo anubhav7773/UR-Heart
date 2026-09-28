@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/error/sanctuary_exceptions.dart';
 import '../../../core/network/dio_client.dart';
@@ -54,6 +57,26 @@ class VaultRepository {
     }
   }
 
+  /// DPDP Sec 11: Fetches payload archive, saves to local temp file, and triggers native share/download
+  Future<bool> downloadAndShareArchive(String requestId) async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/vault/export-status/$requestId');
+      final data = response.data as Map<String, dynamic>;
+      final payload = data['payload'] ?? data;
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(payload);
+
+      final tempDir = Directory.systemTemp;
+      final file = File('${tempDir.path}/urheart_dpdp_archive_${requestId.substring(0, 8)}.json');
+      await file.writeAsString(jsonStr);
+
+      final xfile = XFile(file.path, mimeType: 'application/json', name: 'urheart_dpdp_data_archive.json');
+      await Share.shareXFiles([xfile], text: 'UR-Heart DPDP Act 2023 Statutory Data Export Archive');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// DPDP Sec 14: Persists legal nominee to Supabase public.data_nominees
   Future<DataNominee> designateNominee({
     required String name,
@@ -103,6 +126,37 @@ class VaultRepository {
         },
       );
       return GrievanceReceipt.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
+  /// Tracks a specific statutory grievance ticket status and SLA countdown
+  Future<Map<String, dynamic>> trackGrievanceTicket(String referenceId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/vault/grievance/track/${referenceId.trim()}',
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data!;
+      }
+      throw const ServerException('Ticket not found or inaccessible.');
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
+  /// Fetches all grievance tickets filed by the current user
+  Future<List<Map<String, dynamic>>> fetchMyGrievances() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/api/v1/vault/grievances');
+      if (response.statusCode == 200 && response.data != null) {
+        final list = response.data!['grievances'] as List<dynamic>? ?? [];
+        return list.cast<Map<String, dynamic>>();
+      }
+      return [];
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;

@@ -212,6 +212,23 @@ async def send_chat_message(
     await db.commit()
     await db.refresh(msg)
 
+    # Find recipient from match and push notification
+    try:
+        match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+        m = match_res.scalar_one_or_none()
+        if m:
+            recipient_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+            from app.api.v1.endpoints.notifications import push_notification
+            push_notification(
+                user_id=str(recipient_id),
+                notif_type="message",
+                title=f"Message from {current_user.full_name} 💬",
+                body=text_content[:80],
+                data={"match_id": str(match_uuid), "sender_id": str(current_user.id)}
+            )
+    except Exception as e:
+        print(f"[CHAT MESSAGE NOTIF] Notice: {e}", flush=True)
+
     return {
         "status": "sent",
         "id": str(msg.id),

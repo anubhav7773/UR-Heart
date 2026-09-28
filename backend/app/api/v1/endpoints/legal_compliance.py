@@ -307,6 +307,61 @@ async def submit_grievance_dossier(
     }
 
 
+@router.get("/grievances", status_code=status.HTTP_200_OK, summary="List User Filed Grievances")
+async def get_my_grievances(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Returns list of statutory grievances filed by current user for IT Rules 2021 tracking."""
+    stmt = (
+        select(GrievanceDossier)
+        .where(GrievanceDossier.reporter_id == current_user.id)
+        .order_by(GrievanceDossier.created_at.desc())
+    )
+    res = await db.execute(stmt)
+    dossiers = res.scalars().all()
+
+    return {
+        "status": "success",
+        "grievances": [
+            {
+                "dossier_reference_id": d.dossier_reference_id,
+                "violation_category": d.violation_category,
+                "status": d.status,
+                "filed_at": d.created_at.isoformat() if d.created_at else None,
+                "sla_resolution_due": d.statutory_resolution_due_at.isoformat() if d.statutory_resolution_due_at else None,
+                "resolution_notes": d.resolution_notes or "Under active review by Statutory Grievance Officer (Rule 3(2))."
+            }
+            for d in dossiers
+        ]
+    }
+
+
+@router.get("/grievance/track/{reference_id}", status_code=status.HTTP_200_OK, summary="Track Specific Grievance Ticket")
+async def track_grievance_ticket(
+    reference_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Statutory tracking endpoint for any grievance dossier by reference ID."""
+    stmt = select(GrievanceDossier).where(GrievanceDossier.dossier_reference_id == reference_id.strip())
+    res = await db.execute(stmt)
+    d = res.scalar_one_or_none()
+
+    if not d:
+        raise HTTPException(status_code=404, detail=f"Grievance dossier '{reference_id}' not found.")
+
+    return {
+        "status": "success",
+        "dossier_reference_id": d.dossier_reference_id,
+        "category": d.violation_category,
+        "ticket_status": d.status,
+        "filed_at": d.created_at.isoformat() if d.created_at else None,
+        "sla_resolution_due": d.statutory_resolution_due_at.isoformat() if d.statutory_resolution_due_at else None,
+        "support_desk_contact": "grievance-officer@urheart.app",
+        "resolution_notes": d.resolution_notes or "Under active review by Statutory Grievance Officer (Rule 3(2))."
+    }
+
+
 # ---------------------------------------------------------------------------
 # 4. BLOCKED USERS PERIMETER (DUM-08 & ACT-05 FIX)
 # ---------------------------------------------------------------------------
