@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
+    account_incinerator,
     admin_kyc,
     ads_ssv,
     ai_cluster,
@@ -8,13 +9,16 @@ from app.api.v1.endpoints import (
     chat_api,
     feed,
     health,
+    legal_compliance,
     moderation,
     profile,
     resonances,
     telemetry,
+    underage_quarantine,
 )
 
 api_router = APIRouter()
+
 
 # 0. Live Activity Telemetry (Immediate Render Stream)
 api_router.include_router(telemetry.router)
@@ -52,3 +56,13 @@ api_router.include_router(resonances.router)
 
 # 11. 1:1 Encrypted Dialogues & Message History
 api_router.include_router(chat_api.router)
+
+# 12. Statutory Legal & DPDP Compliance (SEC-09)
+api_router.include_router(legal_compliance.router)
+
+# 13. Irrevocable Account Incinerator (SEC-06)
+api_router.include_router(account_incinerator.router)
+
+# 14. Hardware-Level Underage Quarantine Engine (SEC-08)
+api_router.include_router(underage_quarantine.router)
+

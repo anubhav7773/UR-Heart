@@ -4,21 +4,25 @@ import '../../../../core/theme/theme_controller.dart';
 /// Immutable state for Screen 1 Mindful Consent
 class ConsentState {
   final bool isAgeConfirmed;
+  final bool isEulaAccepted;
   final bool isDpdpConsented;
 
   const ConsentState({
     this.isAgeConfirmed = false,
+    this.isEulaAccepted = false,
     this.isDpdpConsented = false,
   });
 
-  bool get canProceed => isAgeConfirmed && isDpdpConsented;
+  bool get canProceed => isAgeConfirmed && isEulaAccepted && isDpdpConsented;
 
   ConsentState copyWith({
     bool? isAgeConfirmed,
+    bool? isEulaAccepted,
     bool? isDpdpConsented,
   }) {
     return ConsentState(
       isAgeConfirmed: isAgeConfirmed ?? this.isAgeConfirmed,
+      isEulaAccepted: isEulaAccepted ?? this.isEulaAccepted,
       isDpdpConsented: isDpdpConsented ?? this.isDpdpConsented,
     );
   }
@@ -29,10 +33,11 @@ class ConsentState {
       other is ConsentState &&
           runtimeType == other.runtimeType &&
           isAgeConfirmed == other.isAgeConfirmed &&
+          isEulaAccepted == other.isEulaAccepted &&
           isDpdpConsented == other.isDpdpConsented;
 
   @override
-  int get hashCode => isAgeConfirmed.hashCode ^ isDpdpConsented.hashCode;
+  int get hashCode => isAgeConfirmed.hashCode ^ isEulaAccepted.hashCode ^ isDpdpConsented.hashCode;
 }
 
 /// Controller managing legal consent affirmations and irrevocable theme lock
@@ -43,6 +48,10 @@ class ConsentController extends StateNotifier<ConsentState> {
 
   void toggleAgeConfirmed(bool value) {
     state = state.copyWith(isAgeConfirmed: value);
+  }
+
+  void toggleEulaAccepted(bool value) {
+    state = state.copyWith(isEulaAccepted: value);
   }
 
   void toggleDpdpConsented(bool value) {
@@ -58,10 +67,12 @@ class ConsentController extends StateNotifier<ConsentState> {
     await _ref.read(themeProvider.notifier).lockCurrentThemePermanently();
     return true;
   }
+
   Future<bool> persistConsent() async {
     return submitConsent();
   }
 }
+
 
 /// Provider for Screen 1 consent state
 final consentProvider =

@@ -25,6 +25,8 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
     autoflush=False
 )
+async_session_factory = AsyncSessionLocal
+
 
 class Base(declarative_base()):
     __abstract__ = True
