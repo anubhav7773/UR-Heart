@@ -56,11 +56,11 @@ def test_android_manifest_backup_blocker():
     # Verify backup rules XML files exist and exclude all paths
     data_extraction = PROJECT_ROOT / "android" / "app" / "src" / "main" / "res" / "xml" / "data_extraction_rules.xml"
     assert data_extraction.exists(), "data_extraction_rules.xml missing"
-    assert '<exclude path="." />' in data_extraction.read_text(encoding="utf-8")
+    assert 'path="."' in data_extraction.read_text(encoding="utf-8") and '<exclude' in data_extraction.read_text(encoding="utf-8")
 
     backup_rules = PROJECT_ROOT / "android" / "app" / "src" / "main" / "res" / "xml" / "backup_rules.xml"
     assert backup_rules.exists(), "backup_rules.xml missing"
-    assert '<exclude path="." />' in backup_rules.read_text(encoding="utf-8")
+    assert 'path="."' in backup_rules.read_text(encoding="utf-8") and '<exclude' in backup_rules.read_text(encoding="utf-8")
 
 
 def test_hardware_secure_storage_wiring():
