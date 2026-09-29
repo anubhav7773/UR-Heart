@@ -300,17 +300,32 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
         flush=True
     )
 
-    return {
+    # Mask email string for safe generic delivery confirmation
+    parts = clean_email.split("@")
+    if len(parts) == 2 and len(parts[0]) > 2:
+        masked_email = f"{parts[0][:2]}***@{parts[1]}"
+    elif len(parts) == 2:
+        masked_email = f"{parts[0][:1]}***@{parts[1]}"
+    else:
+        masked_email = clean_email
+
+    response_payload = {
         "status": "sent",
         "email": clean_email,
-        "magic_link": browser_verify_link,
-        "deep_link": deep_link,
+        "masked_email": masked_email,
         "supabase_dispatched": dispatch_res.get("dispatched", False),
         "rate_limited": dispatch_res.get("rate_limited", False),
         "provider": dispatch_res.get("provider", "direct_link"),
         "expires_in_minutes": 15,
-        "message": dispatch_res.get("message", "Sacred verification link prepared.")
+        "message": dispatch_res.get("message", "A sacred verification link has been dispatched to your email address.")
     }
+
+    # Strict Security Guard: Only expose magic_link/deep_link in non-production or debug test environments
+    if getattr(settings, "ENVIRONMENT", "production") != "production" or getattr(settings, "DEBUG", False):
+        response_payload["magic_link"] = browser_verify_link
+        response_payload["deep_link"] = deep_link
+
+    return response_payload
 
 
 @router.get("/verification-status", status_code=status.HTTP_200_OK, summary="Live Polling Status for Magic Link")

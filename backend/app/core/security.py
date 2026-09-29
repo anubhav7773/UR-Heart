@@ -12,8 +12,22 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.models.domain.user import User
+from starlette.requests import Request
 
-security_scheme = HTTPBearer(auto_error=True)
+
+class StrictHTTPBearer(HTTPBearer):
+    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
+        res = await super().__call__(request)
+        if not res or not res.credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return res
+
+
+security_scheme = StrictHTTPBearer(auto_error=False)
 
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "ur-heart-44b46")
 FIREBASE_ISSUER = f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"

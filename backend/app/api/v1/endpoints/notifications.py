@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user
 from app.models.domain.user import User
 
 router = APIRouter(prefix="/notifications", tags=["In-App Notifications"])
@@ -50,12 +50,10 @@ class MarkReadRequest(BaseModel):
 @router.get("", status_code=status.HTTP_200_OK, summary="Get In-App Notifications")
 @router.get("/", status_code=status.HTTP_200_OK, summary="Get In-App Notifications")
 async def get_notifications(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns list of notifications and unread count for current user."""
-    if not current_user:
-        return {"status": "success", "notifications": [], "unread_count": 0}
 
     user_key = str(current_user.id)
     items = NOTIFICATION_STORE.get(user_key, [])
@@ -71,11 +69,9 @@ async def get_notifications(
 @router.post("/mark-read", status_code=status.HTTP_200_OK, summary="Mark Notifications as Read")
 async def mark_notifications_read(
     payload: MarkReadRequest,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    if not current_user:
-        return {"status": "ok", "unread_count": 0}
 
     user_key = str(current_user.id)
     items = NOTIFICATION_STORE.get(user_key, [])

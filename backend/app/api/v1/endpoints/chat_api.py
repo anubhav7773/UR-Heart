@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user
 from app.models.domain.user import User
 from app.models.domain.match import Match
 from app.models.domain.message import Message
@@ -31,7 +31,7 @@ class SendMessageRequest(BaseModel):
 
 @router.get("/threads", status_code=status.HTTP_200_OK, summary="Get Active Dialogue Threads")
 async def get_dialogue_threads(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns active dialogue threads from PostgreSQL matches table."""
@@ -90,7 +90,7 @@ async def get_dialogue_threads(
 
 @router.get("/sparks", status_code=status.HTTP_200_OK, summary="Get Active Exploration Sparks")
 async def get_active_sparks(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns active sparks under exploration timer from PostgreSQL."""
@@ -133,7 +133,7 @@ async def get_active_sparks(
 @router.get("/messages/{match_id}", status_code=status.HTTP_200_OK, summary="Get Messages for Dialogue")
 async def get_dialogue_messages(
     match_id: str,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns chronologically ordered messages for match dialogue."""
@@ -171,7 +171,7 @@ async def get_dialogue_messages(
 @router.get("/threads/{match_id}/messages", status_code=status.HTTP_200_OK, summary="Get Thread Messages")
 async def get_thread_messages(
     match_id: str,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns chronologically ordered messages for match dialogue thread."""
@@ -184,7 +184,7 @@ async def get_thread_messages(
 async def send_chat_message(
     payload: SendMessageRequest,
     match_id: Optional[str] = None,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Persists a new message in PostgreSQL messages table."""

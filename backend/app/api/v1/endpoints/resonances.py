@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user
 from app.models.domain.user import User
 from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
@@ -24,7 +24,7 @@ def _calculate_age(dob: Optional[date]) -> int:
 @router.get("/incoming", status_code=status.HTTP_200_OK, summary="Get Incoming Likes")
 @router.get("/likes", status_code=status.HTTP_200_OK, summary="Get Incoming Likes Alias")
 async def get_incoming_likes(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns incoming admirers who liked the user profile from PostgreSQL."""
@@ -64,7 +64,7 @@ async def get_incoming_likes(
 
 @router.get("/mutual", status_code=status.HTTP_200_OK, summary="Get Mutual Connections")
 async def get_mutual_connections(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns mutual matches eligible for 1:1 dialogue from PostgreSQL."""

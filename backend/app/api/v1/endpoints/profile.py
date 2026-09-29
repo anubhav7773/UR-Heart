@@ -267,6 +267,7 @@ class ProfileCreateRequest(BaseModel):
     education: Optional[str] = None
     is_kyc: Optional[bool] = False
     photos: Optional[list] = None
+    avatar_url: Optional[str] = None
     email: Optional[str] = None
 
     model_config = ConfigDict(extra="ignore")
@@ -279,96 +280,70 @@ class ProfileCreateRequest(BaseModel):
 )
 async def create_or_update_profile(
     payload: ProfileCreateRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Saves completed user profile parameters to Sanctuary database
-    and logs the creation event to Render console.
+    Saves completed user profile parameters strictly bound to authenticated current_user.
+    Permanently neutralizes IDOR vulnerabilities by ignoring any email passed in request body.
     """
     loc_name = payload.location_name or payload.location
 
     if payload.full_name:
         COMPLETED_PROFILES.add(payload.full_name.strip().lower())
-    if payload.email:
-        COMPLETED_PROFILES.add(payload.email.strip().lower())
+    if current_user.email:
+        COMPLETED_PROFILES.add(current_user.email.strip().lower())
 
-    if payload.email:
-        clean_email = payload.email.strip().lower()
-        up_vals: Dict[str, Any] = {"is_profile_completed": True}
-        if payload.full_name:
-            up_vals["full_name"] = payload.full_name
-        if payload.gender:
-            up_vals["gender"] = payload.gender
-        if payload.bio:
-            up_vals["bio"] = payload.bio
-        if payload.profession:
-            up_vals["profession"] = payload.profession
-        if payload.education:
-            up_vals["education"] = payload.education
-        if loc_name:
-            up_vals["location_name"] = loc_name
-        if payload.is_kyc is not None:
-            up_vals["kyc_status"] = payload.is_kyc
-        if payload.bridge_platform:
-            up_vals["contact_bridge_type"] = payload.bridge_platform
-        if payload.bridge_value:
-            up_vals["contact_bridge_encrypted"] = payload.bridge_value
-        if payload.photos:
-            up_vals["photos"] = payload.photos
-            if not payload.avatar_url and len(payload.photos) > 0:
-                up_vals["avatar_url"] = payload.photos[0]
-        if payload.avatar_url:
-            up_vals["avatar_url"] = payload.avatar_url
-
-        res = await db.execute(select(User).where(User.email == clean_email))
-        existing_user = res.scalar_one_or_none()
-        if existing_user:
-            await db.execute(
-                update(User)
-                .where(User.email == clean_email)
-                .values(**up_vals)
-            )
-        else:
-            import uuid as _uuid
-            from datetime import date as _date
-            parsed_dob = _date(2000, 1, 1)
-            if payload.date_of_birth:
-                try:
-                    parsed_dob = _date.fromisoformat(payload.date_of_birth)
-                except Exception:
-                    pass
-
-            new_user = User(
-                id=_uuid.uuid4(),
-                auth_id=_uuid.uuid4(),
-                email=clean_email,
-                full_name=payload.full_name or "Sanctuary Seeker",
-                dob=parsed_dob,
-                gender=payload.gender or "Unspecified",
-                interested_in=payload.looking_for or "Everyone",
-                bio=payload.bio or "",
-                profession=payload.profession or "",
-                education=payload.education or "",
-                contact_bridge_type=payload.bridge_platform or "whatsapp",
-                contact_bridge_encrypted=payload.bridge_value or "",
-                location_name=loc_name or "Saket, Ayodhya",
-                referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
-                kyc_status=bool(payload.is_kyc),
-                is_profile_completed=True,
-                photos=payload.photos or [],
-                avatar_url=payload.avatar_url or (payload.photos[0] if (payload.photos and len(payload.photos) > 0) else None),
-            )
-            db.add(new_user)
+    up_vals: Dict[str, Any] = {"is_profile_completed": True}
+    if payload.full_name:
+        up_vals["full_name"] = payload.full_name
+    if payload.gender:
+        up_vals["gender"] = payload.gender
+    if payload.looking_for:
+        up_vals["interested_in"] = payload.looking_for
+    if payload.bio:
+        up_vals["bio"] = payload.bio
+    if payload.profession:
+        up_vals["profession"] = payload.profession
+    if payload.education:
+        up_vals["education"] = payload.education
+    if loc_name:
+        up_vals["location_name"] = loc_name
+    if payload.is_kyc is not None:
+        up_vals["kyc_status"] = payload.is_kyc
+    if payload.bridge_platform:
+        up_vals["contact_bridge_type"] = payload.bridge_platform
+    if payload.bridge_value:
+        up_vals["contact_bridge_encrypted"] = payload.bridge_value
+    if payload.photos:
+        up_vals["photos"] = payload.photos
+        if not payload.avatar_url and len(payload.photos) > 0:
+            up_vals["avatar_url"] = payload.photos[0]
+    if payload.avatar_url:
+        up_vals["avatar_url"] = payload.avatar_url
+    if payload.date_of_birth:
         try:
-            await db.commit()
-        except Exception as e:
-            await db.rollback()
-            print(f"[PROFILE PERSISTENCE] Commit error: {e}", flush=True)
+            from datetime import date as _date
+            up_vals["dob"] = _date.fromisoformat(payload.date_of_birth)
+        except Exception:
+            pass
+
+    # Strictly bind mutations to current_user.id - completely ignoring any untrusted payload.email
+    await db.execute(
+        update(User)
+        .where(User.id == current_user.id)
+        .values(**up_vals)
+    )
+    try:
+        await db.commit()
+        await db.refresh(current_user)
+    except Exception as e:
+        await db.rollback()
+        print(f"[PROFILE PERSISTENCE] Commit error: {e}", flush=True)
 
     print(
-        f"[PROFILE PERSISTENCE] Profile Created/Updated: name={payload.full_name} "
-        f"gender={payload.gender} looking_for={payload.looking_for} "
-        f"location={loc_name} kyc={payload.is_kyc}",
+        f"[PROFILE PERSISTENCE] Profile Saved: user_id={current_user.id} name={current_user.full_name} "
+        f"location={current_user.location_name} kyc={current_user.kyc_status}",
         flush=True
     )
     return {
@@ -377,8 +352,8 @@ async def create_or_update_profile(
         "is_profile_completed": True,
         "message": "Sanctuary profile saved and verified successfully.",
         "profile": {
-            "full_name": payload.full_name,
-            "location_name": loc_name,
-            "is_kyc": payload.is_kyc,
+            "full_name": current_user.full_name,
+            "location_name": current_user.location_name,
+            "is_kyc": current_user.kyc_status,
         }
     }

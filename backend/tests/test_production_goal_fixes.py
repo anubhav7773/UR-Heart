@@ -8,16 +8,27 @@ from app.services.ai_orchestrator import AiOrchestrator
 client = TestClient(app)
 
 def test_notifications_both_routes_200():
-    """Problem 1: Verify notifications 404 is resolved on both root and v1 routes."""
-    # Root route /notifications
-    res_root = client.get("/notifications")
-    assert res_root.status_code == 200
-    assert res_root.json()["status"] == "success"
+    """Verify notifications endpoints exist on both root and v1 routes, enforce 401 unauth, and succeed with auth."""
+    # Unauthenticated must be rejected with 401
+    assert client.get("/notifications").status_code == 401
+    assert client.get("/api/v1/notifications").status_code == 401
 
-    # API v1 route /api/v1/notifications
-    res_v1 = client.get("/api/v1/notifications")
-    assert res_v1.status_code == 200
-    assert res_v1.json()["status"] == "success"
+    # With authenticated user, both routes return 200 success
+    from app.core.security import get_current_user
+    from app.models.domain.user import User
+    import uuid
+    dummy_user = User(id=uuid.UUID("11111111-1111-1111-1111-111111111111"), email="tester@urheart.app", full_name="Tester")
+    app.dependency_overrides[get_current_user] = lambda: dummy_user
+    try:
+        res_root = client.get("/notifications", headers={"Authorization": "Bearer dummy_token"})
+        assert res_root.status_code == 200
+        assert res_root.json()["status"] == "success"
+
+        res_v1 = client.get("/api/v1/notifications", headers={"Authorization": "Bearer dummy_token"})
+        assert res_v1.status_code == 200
+        assert res_v1.json()["status"] == "success"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 def test_magic_link_intent_and_dispatch():
@@ -38,9 +49,10 @@ def test_magic_link_intent_and_dispatch():
     assert res_link.status_code == 200
     data = res_link.json()
     assert data["status"] == "sent"
-    assert "token=" in data["magic_link"]
-    assert "https://urheart.asiverticals.me" in data["magic_link"]
-    assert "urheart://auth/verify" in data["deep_link"]
+    assert "magic_link" not in data, "Security failure: magic_link leaked in public HTTP response"
+    assert "deep_link" not in data, "Security failure: deep_link leaked in public HTTP response"
+    assert "token" not in data, "Security failure: raw token leaked in public HTTP response"
+    assert "masked_email" in data
 
     # 3. Check Initial Live Polling Status (Should be pending)
     res_poll_init = client.get("/api/v1/auth/verification-status?email=seeker@urheart.app")
@@ -48,8 +60,9 @@ def test_magic_link_intent_and_dispatch():
     assert res_poll_init.json()["is_verified"] is False
     assert res_poll_init.json()["status"] == "pending"
 
-    # 4. Simulate User Tapping Link in Browser (GET /api/v1/auth/verify)
-    token = data["magic_link"].split("token=")[1].split("&")[0]
+    # 4. Simulate User Tapping Link in Dispatched Email (retrieved securely from vault)
+    from app.api.v1.endpoints.auth import EMAIL_VERIFICATION_STATUS
+    token = EMAIL_VERIFICATION_STATUS["seeker@urheart.app"]["token"]
     res_tap = client.get(f"/api/v1/auth/verify?token={token}&email=seeker@urheart.app")
     assert res_tap.status_code == 200
     assert "text/html" in res_tap.headers["content-type"]
