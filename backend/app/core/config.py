@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # App Information
     APP_NAME: str = "UR-Heart Core Engine"
-    ENVIRONMENT: str = "production"
+    ENVIRONMENT: str = "development"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
     BASE_WEB_URL: str = "https://urheart.asiverticals.me"
@@ -20,9 +20,7 @@ class Settings(BaseSettings):
     SUPABASE_PGBOUNCER_URL: str = (
         "postgresql+asyncpg://postgres.fmedkihgcvvzcekwybhe:[YOUR-PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:6543/postgres"
     )
-    SUPABASE_SERVICE_ROLE_KEY: str = (
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtZWRraWhnY3Z2emNla3d5YmhlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDMyNTU3MSwiZXhwIjoyMTA1OTAxNTcxfQ._coyARO4-CsBGxjzx874_H4wI89ljKI1b9zSP0dJdcU"
-    )
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_URL: str = "https://fmedkihgcvvzcekwybhe.supabase.co"
     SUPABASE_STORAGE_BUCKET: str = "ur-heart-media"
 
