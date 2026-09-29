@@ -3,10 +3,15 @@
 class ApiEndpoints {
   const ApiEndpoints._();
 
-  // Base API URL injected via environment or defaulting to secure Render backend
+  // Official Production Domain (Asiverticals.me parent network)
+  static const String officialDomain = 'urheart.asiverticals.me';
+  static const String fallbackDomain = 'ur-heart.onrender.com';
+  static const String webSanctuaryUrl = 'https://urheart.asiverticals.me';
+
+  // Base API URL injected via environment or defaulting to official domain
   static const String defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://ur-heart.onrender.com',
+    defaultValue: 'https://urheart.asiverticals.me',
   );
 
   // Core API Routes

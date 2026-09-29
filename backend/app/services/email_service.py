@@ -104,6 +104,8 @@ class EmailService:
             except Exception as e:
                 print(f"[EMAIL SERVICE] Resend dispatch error: {e}", flush=True)
 
+        base_web = getattr(settings, "BASE_WEB_URL", "https://urheart.asiverticals.me")
+
         # 3. Supabase Auth OTP Dispatch
         supabase_dispatched = False
         rate_limited = False
@@ -121,7 +123,7 @@ class EmailService:
                             "email": clean_email,
                             "create_user": True,
                             "options": {
-                                "email_redirect_to": f"https://ur-heart.onrender.com/api/v1/auth/callback?email={clean_email}&token={token}"
+                                "email_redirect_to": f"{base_web}/api/v1/auth/callback?email={clean_email}&token={token}"
                             }
                         },
                     )
@@ -151,7 +153,7 @@ class EmailService:
                             "type": "magiclink",
                             "email": clean_email,
                             "options": {
-                                "redirect_to": f"https://ur-heart.onrender.com/api/v1/auth/callback?email={clean_email}&token={token}"
+                                "redirect_to": f"{base_web}/api/v1/auth/callback?email={clean_email}&token={token}"
                             }
                         }
                     )

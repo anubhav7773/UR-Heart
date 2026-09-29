@@ -66,7 +66,7 @@ class AiOrchestrator:
         key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
         headers = {
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://urheart.app",
+            "HTTP-Referer": "https://urheart.asiverticals.me",
             "X-Title": "UR-Heart Sanctuary",
         }
         if key:

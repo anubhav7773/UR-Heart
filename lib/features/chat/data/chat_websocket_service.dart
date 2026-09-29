@@ -33,7 +33,7 @@ class ChatWebSocketService {
         if (host.isNotEmpty) return host;
       } catch (_) {}
     }
-    return 'ur-heart.onrender.com';
+    return 'urheart.asiverticals.me';
   }
 
   /// Acquires single-use ephemeral ticket and opens secure WSS channel.

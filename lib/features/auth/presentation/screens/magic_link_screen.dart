@@ -97,7 +97,8 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) async {
         if ((uri.scheme == 'urheart' && uri.host == 'auth' && uri.path.contains('verify')) ||
-            (uri.host.contains('ur-heart.onrender.com') && uri.path.contains('auth'))) {
+            ((uri.host.contains('urheart.asiverticals.me') || uri.host.contains('ur-heart.onrender.com')) &&
+             (uri.path.contains('auth') || uri.path.contains('verify')))) {
           final token = uri.queryParameters['token'] ?? uri.queryParameters['code'];
           if (token != null && token.isNotEmpty) {
             await _verifyMagicLinkToken(token);

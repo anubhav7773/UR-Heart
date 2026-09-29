@@ -16,7 +16,7 @@ class AiFallbackService:
     def _headers(cls) -> Dict[str, str]:
         headers = {
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://urheart.app",
+            "HTTP-Referer": "https://urheart.asiverticals.me",
             "X-Title": "UR-Heart Mindful Sanctuary",
         }
         if settings.OPENROUTER_API_KEY:

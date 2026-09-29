@@ -91,7 +91,7 @@ class DataExportStatus {
   bool get isReady => status.toLowerCase() == 'completed' || status.toLowerCase() == 'ready';
   String? get downloadUrl =>
       (payload?['download_url'] as String?) ??
-      (isReady ? 'https://ur-heart.onrender.com/api/v1/vault/export-download/$requestId' : null);
+      (isReady ? 'https://urheart.asiverticals.me/api/v1/vault/export-download/$requestId' : null);
 }
 
 /// Data Nominee under DPDP Act 2023 Sec 14

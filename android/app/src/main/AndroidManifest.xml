@@ -45,6 +45,26 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="urheart" android:host="auth" android:pathPrefix="/verify" />
             </intent-filter>
+            <!-- Official Production Domain Deep Linking: urheart.asiverticals.me -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="urheart.asiverticals.me" android:pathPrefix="/api/v1/auth" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="urheart.asiverticals.me" android:pathPrefix="/auth" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="urheart.asiverticals.me" android:pathPrefix="/verify" />
+            </intent-filter>
+            <!-- Render Fallback Domain Deep Linking -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

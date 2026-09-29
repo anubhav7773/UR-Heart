@@ -10,6 +10,8 @@ import 'package:ur_heart/features/navigation/presentation/screens/sanctuary_navi
 import 'package:ur_heart/features/chat/presentation/screens/chat_dialogue_screen.dart';
 import 'package:ur_heart/features/rewards/presentation/widgets/sacred_kinship_card.dart';
 import 'package:ur_heart/features/auth/presentation/widgets/magic_link_passage_card.dart';
+import 'package:ur_heart/core/constants/api_endpoints.dart';
+import 'package:ur_heart/features/settings/presentation/widgets/official_web_sanctuary_card.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -193,5 +195,30 @@ void main() {
       expect(find.text('Verify Passkey & Enter ➔'), findsNothing);
     });
   });
+
+  group('Official Domain Verification: urheart.asiverticals.me', () {
+    test('ApiEndpoints configured with urheart.asiverticals.me', () {
+      expect(ApiEndpoints.officialDomain, 'urheart.asiverticals.me');
+      expect(ApiEndpoints.defaultBaseUrl, 'https://urheart.asiverticals.me');
+      expect(ApiEndpoints.webSanctuaryUrl, 'https://urheart.asiverticals.me');
+    });
+
+    testWidgets('OfficialWebSanctuaryCard renders official domain and launch button', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: OfficialWebSanctuaryCard(isDark: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Official Web Sanctuary'), findsOneWidget);
+      expect(find.text('urheart.asiverticals.me'), findsOneWidget);
+      expect(find.text('Visit urheart.asiverticals.me'), findsOneWidget);
+      expect(find.byIcon(Icons.open_in_browser_rounded), findsOneWidget);
+    });
+  });
 }
+
 

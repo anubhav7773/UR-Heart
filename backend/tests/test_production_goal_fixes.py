@@ -39,6 +39,7 @@ def test_magic_link_intent_and_dispatch():
     data = res_link.json()
     assert data["status"] == "sent"
     assert "token=" in data["magic_link"]
+    assert "https://urheart.asiverticals.me" in data["magic_link"]
     assert "urheart://auth/verify" in data["deep_link"]
 
     # 3. Check Initial Live Polling Status (Should be pending)
@@ -135,3 +136,23 @@ async def test_eva_feedback_and_ticket_awareness():
     })
     assert res_fb.status_code == 201
     assert res_fb.json()["status"] == "success"
+
+
+def test_official_domain_web_and_root_landing():
+    """Verify official domain urheart.asiverticals.me is served cleanly on root and health."""
+    # 1. Browser HTML visit on root '/'
+    res_html = client.get("/", headers={"Accept": "text/html,application/xhtml+xml"})
+    assert res_html.status_code == 200
+    assert "text/html" in res_html.headers["content-type"]
+    assert "urheart.asiverticals.me" in res_html.text
+    assert "Asiverticals" in res_html.text
+    assert "Open UR-Heart App" in res_html.text
+
+    # 2. JSON health probe on '/health'
+    res_health = client.get("/health")
+    assert res_health.status_code == 200
+    json_data = res_health.json()
+    assert json_data["status"] == "healthy"
+    assert json_data["domain"] == "urheart.asiverticals.me"
+    assert json_data["parent_entity"] == "asiverticals.me"
+

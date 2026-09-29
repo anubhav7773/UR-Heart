@@ -8,6 +8,7 @@ import '../widgets/alerts_toggle_group.dart';
 import '../widgets/atmosphere_theme_card.dart';
 import '../widgets/discovery_privacy_card.dart';
 import '../widgets/irrevocable_erasure_modal.dart';
+import '../widgets/official_web_sanctuary_card.dart';
 import '../widgets/superadmin_sentinel_tile.dart';
 
 /// Screen 13: Sanctuary Preferences & Governance
@@ -112,6 +113,9 @@ class SanctuarySettingsScreen extends ConsumerWidget {
                 isRotatingKey: state.isRotatingKey,
                 onIncognitoChanged: notifier.toggleIncognito,
                 onRotateKey: notifier.rotateKey,
+              ),
+              OfficialWebSanctuaryCard(
+                isDark: isDark,
               ),
               // Superadmin Sentinel Tile: Strictly renders via server-side role resolution claim
               SuperadminSentinelTile(

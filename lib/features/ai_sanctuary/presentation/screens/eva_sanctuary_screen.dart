@@ -457,7 +457,7 @@ class _EvaSanctuaryScreenState extends ConsumerState<EvaSanctuaryScreen>
                     isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
                   Text(
-                    msg.content,
+                    (msg.content?.toString() ?? ''),
                     style: TextStyle(
                       color: headlineColor,
                       fontSize: 13.5,

@@ -276,8 +276,11 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
         "expires_at": expires_at
     }
 
-    # Browser verification URL on Render
-    browser_verify_link = f"https://ur-heart.onrender.com/api/v1/auth/verify?token={token}&email={clean_email}"
+    # Browser verification URL on official domain
+    from app.core.config import get_settings
+    settings = get_settings()
+    base_web = getattr(settings, "BASE_WEB_URL", "https://urheart.asiverticals.me")
+    browser_verify_link = f"{base_web}/api/v1/auth/verify?token={token}&email={clean_email}"
     deep_link = f"urheart://auth/verify?token={token}&email={clean_email}"
 
     # Multi-provider email dispatch

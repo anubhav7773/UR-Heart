@@ -62,7 +62,7 @@ class _SacredKinshipCardState extends ConsumerState<SacredKinshipCard> {
   }
 
   String get _shareLink =>
-      'https://urheart.app/join?ref=$_effectiveReferralCode';
+      'https://urheart.asiverticals.me/join?ref=$_effectiveReferralCode';
 
   String get _shareMessage =>
       'Join me in UR-Heart — A mindful dating sanctuary without superficial algorithms. '

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
+    BASE_WEB_URL: str = "https://urheart.asiverticals.me"
 
     # Supabase PgBouncer Pooler (Port 6543)
     SUPABASE_PGBOUNCER_URL: str = (

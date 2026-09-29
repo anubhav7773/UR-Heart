@@ -45,7 +45,7 @@ class SettingsActionHandlers {
     required String referralCode,
   }) async {
     final text = 'Join me in the quiet presence of UR-Heart Dating Sanctuary. '
-        'Enter with my passage crest: $referralCode\nhttps://urheart.app/join/$referralCode';
+        'Enter with my passage crest: $referralCode\nhttps://urheart.asiverticals.me/join/$referralCode';
     await Share.share(text, subject: 'UR-Heart Sanctuary Invitation');
   }
 

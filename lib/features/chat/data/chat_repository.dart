@@ -12,7 +12,7 @@ export '../domain/chat_models.dart';
 final chatWebSocketServiceProvider = Provider<ChatWebSocketService>((ref) {
   final dioClient = ref.watch(dioClientProvider);
   final wsHost = Uri.parse(dioClient.dio.options.baseUrl).host;
-  final service = ChatWebSocketService(dioClient.dio, wsHost.isNotEmpty ? wsHost : 'ur-heart.onrender.com');
+  final service = ChatWebSocketService(dioClient.dio, wsHost.isNotEmpty ? wsHost : 'urheart.asiverticals.me');
   service.connectSecureChannel();
   ref.onDispose(() => service.dispose());
   return service;
