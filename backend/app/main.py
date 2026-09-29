@@ -122,6 +122,12 @@ app.include_router(ws_router)
 from app.api.v1.endpoints.notifications import router as notifications_direct_router
 app.include_router(notifications_direct_router)
 
+# Mount direct magic link verification routes at root for 100% tap compatibility
+from app.api.v1.endpoints.auth import handle_browser_magic_link_tap
+from fastapi.responses import HTMLResponse
+app.add_api_route("/verify", handle_browser_magic_link_tap, methods=["GET"], response_class=HTMLResponse, tags=["Magic Link Direct"])
+app.add_api_route("/auth/callback", handle_browser_magic_link_tap, methods=["GET"], response_class=HTMLResponse, tags=["Magic Link Direct"])
+
 # Mount Main API v1 Router
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 

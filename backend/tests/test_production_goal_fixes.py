@@ -31,15 +31,34 @@ def test_magic_link_intent_and_dispatch():
     assert res_intent.status_code == 200
     assert res_intent.json()["status"] in ["success", "intent_recorded"]
 
-    # 2. Send Magic Link & Passkey
+    # 2. Send Magic Link
     res_link = client.post("/api/v1/auth/send-magic-link", json={
         "email": "seeker@urheart.app"
     })
     assert res_link.status_code == 200
     data = res_link.json()
     assert data["status"] == "sent"
-    assert len(data["passkey"]) == 6
     assert "token=" in data["magic_link"]
+    assert "urheart://auth/verify" in data["deep_link"]
+
+    # 3. Check Initial Live Polling Status (Should be pending)
+    res_poll_init = client.get("/api/v1/auth/verification-status?email=seeker@urheart.app")
+    assert res_poll_init.status_code == 200
+    assert res_poll_init.json()["is_verified"] is False
+    assert res_poll_init.json()["status"] == "pending"
+
+    # 4. Simulate User Tapping Link in Browser (GET /api/v1/auth/verify)
+    token = data["magic_link"].split("token=")[1].split("&")[0]
+    res_tap = client.get(f"/api/v1/auth/verify?token={token}&email=seeker@urheart.app")
+    assert res_tap.status_code == 200
+    assert "text/html" in res_tap.headers["content-type"]
+    assert "Sanctuary Verified" in res_tap.text
+
+    # 5. Check Live Polling Status After Tap (Instantly verified)
+    res_poll_after = client.get("/api/v1/auth/verification-status?email=seeker@urheart.app")
+    assert res_poll_after.status_code == 200
+    assert res_poll_after.json()["is_verified"] is True
+    assert res_poll_after.json()["token"] is not None
 
 
 def test_eva_creator_attribution():

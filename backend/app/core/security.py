@@ -3,6 +3,7 @@ import time
 from typing import Optional, Dict, Any
 from uuid import UUID
 import httpx
+from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -17,6 +18,18 @@ security_scheme = HTTPBearer(auto_error=True)
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "ur-heart-44b46")
 FIREBASE_ISSUER = f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"
 GOOGLE_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ur-heart-sacred-key-production-grade-2026")
+
+
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Creates a JWT access token for authenticating sessions."""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(days=30)
+    to_encode.update({"exp": expire, "iss": "ur-heart"})
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
 
 # In-memory public key cache to avoid fetching Google certs on every single request
 _public_keys_cache: Dict[str, str] = {}
@@ -55,7 +68,20 @@ async def get_google_public_keys() -> Dict[str, str]:
 
 
 async def verify_firebase_jwt(token: str) -> Dict[str, Any]:
-    """Cryptographically verifies incoming JWT. Enforces signature, aud, iss, and exp."""
+    """Cryptographically verifies incoming JWT (supports both UR-Heart HS256 and Google RS256)."""
+    # 0. Check if token is internal UR-Heart HS256 token
+    try:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET_KEY,
+            algorithms=["HS256"],
+            options={"verify_signature": True, "verify_exp": True}
+        )
+        if payload.get("iss") == "ur-heart":
+            return payload
+    except Exception:
+        pass
+
     try:
         # 1. Decode header without verification to retrieve Key ID (kid)
         unverified_header = jwt.get_unverified_header(token)

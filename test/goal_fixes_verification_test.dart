@@ -9,6 +9,7 @@ import 'package:ur_heart/features/profile_setup/presentation/screens/profile_set
 import 'package:ur_heart/features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
 import 'package:ur_heart/features/chat/presentation/screens/chat_dialogue_screen.dart';
 import 'package:ur_heart/features/rewards/presentation/widgets/sacred_kinship_card.dart';
+import 'package:ur_heart/features/auth/presentation/widgets/magic_link_passage_card.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -146,4 +147,47 @@ void main() {
       expect(find.text('Have a referral code? Enter here ▼'), findsOneWidget);
     });
   });
+
+  group('Magic Link Overhaul: Passkey-Free Live Step Tracker Verification', () {
+    testWidgets('MagicLinkPassageCard displays 3 live steps, live listening status, and email client CTA', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: MagicLinkPassageCard(
+                currentStep: 2,
+                elapsedSeconds: 15,
+                targetEmail: 'seeker@urheart.app',
+                onOpenEmailApp: () {},
+                onResend: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // 1. Live step tracker header and step counter
+      expect(find.text('LIVE STEP TRACKER'), findsOneWidget);
+      expect(find.text('Step 2 of 3'), findsOneWidget);
+
+      // 2. Step 1: Dispatched
+      expect(find.text('Sacred Link Dispatched'), findsOneWidget);
+      expect(find.text('Delivered'), findsOneWidget);
+
+      // 3. Step 2: Live Listening with formatted elapsed time
+      expect(find.text('Open Email & Tap Sacred Link'), findsOneWidget);
+      expect(find.text('Listening: 00:15'), findsOneWidget);
+      expect(find.text('Open Email App Now ➔'), findsOneWidget);
+
+      // 4. Step 3: Enter Profile Sanctuary
+      expect(find.text('Enter Profile Sanctuary'), findsOneWidget);
+
+      // 5. Verify passkey input fields are 100% ABSENT
+      expect(find.text('Mindful 6-Digit Passkey'), findsNothing);
+      expect(find.text('Passkey:'), findsNothing);
+      expect(find.text('Verify Passkey & Enter ➔'), findsNothing);
+    });
+  });
 }
+

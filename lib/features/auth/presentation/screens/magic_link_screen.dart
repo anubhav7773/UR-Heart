@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,9 +10,15 @@ import '../../../../core/theme/theme_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/magic_link_passage_card.dart';
 
-/// Screen 3: Magic Link & Mindful Passkey Verification Passage (ACT-01 Production Fix)
-/// Supports real Supabase Auth deep links (urheart://auth/verify?token=...), native mail launcher,
-/// and instant 6-digit mindful passkey direct verification with session JWT issuance.
+/// Screen 3: Sacred Magic Link & Live Step Passage Screen
+/// 100% Passkey-Free: Streamlined tap-to-verify flow.
+/// User registers with email & password -> Sacred link dispatched ->
+/// User opens mail and taps link -> Instantly verifies ->
+/// Enters Profile Sanctuary (/profile-setup) to complete profile.
+/// Live step counting tracks:
+/// Step 1: Dispatched (Delivered)
+/// Step 2: Listening for Link Tap (Live seconds counter)
+/// Step 3: Verified & Sacred Sanctuary Entry
 class MagicLinkScreen extends ConsumerStatefulWidget {
   final String? email;
 
@@ -26,19 +33,61 @@ class MagicLinkScreen extends ConsumerStatefulWidget {
 class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
-  final TextEditingController _passkeyController = TextEditingController();
-  bool _isVerifying = false;
+  Timer? _pollingTimer;
+  Timer? _elapsedTimer;
+
+  int _currentStep = 2; // Step 1 is already dispatched upon signup
+  int _elapsedSeconds = 0;
+  bool _isNavigating = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _initDeepLinkListener();
+    _startLiveElapsedTimer();
+    _startLiveStatusPolling();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = ref.read(authControllerProvider);
       final email = widget.email ?? state.email;
-      if (email.isNotEmpty && state.dispatchedPasskey == null) {
+      if (email.isNotEmpty && state.resendCooldownSeconds == 0) {
         ref.read(authControllerProvider.notifier).resendVerificationEmail(email);
+      }
+    });
+  }
+
+  void _startLiveElapsedTimer() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _currentStep < 3) {
+        setState(() {
+          _elapsedSeconds++;
+        });
+      }
+    });
+  }
+
+  void _startLiveStatusPolling() {
+    _pollingTimer?.cancel();
+    // Poll every 1.8 seconds to instantly detect when user taps the email link in their mail app / browser
+    _pollingTimer = Timer.periodic(const Duration(milliseconds: 1800), (_) async {
+      if (!mounted || _currentStep == 3 || _isNavigating) return;
+
+      final state = ref.read(authControllerProvider);
+      final email = widget.email ?? state.email;
+      if (email.isEmpty) return;
+
+      try {
+        final isVerified = await ref
+            .read(authControllerProvider.notifier)
+            .pollVerificationStatus(email);
+
+        if (isVerified && mounted && !_isNavigating) {
+          await _onVerificationSuccess();
+        }
+      } catch (_) {
+        // Silent polling resilience
       }
     });
   }
@@ -47,8 +96,8 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
     _appLinks = AppLinks();
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) async {
-        if ((uri.scheme == 'urheart' && uri.host == 'auth' && uri.path == '/verify') ||
-            (uri.host.contains('urheart.app') && uri.path.contains('auth'))) {
+        if ((uri.scheme == 'urheart' && uri.host == 'auth' && uri.path.contains('verify')) ||
+            (uri.host.contains('ur-heart.onrender.com') && uri.path.contains('auth'))) {
           final token = uri.queryParameters['token'] ?? uri.queryParameters['code'];
           if (token != null && token.isNotEmpty) {
             await _verifyMagicLinkToken(token);
@@ -56,53 +105,124 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
         }
       },
       onError: (_) {
-        if (mounted) setState(() => _errorMessage = 'Deep link listener interrupted.');
+        if (mounted) {
+          setState(() => _errorMessage = 'Deep link listener interrupted.');
+        }
       },
     );
   }
 
-  Future<void> _verifyMagicLinkToken(String tokenOrPasskey) async {
-    setState(() {
-      _isVerifying = true;
-      _errorMessage = null;
-    });
+  Future<void> _verifyMagicLinkToken(String token) async {
+    if (_isNavigating) return;
+    setState(() => _errorMessage = null);
 
     try {
       final authNotifier = ref.read(authControllerProvider.notifier);
       final isSuccess = await authNotifier.verifyMagicLink(
-        tokenOrPasskey,
+        token,
         email: widget.email,
       );
 
       if (isSuccess && mounted) {
-        final prefs = await SharedPreferences.getInstance();
-        final isCompleted = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
-        if (!mounted) return;
-        if (isCompleted) {
-          Navigator.of(context).pushReplacementNamed('/sanctuary');
-        } else {
-          Navigator.of(context).pushReplacementNamed('/profile-setup');
-        }
+        await _onVerificationSuccess();
       } else if (mounted) {
         setState(() {
-          _isVerifying = false;
-          _errorMessage = 'Invalid or expired magic link / passkey. Please request a new link.';
+          _errorMessage = 'Invalid or expired magic link. Please tap "Resend Verification Link".';
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _isVerifying = false;
           _errorMessage = 'Verification failed: ${e.toString()}';
         });
       }
     }
   }
 
+  Future<void> _onVerificationSuccess() async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
+    _pollingTimer?.cancel();
+    _elapsedTimer?.cancel();
+
+    HapticFeedback.heavyImpact();
+
+    if (mounted) {
+      setState(() {
+        _currentStep = 3;
+        _errorMessage = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Text(
+                'Sacred Email Verified! Entering Sanctuary...',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          backgroundColor: Color(0xFF1B4332),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    // Brief smooth pause for user to experience the live Step 3 completion tick
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+
+    if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    final isCompleted = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
+
+    if (isCompleted) {
+      Navigator.of(context).pushReplacementNamed('/sanctuary');
+    } else {
+      // Direct transition to Profile Sanctuary as requested
+      Navigator.of(context).pushReplacementNamed('/profile-setup');
+    }
+  }
+
+  Future<void> _launchNativeEmailClient() async {
+    final emailUri = Uri(scheme: 'mailto');
+    try {
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please open your Gmail / Email app to tap the verification link.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please open your Gmail / Email app to tap the verification link.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _pollingTimer?.cancel();
+    _elapsedTimer?.cancel();
     _linkSubscription?.cancel();
-    _passkeyController.dispose();
     super.dispose();
   }
 
@@ -140,18 +260,25 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
             children: [
               // Sanctuary Dispatch Icon
               Container(
-                width: 64,
-                height: 64,
+                width: 68,
+                height: 68,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: pine.withValues(alpha: 0.12),
-                  border: Border.all(color: pine.withValues(alpha: 0.3)),
+                  border: Border.all(color: pine.withValues(alpha: 0.35), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: pine.withValues(alpha: 0.2),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
-                child: Icon(Icons.mark_email_read_outlined, color: pine, size: 32),
+                child: Icon(Icons.mark_email_read_outlined, color: pine, size: 34),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
-              // Editorial Headline matching spec exactly
+              // Editorial Headline matching brand identity
               Text(
                 'Almost home.',
                 style: TextStyle(
@@ -174,13 +301,13 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'We have dispatched an encrypted invitation link to confirm your genuine space:',
+                'We dispatched a sacred verification link to verify your genuine presence:',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: textMuted, height: 1.4),
               ),
               const SizedBox(height: 16),
 
-              // Email Pill with Edit Action
+              // Target Email Pill with Edit Action
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
                 decoration: BoxDecoration(
@@ -206,224 +333,72 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
                       child: Text(
-                        'Edit',
-                        style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 13.0),
+                        'Change',
+                        style: TextStyle(
+                          color: accentColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.0,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
-              // 3-Step Mindful Passage Card
-              const MagicLinkPassageCard(),
-              const SizedBox(height: 16),
-
-              // Mindful 6-Digit Passkey Direct Input Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.pin_outlined, size: 18, color: accentColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Mindful 6-Digit Passkey',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: textHeadline,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Prefer typing a code? Enter the 6-digit passkey sent with your invitation:',
-                      style: TextStyle(fontSize: 12, color: textMuted),
-                    ),
-                    const SizedBox(height: 12),
-                    if (authState.dispatchedPasskey != null && authState.dispatchedPasskey!.isNotEmpty) ...[
-                      InkWell(
-                        onTap: () {
-                          _passkeyController.text = authState.dispatchedPasskey!;
-                          _verifyMagicLinkToken(authState.dispatchedPasskey!);
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: pine.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: pine.withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.key, color: pine, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Passkey: ${authState.dispatchedPasskey}',
-                                    style: TextStyle(
-                                      color: textHeadline,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: pine,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'Tap to Auto-fill',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    TextField(
-                      controller: _passkeyController,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Courier',
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 6,
-                        color: textHeadline,
-                      ),
-                      decoration: InputDecoration(
-                        counterText: '',
-                        hintText: '000000',
-                        hintStyle: TextStyle(
-                          letterSpacing: 6,
-                          color: textMuted.withValues(alpha: 0.3),
-                        ),
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF141C19) : const Color(0xFFF3F5F4),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: accentColor, width: 2),
-                        ),
-                      ),
-                      onChanged: (val) {
-                        if (val.trim().length == 6) {
-                          _verifyMagicLinkToken(val.trim());
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 44,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentColor,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: _isVerifying
-                            ? null
-                            : () {
-                                final code = _passkeyController.text.trim();
-                                if (code.isNotEmpty) {
-                                  _verifyMagicLinkToken(code);
-                                } else {
-                                  setState(() => _errorMessage = 'Please enter your 6-digit passkey.');
-                                }
-                              },
-                        child: _isVerifying
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Text(
-                                'Verify Passkey & Enter ➔',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
+              // 3-Step Live Count Mindful Passage Card
+              MagicLinkPassageCard(
+                currentStep: _currentStep,
+                elapsedSeconds: _elapsedSeconds,
+                targetEmail: targetEmail,
+                onOpenEmailApp: _launchNativeEmailClient,
+                onResend: () {
+                  ref
+                      .read(authControllerProvider.notifier)
+                      .resendVerificationEmail(widget.email);
+                },
               ),
               const SizedBox(height: 16),
 
               if (_errorMessage != null) ...[
-                Text(
-                  _errorMessage ?? '',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isDark ? DarkSanctuaryTokens.dangerBorder : LightSanctuaryTokens.dangerBorder,
-                    fontSize: 12,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    _errorMessage ?? '',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFE63946),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
               ],
 
-              // Primary CTA: Open Email App
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: pine, width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              // Secondary manual help notice
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  '💡 Note: You can tap the link from Gmail on your phone or any browser. UR-Heart will automatically detect your confirmation and bring you into the Sanctuary.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textMuted.withValues(alpha: 0.8),
+                    height: 1.4,
                   ),
-                  icon: const Icon(Icons.mail_outline, size: 18),
-                  label: const Text(
-                    'Open Email App ➔',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: _launchNativeEmailClient,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Future<void> _launchNativeEmailClient() async {
-    final emailUri = Uri(scheme: 'mailto');
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please open your mail client manually.')),
-        );
-      }
-    }
   }
 }

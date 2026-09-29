@@ -239,6 +239,41 @@ class AuthRepository {
     final res = await sendMagicLink(email);
     return res != null;
   }
+
+  /// Polls backend to detect instant tap on verification link in email client
+  Future<Map<String, dynamic>?> checkVerificationStatus(String email) async {
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/api/v1/auth/verification-status',
+        queryParameters: {'email': cleanEmail},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data!;
+        if (data['is_verified'] == true) {
+          final tokenStr = data['access_token'] ?? data['token'];
+          if (tokenStr != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('ur_heart_auth_token', tokenStr.toString());
+            await prefs.setString('auth_token', tokenStr.toString());
+            await prefs.setString('ur_heart_user_email', cleanEmail);
+            await prefs.setString('profile_email', cleanEmail);
+            if (cleanEmail == 'kshtriyaanubhav9120@gmail.com') {
+              await prefs.setString('user_role', 'superadmin');
+            }
+            if (data['is_profile_completed'] == true) {
+              await prefs.setBool('ur_heart_profile_setup_completed', true);
+            }
+          }
+        }
+        return data;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[AUTH] checkVerificationStatus error: $e');
+      return null;
+    }
+  }
 }
 
 /// Provider for AuthRepository

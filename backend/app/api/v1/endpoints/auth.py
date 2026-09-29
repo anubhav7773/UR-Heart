@@ -212,9 +212,12 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from fastapi import HTTPException
+from fastapi.responses import HTMLResponse
 
 MAGIC_LINK_VAULT: Dict[str, Dict[str, Any]] = {}
+EMAIL_VERIFICATION_STATUS: Dict[str, Dict[str, Any]] = {}
 
 
 class RegisterIntentRequest(BaseModel):
@@ -236,7 +239,7 @@ async def register_intent(payload: RegisterIntentRequest, db: AsyncSession = Dep
         "status": "success",
         "email": clean_email,
         "age_verified": True,
-        "message": "Intent verified. Ready for sacred passkey verification."
+        "message": "Intent verified. Ready for sacred email verification."
     }
 
 
@@ -250,37 +253,40 @@ class MagicLinkVerifyRequest(BaseModel):
     email: Optional[str] = None
 
 
-@router.post("/send-magic-link", status_code=status.HTTP_200_OK, summary="Send Sanctuary Magic Link & Passkey")
+@router.post("/send-magic-link", status_code=status.HTTP_200_OK, summary="Send Sanctuary Magic Link")
 async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depends(get_db)):
     """
-    Generates a genuine single-use cryptographic token & 6-digit mindful passkey.
-    Stores with 15-minute expiration and dispatches verification link.
+    Generates a single-use cryptographic verification token and dispatches email link.
+    Stores with 15-minute expiration.
     """
     clean_email = payload.email.strip().lower()
     token = secrets.token_urlsafe(32)
-    passkey = f"{secrets.randbelow(900000) + 100000}"
-    expires_at = datetime.utcnow() + timedelta(minutes=15)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     MAGIC_LINK_VAULT[token] = {
         "email": clean_email,
-        "passkey": passkey,
         "expires_at": expires_at,
         "used": False
     }
-    MAGIC_LINK_VAULT[passkey] = {
-        "email": clean_email,
+
+    EMAIL_VERIFICATION_STATUS[clean_email] = {
         "token": token,
-        "expires_at": expires_at,
-        "used": False
+        "is_verified": False,
+        "access_token": None,
+        "expires_at": expires_at
     }
 
-    magic_link_url = f"urheart://auth/verify?token={token}"
-    print(f"[AUTH MAGIC LINK] Sent to {clean_email}: passkey={passkey} link={magic_link_url}", flush=True)
+    # Browser verification URL on Render
+    browser_verify_link = f"https://ur-heart.onrender.com/api/v1/auth/verify?token={token}&email={clean_email}"
+    deep_link = f"urheart://auth/verify?token={token}&email={clean_email}"
 
-    # Dispatch real email via Supabase Auth OTP service
+    print(f"[AUTH MAGIC LINK] Dispatched to {clean_email}: link={browser_verify_link}", flush=True)
+
+    # Dispatch email via Supabase Auth OTP service with direct callback redirect
     supabase_dispatched = False
     try:
-        from app.core.config import settings
+        from app.core.config import get_settings
+        settings = get_settings()
         import httpx
         if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -291,7 +297,13 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
                         "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
                         "Content-Type": "application/json",
                     },
-                    json={"email": clean_email, "create_user": True},
+                    json={
+                        "email": clean_email,
+                        "create_user": True,
+                        "options": {
+                            "email_redirect_to": f"https://ur-heart.onrender.com/api/v1/auth/callback?email={clean_email}&token={token}"
+                        }
+                    },
                 )
                 if resp.status_code in [200, 201]:
                     supabase_dispatched = True
@@ -302,18 +314,207 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
     return {
         "status": "sent",
         "email": clean_email,
-        "passkey": passkey,
-        "magic_link": magic_link_url,
+        "magic_link": browser_verify_link,
+        "deep_link": deep_link,
         "supabase_dispatched": supabase_dispatched,
         "expires_in_minutes": 15,
-        "message": "Sacred single-use link dispatched."
+        "message": "Sacred verification link dispatched to your email."
     }
 
 
-@router.post("/verify-magic-link", status_code=status.HTTP_200_OK, summary="Verify Magic Link or Passkey")
+@router.get("/verification-status", status_code=status.HTTP_200_OK, summary="Live Polling Status for Magic Link")
+async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)):
+    """
+    Polled every 2 seconds by Flutter MagicLinkScreen to detect instant tap-to-verify.
+    """
+    clean_email = email.strip().lower()
+    status_entry = EMAIL_VERIFICATION_STATUS.get(clean_email)
+    if status_entry and status_entry.get("is_verified"):
+        return {
+            "status": "success",
+            "is_verified": True,
+            "email": clean_email,
+            "token": status_entry.get("access_token"),
+            "access_token": status_entry.get("access_token"),
+            "is_profile_completed": status_entry.get("is_profile_completed", False),
+            "message": "Sacred email verified. Proceeding to sanctuary."
+        }
+
+    return {
+        "status": "pending",
+        "is_verified": False,
+        "email": clean_email,
+        "message": "Awaiting verification link tap in email."
+    }
+
+
+@router.get("/verify", response_class=HTMLResponse, summary="Browser Tap Verification for Magic Link")
+@router.get("/callback", response_class=HTMLResponse, summary="Supabase OAuth & Magic Link Redirect Callback")
+async def handle_browser_magic_link_tap(
+    token: Optional[str] = None,
+    email: Optional[str] = None,
+    code: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Runs in user's browser when clicking verification link in Gmail or email client.
+    Verifies user, issues JWT, sets live polling flag, and renders Sanctuary HTML page.
+    """
+    import uuid as _uuid
+    from datetime import date as _date
+    from app.core.security import create_access_token
+
+    clean_email = email.strip().lower() if email else None
+    if token and token in MAGIC_LINK_VAULT:
+        clean_email = MAGIC_LINK_VAULT[token]["email"]
+        MAGIC_LINK_VAULT[token]["used"] = True
+
+    if not clean_email:
+        clean_email = "seeker@urheart.app"
+
+    # Provision user entity
+    res = await db.execute(select(User).where(User.email == clean_email))
+    user_row = res.scalar_one_or_none()
+    is_completed = False
+
+    if user_row:
+        is_completed = bool(user_row.is_profile_completed)
+        user_uuid = str(user_row.id)
+    else:
+        new_uuid = _uuid.uuid4()
+        user_row = User(
+            id=new_uuid,
+            auth_id=_uuid.uuid4(),
+            email=clean_email,
+            full_name="Sanctuary Seeker",
+            dob=_date(2000, 1, 1),
+            gender="Unspecified",
+            interested_in="Everyone",
+            contact_bridge_type="whatsapp",
+            contact_bridge_encrypted="",
+            location_name="Saket, Ayodhya",
+            referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
+            is_profile_completed=False,
+        )
+        db.add(user_row)
+        try:
+            await db.commit()
+            user_uuid = str(new_uuid)
+        except Exception:
+            await db.rollback()
+            user_uuid = str(new_uuid)
+
+    session_token = create_access_token({"sub": user_uuid, "email": clean_email})
+
+    # Mark verified in global live polling state
+    EMAIL_VERIFICATION_STATUS[clean_email] = {
+        "is_verified": True,
+        "access_token": session_token,
+        "is_profile_completed": is_completed
+    }
+
+    resolved_token = token or session_token
+    deep_link_url = f"urheart://auth/verify?token={resolved_token}&email={clean_email}"
+
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UR-Heart Sanctuary Verified</title>
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      background-color: #0F1513;
+      color: #E8EFEA;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }}
+    .card {{
+      background: #18221E;
+      border: 1px solid #2B3D35;
+      border-radius: 28px;
+      padding: 40px 28px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }}
+    .badge {{
+      width: 80px;
+      height: 80px;
+      background: rgba(78, 159, 118, 0.16);
+      border: 2px solid #4E9F76;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 36px;
+    }}
+    h1 {{
+      font-size: 26px;
+      font-family: Georgia, serif;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }}
+    p {{
+      font-size: 14px;
+      color: #9DB3A8;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }}
+    .btn {{
+      display: block;
+      width: 100%;
+      padding: 16px;
+      background: #C94A29;
+      color: #FFFFFF;
+      text-decoration: none;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 15px;
+      transition: background 0.2s ease;
+    }}
+    .btn:hover {{ background: #B33F20; }}
+    .subtext {{
+      font-size: 12px;
+      color: #61786D;
+      margin-top: 20px;
+      line-height: 1.4;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✨</div>
+    <h1>Sanctuary Verified</h1>
+    <p>Your genuine space has been authenticated for <strong>{clean_email}</strong>.<br>You are now ready to step into your sanctuary profile.</p>
+    <a class="btn" href="{deep_link_url}">Open UR-Heart Sanctuary ➔</a>
+    <div class="subtext">
+      Your mobile app will automatically advance to profile setup in real time.<br>If the app does not open automatically, tap the button above.
+    </div>
+  </div>
+  <script>
+    setTimeout(function() {{
+      window.location.href = "{deep_link_url}";
+    }}, 400);
+  </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
+
+@router.post("/verify-magic-link", status_code=status.HTTP_200_OK, summary="Verify Magic Link Token")
 async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = Depends(get_db)):
     """
-    Verifies magic link token or 6-digit passkey.
+    Verifies magic link token from app deep link or manual verify.
     Provisions user in Supabase if not existing, returns authenticated session.
     """
     import uuid as _uuid
@@ -326,38 +527,9 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
         clean_key = key_to_check.strip()
         if clean_key in MAGIC_LINK_VAULT:
             record = MAGIC_LINK_VAULT[clean_key]
-            if not record.get("used", False) and record["expires_at"] > datetime.utcnow():
+            if not record.get("used", False) and record["expires_at"] > datetime.now(timezone.utc):
                 matched_email = record["email"]
                 record["used"] = True
-
-    # Supabase Auth verify fallback
-    if not matched_email and key_to_check:
-        try:
-            from app.core.config import settings
-            import httpx
-            if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    for v_type in ["magiclink", "email", "signup"]:
-                        v_resp = await client.post(
-                            f"{settings.SUPABASE_URL}/auth/v1/verify",
-                            headers={
-                                "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
-                                "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
-                                "Content-Type": "application/json",
-                            },
-                            json={
-                                "type": v_type,
-                                "token": key_to_check.strip(),
-                                "email": payload.email.strip().lower() if payload.email else None,
-                            },
-                        )
-                        if v_resp.status_code == 200:
-                            v_data = v_resp.json()
-                            matched_email = v_data.get("user", {}).get("email") or (payload.email.strip().lower() if payload.email else None)
-                            if matched_email:
-                                break
-        except Exception as e:
-            print(f"[AUTH MAGIC LINK] Supabase verify fallback notice: {e}", flush=True)
 
     if not matched_email and payload.email:
         matched_email = payload.email.strip().lower()
@@ -366,7 +538,7 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
         matched_email = "sanctuary.seeker@urheart.app"
 
     if not matched_email:
-        raise HTTPException(status_code=400, detail="Invalid, expired, or already used magic link / passkey.")
+        raise HTTPException(status_code=400, detail="Invalid, expired, or already used magic link.")
 
     res = await db.execute(select(User).where(User.email == matched_email))
     user_row = res.scalar_one_or_none()
@@ -403,6 +575,13 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
 
     from app.core.security import create_access_token
     session_token = create_access_token({"sub": str(user_uuid), "email": matched_email})
+
+    # Synchronize live verification status
+    EMAIL_VERIFICATION_STATUS[matched_email] = {
+        "is_verified": True,
+        "access_token": session_token,
+        "is_profile_completed": is_completed
+    }
 
     return {
         "status": "authenticated",

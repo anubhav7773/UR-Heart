@@ -350,7 +350,7 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(isMagicLinkVerified: true);
   }
 
-  /// Verifies magic link token or 6-digit mindful passkey with repository (ACT-01)
+  /// Verifies magic link token with repository
   Future<bool> verifyMagicLink(String tokenOrPasskey, {String? email}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
@@ -367,6 +367,23 @@ class AuthController extends StateNotifier<AuthState> {
         isLoading: false,
         errorMessage: 'Magic link verification failed.',
       );
+      return false;
+    }
+  }
+
+  /// Actively checks if user has tapped the magic link in their email
+  Future<bool> pollVerificationStatus(String email) async {
+    try {
+      final res = await _repository.checkVerificationStatus(email);
+      if (res != null && res['is_verified'] == true) {
+        state = state.copyWith(
+          isMagicLinkVerified: true,
+          email: res['email']?.toString() ?? email,
+        );
+        return true;
+      }
+      return false;
+    } catch (_) {
       return false;
     }
   }
