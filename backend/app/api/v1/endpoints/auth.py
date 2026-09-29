@@ -280,45 +280,33 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
     browser_verify_link = f"https://ur-heart.onrender.com/api/v1/auth/verify?token={token}&email={clean_email}"
     deep_link = f"urheart://auth/verify?token={token}&email={clean_email}"
 
-    print(f"[AUTH MAGIC LINK] Dispatched to {clean_email}: link={browser_verify_link}", flush=True)
+    # Multi-provider email dispatch
+    from app.services.email_service import EmailService
+    dispatch_res = await EmailService.dispatch_magic_link(
+        email=clean_email,
+        magic_link=browser_verify_link,
+        deep_link=deep_link,
+        token=token
+    )
 
-    # Dispatch email via Supabase Auth OTP service with direct callback redirect
-    supabase_dispatched = False
-    try:
-        from app.core.config import get_settings
-        settings = get_settings()
-        import httpx
-        if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    f"{settings.SUPABASE_URL}/auth/v1/otp",
-                    headers={
-                        "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
-                        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "email": clean_email,
-                        "create_user": True,
-                        "options": {
-                            "email_redirect_to": f"https://ur-heart.onrender.com/api/v1/auth/callback?email={clean_email}&token={token}"
-                        }
-                    },
-                )
-                if resp.status_code in [200, 201]:
-                    supabase_dispatched = True
-                    print(f"[AUTH MAGIC LINK] Dispatched real email via Supabase to {clean_email}", flush=True)
-    except Exception as e:
-        print(f"[AUTH MAGIC LINK] Supabase OTP dispatch notice: {e}", flush=True)
+    print(
+        f"[AUTH MAGIC LINK] Dispatched to {clean_email}: "
+        f"provider={dispatch_res.get('provider')} "
+        f"rate_limited={dispatch_res.get('rate_limited')} "
+        f"link={browser_verify_link}",
+        flush=True
+    )
 
     return {
         "status": "sent",
         "email": clean_email,
         "magic_link": browser_verify_link,
         "deep_link": deep_link,
-        "supabase_dispatched": supabase_dispatched,
+        "supabase_dispatched": dispatch_res.get("dispatched", False),
+        "rate_limited": dispatch_res.get("rate_limited", False),
+        "provider": dispatch_res.get("provider", "direct_link"),
         "expires_in_minutes": 15,
-        "message": "Sacred verification link dispatched to your email."
+        "message": dispatch_res.get("message", "Sacred verification link prepared.")
     }
 
 

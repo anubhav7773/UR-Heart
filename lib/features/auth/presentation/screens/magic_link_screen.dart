@@ -218,6 +218,42 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
     }
   }
 
+  Future<void> _openDirectVerificationLink() async {
+    final state = ref.read(authControllerProvider);
+    final link = state.magicLinkUrl;
+    if (link != null && link.isNotEmpty) {
+      final uri = Uri.parse(link);
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+
+      // Fallback: verify directly with backend in-app
+      final token = uri.queryParameters['token'];
+      if (token != null && token.isNotEmpty) {
+        await _verifyMagicLinkToken(token);
+      }
+    }
+  }
+
+  void _copyMagicLink() {
+    final state = ref.read(authControllerProvider);
+    final link = state.magicLinkUrl;
+    if (link != null && link.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: link));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sacred verification link copied to clipboard 📋'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _pollingTimer?.cancel();
@@ -352,6 +388,8 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
                 elapsedSeconds: _elapsedSeconds,
                 targetEmail: targetEmail,
                 onOpenEmailApp: _launchNativeEmailClient,
+                onOpenDirectLink: _openDirectVerificationLink,
+                onCopyLink: _copyMagicLink,
                 onResend: () {
                   ref
                       .read(authControllerProvider.notifier)

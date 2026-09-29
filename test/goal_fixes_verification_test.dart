@@ -159,6 +159,8 @@ void main() {
                 elapsedSeconds: 15,
                 targetEmail: 'seeker@urheart.app',
                 onOpenEmailApp: () {},
+                onOpenDirectLink: () {},
+                onCopyLink: () {},
                 onResend: () {},
               ),
             ),
@@ -179,6 +181,8 @@ void main() {
       expect(find.text('Open Email & Tap Sacred Link'), findsOneWidget);
       expect(find.text('Listening: 00:15'), findsOneWidget);
       expect(find.text('Open Email App Now ➔'), findsOneWidget);
+      expect(find.text('Open Link in Browser Directly ➔'), findsOneWidget);
+      expect(find.text('Copy Verification Link'), findsOneWidget);
 
       // 4. Step 3: Enter Profile Sanctuary
       expect(find.text('Enter Profile Sanctuary'), findsOneWidget);

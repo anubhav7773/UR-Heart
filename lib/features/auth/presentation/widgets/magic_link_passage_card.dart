@@ -15,6 +15,8 @@ class MagicLinkPassageCard extends ConsumerWidget {
   final int elapsedSeconds;
   final String targetEmail;
   final VoidCallback onOpenEmailApp;
+  final VoidCallback? onOpenDirectLink;
+  final VoidCallback? onCopyLink;
   final VoidCallback onResend;
 
   const MagicLinkPassageCard({
@@ -23,6 +25,8 @@ class MagicLinkPassageCard extends ConsumerWidget {
     required this.elapsedSeconds,
     required this.targetEmail,
     required this.onOpenEmailApp,
+    this.onOpenDirectLink,
+    this.onCopyLink,
     required this.onResend,
   });
 
@@ -265,28 +269,100 @@ class MagicLinkPassageCard extends ConsumerWidget {
             actionWidget: currentStep == 2
                 ? Padding(
                     padding: const EdgeInsets.only(top: 10.0),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 40,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: pineColor,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: 40,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: pineColor,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: onOpenEmailApp,
+                            icon: const Icon(Icons.mail_outline, size: 16, color: Colors.white),
+                            label: const Text(
+                              'Open Email App Now ➔',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
-                        onPressed: onOpenEmailApp,
-                        icon: const Icon(Icons.mail_outline, size: 16, color: Colors.white),
-                        label: const Text(
-                          'Open Email App Now ➔',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                        if (onOpenDirectLink != null) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 38,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: accentColor, width: 1.2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: onOpenDirectLink,
+                              icon: Icon(Icons.open_in_browser, size: 16, color: accentColor),
+                              label: Text(
+                                'Open Link in Browser Directly ➔',
+                                style: TextStyle(
+                                  color: accentColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (onCopyLink != null) ...[
+                          const SizedBox(height: 6),
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: onCopyLink,
+                              icon: Icon(Icons.copy_rounded, size: 13, color: mutedColor),
+                              label: Text(
+                                'Copy Verification Link',
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        Container(
+                          margin: const EdgeInsets.only(top: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: isDark ? 0.08 : 0.05),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.amber.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, size: 14, color: Colors.amber),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Gmail delay or rate-limit? Tap "Open Link in Browser Directly" above to verify instantly without waiting!',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: isDark ? const Color(0xFFFFD166) : const Color(0xFF8C5800),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   )
                 : null,
