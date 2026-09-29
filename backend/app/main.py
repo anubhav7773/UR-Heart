@@ -13,12 +13,31 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.api_router import api_router as api_v1_router
 from app.api.v1.endpoints.chat_websocket import ws_router
-from app.core.config import get_settings
+from typing import List
+from app.core.config import get_settings, validate_production_env
 from app.core.exceptions import SanctuaryException
 from app.core.limiter import limiter
 
 settings = get_settings()
 
+
+def get_allowed_cors_origins() -> List[str]:
+    canonical_origins = [
+        "https://urheart.app",
+        "https://vault.urheart.app",
+        "https://urheart.asiverticals.me",
+        "https://urheart.in",
+        "https://www.urheart.in",
+    ]
+    env = (getattr(settings, "ENVIRONMENT", "") or os.getenv("ENVIRONMENT", "production")).lower()
+    if env != "production":
+        canonical_origins.extend([
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+        ])
+    return canonical_origins
 
 
 # 2. Strict Security Headers Middleware (Checklist Points 18 & 19)
@@ -50,7 +69,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # STARTUP: Shared HTTP client allocated for external services
+    # STARTUP: Fail-fast secret validation in production
+    validate_production_env(settings)
     app.state.http_client = httpx.AsyncClient(timeout=15.0)
     yield
     # SHUTDOWN: Gracefully close HTTP client
@@ -75,10 +95,17 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=get_allowed_cors_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Installation-UUID",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
 )
 
 

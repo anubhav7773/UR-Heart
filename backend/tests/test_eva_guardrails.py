@@ -108,6 +108,21 @@ class TestEvaGuardrailsUnit:
 class TestEvaApiEndpoints:
     """Integration tests for /api/v1/ai/eva endpoints."""
 
+    @pytest.fixture(autouse=True)
+    def setup_authenticated_eva_user(self):
+        import uuid
+        from app.core.security import get_current_user
+        from app.models.domain.user import User
+        mock_user = User(
+            id=uuid.uuid4(),
+            auth_id=uuid.uuid4(),
+            full_name="Eva Seeker",
+            email="eva_seeker@urheart.app"
+        )
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        yield mock_user
+        app.dependency_overrides.pop(get_current_user, None)
+
     async def test_chat_creator_attribution_endpoint(self):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:

@@ -75,37 +75,56 @@ async def test_exit_criterion_3_groq_ai_verification():
     Exit Criterion 3: Groq 360° AI Verification.
     Test /api/v1/ai/icebreakers with two profiles; verify 3 bespoke JSON prompts return within <400ms.
     """
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        payload = {
-            "user_a": {"bio": "Lover of silent architecture and slow walks in Kyoto.", "interests": "books, architecture"},
-            "user_b": {"bio": "Gardener and tea ceremonialist.", "interests": "botany, tea"}
-        }
-        res = await client.post("/api/v1/ai/icebreakers", json=payload)
-        assert res.status_code == 200
-        data = res.json()
-        assert "icebreakers" in data
-        assert len(data["icebreakers"]) == 3
-        for item in data["icebreakers"]:
-            assert isinstance(item, str) and len(item) > 5
+    from app.core.security import get_current_user
+    mock_ai_user = User(
+        id=uuid.uuid4(),
+        auth_id=uuid.uuid4(),
+        full_name="Groq Seeker",
+        email="groq@sanctuary.app"
+    )
+    app.dependency_overrides[get_current_user] = lambda: mock_ai_user
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            payload = {
+                "user_a": {"bio": "Lover of silent architecture and slow walks in Kyoto.", "interests": "books, architecture"},
+                "user_b": {"bio": "Gardener and tea ceremonialist.", "interests": "botany, tea"}
+            }
+            res = await client.post("/api/v1/ai/icebreakers", json=payload, headers={"Authorization": "Bearer test"})
+            assert res.status_code == 200
+            data = res.json()
+            assert "icebreakers" in data
+            assert len(data["icebreakers"]) == 3
+            for item in data["icebreakers"]:
+                assert isinstance(item, str) and len(item) > 5
 
-        # Test Bio Polish
-        bio_res = await client.post("/api/v1/ai/bio-polish", json={"raw_bio": "I read books and drink coffee in rain."})
-        assert bio_res.status_code == 200
-        assert "polished_bio" in bio_res.json()
+            # Test Bio Polish
+            bio_res = await client.post(
+                "/api/v1/ai/bio-polish",
+                json={"raw_bio": "I read books and drink coffee in rain."},
+                headers={"Authorization": "Bearer test"}
+            )
+            assert bio_res.status_code == 200
+            assert "polished_bio" in bio_res.json()
 
-        # Test Vision KYC Liveness
-        fake_b64 = base64.b64encode(b"fake_image_bytes").decode("utf-8")
-        kyc_res = await client.post("/api/v1/ai/kyc-liveness", json={
-            "anchor_photo_b64": fake_b64,
-            "frame_1_b64": fake_b64,
-            "frame_2_b64": fake_b64,
-            "frame_3_b64": fake_b64
-        })
-        assert kyc_res.status_code == 200
-        kyc_data = kyc_res.json()
-        assert "is_live_human" in kyc_data
-        assert "face_match_score" in kyc_data
+            # Test Vision KYC Liveness
+            fake_b64 = base64.b64encode(b"fake_image_bytes").decode("utf-8")
+            kyc_res = await client.post(
+                "/api/v1/ai/kyc-liveness",
+                json={
+                    "anchor_photo_b64": fake_b64,
+                    "frame_1_b64": fake_b64,
+                    "frame_2_b64": fake_b64,
+                    "frame_3_b64": fake_b64
+                },
+                headers={"Authorization": "Bearer test"}
+            )
+            assert kyc_res.status_code == 200
+            kyc_data = kyc_res.json()
+            assert "is_live_human" in kyc_data
+            assert "face_match_score" in kyc_data
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 @pytest.mark.asyncio

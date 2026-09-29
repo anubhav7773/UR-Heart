@@ -211,6 +211,12 @@ async def update_my_profile(
     update_data.pop("photo_slots_count", None)
     email_val = update_data.pop("email", None)
 
+    # SEC-MED-05: Geolocation Precision Truncation (Fuzzy ~1.1km radius, 2 decimal places for DPDP compliance)
+    if "latitude" in update_data and update_data["latitude"] is not None:
+        update_data["latitude"] = round(float(update_data["latitude"]), 2)
+    if "longitude" in update_data and update_data["longitude"] is not None:
+        update_data["longitude"] = round(float(update_data["longitude"]), 2)
+
     # Mark profile completed in database (Fixes DUM-17 volatile memory set)
     update_data["is_profile_completed"] = True
 
@@ -269,6 +275,8 @@ class ProfileCreateRequest(BaseModel):
     photos: Optional[list] = None
     avatar_url: Optional[str] = None
     email: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -327,6 +335,10 @@ async def create_or_update_profile(
             up_vals["dob"] = _date.fromisoformat(payload.date_of_birth)
         except Exception:
             pass
+    if payload.latitude is not None:
+        up_vals["latitude"] = round(float(payload.latitude), 2)
+    if payload.longitude is not None:
+        up_vals["longitude"] = round(float(payload.longitude), 2)
 
     # Strictly bind mutations to current_user.id - completely ignoring any untrusted payload.email
     await db.execute(

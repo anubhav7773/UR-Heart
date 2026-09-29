@@ -29,10 +29,20 @@ class StrictHTTPBearer(HTTPBearer):
 
 security_scheme = StrictHTTPBearer(auto_error=False)
 
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "ur-heart-44b46")
+from app.core.config import get_settings
+
+_settings = get_settings()
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID") or _settings.FIREBASE_PROJECT_ID
 FIREBASE_ISSUER = f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"
 GOOGLE_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ur-heart-sacred-key-production-grade-2026")
+
+_raw_jwt = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or _settings.JWT_SECRET_KEY
+if not _raw_jwt or len(_raw_jwt.strip()) < 32:
+    if (_settings.ENVIRONMENT or "").lower() == "production":
+        raise RuntimeError("FATAL PRODUCTION SECURITY ERROR: JWT_SECRET_KEY is missing or insecure (<32 bytes). Refusing boot.")
+    _raw_jwt = "dev-insecure-test-jwt-secret-key-32-chars-long"
+
+JWT_SECRET_KEY = _raw_jwt
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
