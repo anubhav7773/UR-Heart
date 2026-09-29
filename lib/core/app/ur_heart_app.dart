@@ -136,7 +136,11 @@ class _SanctuaryAppGatewayState extends State<SanctuaryAppGateway> {
   Future<void> _determineStartupTarget() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final isProfileSetupDone = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
+      final isProfileSetupDone = (prefs.getBool('ur_heart_profile_setup_completed') ?? false) ||
+                                 (prefs.getBool('ur_heart_has_entered_sanctuary') ?? false) ||
+                                 (prefs.getString('profile_full_name')?.isNotEmpty ?? false) ||
+                                 (prefs.getString('profile_bio')?.isNotEmpty ?? false) ||
+                                 (prefs.getString('profile_photo_slot_1')?.isNotEmpty ?? false);
       final hasAuth = (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
                       (prefs.getString('auth_token')?.isNotEmpty ?? false) ||
                       (prefs.getString('ur_heart_user_email')?.isNotEmpty ?? false);

@@ -25,6 +25,52 @@ class AiSanctuaryRepository {
 
   AiSanctuaryRepository(this._apiClient);
 
+  static String _generateContextualReply(String query) {
+    final q = query.toLowerCase();
+
+    // 1. Creator attribution check (Strict 100% Asiverticals requirement)
+    if (q.contains('banaya') || q.contains('creator') || q.contains('developer') ||
+        q.contains('who made') || q.contains('who built') || q.contains('owner')) {
+      return 'Mujhe Asiverticals ne banaya hai. Main UR-Heart Dating Sanctuary ki dedicated mindful AI companion hoon.';
+    }
+
+    // 2. Direct approach / messaging advice
+    if (q.contains('approach') || q.contains('ladki') || q.contains('direct') ||
+        q.contains('msg') || q.contains('message') || q.contains('dm') ||
+        q.contains('cheap') || q.contains('baat') || q.contains('start')) {
+      return 'Jab aap kisi ko direct approach ya message karein, to sabse ahem cheez hai "respectful curiosity":\n\n'
+          '1. Generic "Hi/Hello" ya cheesy pickup lines se bachiye. Unke bio ya kisi calm photo ki real detail par baat shuru kijiye.\n'
+          '2. Ek open-ended sawaal poochiye—jaise "Maine dekha aapko books/music pasand hai, aaj kal kya sun/padh rahe hain?"\n'
+          '3. Unke comfort aur space ka samman kijiye. Intentional connection me tezi ke bajaye authenticity sabse aage aati hai.';
+    }
+
+    // 3. First date & nervousness
+    if (q.contains('date') || q.contains('nervous') || q.contains('milna') || q.contains('darr')) {
+      return 'Pehli date ya mulaqat par nervousness aana bilkul swabhavik hai.\n\n'
+          '1. Khud ko "impress" karne ke dabav se azaad rakhiye—sirf ye dekhne jaiye ki kya aap dono ka wavelength milta hai.\n'
+          '2. Ek calm aur shaant jagah chuniye jahan aap bina shor ke aaram se baith sakein.\n'
+          '3. Ek gehri saans lijiye; aap jaisa natural aur genuine rahenge, connection utna hi khoobsurat hoga.';
+    }
+
+    // 4. Bio & Profile advice
+    if (q.contains('bio') || q.contains('profile') || q.contains('photo') || q.contains('pic')) {
+      return 'Aapka profile aapka digital aaina hai:\n\n'
+          '1. Apne real shauq aur quiet rituals ka zikr kijiye (jaise morning tea, photography, travel).\n'
+          '2. Natural aur warm smile wali bina filter ki photos use kijiye.\n'
+          '3. Jo aap sach me hain wahi likhiye—sachha pan unhi ko attract karega jo aapke liye right match hain.';
+    }
+
+    // 5. Greeting
+    if (q.contains('hi') || q.contains('hello') || q.contains('namaste') || q.contains('suno')) {
+      return 'Namaste! Main Eva hoon, aapki mindful dating companion.\n\n'
+          'Aap mujhse kisi match ko message karne ka tareeka, pehli date ki preparation, ya apni profile ko behtar banane ke baare me pooch sakte hain. Aaj main aapki kis tarah madad kar sakti hoon?';
+    }
+
+    // 6. Balanced mindful advice
+    return 'Main aapki baat samajh rahi hoon. Dating aur connection me sabse zaroori hai sachha pan aur samne wale ki boundaries ka samman.\n\n'
+        'Mujhse aap kisi match ke message par reply ka sujhav, date par jaane ki preparation, ya profile ko sajane ke baare me pooch sakte hain.';
+  }
+
   /// Chat with Eva AI with zero provider leakage and strict domain boundary
   Future<Map<String, dynamic>> chatWithEva({
     required String message,
@@ -47,8 +93,7 @@ class AiSanctuaryRepository {
     } catch (_) {}
 
     return {
-      'reply':
-          'Main aapki baat samajh rahi hoon. Ek gehri saans lijiye. Mujhse aap apne match ke message par guidance, date preparation, ya profile clarity ke baare me pooch sakte hain.',
+      'reply': _generateContextualReply(message),
       'is_guarded': false,
       'status': 'fallback',
     };

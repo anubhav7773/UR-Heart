@@ -1,0 +1,27 @@
+{
+  "recommendations": [
+    // --- Flutter & Dart (Frontend) ---
+    "dart-code.dart-code",
+    "dart-code.flutter",
+    "alexisvt.flutter-snippets",
+    "carlos-menezes.flutter-riverpod-snippets",
+    "misterj.flutter-color",
+
+    // --- Python & FastAPI (Backend) ---
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "ms-python.debugpy",
+
+    // --- API & Database Testing ---
+    "rangav.vscode-thunder-client",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg",
+
+    // --- Developer Experience & Productivity ---
+    "usernamehw.errorlens",
+    "eamodio.gitlens",
+    "bierner.markdown-preview-github-styles",
+    "wayou.vscode-todo-highlight"
+  ]
+}

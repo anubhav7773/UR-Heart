@@ -251,13 +251,13 @@ class ProfileRepository {
             'Content-Type': 'application/json',
           },
           body: jsonEncode({
-            'model': 'llama-3.3-70b-versatile',
+            'model': 'openai/gpt-oss-120b',
             'messages': [
               {
                 'role': 'system',
                 'content':
                     'You are EVA AI, the poetic and mindful AI companion for UR-Heart dating sanctuary. '
-                    'Rewrite the user bio with elegance, mindfulness, and authenticity. '
+                    'Rewrite the user bio with elegance, mindfulness, and authenticity in 35-50 words. '
                     'Keep the user core interests unchanged. Return ONLY the polished bio text, no explanations.'
               },
               {
@@ -265,7 +265,7 @@ class ProfileRepository {
                 'content': 'Please polish this dating bio: "$rawText"'
               }
             ],
-            'temperature': 0.7,
+            'temperature': 0.8,
             'max_tokens': 120,
           }),
         ).timeout(const Duration(seconds: 8));
@@ -291,7 +291,15 @@ class ProfileRepository {
       }
     }
 
-    return '$rawText · Mindfully present, cherishing authentic conversation and intentional depth.';
+    // Dynamic poetic fallback rotation so user never gets identical repetitive bio
+    final fallbacks = [
+      '$rawText · Grounded in quiet rituals, genuine curiosity, and heartfelt presence.',
+      'Appreciating intentional conversations and slow mornings. $rawText — here for honest connection.',
+      '$rawText · Believer in slow connections, sincere laughter, and peaceful spaces.',
+      'Guided by kindness and authentic depth. $rawText · Seeking a mindful companion.',
+    ];
+    fallbacks.shuffle();
+    return fallbacks.first;
   }
 
   Future<String> polishBioWithGroq(String currentBio) =>

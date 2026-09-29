@@ -35,21 +35,64 @@ EVA_SYSTEM_DIRECTIVE = (
 class AiOrchestrator:
     @classmethod
     def _groq_headers(cls) -> Dict[str, str]:
+        key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
         return {
-            "Authorization": f"Bearer {os.getenv('GROQ_API_KEY', '')}",
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json"
         }
 
     @classmethod
     def _openrouter_headers(cls) -> Dict[str, str]:
+        key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
         headers = {
             "Content-Type": "application/json",
             "HTTP-Referer": "https://urheart.app",
             "X-Title": "UR-Heart Sanctuary",
         }
-        if settings.OPENROUTER_API_KEY:
-            headers["Authorization"] = f"Bearer {settings.OPENROUTER_API_KEY}"
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
         return headers
+
+    @classmethod
+    def _generate_contextual_fallback(cls, message: str) -> str:
+        """
+        Deep mindful fallback when remote networks are waking up or offline.
+        Provides genuine, thoughtful dating advice tailored to the user's inquiry
+        instead of repeating an identical canned string.
+        """
+        q = message.lower()
+        if any(w in q for w in ["approach", "ladki", "direct", "msg", "message", "dm", "cheap", "baat", "start"]):
+            return (
+                "Kisi ko direct message ya approach karte waqt sabse zaroori cheez hai 'respectful curiosity'.\n\n"
+                "1. Generic 'Hi/Hello' ya copy-pasted pickup lines se bachiye. Iske bajaye unke profile ki kisi genuine detail par baat shuru kijiye (jaise unka favorite music, book, ya koi calm photo).\n"
+                "2. Ek open-ended aur polite sawaal poochiye—jaise 'Aapka Sunday morning ritual kaisa hota hai?'\n"
+                "3. Har reply me unhe unke space aur comfort ka ehsaas dijiye. Intentional connection humesha patience aur respect se banti hai."
+            )
+        elif any(w in q for w in ["date", "nervous", "first date", "milna", "darr"]):
+            return (
+                "Pehli date ya mulaqat se pehle thoda darr ya nervousness bilkul natural hai.\n\n"
+                "1. Khud ko impress karne ke dabav se azaad kijiye—sirf ye dekhne jaiye ki kya aap dono ki vibrations match hoti hain.\n"
+                "2. Kisi shaant cafe ya public sanctuary jaisi jagah choose kijiye jahan shanti se baithkar baat ho sake.\n"
+                "3. Ek gehri saans lijiye; genuine aur real rehna hi aapki sabse badi khoobsurti hai."
+            )
+        elif any(w in q for w in ["bio", "profile", "photo", "pic"]):
+            return (
+                "Aapki profile aapka digital aaina hai. Isme show-off ke bajaye wo likhiye jo aapko andar se khushi deta hai.\n\n"
+                "1. Apne hobbies aur quiet rituals ka zikr kijiye.\n"
+                "2. Clear, natural muskaan wali photos lagaiye jisme filters na hon.\n"
+                "3. Authenticity humesha unhi logon ko attract karti hai jo sach me aapke liye bane hain."
+            )
+        elif any(w in q for w in ["hi", "hello", "namaste", "suno", "eva"]):
+            return (
+                "Namaste! Main Eva hoon, aapki mindful dating companion.\n\n"
+                "Aap mujhse kisi match ko message karne ka tareeka, pehli date ki preparation, ya apni profile ko behtar banane ke baare me kuch bhi pooch sakte hain. Aaj aap kis cheez me guidance chahte hain?"
+            )
+        else:
+            return (
+                "Main aapki baat samajh rahi hoon. Ek gehri saans lijiye aur intentional sochiye.\n\n"
+                "Dating aur connection me sabse zaroori hai sachha pan aur samne wale ki boundaries ka samman. "
+                "Mujhse aap specific advice pooch sakte hain—jaise 'conversation kaise shuru karein', 'date par kya baat karein', ya 'profile kaise sajayein'."
+            )
 
     @classmethod
     async def chat_with_eva(
@@ -94,57 +137,57 @@ class AiOrchestrator:
 
         messages.append({"role": "user", "content": user_message[:600]})
 
-        # 3. Primary Engine: Groq LPU for low-latency response (< 400ms)
-        try:
-            groq_key = os.getenv("GROQ_API_KEY", "")
-            if groq_key:
-                payload = {
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": messages,
-                    "temperature": 0.65,
-                    "max_tokens": 300
-                }
-                async with httpx.AsyncClient(timeout=4.5) as client:
-                    res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
-                    if res.status_code == 200:
-                        raw_reply = res.json()["choices"][0]["message"]["content"]
-                        clean_reply = EvaGuardrails.sanitize_output(raw_reply)
-                        return {
-                            "reply": clean_reply,
-                            "is_guarded": False,
-                            "status": "success"
-                        }
-        except Exception as e:
-            logger.warning("Groq engine attempt bypassed: %s", str(e))
+        # 3. Primary Engine: Groq LPU with verified high-performance models
+        groq_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
+        if groq_key:
+            for model_name in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]:
+                try:
+                    payload = {
+                        "model": model_name,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 350
+                    }
+                    async with httpx.AsyncClient(timeout=6.0) as client:
+                        res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
+                        if res.status_code == 200:
+                            raw_reply = res.json()["choices"][0]["message"]["content"]
+                            clean_reply = EvaGuardrails.sanitize_output(raw_reply)
+                            return {
+                                "reply": clean_reply,
+                                "is_guarded": False,
+                                "status": "success"
+                            }
+                except Exception as e:
+                    logger.warning("Groq model %s attempt bypassed: %s", model_name, str(e))
 
         # 4. Secondary Engine: OpenRouter Frontier Failover
-        try:
-            if settings.OPENROUTER_API_KEY:
-                payload = {
-                    "model": "meta-llama/llama-3.1-8b-instruct:free",
-                    "messages": messages,
-                    "temperature": 0.65,
-                    "max_tokens": 300
-                }
-                async with httpx.AsyncClient(timeout=6.0) as client:
-                    res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
-                    if res.status_code == 200:
-                        raw_reply = res.json()["choices"][0]["message"]["content"]
-                        clean_reply = EvaGuardrails.sanitize_output(raw_reply)
-                        return {
-                            "reply": clean_reply,
-                            "is_guarded": False,
-                            "status": "success"
-                        }
-        except Exception as e:
-            logger.warning("OpenRouter engine attempt bypassed: %s", str(e))
+        openrouter_key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
+        if openrouter_key:
+            for or_model in ["qwen/qwen3.8-27b:free", "liquid/lfm-2.5-2.6b:free"]:
+                try:
+                    payload = {
+                        "model": or_model,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 300
+                    }
+                    async with httpx.AsyncClient(timeout=6.0) as client:
+                        res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
+                        if res.status_code == 200:
+                            raw_reply = res.json()["choices"][0]["message"]["content"]
+                            clean_reply = EvaGuardrails.sanitize_output(raw_reply)
+                            return {
+                                "reply": clean_reply,
+                                "is_guarded": False,
+                                "status": "success"
+                            }
+                except Exception as e:
+                    logger.warning("OpenRouter model %s attempt bypassed: %s", or_model, str(e))
 
-        # 5. Deterministic Sanctuary Safe Fallback (No internal errors leaked)
+        # 5. Deterministic Contextual Fallback (No canned loop, genuine mindful advice)
         return {
-            "reply": (
-                "Main aapki baat samajh rahi hoon. Ek gehri saans lijiye. "
-                "Mujhse aap apne match ke message par guidance, date preparation, ya profile clarity ke baare me pooch sakte hain."
-            ),
+            "reply": cls._generate_contextual_fallback(user_message),
             "is_guarded": False,
             "status": "success"
         }

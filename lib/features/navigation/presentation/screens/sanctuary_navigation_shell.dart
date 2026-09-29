@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -49,6 +50,10 @@ class _SanctuaryNavigationShellState
   @override
   void initState() {
     super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('ur_heart_profile_setup_completed', true);
+      prefs.setBool('ur_heart_has_entered_sanctuary', true);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialIndex != 0) {
         ref.read(navigationIndexProvider.notifier).state = widget.initialIndex;
