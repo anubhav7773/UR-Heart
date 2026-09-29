@@ -1,8 +1,24 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
+}
+
+// SEC-MED-03: Externalized Production Signing Architecture
+val keystorePropertiesFile = rootProject.file("key.properties")
+val localKeystoreFile = project.file("key.properties")
+val targetKeystoreFile = if (keystorePropertiesFile.exists()) keystorePropertiesFile else localKeystoreFile
+val keystoreProperties = Properties()
+val hasReleaseSigning = targetKeystoreFile.exists()
+
+if (hasReleaseSigning) {
+    FileInputStream(targetKeystoreFile).use { stream ->
+        keystoreProperties.load(stream)
+    }
 }
 
 android {
@@ -13,19 +29,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    // SEC-MED-03: Externalized Production Signing Architecture
-    val keystorePropertiesFile = rootProject.file("key.properties")
-    val localKeystoreFile = project.file("key.properties")
-    val targetKeystoreFile = if (keystorePropertiesFile.exists()) keystorePropertiesFile else localKeystoreFile
-    val keystoreProperties = java.util.Properties()
-    val hasReleaseSigning = targetKeystoreFile.exists().also { exists ->
-        if (exists) {
-            java.io.FileInputStream(targetKeystoreFile).use { stream ->
-                keystoreProperties.load(stream)
-            }
-        }
     }
 
     signingConfigs {
