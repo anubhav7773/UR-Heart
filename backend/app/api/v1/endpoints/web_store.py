@@ -10,14 +10,16 @@ from sqlalchemy import select, update
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.security import require_superadmin, get_current_user
 from app.models.domain.user import User
 from app.models.domain.in_app_purchases import InAppPurchase
 
 settings = get_settings()
 router = APIRouter(tags=["Web Sanctuary Store"])
 
-# In-memory store orders vault for fast lookup
+# In-memory store orders vault for fast lookup (backed by PostgreSQL for persistence)
 WEB_STORE_ORDERS: Dict[str, Dict[str, Any]] = {}
+SUBMITTED_UTRS: set[str] = set()
 
 STORE_PRODUCTS = {
     "urheart_pass_weekly": {
@@ -160,6 +162,7 @@ async def verify_store_user(payload: VerifyUserRequest, db: AsyncSession = Depen
 async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Depends(get_db)):
     """
     Step 3: Creates a pending checkout order for the chosen pass.
+    Persists order in PostgreSQL in_app_purchases table for stateless durability.
     """
     product = STORE_PRODUCTS.get(payload.product_id)
     if not product:
@@ -176,44 +179,13 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         "amount": amount,
         "currency": payload.currency,
         "payment_method": payload.payment_method,
-        "status": "pending",
+        "status": "pending_verification",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     WEB_STORE_ORDERS[order_id] = order_data
 
-    return {
-        "status": "order_created",
-        "order": order_data
-    }
-
-
-@router.post("/api/v1/store/complete-order")
-async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession = Depends(get_db)):
-    """
-    Step 4: Completes the transaction, records InAppPurchase, updates user in database.
-    """
-    order = WEB_STORE_ORDERS.get(payload.order_id)
-    if not order:
-        # Fallback create instant order for resiliency
-        product_id = "urheart_pass_monthly"
-        product = STORE_PRODUCTS[product_id]
-        order = {
-            "order_id": payload.order_id,
-            "product_id": product_id,
-            "product_name": product["name"],
-            "user_query": "seeker@urheart.app",
-            "amount": product["price_inr"],
-            "currency": "INR",
-            "payment_method": "upi",
-            "status": "pending"
-        }
-        WEB_STORE_ORDERS[payload.order_id] = order
-
-    product_id = order["product_id"]
-    product = STORE_PRODUCTS.get(product_id, STORE_PRODUCTS["urheart_pass_monthly"])
-    user_query = order.get("user_query", "").strip()
-
-    # Find user
+    # Resolve user if available to bind ledger entry in PostgreSQL
+    user_query = payload.user_query.strip()
     user = None
     try:
         parsed_uuid = uuid.UUID(user_query)
@@ -230,14 +202,184 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
         res = await db.execute(select(User).where(User.email == user_query.lower()))
         user = res.scalar_one_or_none()
 
-    user_id = user.id if user else uuid.uuid4()
-    duration_days = product.get("duration_days", 0)
-    tier = product.get("tier", "free")
+    target_user_id = user.id if user else uuid.uuid4()
 
-    # If user exists, apply entitlements
+    # SEC-MED-02: Persist pending order to PostgreSQL so container spin-downs do not lose order state
+    try:
+        ledger = InAppPurchase(
+            user_id=target_user_id,
+            transaction_reference=order_id,
+            product_identifier=payload.product_id,
+            store="web_store",
+            currency=payload.currency,
+            amount_gross=float(amount),
+            platform_fee=0.00,
+            amount_net=float(amount),
+            status="pending_verification"
+        )
+        db.add(ledger)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        print(f"[STORE ORDER PERSISTENCE WARNING] {e}", flush=True)
+
+    return {
+        "status": "order_created",
+        "order": order_data
+    }
+
+
+@router.post("/api/v1/store/complete-order")
+async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Step 4: Submits UPI payment reference/UTR for founder bank verification.
+    SEC-CRIT-05: Eliminates instant client self-activation. Sets status to 'pending_verification'.
+    Perks are only unlocked when founder verifies PNB credit or via superadmin approval.
+    """
+    # 1. Retrieve order from RAM or PostgreSQL
+    order = WEB_STORE_ORDERS.get(payload.order_id)
+    if not order:
+        stmt = select(InAppPurchase).where(InAppPurchase.transaction_reference == payload.order_id)
+        db_purchase = (await db.execute(stmt)).scalar_one_or_none()
+        if db_purchase:
+            product = STORE_PRODUCTS.get(db_purchase.product_identifier, STORE_PRODUCTS["urheart_pass_monthly"])
+            order = {
+                "order_id": payload.order_id,
+                "product_id": db_purchase.product_identifier,
+                "product_name": product["name"],
+                "user_query": str(db_purchase.user_id),
+                "amount": float(db_purchase.amount_gross),
+                "currency": db_purchase.currency,
+                "payment_method": "upi",
+                "status": db_purchase.status
+            }
+            WEB_STORE_ORDERS[payload.order_id] = order
+        else:
+            product_id = "urheart_pass_monthly"
+            product = STORE_PRODUCTS[product_id]
+            order = {
+                "order_id": payload.order_id,
+                "product_id": product_id,
+                "product_name": product["name"],
+                "user_query": "seeker@urheart.app",
+                "amount": product["price_inr"],
+                "currency": "INR",
+                "payment_method": "upi",
+                "status": "pending_verification"
+            }
+            WEB_STORE_ORDERS[payload.order_id] = order
+
+    product_id = order["product_id"]
+    product = STORE_PRODUCTS.get(product_id, STORE_PRODUCTS["urheart_pass_monthly"])
+    utr = (payload.payment_reference or "").strip()
+
+    # 2. Duplicate UTR check (prevent replay attack across orders)
+    if utr:
+        if utr in SUBMITTED_UTRS:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"UTR transaction reference '{utr}' has already been submitted for another order."
+            )
+        dup_stmt = select(InAppPurchase).where(
+            InAppPurchase.transaction_reference == utr,
+            InAppPurchase.status == "completed"
+        )
+        if (await db.execute(dup_stmt)).scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"UTR transaction reference '{utr}' has already been credited."
+            )
+        SUBMITTED_UTRS.add(utr)
+
+    # 3. Transition order state machine to 'pending_verification'
+    order["status"] = "pending_verification"
+    order["payment_reference"] = utr
+
+    # Update ledger status in DB
+    try:
+        await db.execute(
+            update(InAppPurchase)
+            .where(InAppPurchase.transaction_reference == payload.order_id)
+            .values(status="pending_verification")
+        )
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+
+    tx_hash = f"0x{uuid.uuid4().hex[:16]}"
+    deep_link = f"urheart://store/receipt?order_id={payload.order_id}&status=pending_verification"
+
+    return {
+        "status": "pending_verification",
+        "order_id": payload.order_id,
+        "product_id": product_id,
+        "product_name": product["name"],
+        "payment_reference": utr,
+        "transaction_hash": tx_hash,
+        "deep_link": deep_link,
+        "message": (
+            f"Payment reference recorded for {product['name']}. "
+            "Verification in progress with Founder Desk (PNB UPI). "
+            "Passes activate once founder confirms bank credit."
+        )
+    }
+
+
+class ApproveOrderRequest(BaseModel):
+    order_id: Optional[str] = None
+    admin_notes: Optional[str] = "Verified in PNB Account"
+
+
+@router.post("/api/v1/store/orders/{order_id}/approve", status_code=status.HTTP_200_OK)
+@router.post("/api/v1/store/admin/approve-order", status_code=status.HTTP_200_OK)
+async def approve_store_order(
+    order_id: Optional[str] = None,
+    payload: Optional[ApproveOrderRequest] = None,
+    current_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Founder Approval Channel (Anubhav Singh / Superadmin Sentinel).
+    Unlocks passes in database ONLY after founder verifies credit in PNB account.
+    """
+    resolved_order_id = order_id or (payload.order_id if payload else None)
+    if not resolved_order_id:
+        raise HTTPException(status_code=400, detail="order_id is required.")
+
+    order = WEB_STORE_ORDERS.get(resolved_order_id)
+    product_id = order.get("product_id", "urheart_pass_monthly") if order else "urheart_pass_monthly"
+    product = STORE_PRODUCTS.get(product_id, STORE_PRODUCTS["urheart_pass_monthly"])
+    tier = product.get("tier", "monthly")
+    duration_days = product.get("duration_days", 30)
+
+    # Find user associated with order
+    user = None
+    user_query = order.get("user_query", "").strip() if order else ""
+    if user_query:
+        try:
+            parsed_uuid = uuid.UUID(user_query)
+            res = await db.execute(select(User).where(User.id == parsed_uuid))
+            user = res.scalar_one_or_none()
+        except Exception:
+            pass
+
+        if not user and "@" in user_query:
+            res = await db.execute(select(User).where(User.email == user_query.lower()))
+            user = res.scalar_one_or_none()
+
+    if not user:
+        db_res = await db.execute(
+            select(InAppPurchase).where(InAppPurchase.transaction_reference == resolved_order_id)
+        )
+        db_purch = db_res.scalar_one_or_none()
+        if db_purch:
+            res = await db.execute(select(User).where(User.id == db_purch.user_id))
+            user = res.scalar_one_or_none()
+
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(days=duration_days) if duration_days > 0 else None
 
+    # Apply sovereign perks in database
     if user:
         if tier in ["weekly", "monthly", "lifetime"]:
             await db.execute(
@@ -264,38 +406,57 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
                 .values(reward_balance=User.reward_balance + 50)
             )
 
-        # Record financial ledger entry
-        try:
-            tx_ref = payload.payment_reference or f"TX-WEB-{payload.order_id}"
-            ledger = InAppPurchase(
-                user_id=user.id,
-                transaction_reference=tx_ref,
-                product_identifier=product_id,
-                store="web_store",
-                currency=order.get("currency", "INR"),
-                amount_gross=float(order.get("amount", 0)),
-                platform_fee=0.00,  # Zero app store fee on sovereign web!
-                amount_net=float(order.get("amount", 0)),
-                status="completed"
-            )
-            db.add(ledger)
-            await db.commit()
-        except Exception as e:
-            await db.rollback()
-            print(f"[STORE LEDGER WARNING] {e}", flush=True)
+    # Update order & ledger status to 'completed'
+    if order:
+        order["status"] = "completed"
 
-    order["status"] = "completed"
-    tx_hash = f"0x{uuid.uuid4().hex[:16]}"
-    deep_link = f"urheart://store/receipt?order_id={payload.order_id}&product={product_id}"
+    await db.execute(
+        update(InAppPurchase)
+        .where(InAppPurchase.transaction_reference == resolved_order_id)
+        .values(status="completed")
+    )
+    await db.commit()
+
+    return {
+        "status": "completed",
+        "order_id": resolved_order_id,
+        "subscription_tier": tier,
+        "user_id": str(user.id) if user else None,
+        "message": f"Order {resolved_order_id} approved by founder. Pass activated."
+    }
+
+
+@router.get("/api/v1/store/orders/{order_id}", status_code=status.HTTP_200_OK)
+async def get_store_order_status(order_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Step 5 / Polling: Retrieves order status with stateless PostgreSQL fallback.
+    Ensures zero data loss across container restarts.
+    """
+    order = WEB_STORE_ORDERS.get(order_id)
+    if not order:
+        stmt = select(InAppPurchase).where(InAppPurchase.transaction_reference == order_id)
+        db_purchase = (await db.execute(stmt)).scalar_one_or_none()
+        if db_purchase:
+            product = STORE_PRODUCTS.get(db_purchase.product_identifier, STORE_PRODUCTS["urheart_pass_monthly"])
+            order = {
+                "order_id": order_id,
+                "product_id": db_purchase.product_identifier,
+                "product_name": product["name"],
+                "user_query": str(db_purchase.user_id),
+                "amount": float(db_purchase.amount_gross),
+                "currency": db_purchase.currency,
+                "payment_method": "upi",
+                "status": db_purchase.status,
+                "created_at": db_purchase.purchased_at.isoformat() if db_purchase.purchased_at else None
+            }
+            WEB_STORE_ORDERS[order_id] = order
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
 
     return {
         "status": "success",
-        "order_id": payload.order_id,
-        "product_id": product_id,
-        "product_name": product["name"],
-        "transaction_hash": tx_hash,
-        "deep_link": deep_link,
-        "message": f"Sanctuary Pass Activated! {product['name']} unlocked with zero store tax."
+        "order": order
     }
 
 

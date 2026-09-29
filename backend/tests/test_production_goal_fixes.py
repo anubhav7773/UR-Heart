@@ -202,16 +202,29 @@ def test_web_sanctuary_store_flow():
     assert order_id.startswith("ORD-UR-")
     assert order_data["amount"] == 149
 
-    # 4. Step 4: Complete Sacred Payment Order
+    # 4. Step 4: Submit Sacred Payment Reference (Pending Founder Bank Verification)
     res_complete = client.post("/api/v1/store/complete-order", json={
         "order_id": order_id,
         "payment_reference": "UPI-TXN-998877"
     })
     assert res_complete.status_code == 200
     data_comp = res_complete.json()
-    assert data_comp["status"] == "success"
+    assert data_comp["status"] == "pending_verification"
     assert "urheart://store/receipt" in data_comp["deep_link"]
     assert "1-Month Sovereign Pass" in data_comp["product_name"]
+
+    # 5. Step 5: Founder Approves Order (After verifying credit in PNB account)
+    from app.core.security import require_superadmin
+    from app.models.domain.user import User
+    import uuid
+    admin_user = User(id=uuid.uuid4(), email="kshtriyaanubhav9120@gmail.com", full_name="Anubhav Singh")
+    app.dependency_overrides[require_superadmin] = lambda: admin_user
+    try:
+        res_approve = client.post(f"/api/v1/store/orders/{order_id}/approve")
+        assert res_approve.status_code == 200
+        assert res_approve.json()["status"] == "completed"
+    finally:
+        app.dependency_overrides.pop(require_superadmin, None)
 
 
 def test_statutory_legal_and_deletion_portals():

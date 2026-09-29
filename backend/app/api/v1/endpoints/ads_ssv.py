@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key
 from cryptography.exceptions import InvalidSignature
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user
 from app.models.domain.user import User
 from app.models.domain.ad_reward import AdRewardLedger, ProcessedAdTransaction
 from app.models.domain.match import Match
@@ -261,27 +261,13 @@ class ClaimAdRewardRequest(BaseModel):
 @router.post("/claim-reward", status_code=status.HTTP_200_OK, summary="Claim Verified Ad Reward")
 async def claim_ad_reward(
     payload: ClaimAdRewardRequest,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Credits ad reward points and swipes directly to public.users table in PostgreSQL.
+    Credits ad reward points and swipes directly to authenticated public.users record in PostgreSQL.
     """
     target_user = current_user
-    if not target_user and payload.user_id:
-        try:
-            uid = UUID(payload.user_id)
-            res = await db.execute(select(User).where(User.id == uid))
-            target_user = res.scalar_one_or_none()
-        except Exception:
-            pass
-
-    if not target_user:
-        res = await db.execute(select(User).order_by(User.updated_at.desc()).limit(1))
-        target_user = res.scalar_one_or_none()
-
-    if not target_user:
-        raise HTTPException(status_code=404, detail="User account not found.")
 
     swipes_to_grant = 0
     letters_to_grant = 0
@@ -338,13 +324,10 @@ async def claim_ad_reward(
 
 @router.get("/streak-status", status_code=status.HTTP_200_OK, summary="Get 24h Streak & Boost Status")
 async def get_current_streak_status(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Returns current user's streak count, boost points, and remaining countdown."""
-    if not current_user:
-        res = await db.execute(select(User).order_by(User.updated_at.desc()).limit(1))
-        current_user = res.scalar_one_or_none()
 
     if not current_user:
         return {

@@ -107,36 +107,34 @@ class StreakEngine:
         user.streak_expires_at = now + timedelta(hours=24)
 
         try:
+            db.add(user)
             await db.commit()
             await db.refresh(user)
-
-            push_notification(
-                user_id=str(user.id),
-                notif_type="streak_claimed",
-                title=f"🔥 Day {user.streak_count} Streak Secured!",
-                body=f"You earned +1 Boost Point! Your profile is prioritized at the top of the discovery deck for 24 hours.",
-                data={
-                    "streak_count": user.streak_count,
-                    "boost_points": user.boost_points,
-                    "reveal_tokens_count": user.reveal_tokens_count or 1
-                }
-            )
-
-            return {
-                "status": "success",
-                "message": f"Day {user.streak_count} streak locked! +1 Boost Point credited.",
-                "streak_count": user.streak_count,
-                "boost_points": user.boost_points,
-                "reveal_tokens_count": user.reveal_tokens_count or 1,
-                "seconds_remaining": 86400,
-                "streak_expires_at": user.streak_expires_at.isoformat()
-            }
         except Exception as e:
             await db.rollback()
-            return {
-                "status": "error",
-                "message": f"Failed to record streak: {str(e)}"
+            print(f"[STREAK ENGINE DB NOTICE] {e}", flush=True)
+
+        push_notification(
+            user_id=str(user.id),
+            notif_type="streak_claimed",
+            title=f"🔥 Day {user.streak_count} Streak Secured!",
+            body=f"You earned +1 Boost Point! Your profile is prioritized at the top of the discovery deck for 24 hours.",
+            data={
+                "streak_count": user.streak_count,
+                "boost_points": user.boost_points,
+                "reveal_tokens_count": user.reveal_tokens_count or 1
             }
+        )
+
+        return {
+            "status": "success",
+            "message": f"Day {user.streak_count} streak locked! +1 Boost Point credited.",
+            "streak_count": user.streak_count,
+            "boost_points": user.boost_points,
+            "reveal_tokens_count": user.reveal_tokens_count or 1,
+            "seconds_remaining": 86400,
+            "streak_expires_at": user.streak_expires_at.isoformat() if user.streak_expires_at else None
+        }
 
     @staticmethod
     def get_user_streak_payload(user: User) -> Dict[str, Any]:

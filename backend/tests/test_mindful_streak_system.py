@@ -14,16 +14,31 @@ client = TestClient(app)
 
 def test_claim_daily_streak_boost():
     """Verifies that claiming daily streak grants +1 streak, +1 boost point, and 24h timer."""
-    res = client.post("/api/v1/ads/claim-reward", json={
-        "ad_type": "daily_streak_boost"
-    })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "success"
-    assert data["streak_count"] >= 1
-    assert data["boost_points"] >= 1
-    assert data["seconds_remaining"] > 0
-    assert data["streak_expires_at"] is not None
+    from app.core.security import get_current_user
+    test_user = User(
+        id=uuid4(),
+        auth_id=uuid4(),
+        full_name="Streak Seeker",
+        email="streak@urheart.app",
+        streak_count=0,
+        boost_points=0,
+        reveal_tokens_count=1,
+        is_profile_completed=True
+    )
+    app.dependency_overrides[get_current_user] = lambda: test_user
+    try:
+        res = client.post("/api/v1/ads/claim-reward", json={
+            "ad_type": "daily_streak_boost"
+        }, headers={"Authorization": "Bearer test"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert data["streak_count"] >= 1
+        assert data["boost_points"] >= 1
+        assert data["seconds_remaining"] > 0
+        assert data["streak_expires_at"] is not None
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 def test_streak_boost_feed_ranking():
@@ -83,11 +98,32 @@ async def test_streak_decay_penalty_and_token_loss():
 
 
 def test_get_streak_status_endpoint():
-    """Verifies that /api/v1/ads/streak-status returns active countdown and visibility label."""
-    res = client.get("/api/v1/ads/streak-status")
-    assert res.status_code == 200
-    data = res.json()
-    assert "streak_count" in data
-    assert "boost_points" in data
-    assert "reveal_tokens_count" in data
-    assert "visibility_multiplier_label" in data
+    """Verifies that /api/v1/ads/streak-status rejects unauth with 401, and returns active countdown for auth user."""
+    # 1. Unauthenticated request must be rejected with 401
+    res_unauth = client.get("/api/v1/ads/streak-status")
+    assert res_unauth.status_code == 401
+
+    # 2. Authenticated request succeeds with 200 and returns active metrics
+    from app.core.security import get_current_user
+    test_user = User(
+        id=uuid4(),
+        auth_id=uuid4(),
+        full_name="Status Seeker",
+        email="status@urheart.app",
+        streak_count=3,
+        boost_points=3,
+        reveal_tokens_count=2,
+        is_profile_completed=True
+    )
+    app.dependency_overrides[get_current_user] = lambda: test_user
+    try:
+        res = client.get("/api/v1/ads/streak-status", headers={"Authorization": "Bearer test"})
+        assert res.status_code == 200
+        data = res.json()
+        assert "streak_count" in data
+        assert "boost_points" in data
+        assert "reveal_tokens_count" in data
+        assert "visibility_multiplier_label" in data
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
