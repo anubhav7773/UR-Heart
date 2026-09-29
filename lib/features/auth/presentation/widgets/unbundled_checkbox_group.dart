@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
@@ -55,6 +57,35 @@ class UnbundledCheckboxGroup extends ConsumerWidget {
           activeColor: pine,
           textColor: primaryText,
           subTextColor: subText,
+          actionWidget: InkWell(
+            onTap: () async {
+              final uri = Uri.parse(ApiEndpoints.termsOfServiceUrl);
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Read Terms of Service in browser',
+                    style: TextStyle(
+                      color: pine,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.open_in_new,
+                    size: 12,
+                    color: pine,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 8),
 
@@ -68,6 +99,35 @@ class UnbundledCheckboxGroup extends ConsumerWidget {
           activeColor: pine,
           textColor: primaryText,
           subTextColor: subText,
+          actionWidget: InkWell(
+            onTap: () async {
+              final uri = Uri.parse(ApiEndpoints.privacyPolicyUrl);
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Read DPDP Privacy Policy in browser',
+                    style: TextStyle(
+                      color: pine,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.open_in_new,
+                    size: 12,
+                    color: pine,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -82,6 +142,7 @@ class UnbundledCheckboxGroup extends ConsumerWidget {
     required Color activeColor,
     required Color textColor,
     required Color subTextColor,
+    Widget? actionWidget,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -104,12 +165,18 @@ class UnbundledCheckboxGroup extends ConsumerWidget {
           title,
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor),
         ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Text(
-            subtitle,
-            style: TextStyle(fontSize: 11, color: subTextColor, height: 1.3),
-          ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                subtitle,
+                style: TextStyle(fontSize: 11, color: subTextColor, height: 1.3),
+              ),
+            ),
+            if (actionWidget != null) actionWidget,
+          ],
         ),
       ),
     ),

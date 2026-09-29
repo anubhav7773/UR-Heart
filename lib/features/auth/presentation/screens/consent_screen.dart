@@ -8,6 +8,9 @@ import '../../../../core/theme/widgets/theme_selector_pill.dart';
 import '../controllers/consent_controller.dart';
 import '../widgets/consent_accordion_group.dart';
 import '../widgets/unbundled_checkbox_group.dart';
+import '../widgets/statutory_links_card.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Screen 1: Mindful Consent & Statutory Legal Gateway
 /// Features bilingual DPDP Act 2023 unbundled consent and permanent theme locking
@@ -145,7 +148,12 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
               const SizedBox(height: 16.0),
               // Unbundled Affirmative Checkboxes
               const UnbundledCheckboxGroup(),
+              const SizedBox(height: 20.0),
+
+              // Prominent Statutory Legal & Data Erasure Links Card
+              StatutoryLinksCard(isDark: isDark),
               const SizedBox(height: 24.0),
+
               // Submit button
               SizedBox(
                 width: double.infinity,
@@ -181,7 +189,44 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
                 ),
               ),
               const SizedBox(height: 16.0),
+
+              // Quick browser links footer for forgotten links & compliance
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 10.0,
+                children: [
+                  _buildFooterLink(context, 'Privacy Policy', ApiEndpoints.privacyPolicyUrl, cornerTextColor),
+                  Text('•', style: TextStyle(color: cornerTextColor, fontSize: 11)),
+                  _buildFooterLink(context, 'Terms & EULA', ApiEndpoints.termsOfServiceUrl, cornerTextColor),
+                  Text('•', style: TextStyle(color: cornerTextColor, fontSize: 11)),
+                  _buildFooterLink(context, 'Delete Account', ApiEndpoints.deleteAccountUrl, cornerTextColor),
+                ],
+              ),
+              const SizedBox(height: 20.0),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooterLink(BuildContext context, String title, String url, Color color) {
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(url);
+        try {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (_) {}
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 2.0),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 11.5,
+            color: color,
+            decoration: TextDecoration.underline,
           ),
         ),
       ),

@@ -8,8 +8,8 @@ import '../../domain/candidate_profile.dart';
 import '../widgets/candidate_profile_card.dart';
 import '../widgets/feed_floating_action_bar.dart';
 import '../widgets/out_of_swipes_ad_modal.dart';
-import '../../growth/presentation/controllers/growth_hub_controller.dart';
-import '../../navigation/presentation/screens/sanctuary_navigation_shell.dart';
+import '../../../growth/presentation/controllers/growth_hub_controller.dart';
+import '../../../navigation/presentation/screens/sanctuary_navigation_shell.dart';
 
 /// Screen 05: Sanctuary Discovery Feed Scaffold
 /// Features 60fps drag physics, reciprocal orientation filtering, and quota gate

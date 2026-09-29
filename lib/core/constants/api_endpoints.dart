@@ -7,6 +7,9 @@ class ApiEndpoints {
   static const String officialDomain = 'urheart.asiverticals.me';
   static const String fallbackDomain = 'ur-heart.onrender.com';
   static const String webSanctuaryUrl = 'https://urheart.asiverticals.me';
+  static const String privacyPolicyUrl = 'https://urheart.asiverticals.me/privacy';
+  static const String termsOfServiceUrl = 'https://urheart.asiverticals.me/terms';
+  static const String deleteAccountUrl = 'https://urheart.asiverticals.me/delete-account';
 
   // Base API URL injected via environment or defaulting to official domain
   static const String defaultBaseUrl = String.fromEnvironment(
