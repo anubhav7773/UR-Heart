@@ -1,9 +1,10 @@
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 
@@ -443,8 +444,16 @@ async def serve_data_deletion_page(request: Request):
 
 
 class WebDeletionRequest(BaseModel):
-    email: EmailStr
+    email: str
     reason: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        cleaned = v.strip().lower()
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", cleaned):
+            raise ValueError("Invalid email format.")
+        return cleaned
 
 
 @router.post("/api/v1/vault/request-web-deletion")
