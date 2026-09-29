@@ -303,7 +303,7 @@ async def submit_grievance_dossier(
         "dossier_reference_id": dossier.dossier_reference_id,
         "sla_acknowledgment": "Acknowledged within statutory 24-hour SLA (IT Rules 2021 Rule 3(2))",
         "statutory_resolution_deadline": dossier.statutory_resolution_due_at.isoformat(),
-        "support_desk_contact": "grievance-officer@urheart.app"
+        "support_desk_contact": "asiverticals@gmail.com"
     }
 
 
@@ -357,7 +357,7 @@ async def track_grievance_ticket(
         "ticket_status": d.status,
         "filed_at": d.created_at.isoformat() if d.created_at else None,
         "sla_resolution_due": d.statutory_resolution_due_at.isoformat() if d.statutory_resolution_due_at else None,
-        "support_desk_contact": "grievance-officer@urheart.app",
+        "support_desk_contact": "asiverticals@gmail.com",
         "resolution_notes": d.resolution_notes or "Under active review by Statutory Grievance Officer (Rule 3(2))."
     }
 

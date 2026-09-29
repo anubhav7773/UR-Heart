@@ -63,7 +63,7 @@ class AiSanctuaryRepository {
     // 5. Tickets, Reports & Grievances under IT Rules 2021
     if (q.contains('ticket') || q.contains('report') || q.contains('grievance') || q.contains('complaint') || q.contains('shikayat')) {
       return 'Aapne jo complaint ya grievance file ki hai, wo India ke IT Rules 2021 (Rule 3(2)) ke tahat '
-          'hamare Grievance Officer (KSHTRIYA ANUBHAV) ke paas securely submit ho chuki hai.\n\n'
+          'hamare Grievance Officer (ANUBHAV SINGH) ke paas securely submit ho chuki hai.\n\n'
           '1. Initial acknowledgment 24 ghante ke andar confirm ho jati hai.\n'
           '2. Statutory review and resolution timeline 24 se 48 ghante hai.\n'
           '3. Review ke doran reported account isolated rehta hai taaki aapki safety 100% surakshit rahe.';

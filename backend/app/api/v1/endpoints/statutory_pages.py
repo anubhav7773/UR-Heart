@@ -162,6 +162,177 @@ COMMON_CSS = """
     color: var(--gold);
     text-decoration: none;
   }
+  .contact-box {
+    background: rgba(10, 15, 13, 0.7);
+    border: 1.5px solid rgba(43, 61, 53, 0.9);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 14px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .contact-primary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .contact-icon {
+    font-size: 26px;
+    width: 48px;
+    height: 48px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .contact-info {
+    display: flex;
+    flex-direction: column;
+  }
+  .contact-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .contact-email {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gold);
+    text-decoration: none;
+    word-break: break-all;
+    margin-top: 2px;
+    transition: color 0.2s;
+  }
+  .contact-email:hover {
+    color: #FFE680;
+    text-decoration: underline;
+  }
+  .contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .contact-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+  .contact-btn-primary {
+    background: linear-gradient(135deg, var(--coral), #C94A29);
+    color: #FFFFFF;
+  }
+  .contact-btn-primary:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+  }
+  .contact-btn-gmail {
+    background: rgba(46, 111, 94, 0.3);
+    border-color: var(--pine-glow);
+    color: #A3E4D1;
+  }
+  .contact-btn-gmail:hover {
+    background: rgba(46, 111, 94, 0.5);
+    color: #FFFFFF;
+  }
+  .contact-btn-copy {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(212, 175, 55, 0.4);
+    color: var(--gold);
+  }
+  .contact-btn-copy:hover {
+    background: rgba(212, 175, 55, 0.15);
+    border-color: var(--gold);
+  }
+  .contact-toast {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: rgba(78, 159, 118, 0.2);
+    border: 1px solid var(--success);
+    border-radius: 10px;
+    color: #A3E4D1;
+    font-size: 13px;
+  }
+  .btn-mini-copy {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    margin-left: 8px;
+    font-size: 11px;
+    border-radius: 6px;
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    color: var(--gold);
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .btn-mini-copy:hover {
+    background: rgba(212, 175, 55, 0.3);
+  }
+"""
+
+CONTACT_SCRIPT = """
+  <script>
+    function copyContactEmail(email, btnEl) {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(email).then(function() { showToast(email, btnEl); }).catch(function() { fallbackCopy(email, btnEl); });
+      } else {
+        fallbackCopy(email, btnEl);
+      }
+    }
+
+    function fallbackCopy(email, btnEl) {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = email;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast(email, btnEl);
+      } catch (e) {
+        prompt("Copy email address:", email);
+      }
+    }
+
+    function showToast(email, btnEl) {
+      var toast = document.getElementById("copyToast") || document.getElementById("copyToastTerms");
+      if (toast) {
+        toast.style.display = "block";
+        setTimeout(function() { toast.style.display = "none"; }, 3500);
+      }
+      if (btnEl) {
+        var orig = btnEl.innerHTML;
+        btnEl.innerHTML = "✓ Copied!";
+        btnEl.style.borderColor = "var(--success)";
+        btnEl.style.color = "var(--success)";
+        setTimeout(function() {
+          btnEl.innerHTML = orig;
+          btnEl.style.borderColor = "";
+          btnEl.style.color = "";
+        }, 2500);
+      }
+    }
+
+    function handleEmailClick(e, email) {
+      copyContactEmail(email, null);
+    }
+  </script>
 """
 
 
@@ -200,7 +371,7 @@ async def serve_privacy_policy(request: Request):
       <h1>Privacy Policy</h1>
       <p style="color:var(--text-muted); font-size:12px;">Last Updated & Legally Effective: September 2026</p>
 
-      <p>Welcome to <strong>UR-Heart</strong> ("App", "Sanctuary", "Service"), operated by <strong>Asiverticals</strong> (Sole Proprietorship: Kshtriya Anubhav). We are deeply dedicated to preserving user privacy, mindful resonance, and data sovereignty. This Privacy Policy details how we collect, safeguard, and respect your personal digital data in strict compliance with India's <strong>Digital Personal Data Protection Act, 2023 (DPDP Act)</strong>, the <strong>Information Technology Act, 2000</strong>, and international data standards.</p>
+      <p>Welcome to <strong>UR-Heart</strong> ("App", "Sanctuary", "Service"), operated by <strong>Asiverticals</strong> (Sole Proprietorship: Anubhav Singh). We are deeply dedicated to preserving user privacy, mindful resonance, and data sovereignty. This Privacy Policy details how we collect, safeguard, and respect your personal digital data in strict compliance with India's <strong>Digital Personal Data Protection Act, 2023 (DPDP Act)</strong>, the <strong>Information Technology Act, 2000</strong>, and international data standards.</p>
 
       <h2>1. Age Gate & Strict Minor Protection</h2>
       <p>UR-Heart is strictly for individuals who are <strong>18 years of age or older</strong>. We strictly prohibit minors from creating an account or accessing the sanctuary. If we discover any account belonging to an individual under 18, it is immediately quarantined and permanently incinerated along with all associated media and records.</p>
@@ -231,21 +402,53 @@ async def serve_privacy_policy(request: Request):
       <p>In accordance with the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021, the details of our designated Grievance Officer are published below:</p>
       
       <div class="officer-card">
-        <div class="officer-row"><strong>Designated Grievance Officer:</strong> Kshtriya Anubhav</div>
+        <div class="officer-row"><strong>Designated Grievance Officer:</strong> Anubhav Singh</div>
         <div class="officer-row"><strong>Operating Entity:</strong> Asiverticals (Sole Proprietor)</div>
-        <div class="officer-row"><strong>Statutory Grievance Email:</strong> grievance@urheart.asiverticals.me</div>
-        <div class="officer-row"><strong>Registered Operational Desk:</strong> Saket, Ayodhya, Uttar Pradesh - 224001, India</div>
+        <div class="officer-row">
+          <strong>Statutory Grievance Email:</strong> 
+          <a href="mailto:asiverticals@gmail.com?subject=IT%20Rules%202021%20Grievance%20Redressal" style="color:var(--gold); text-decoration:underline;">asiverticals@gmail.com</a>
+          <button type="button" onclick="copyContactEmail('asiverticals@gmail.com', this)" class="btn-mini-copy">📋 Copy</button>
+        </div>
+        <div class="officer-row"><strong>Registered Operational Desk:</strong> District Court, Ayodhya, Uttar Pradesh - 224001, India</div>
         <div class="officer-row"><strong>Statutory Timelines:</strong> Acknowledgment within 24 hours; complete resolution within 15 days.</div>
       </div>
 
       <h2>6. Contact Us</h2>
-      <p>For questions or compliance audits, contact our privacy desk at <a href="mailto:privacy@urheart.asiverticals.me" style="color:var(--gold);">privacy@urheart.asiverticals.me</a>.</p>
+      <p>For questions, support, compliance audits, or data rights, reach our operational desk anytime:</p>
+
+      <div class="contact-box" id="contactCard">
+        <div class="contact-primary">
+          <div class="contact-icon">✉️</div>
+          <div class="contact-info">
+            <span class="contact-label">Official Support & Privacy Desk</span>
+            <a href="mailto:asiverticals@gmail.com?subject=UR-Heart%20Support%20%26%20Privacy%20Desk" onclick="handleEmailClick(event, 'asiverticals@gmail.com')" class="contact-email">asiverticals@gmail.com</a>
+          </div>
+        </div>
+
+        <div class="contact-actions">
+          <a href="mailto:asiverticals@gmail.com?subject=UR-Heart%20Support%20%26%20Privacy%20Desk" class="contact-btn contact-btn-primary" id="sendEmailBtn">
+            🚀 Send Email
+          </a>
+          <a href="https://mail.google.com/mail/?view=cm&fs=1&to=asiverticals@gmail.com&su=UR-Heart+Support+%26+Privacy+Desk" target="_blank" rel="noopener noreferrer" class="contact-btn contact-btn-gmail" id="openGmailBtn">
+            🌐 Open in Gmail
+          </a>
+          <button type="button" class="contact-btn contact-btn-copy" onclick="copyContactEmail('asiverticals@gmail.com', this)" id="copyEmailBtn">
+            📋 Copy Email Address
+          </button>
+        </div>
+
+        <div id="copyToast" class="contact-toast" style="display:none;">
+          ✓ Email copied to clipboard: <strong>asiverticals@gmail.com</strong>
+        </div>
+      </div>
     </div>
 
     <footer>
-      <p>© 2026 Asiverticals (Proprietor: Kshtriya Anubhav) • <a href="/terms">Terms of Service</a> • <a href="/delete-account">Account Deletion Portal</a></p>
+      <p>© 2026 Asiverticals (Proprietor: Anubhav Singh) • <a href="/terms">Terms of Service</a> • <a href="/delete-account">Account Deletion Portal</a></p>
     </footer>
   </div>
+
+  {CONTACT_SCRIPT}
 </body>
 </html>"""
     return HTMLResponse(content=html, status_code=200)
@@ -283,7 +486,7 @@ async def serve_terms_of_service(request: Request):
       <h1>Terms of Service & End User Agreement</h1>
       <p style="color:var(--text-muted); font-size:12px;">Last Updated: September 2026</p>
 
-      <p>Please read these Terms of Service ("Terms") carefully. By creating an account, downloading, or using <strong>UR-Heart</strong>, you enter into a binding agreement with <strong>Asiverticals</strong> (Proprietorship: Kshtriya Anubhav).</p>
+      <p>Please read these Terms of Service ("Terms") carefully. By creating an account, downloading, or using <strong>UR-Heart</strong>, you enter into a binding agreement with <strong>Asiverticals</strong> (Proprietorship: Anubhav Singh).</p>
 
       <h2>1. Mandatory 18+ Eligibility</h2>
       <p>You must be at least 18 years of age to access UR-Heart. By accessing this platform, you warrant and represent that you have legal capacity to enter into this contract under the Indian Contract Act, 1872.</p>
@@ -308,12 +511,46 @@ async def serve_terms_of_service(request: Request):
 
       <h2>6. Governing Law & Dispute Jurisdiction</h2>
       <p>These Terms are governed by and construed in accordance with the laws of the Republic of India. Any statutory disputes shall be subject to the exclusive jurisdiction of the competent courts in <strong>Ayodhya / Uttar Pradesh, India</strong>.</p>
+
+      <h2>7. Grievance Redressal & Legal Desk (IT Rules 2021 Rule 3(2))</h2>
+      <p>In accordance with Rule 3(2) of the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021:</p>
+      <div class="officer-card">
+        <div class="officer-row"><strong>Designated Grievance Officer:</strong> Anubhav Singh</div>
+        <div class="officer-row"><strong>Operating Entity:</strong> Asiverticals (Sole Proprietor)</div>
+        <div class="officer-row">
+          <strong>Official Contact Email:</strong> 
+          <a href="mailto:asiverticals@gmail.com?subject=IT%20Rules%202021%20Grievance%20Redressal" style="color:var(--gold); text-decoration:underline;">asiverticals@gmail.com</a>
+          <button type="button" onclick="copyContactEmail('asiverticals@gmail.com', this)" class="btn-mini-copy">📋 Copy</button>
+        </div>
+        <div class="officer-row"><strong>Registered Operational Desk:</strong> District Court, Ayodhya, Uttar Pradesh - 224001, India</div>
+        <div class="officer-row"><strong>Statutory Timelines:</strong> Acknowledgment within 24 hours; resolution within 15 days.</div>
+      </div>
+
+      <div class="contact-box">
+        <div class="contact-primary">
+          <div class="contact-icon">⚖️</div>
+          <div class="contact-info">
+            <span class="contact-label">Legal & Terms Desk</span>
+            <a href="mailto:asiverticals@gmail.com?subject=UR-Heart%20Terms%20%26%20Legal%20Desk" class="contact-email">asiverticals@gmail.com</a>
+          </div>
+        </div>
+        <div class="contact-actions">
+          <a href="mailto:asiverticals@gmail.com?subject=UR-Heart%20Terms%20%26%20Legal%20Desk" class="contact-btn contact-btn-primary">🚀 Send Email</a>
+          <a href="https://mail.google.com/mail/?view=cm&fs=1&to=asiverticals@gmail.com&su=UR-Heart+Terms+%26+Legal+Desk" target="_blank" rel="noopener noreferrer" class="contact-btn contact-btn-gmail">🌐 Open in Gmail</a>
+          <button type="button" class="contact-btn contact-btn-copy" onclick="copyContactEmail('asiverticals@gmail.com', this)">📋 Copy Email Address</button>
+        </div>
+        <div id="copyToastTerms" class="contact-toast" style="display:none;">
+          ✓ Email copied to clipboard: <strong>asiverticals@gmail.com</strong>
+        </div>
+      </div>
     </div>
 
     <footer>
-      <p>© 2026 Asiverticals (Proprietor: Kshtriya Anubhav) • <a href="/privacy">Privacy Policy</a> • <a href="/delete-account">Account Deletion</a></p>
+      <p>© 2026 Asiverticals (Proprietor: Anubhav Singh) • <a href="/privacy">Privacy Policy</a> • <a href="/delete-account">Account Deletion</a></p>
     </footer>
   </div>
+
+  {CONTACT_SCRIPT}
 </body>
 </html>"""
     return HTMLResponse(content=html, status_code=200)
@@ -412,7 +649,7 @@ async def serve_data_deletion_page(request: Request):
     </div>
 
     <footer>
-      <p>© 2026 Asiverticals (Proprietor: Kshtriya Anubhav) • <a href="/privacy">Privacy Policy</a> • <a href="/terms">Terms</a></p>
+      <p>© 2026 Asiverticals (Proprietor: Anubhav Singh) • <a href="/privacy">Privacy Policy</a> • <a href="/terms">Terms</a></p>
     </footer>
   </div>
 

@@ -87,10 +87,14 @@ async def get_current_user(
 
 async def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
     """Strict authorization gate: Validates server-side role and immutable admin identity."""
-    expected_admin_email = os.getenv("SUPERADMIN_CANONICAL_EMAIL") or os.getenv("SUPERADMIN_EMAIL", "kshtriyaanubhav9120@gmail.com")
-    user_email = getattr(current_user, "email", "") or ""
-    user_role = getattr(current_user, "role", "user") or "user"
+    admin_whitelist = {
+        (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower(),
+        (os.getenv("SUPERADMIN_EMAIL") or "").strip().lower(),
+        "asiverticals@gmail.com",
+        "kshtriyaanubhav9120@gmail.com",
+    }
+    user_email = (getattr(current_user, "email", "") or "").strip().lower()
 
-    if user_email.strip().lower() != expected_admin_email.strip().lower():
+    if user_email not in admin_whitelist:
         raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to the Sovereign Sanctuary Sentinel.")
     return current_user

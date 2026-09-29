@@ -45,7 +45,7 @@ class ConsentAccordionGroup extends ConsumerWidget {
           title: 'Rule 3(2) IT Rules & Grievance Redressal',
           purposeSummary: 'Statutory 24h complaint acknowledgment and 15-day resolution.',
           detailedText:
-              'In compliance with Information Technology Rules 2021, UR-Heart maintains an appointed Grievance Officer reachable at grievance@urheart.app. All safety violations are ticketed within 24 hours.',
+              'In compliance with Information Technology Rules 2021, UR-Heart maintains an appointed Grievance Officer: Anubhav Singh (Operational Desk: District Court, Ayodhya), reachable at asiverticals@gmail.com. All safety violations are ticketed within 24 hours.',
         ),
         const ConsentAccordionCard(
           category: 'Community Safe Space',

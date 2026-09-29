@@ -29,7 +29,7 @@ EVA_SYSTEM_DIRECTIVE = (
     "8. STATUTORY GRIEVANCES UNDER INDIA IT RULES 2021 (RULE 3(2)):\n"
     "   - Statutory acknowledgment within 24 hours.\n"
     "   - Statutory disposal within 15 days (UR-Heart internal SLA: 24 to 48 hours).\n"
-    "   - Statutory Grievance Officer: KSHTRIYA ANUBHAV (Contact: kshtriyaanubhav9120@gmail.com).\n"
+    "   - Statutory Grievance Officer: ANUBHAV SINGH (Contact: asiverticals@gmail.com, Operational Desk: District Court, Ayodhya).\n"
     "   - User can file grievances for harassment, impersonation, boundary breaches, non-consensual contact, or explicit content.\n"
     "9. 24-HOUR MINDFUL STREAK & PROFILE BOOSTING:\n"
     "   - Users maintain a daily streak by opening the sanctuary once every 24 hours and watching one 30s reflection sponsor ad.\n"
@@ -94,7 +94,7 @@ class AiOrchestrator:
         if any(w in q for w in ["ticket", "report", "grievance", "complaint", "shikayat"]):
             return (
                 "Aapne jo complaint ya grievance file ki hai, wo India ke IT Rules 2021 (Rule 3(2)) ke tahat "
-                "hamare Grievance Officer (KSHTRIYA ANUBHAV) ke paas securely register ho chuki hai.\n\n"
+                "hamare Grievance Officer (ANUBHAV SINGH) ke paas securely register ho chuki hai.\n\n"
                 "1. Initial acknowledgment 24 hours ke andar ho jati hai.\n"
                 "2. Hamara internal expedited resolution time 24 se 48 hours hai.\n"
                 "3. Reported account ko review ke doran isolated rakha jata hai taaki aapka sanctuary space 100% safe rahe."

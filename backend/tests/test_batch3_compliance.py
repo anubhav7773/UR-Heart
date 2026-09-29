@@ -254,7 +254,7 @@ async def test_sec09_it_rules_2021_grievance_filing(mock_user):
         assert data["status"] == "acknowledged"
         assert "IT Rules 2021 Rule 3(2)" in data["sla_acknowledgment"]
         assert "statutory_resolution_deadline" in data
-        assert data["support_desk_contact"] == "grievance-officer@urheart.app"
+        assert data["support_desk_contact"] == "asiverticals@gmail.com"
 
     app.dependency_overrides.clear()
 

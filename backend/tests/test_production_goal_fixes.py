@@ -209,8 +209,9 @@ def test_statutory_legal_and_deletion_portals():
     assert "text/html" in res_privacy.headers["content-type"]
     assert "Privacy Policy" in res_privacy.text
     assert "DPDP Act" in res_privacy.text
-    assert "Kshtriya Anubhav" in res_privacy.text
-    assert "grievance@urheart.asiverticals.me" in res_privacy.text
+    assert "Anubhav Singh" in res_privacy.text
+    assert "asiverticals@gmail.com" in res_privacy.text
+    assert "District Court, Ayodhya" in res_privacy.text
 
     # 2. Terms of Service & EULA
     res_terms = client.get("/terms")
@@ -219,6 +220,9 @@ def test_statutory_legal_and_deletion_portals():
     assert "Terms of Service" in res_terms.text
     assert "Section 79" in res_terms.text
     assert "Asiverticals" in res_terms.text
+    assert "Anubhav Singh" in res_terms.text
+    assert "asiverticals@gmail.com" in res_terms.text
+    assert "District Court, Ayodhya" in res_terms.text
 
     # 3. Google Play Mandated Data Deletion Portal
     res_del = client.get("/delete-account")
@@ -226,6 +230,7 @@ def test_statutory_legal_and_deletion_portals():
     assert "text/html" in res_del.headers["content-type"]
     assert "Account & Data Deletion" in res_del.text
     assert "Google Play" in res_del.text
+    assert "Anubhav Singh" in res_del.text
 
     # 4. Web Deletion Request API
     res_del_post = client.post("/api/v1/vault/request-web-deletion", json={

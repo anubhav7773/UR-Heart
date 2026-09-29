@@ -245,12 +245,17 @@ async def require_superadmin(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """Strict authorization gate: Validates server-side role and immutable admin identity."""
-    expected_admin_email = os.getenv("SUPERADMIN_CANONICAL_EMAIL") or os.getenv("SUPERADMIN_EMAIL", "kshtriyaanubhav9120@gmail.com")
+    admin_whitelist = {
+        (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower(),
+        (os.getenv("SUPERADMIN_EMAIL") or "").strip().lower(),
+        "asiverticals@gmail.com",
+        "kshtriyaanubhav9120@gmail.com",
+    }
     
     # Check both verified email and database role claim
-    user_email = getattr(current_user, "email", "") or ""
+    user_email = (getattr(current_user, "email", "") or "").strip().lower()
     user_role = getattr(current_user, "role", "user") or "user"
-    if user_email.strip().lower() != expected_admin_email.strip().lower() or user_role != "superadmin":
+    if (user_email not in admin_whitelist) or user_role != "superadmin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access strictly restricted to the Sovereign Sanctuary Sentinel."

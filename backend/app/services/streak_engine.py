@@ -96,7 +96,8 @@ class StreakEngine:
                     "streak_count": user.streak_count or 1,
                     "boost_points": user.boost_points or 1,
                     "reveal_tokens_count": user.reveal_tokens_count or 1,
-                    "seconds_remaining": int((user.streak_expires_at - now).total_seconds())
+                    "seconds_remaining": int((user.streak_expires_at - now).total_seconds()),
+                    "streak_expires_at": user.streak_expires_at.isoformat()
                 }
 
         # Increment streak & boost
