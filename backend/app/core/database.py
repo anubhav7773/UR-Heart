@@ -10,12 +10,16 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# NullPool is strictly mandatory for Supabase PgBouncer (Port 6543 transaction pooling)
+# NullPool and disabled statement cache are strictly mandatory for Supabase PgBouncer (Port 6543 transaction pooling)
 engine = create_async_engine(
     settings.SUPABASE_PGBOUNCER_URL,
     poolclass=NullPool,
     echo=settings.DEBUG,
-    future=True
+    future=True,
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
 )
 
 AsyncSessionLocal = async_sessionmaker(

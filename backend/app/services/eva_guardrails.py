@@ -49,8 +49,10 @@ _INFRA_LEAK_PATTERNS = [
     r"\bmodel[_\s-]?name\b",
     r"\bwhat\s+(model|llm|engine|api|platform)\b",
     r"\bwhich\s+(api|model|endpoint|llm|engine)\b",
-    r"\bkon\s+si\s+api\b",
+    r"\b(kon|kaun)\s+si\s+api\b",
     r"\b(backend|api)\s+(endpoint|key|secret|token|url|architecture)\b",
+    r"\bapi\s+key\b",
+    r"\bapi\b",
     r"\bendpoint\b",
     r"\bllm\b",
 ]
@@ -148,5 +150,24 @@ class EvaGuardrails:
         ]
         for pattern in leaked_keywords:
             cleaned = re.sub(pattern, "Asiverticals Sanctuary Engine", cleaned, flags=re.IGNORECASE)
+
+        # Enforce Roman Hindi Font (Strictly NO Devanagari script)
+        if re.search(r"[\u0900-\u097F]", cleaned):
+            devanagari_map = {
+                'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo',
+                'ऋ': 'ri', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'क': 'k',
+                'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'ng', 'च': 'ch', 'छ': 'chh',
+                'ज': 'j', 'झ': 'jh', 'ञ': 'ny', 'ट': 't', 'ठ': 'th', 'ड': 'd',
+                'ढ': 'dh', 'ण': 'n', 'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh',
+                'न': 'n', 'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm',
+                'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v', 'श': 'sh', 'ष': 'sh',
+                'स': 's', 'ह': 'h', 'ा': 'a', 'ि': 'i', 'ी': 'ee', 'ु': 'u',
+                'ू': 'oo', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', '्': '',
+                'ं': 'n', 'ँ': 'n', 'ः': 'h', '़': '', '।': '.', '॥': '.'
+            }
+            transliterated = []
+            for char in cleaned:
+                transliterated.append(devanagari_map.get(char, char if ord(char) < 128 else ''))
+            cleaned = "".join(transliterated)
 
         return cleaned.strip()

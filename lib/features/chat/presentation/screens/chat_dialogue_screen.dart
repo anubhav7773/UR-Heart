@@ -68,7 +68,24 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
 
     Future.microtask(() {
       final mId = _resolveMatchId();
-      ref.read(chatDialogueControllerProvider(mId).notifier).initializeDialogue();
+      final routeArgs = ModalRoute.of(context)?.settings.arguments;
+      final notifier = ref.read(chatDialogueControllerProvider(mId).notifier);
+      if (routeArgs is ChatDialogueArguments) {
+        notifier.setPeerProfile({
+          'full_name': routeArgs.recipientName,
+          'recipient_id': routeArgs.recipientId,
+          'age': routeArgs.recipientAge,
+          'is_online': routeArgs.isOnline,
+        });
+      } else if (routeArgs is Map<String, dynamic>) {
+        notifier.setPeerProfile({
+          'full_name': routeArgs['partner_name'] ?? routeArgs['peer_name'] ?? routeArgs['name'],
+          'recipient_id': routeArgs['partner_id'] ?? routeArgs['peer_id'],
+          'avatar_url': routeArgs['partner_photo'] ?? routeArgs['peer_photo'],
+          'is_online': true,
+        });
+      }
+      notifier.initializeDialogue();
     });
   }
 
@@ -97,10 +114,14 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
     final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
 
     final peer = dialogueState.peerProfile;
+    final mapArgs = routeArgs is Map<String, dynamic> ? routeArgs : null;
+    final fallbackName = mapArgs?['partner_name'] ?? mapArgs?['peer_name'] ?? mapArgs?['name'] ?? peer['full_name'] ?? 'Mindful Seeker';
+    final fallbackAge = mapArgs?['partner_age'] ?? mapArgs?['peer_age'] ?? mapArgs?['age'] ?? peer['age'];
+
     final displayName = args != null
         ? '${args.recipientName}, ${args.recipientAge}'
-        : (peer['full_name'] as String? ?? 'Meera Sen, 25');
-    final isOnline = args?.isOnline ?? (peer['is_online'] as bool? ?? false);
+        : (fallbackAge != null ? '$fallbackName, $fallbackAge' : '$fallbackName');
+    final isOnline = args?.isOnline ?? (peer['is_online'] as bool? ?? true);
     final bridgeData = {
       ...dialogueState.bridgeData,
       if (args != null) 'has_wa_key': args.hasWaKey,

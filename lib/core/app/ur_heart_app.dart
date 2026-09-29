@@ -61,6 +61,21 @@ class URHeartApp extends ConsumerWidget {
         SuperadminKycDeskScreen.routeName: (context) => const SuperadminKycDeskScreen(),
         EvaSanctuaryScreen.routeName: (context) => const EvaSanctuaryScreen(),
       },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/verify-email' || settings.name == '/magic-link') {
+          String? email;
+          if (settings.arguments is Map) {
+            email = (settings.arguments as Map)['email']?.toString();
+          } else if (settings.arguments is String) {
+            email = settings.arguments as String;
+          }
+          return MaterialPageRoute(
+            builder: (context) => MagicLinkScreen(email: email),
+            settings: settings,
+          );
+        }
+        return null;
+      },
     );
   }
 

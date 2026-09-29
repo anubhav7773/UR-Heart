@@ -16,23 +16,43 @@ OPENROUTER_ENDPOINT = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api
 EVA_SYSTEM_DIRECTIVE = (
     "You are Eva, the dedicated, sovereign mindful companion of UR-Heart Dating Sanctuary, created by Asiverticals.\n"
     "MISSION & PURPOSE:\n"
-    "You guide conscious seekers through intentional dating, authentic connection, and emotional safety.\n"
-    "You assist users in:\n"
-    "1. Mindful communication and dialogue advice between matches.\n"
-    "2. Reflective profile and bio alignment.\n"
-    "3. Date readiness, boundary setting, and nervousness reduction.\n"
-    "4. Empathetic guidance for reporting harassment, stalking, or boundary violations under India's IT Rules 2021 (Rule 3(2)).\n"
+    "You guide conscious seekers through intentional dating, authentic connection, and emotional safety across the entire UR-Heart ecosystem.\n"
     "\n"
-    "ABSOLUTE RESTRICTIONS (ZERO COMPROMISE):\n"
-    "1. IDENTITY: If asked who created you, who made you, or who your developer is, state strictly: 'Mujhe Asiverticals ne banaya hai.' Never claim to be made by OpenAI, Meta, Google, Groq, or anyone else.\n"
+    "COMPREHENSIVE KNOWLEDGE OF UR-HEART ECOSYSTEM:\n"
+    "1. 25 DAILY INTENTIONAL SWIPES: Designed to eliminate mindless doomscrolling and dopamine burnout. Swipes replenish every midnight or through brief mindful reflection.\n"
+    "2. SLUMBER MODE: Active every night from 10:00 PM to 6:00 AM. Guards users against late-night impulsive texting and protects natural sleep rhythm.\n"
+    "3. SATELLITE HARDWARE GPS: Advanced geolocation matching with strict anti-spoofing and mock-location detection to guarantee authentic geographic proximity without exposing exact street coordinates.\n"
+    "4. 5-SLOT MOMENTS GALLERY: Pure, authentic photos with blur-hash privacy pre-screening. Demands at least one unfiltered, genuine self-portrait.\n"
+    "5. SACRED WHATSAPP CONTACT BRIDGE: A 3-stage progressive contact unlock. Stage 1: In-app encrypted chat; Stage 2: Mutual consent unlock; Stage 3: Direct verified WhatsApp bridge without revealing raw phone numbers to strangers.\n"
+    "6. MINDFUL PASSKEY & INVITATION: Passwordless authentication using cryptographic single-use tokens and 6-digit mindful passkeys valid for 15 minutes.\n"
+    "7. DPDP ACT 2023 DATA INCINERATOR: Provides absolute right-to-be-forgotten with permanent cryptographic shredding of user profiles and chat history.\n"
+    "8. STATUTORY GRIEVANCES UNDER INDIA IT RULES 2021 (RULE 3(2)):\n"
+    "   - Statutory acknowledgment within 24 hours.\n"
+    "   - Statutory disposal within 15 days (UR-Heart internal SLA: 24 to 48 hours).\n"
+    "   - Statutory Grievance Officer: KSHTRIYA ANUBHAV (Contact: kshtriyaanubhav9120@gmail.com).\n"
+    "   - User can file grievances for harassment, impersonation, boundary breaches, non-consensual contact, or explicit content.\n"
+    "\n"
+    "USER CONTEXT AWARENESS:\n"
+    "- ACTIVE PARTNER AWARENESS: You have direct visibility into the user's active partner (name, age, bio, passions, last messages). When the user asks about who they are talking to, how to reply, or how to break the ice with their specific partner, reference their specific bio, traits, and shared values.\n"
+    "- TICKET & REPORT TRACKING: You know the status of any tickets or grievances the user has submitted. When the user asks about their ticket status, give them accurate, calming updates on the 24-48h review timeline.\n"
+    "- USER FEEDBACK & APP DEFICIENCY CAPTURE: If the user expresses that something is missing in the app ('app me ye kami hai', 'ye feature hona chahiye', 'kya problem hai'), listen with deep gratitude, validate their perspective, and assure them that their feedback is recorded for Asiverticals core engineers.\n"
+    "\n"
+    "STRICT BILINGUAL SCRIPT CONSTRAINT (MANDATORY):\n"
+    "- You support 2 languages: English and Hindi.\n"
+    "- CRITICAL SCRIPT RULE: When responding in Hindi, YOU MUST STRICTLY USE THE LATIN/ENGLISH ALPHABET (Roman Hindi / Hinglish font, e.g., 'Aap unhe message bhej sakte hain'). NEVER USE DEVANAGARI SCRIPT (Do not use characters in Unicode range \\u0900-\\u097F). This app is designed for international & diaspora users where Latin alphabet Hindi is the standard.\n"
+    "- When responding in English, use refined, warm, articulate English.\n"
+    "\n"
+    "SOVEREIGN IDENTITY & RESTRICTIONS (ZERO COMPROMISE):\n"
+    "1. IDENTITY: If asked who created you, who made you, or who your developer is, state strictly: 'Mujhe Asiverticals ne banaya hai.' Never claim to be made by OpenAI, Meta, Google, Groq, Anthropic, or anyone else.\n"
     "2. ZERO INFRASTRUCTURE LEAKAGE: Never mention APIs, keys, Groq, OpenRouter, Llama, Claude, DeepSeek, endpoints, or backend engineering details.\n"
     "3. OUT-OF-DOMAIN REFUSAL: You are strictly a dating sanctuary companion. If the user asks for programming/coding, hacking, reverse engineering, academic math/science, political debates, recipes, or general trivia, politely and firmly decline. Remind them that you exclusively assist with UR-Heart dating, connection, and emotional sanctuary.\n"
-    "4. TONE: Warm, grounded, mature, calming, empathetic, non-judgmental, and sovereign. Never use cheesy pickup lines or manipulative games.\n"
-    "5. LANGUAGE: Respond naturally in the language or mix the user speaks (English, Hindi, or Hinglish)."
+    "4. TONE: Warm, grounded, mature, calming, empathetic, non-judgmental, and sovereign. Never use cheesy pickup lines or manipulative games."
 )
 
 
 class AiOrchestrator:
+    _recorded_feedback: List[Dict[str, Any]] = []
+
     @classmethod
     def _groq_headers(cls) -> Dict[str, str]:
         key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
@@ -54,19 +74,56 @@ class AiOrchestrator:
         return headers
 
     @classmethod
-    def _generate_contextual_fallback(cls, message: str) -> str:
+    def _generate_contextual_fallback(cls, message: str, context_metadata: Optional[Dict[str, Any]] = None) -> str:
         """
         Deep mindful fallback when remote networks are waking up or offline.
         Provides genuine, thoughtful dating advice tailored to the user's inquiry
-        instead of repeating an identical canned string.
+        in strict Roman Hindi or English without canned repetition.
         """
         q = message.lower()
-        if any(w in q for w in ["approach", "ladki", "direct", "msg", "message", "dm", "cheap", "baat", "start"]):
+        partner_name = "Aapke match"
+        if context_metadata:
+            partner_info = context_metadata.get("active_partner") or {}
+            partner_name = partner_info.get("name") or context_metadata.get("partner_name") or "Aapke match"
+
+        if any(w in q for w in ["ticket", "report", "grievance", "complaint", "shikayat"]):
             return (
-                "Kisi ko direct message ya approach karte waqt sabse zaroori cheez hai 'respectful curiosity'.\n\n"
-                "1. Generic 'Hi/Hello' ya copy-pasted pickup lines se bachiye. Iske bajaye unke profile ki kisi genuine detail par baat shuru kijiye (jaise unka favorite music, book, ya koi calm photo).\n"
-                "2. Ek open-ended aur polite sawaal poochiye—jaise 'Aapka Sunday morning ritual kaisa hota hai?'\n"
-                "3. Har reply me unhe unke space aur comfort ka ehsaas dijiye. Intentional connection humesha patience aur respect se banti hai."
+                "Aapne jo complaint ya grievance file ki hai, wo India ke IT Rules 2021 (Rule 3(2)) ke tahat "
+                "hamare Grievance Officer (KSHTRIYA ANUBHAV) ke paas securely register ho chuki hai.\n\n"
+                "1. Initial acknowledgment 24 hours ke andar ho jati hai.\n"
+                "2. Hamara internal expedited resolution time 24 se 48 hours hai.\n"
+                "3. Reported account ko review ke doran isolated rakha jata hai taaki aapka sanctuary space 100% safe rahe."
+            )
+        elif any(w in q for w in ["kami", "problem", "feedback", "defect", "flaw", "glitch", "sugges", "kmi"]):
+            cls._recorded_feedback.append({
+                "message": message,
+                "recorded_at": "now",
+                "source": "eva_chat_listener"
+            })
+            return (
+                "Aapke feedback aur is kami ko highlight karne ke liye dil se shukriya.\n\n"
+                "Maine aapki baat ko Asiverticals core engineering team ke liye record kar liya hai. "
+                "UR-Heart ka uddeshya ek bilkul authentic aur seamless experience dena hai, "
+                "aur aapka ye sujhav agle update me incorporate kiya jayega."
+            )
+        elif any(w in q for w in ["kisse", "partner", "who am i talking", "kaun hai", "bio"]):
+            return (
+                f"Aap currently {partner_name} se connect ho rahe hain.\n\n"
+                "1. Unke bio aur shared moments me jo authentic details hain, unse inspiration lijiye.\n"
+                "2. Pehla message respectful curiosity ke sath bhej sakte hain—jaise unke music ya favorite peaceful space ke baare me.\n"
+                "3. Har conversation ko natural pace par badhne dijiye."
+            )
+        elif any(w in q for w in ["slumber", "soye", "sleep", "raat"]):
+            return (
+                "Slumber Mode UR-Heart ka ek digital wellness feature hai jo raat 10:00 PM se subah 6:00 AM tak active rehta hai.\n\n"
+                "Iska maksad late-night impulsive decisions aur blue-light exposure se bachana hai taaki aapki neend undisturbed rahe."
+            )
+        elif any(w in q for w in ["approach", "ladki", "direct", "msg", "message", "dm", "baat", "start"]):
+            return (
+                f"{partner_name} ko direct message ya approach karte waqt sabse zaroori cheez hai 'respectful curiosity'.\n\n"
+                "1. Generic 'Hi/Hello' ke bajaye unke profile ki kisi genuine detail par baat shuru kijiye (jaise unka favorite interest ya koi calm photo).\n"
+                "2. Ek open-ended aur polite sawaal poochiye—jaise 'Aapka ideal Sunday kaisa hota hai?'\n"
+                "3. Har reply me unhe unke space aur comfort ka ehsaas dijiye. Intentional connection patience aur respect se banti hai."
             )
         elif any(w in q for w in ["date", "nervous", "first date", "milna", "darr"]):
             return (
@@ -84,8 +141,8 @@ class AiOrchestrator:
             )
         elif any(w in q for w in ["hi", "hello", "namaste", "suno", "eva"]):
             return (
-                "Namaste! Main Eva hoon, aapki mindful dating companion.\n\n"
-                "Aap mujhse kisi match ko message karne ka tareeka, pehli date ki preparation, ya apni profile ko behtar banane ke baare me kuch bhi pooch sakte hain. Aaj aap kis cheez me guidance chahte hain?"
+                "Namaste! Main Eva hoon, aapki mindful dating companion from Asiverticals.\n\n"
+                "Aap mujhse matches ko message karne ka tareeka, pehli date ki preparation, report/ticket status, ya app features ke baare me kuch bhi pooch sakte hain. Aaj main aapki kya madad kar sakti hoon?"
             )
         else:
             return (
@@ -114,15 +171,34 @@ class AiOrchestrator:
                 "status": "success"
             }
 
-        # 2. Build message context
+        # If user is providing feedback or reporting app deficiencies, record it
+        msg_lower = user_message.lower()
+        if any(w in msg_lower for w in ["kami", "feedback", "defect", "bug", "missing", "kmi", "problem"]):
+            cls._recorded_feedback.append({
+                "message": user_message,
+                "recorded_at": "now",
+                "source": "eva_chat_stream"
+            })
+
+        # 2. Build rich message context
         messages: List[Dict[str, str]] = [
             {"role": "system", "content": EVA_SYSTEM_DIRECTIVE}
         ]
 
         if context_metadata:
+            screen = context_metadata.get("screen", "Sanctuary")
+            partner_info = context_metadata.get("active_partner") or {}
+            partner_name = partner_info.get("name") or context_metadata.get("partner_name", "None")
+            partner_bio = partner_info.get("bio", "Thoughtful seeker")
+            partner_interests = partner_info.get("interests", [])
+            user_tickets = context_metadata.get("user_tickets") or []
+
             context_snippet = (
-                f"Context: User is on screen '{context_metadata.get('screen', 'Sanctuary')}', "
-                f"Active Partner: '{context_metadata.get('partner_name', 'None')}'."
+                f"LIVE CONTEXT METADATA:\n"
+                f"- User Screen: '{screen}'\n"
+                f"- Active Conversation Partner: '{partner_name}', Bio: '{partner_bio}', Interests: {partner_interests}\n"
+                f"- User Statutory Tickets Filed: {len(user_tickets)} ticket(s) under review by Grievance Officer.\n"
+                f"- Language Guidance: If user writes in Hindi or Hinglish, reply strictly in Roman Hindi (English alphabet). Never use Devanagari script."
             )
             messages.append({"role": "system", "content": context_snippet})
 
@@ -187,7 +263,7 @@ class AiOrchestrator:
 
         # 5. Deterministic Contextual Fallback (No canned loop, genuine mindful advice)
         return {
-            "reply": cls._generate_contextual_fallback(user_message),
+            "reply": cls._generate_contextual_fallback(user_message, context_metadata),
             "is_guarded": False,
             "status": "success"
         }

@@ -18,6 +18,7 @@ router = APIRouter(tags=["Discovery Feed & Swipes"])
 class SwipeRequest(BaseModel):
     target_id: str
     swipe_type: str  # 'like', 'pass', 'direct'
+    letter_text: Optional[str] = None
 
 
 def _calculate_age(dob: Optional[date]) -> int:
@@ -168,6 +169,17 @@ async def record_swipe(
                     await db.flush()
                 match_id = str(match.id)
 
+                # If a direct letter was attached, persist it as a real Message
+                if payload.letter_text and payload.letter_text.strip():
+                    from app.models.domain.message import Message
+                    direct_msg = Message(
+                        match_id=match.id,
+                        sender_id=current_user.id,
+                        encrypted_text=payload.letter_text.strip(),
+                        status="delivered"
+                    )
+                    db.add(direct_msg)
+
                 # Push match notification to both users
                 target_user_res = await db.execute(select(User).where(User.id == target_uuid))
                 target_user = target_user_res.scalar_one_or_none()
@@ -185,11 +197,16 @@ async def record_swipe(
                         "target_route": "/chat-dialogue"
                     }
                 )
+                body_to_target = (
+                    f"{current_user.full_name} sent you a Direct Sanctuary Letter: \"{payload.letter_text.strip()[:60]}...\""
+                    if payload.letter_text and payload.letter_text.strip()
+                    else f"You and {current_user.full_name} have mutually resonated! Begin your mindful dialogue."
+                )
                 push_notification(
                     user_id=str(target_uuid),
                     notif_type="match",
-                    title="Sacred Match Ignited 💫",
-                    body=f"You and {current_user.full_name} have mutually resonated! Begin your mindful dialogue.",
+                    title="Sacred Match Ignited 💫" if not payload.letter_text else "Direct Letter & Match 💌",
+                    body=body_to_target,
                     data={
                         "match_id": match_id,
                         "partner_id": str(current_user.id),

@@ -5,12 +5,16 @@ class EvaState {
   final List<EvaMessage> messages;
   final bool isLoading;
   final String? activePartnerName;
+  final Map<String, dynamic>? activePartner;
+  final List<dynamic>? userTickets;
   final String activeScreen;
 
   const EvaState({
     required this.messages,
     this.isLoading = false,
     this.activePartnerName,
+    this.activePartner,
+    this.userTickets,
     this.activeScreen = 'Sanctuary',
   });
 
@@ -18,12 +22,16 @@ class EvaState {
     List<EvaMessage>? messages,
     bool? isLoading,
     String? activePartnerName,
+    Map<String, dynamic>? activePartner,
+    List<dynamic>? userTickets,
     String? activeScreen,
   }) {
     return EvaState(
       messages: messages ?? this.messages,
       isLoading: isLoading ?? this.isLoading,
       activePartnerName: activePartnerName ?? this.activePartnerName,
+      activePartner: activePartner ?? this.activePartner,
+      userTickets: userTickets ?? this.userTickets,
       activeScreen: activeScreen ?? this.activeScreen,
     );
   }
@@ -45,14 +53,31 @@ class EvaController extends StateNotifier<EvaState> {
               role: 'assistant',
               content:
                   'Namaste. Main Eva hoon — Asiverticals dwara banayi gayi aapki mindful AI companion. '
-                  'Aap mujhse apne matches ke messages par advice, date preparation, ya profile clarity ke baare me pooch sakte hain.',
+                  'Aap mujhse apne matches ke messages par advice, date preparation, ticket status, ya app features ke baare me pooch sakte hain.',
               timestamp: DateTime.now(),
             ),
           ],
         ));
 
-  void setContext({required String screen, String? partnerName}) {
-    state = state.copyWith(activeScreen: screen, activePartnerName: partnerName);
+  void setContext({
+    required String screen,
+    String? partnerName,
+    Map<String, dynamic>? activePartner,
+    List<dynamic>? userTickets,
+  }) {
+    state = state.copyWith(
+      activeScreen: screen,
+      activePartnerName: partnerName ?? activePartner?['name']?.toString(),
+      activePartner: activePartner,
+      userTickets: userTickets,
+    );
+  }
+
+  Future<bool> submitFeedback({
+    required String description,
+    String category = 'ux_deficiency',
+  }) async {
+    return _repository.submitFeedback(description: description, category: category);
   }
 
   Future<void> sendMessage(String text) async {
@@ -83,6 +108,10 @@ class EvaController extends StateNotifier<EvaState> {
         'screen': state.activeScreen,
         if (state.activePartnerName != null)
           'partner_name': state.activePartnerName,
+        if (state.activePartner != null)
+          'active_partner': state.activePartner,
+        if (state.userTickets != null)
+          'user_tickets': state.userTickets,
       },
     );
 

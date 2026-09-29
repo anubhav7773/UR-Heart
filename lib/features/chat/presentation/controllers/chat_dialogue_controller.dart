@@ -143,6 +143,10 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     await _chatRepository.markMessagesAsRead(state.matchId);
   }
 
+  void setPeerProfile(Map<String, dynamic> profile) {
+    state = state.copyWith(peerProfile: {...state.peerProfile, ...profile});
+  }
+
   /// Encrypts plaintext via X25519 + ChaCha20-Poly1305 before dispatching.
   Future<void> sendEncryptedMessage(String plainText) async {
     final peerBytes = state.peerPublicKeyBytes;
@@ -167,6 +171,15 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
         isMe: true,
       );
       state = state.copyWith(messages: [...state.messages, localMsg]);
+
+      // Persist to backend database
+      try {
+        await _chatRepository.sendMessage(
+          matchId: state.matchId,
+          text: plainText,
+          recipientId: state.peerProfile['recipient_id'] as String? ?? 'peer',
+        );
+      } catch (_) {}
       return;
     }
 
@@ -197,6 +210,15 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       isMe: true,
     );
     state = state.copyWith(messages: [...state.messages, localMsg]);
+
+    // Persist to backend database
+    try {
+      await _chatRepository.sendMessage(
+        matchId: state.matchId,
+        text: plainText,
+        recipientId: state.peerProfile['recipient_id'] as String? ?? 'peer',
+      );
+    } catch (_) {}
   }
 
   Future<void> _handleIncomingEncryptedMessage(Map<String, dynamic> rawEvent) async {

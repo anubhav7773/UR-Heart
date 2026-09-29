@@ -83,3 +83,34 @@ async def assist_grievance_filing(payload: GrievanceAssistRequest):
         is_guarded=result.get("is_guarded", False),
         status=result.get("status", "success")
     )
+
+
+class FeedbackRequest(BaseModel):
+    category: str = Field(default="ux_deficiency", max_length=50)
+    description: str = Field(..., max_length=2000)
+    user_sentiment: Optional[str] = "neutral"
+
+
+FEEDBACK_VAULT: List[Dict[str, Any]] = []
+
+
+@router.post("/feedback", status_code=status.HTTP_201_CREATED, summary="Record User App Feedback & Deficiencies")
+async def record_user_feedback(payload: FeedbackRequest):
+    """
+    Records in-app user feedback, complaints, and missing features.
+    """
+    from datetime import datetime
+    entry = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "category": payload.category,
+        "description": payload.description,
+        "sentiment": payload.user_sentiment,
+    }
+    FEEDBACK_VAULT.append(entry)
+    AiOrchestrator._recorded_feedback.append(entry)
+    print(f"[EVA FEEDBACK RECORDED] {entry}", flush=True)
+    return {
+        "status": "success",
+        "message": "Aapka feedback record kar liya gaya hai. Asiverticals team is par kaam kar rahi hai.",
+        "entry": entry
+    }

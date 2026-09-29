@@ -34,6 +34,13 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
   void initState() {
     super.initState();
     _initDeepLinkListener();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(authControllerProvider);
+      final email = widget.email ?? state.email;
+      if (email.isNotEmpty && state.dispatchedPasskey == null) {
+        ref.read(authControllerProvider.notifier).resendVerificationEmail(email);
+      }
+    });
   }
 
   void _initDeepLinkListener() {
@@ -243,6 +250,59 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
                       style: TextStyle(fontSize: 12, color: textMuted),
                     ),
                     const SizedBox(height: 12),
+                    if (authState.dispatchedPasskey != null && authState.dispatchedPasskey!.isNotEmpty) ...[
+                      InkWell(
+                        onTap: () {
+                          _passkeyController.text = authState.dispatchedPasskey!;
+                          _verifyMagicLinkToken(authState.dispatchedPasskey!);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: pine.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: pine.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.key, color: pine, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Passkey: ${authState.dispatchedPasskey}',
+                                    style: TextStyle(
+                                      color: textHeadline,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: pine,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Tap to Auto-fill',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     TextField(
                       controller: _passkeyController,
                       keyboardType: TextInputType.number,

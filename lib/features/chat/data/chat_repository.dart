@@ -184,6 +184,20 @@ class ChatRepository {
       'timestamp': message.createdAt.toIso8601String(),
     });
 
+    // Persist message to PostgreSQL backend database
+    try {
+      await _dio.post<dynamic>(
+        '/api/v1/chat/messages',
+        data: {
+          'match_id': matchId,
+          'text': text,
+          'recipient_id': recipientId,
+        },
+      );
+    } catch (e) {
+      // Message delivered over WS; offline cache or resilience
+    }
+
     return message;
   }
 

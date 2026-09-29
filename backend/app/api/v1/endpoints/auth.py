@@ -217,6 +217,29 @@ from datetime import datetime, timedelta
 MAGIC_LINK_VAULT: Dict[str, Dict[str, Any]] = {}
 
 
+class RegisterIntentRequest(BaseModel):
+    email: str
+    dob: str
+    calculated_age: int
+
+
+@router.post("/register-intent", status_code=status.HTTP_200_OK, summary="Register Intent & 18+ Age Gate Check")
+async def register_intent(payload: RegisterIntentRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Validates adult age gate (18+) and prepares account shell for mindful magic link verification.
+    """
+    if payload.calculated_age < 18:
+        raise HTTPException(status_code=403, detail="Underage access denied. UR-Heart is strictly for verified adults (18+).")
+
+    clean_email = payload.email.strip().lower()
+    return {
+        "status": "success",
+        "email": clean_email,
+        "age_verified": True,
+        "message": "Intent verified. Ready for sacred passkey verification."
+    }
+
+
 class MagicLinkSendRequest(BaseModel):
     email: str
 

@@ -132,7 +132,7 @@ class FeedController extends StateNotifier<FeedState> {
   }
 
   /// Handles Direct Letter (Up swipe)
-  Future<bool> swipeDirectLetter() async {
+  Future<bool> swipeDirectLetter({String? letterText}) async {
     if (state.directLettersCount <= 0) {
       return false;
     }
@@ -150,7 +150,8 @@ class FeedController extends StateNotifier<FeedState> {
     try {
       final remaining = await _repository.recordSwipe(
         targetUserId: candidate.id,
-        swipeType: 'superlike',
+        swipeType: 'direct',
+        letterText: letterText,
       );
       state = state.copyWith(swipesRemaining: remaining);
       return true;

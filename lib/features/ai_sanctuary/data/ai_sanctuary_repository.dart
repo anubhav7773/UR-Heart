@@ -60,15 +60,51 @@ class AiSanctuaryRepository {
           '3. Jo aap sach me hain wahi likhiye—sachha pan unhi ko attract karega jo aapke liye right match hain.';
     }
 
-    // 5. Greeting
-    if (q.contains('hi') || q.contains('hello') || q.contains('namaste') || q.contains('suno')) {
-      return 'Namaste! Main Eva hoon, aapki mindful dating companion.\n\n'
-          'Aap mujhse kisi match ko message karne ka tareeka, pehli date ki preparation, ya apni profile ko behtar banane ke baare me pooch sakte hain. Aaj main aapki kis tarah madad kar sakti hoon?';
+    // 5. Tickets, Reports & Grievances under IT Rules 2021
+    if (q.contains('ticket') || q.contains('report') || q.contains('grievance') || q.contains('complaint') || q.contains('shikayat')) {
+      return 'Aapne jo complaint ya grievance file ki hai, wo India ke IT Rules 2021 (Rule 3(2)) ke tahat '
+          'hamare Grievance Officer (KSHTRIYA ANUBHAV) ke paas securely submit ho chuki hai.\n\n'
+          '1. Initial acknowledgment 24 ghante ke andar confirm ho jati hai.\n'
+          '2. Statutory review and resolution timeline 24 se 48 ghante hai.\n'
+          '3. Review ke doran reported account isolated rehta hai taaki aapki safety 100% surakshit rahe.';
     }
 
-    // 6. Balanced mindful advice
+    // 6. User Feedback / App Deficiencies
+    if (q.contains('kami') || q.contains('problem') || q.contains('feedback') || q.contains('defect') || q.contains('flaw') || q.contains('kmi')) {
+      return 'Aapke feedback aur is kami ko highlight karne ke liye shukriya.\n\n'
+          'Maine aapka suggestion Asiverticals core engineering team ke liye record kar liya hai. '
+          'UR-Heart ka uddeshya ek pure aur seamless sanctuary experience dena hai, '
+          'aur aapka feedback aane wale update me implement kiya jayega.';
+    }
+
+    // 7. Greeting
+    if (q.contains('hi') || q.contains('hello') || q.contains('namaste') || q.contains('suno')) {
+      return 'Namaste! Main Eva hoon, aapki mindful dating companion from Asiverticals.\n\n'
+          'Aap mujhse kisi match ko message karne ka tareeka, pehli date ki preparation, ticket/report status, ya app features ke baare me pooch sakte hain. Aaj main aapki kis tarah madad kar sakti hoon?';
+    }
+
+    // 8. Balanced mindful advice
     return 'Main aapki baat samajh rahi hoon. Dating aur connection me sabse zaroori hai sachha pan aur samne wale ki boundaries ka samman.\n\n'
         'Mujhse aap kisi match ke message par reply ka sujhav, date par jaane ki preparation, ya profile ko sajane ke baare me pooch sakte hain.';
+  }
+
+  /// Submits in-app feedback or reported deficiencies
+  Future<bool> submitFeedback({
+    required String description,
+    String category = 'ux_deficiency',
+  }) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/v1/ai/eva/feedback',
+        data: {
+          'category': category,
+          'description': description,
+        },
+      );
+      return response.statusCode == 201 || response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Chat with Eva AI with zero provider leakage and strict domain boundary

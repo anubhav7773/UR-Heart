@@ -118,6 +118,10 @@ async def sanctuary_exception_handler(request: Request, exc: SanctuaryException)
 # Mount WebSockets router at root
 app.include_router(ws_router)
 
+# Mount Notifications router directly at root to guarantee 100% immunity against 404
+from app.api.v1.endpoints.notifications import router as notifications_direct_router
+app.include_router(notifications_direct_router)
+
 # Mount Main API v1 Router
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 

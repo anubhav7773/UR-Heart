@@ -4,6 +4,7 @@ import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../controllers/feed_controller.dart';
+import '../../domain/candidate_profile.dart';
 import '../widgets/candidate_profile_card.dart';
 import '../widgets/feed_floating_action_bar.dart';
 import '../widgets/out_of_swipes_ad_modal.dart';
@@ -131,7 +132,7 @@ class FeedScreen extends ConsumerWidget {
                     _showOutOfSwipes(context);
                   }
                 },
-                onResonate: () => feedNotifier.swipeDirectLetter(),
+                onResonate: () => _openDirectLetterModal(context, current, feedNotifier, isDark),
                 onLike: () async {
                   final ok = await feedNotifier.swipeLike();
                   if (!ok && context.mounted) {
@@ -149,6 +150,145 @@ class FeedScreen extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (ctx) => const OutOfSwipesAdModal(),
+    );
+  }
+
+  void _openDirectLetterModal(
+    BuildContext context,
+    CandidateProfile candidate,
+    FeedController feedNotifier,
+    bool isDark,
+  ) {
+    final textController = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E2824) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2E3D37) : const Color(0xFFE0E5E2),
+              ),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('💌', style: TextStyle(fontSize: 22)),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Direct Sanctuary Letter',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Serif',
+                            color: isDark ? Colors.white : const Color(0xFF1A2621),
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Write a mindful note directly to ${candidate.fullName}. This bypasses standard waiting and delivers immediately to their dialogue.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white60 : Colors.black54,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: textController,
+                  maxLines: 4,
+                  maxLength: 300,
+                  autofocus: true,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF1A2621),
+                    fontSize: 14,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Share what genuinely resonated with you about their sanctuary...',
+                    hintStyle: TextStyle(
+                      color: isDark ? Colors.white38 : Colors.black38,
+                      fontSize: 13,
+                    ),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF141C19) : const Color(0xFFF4F6F5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: isDark ? const Color(0xFF2E3D37) : const Color(0xFFE0E5E2),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD47355),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2C5E43),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final text = textController.text.trim();
+                      Navigator.of(ctx).pop();
+                      final ok = await feedNotifier.swipeDirectLetter(letterText: text);
+                      if (!ok && context.mounted) {
+                        _showOutOfSwipes(context);
+                      } else if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Direct letter dispatched to ${candidate.fullName} ✨'),
+                            backgroundColor: const Color(0xFF2C5E43),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text(
+                      'Dispatch Direct Letter ➔',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

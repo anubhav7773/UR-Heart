@@ -39,7 +39,8 @@ class FeedRepository {
   /// Dispatches swipe action. Server returns verified remaining swipes balance.
   Future<int> recordSwipe({
     required String targetUserId,
-    required String swipeType, // 'like', 'pass', 'superlike'
+    required String swipeType, // 'like', 'pass', 'superlike', 'direct'
+    String? letterText,
   }) async {
     try {
       final response = await _dio.post<dynamic>(
@@ -47,6 +48,7 @@ class FeedRepository {
         data: {
           'target_id': targetUserId,
           'swipe_type': swipeType,
+          if (letterText != null && letterText.isNotEmpty) 'letter_text': letterText,
         },
       );
 

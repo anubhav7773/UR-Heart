@@ -23,6 +23,8 @@ class AuthState {
   final String? authenticatedUserId;
   final String? authenticatedDisplayName;
   final String? authenticatedPhotoUrl;
+  final String? dispatchedPasskey;
+  final String? magicLinkUrl;
 
   const AuthState({
     this.isSignInTab = false,
@@ -41,6 +43,8 @@ class AuthState {
     this.authenticatedUserId,
     this.authenticatedDisplayName,
     this.authenticatedPhotoUrl,
+    this.dispatchedPasskey,
+    this.magicLinkUrl,
   });
 
   bool get hasSelectedFullDob =>
@@ -90,6 +94,8 @@ class AuthState {
     String? authenticatedUserId,
     String? authenticatedDisplayName,
     String? authenticatedPhotoUrl,
+    String? dispatchedPasskey,
+    String? magicLinkUrl,
   }) {
     return AuthState(
       isSignInTab: isSignInTab ?? this.isSignInTab,
@@ -111,6 +117,8 @@ class AuthState {
           authenticatedDisplayName ?? this.authenticatedDisplayName,
       authenticatedPhotoUrl:
           authenticatedPhotoUrl ?? this.authenticatedPhotoUrl,
+      dispatchedPasskey: dispatchedPasskey ?? this.dispatchedPasskey,
+      magicLinkUrl: magicLinkUrl ?? this.magicLinkUrl,
     );
   }
 }
@@ -298,7 +306,13 @@ class AuthController extends StateNotifier<AuthState> {
 
     if (result.isSuccess) {
       // Dispatch real magic link & passkey to user's inbox
-      _repository.sendMagicLink(state.email);
+      final magicRes = await _repository.sendMagicLink(state.email);
+      final passkey = magicRes?['passkey']?.toString();
+      final magicUrl = magicRes?['magic_link']?.toString();
+      state = state.copyWith(
+        dispatchedPasskey: passkey,
+        magicLinkUrl: magicUrl,
+      );
       startCooldownTimer();
       return true;
     }
@@ -322,7 +336,13 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> resendVerificationEmail([String? overrideEmail]) async {
     if (state.resendCooldownSeconds > 0) return;
     final targetEmail = overrideEmail ?? state.email;
-    await _repository.sendMagicLink(targetEmail);
+    final magicRes = await _repository.sendMagicLink(targetEmail);
+    final passkey = magicRes?['passkey']?.toString();
+    final magicUrl = magicRes?['magic_link']?.toString();
+    state = state.copyWith(
+      dispatchedPasskey: passkey,
+      magicLinkUrl: magicUrl,
+    );
     startCooldownTimer();
   }
 

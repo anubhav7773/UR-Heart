@@ -25,10 +25,11 @@ class _EvaSanctuaryScreenState extends ConsumerState<EvaSanctuaryScreen>
 
   final List<String> _quickPrompts = [
     'How should I reply to my match without sounding eager?',
-    'What are 3 mindful questions for a first audio call?',
-    'I feel anxious about an upcoming date, help me ground myself.',
-    'Someone made me uncomfortable, how do I report them safely?',
-    'Who created you and what is your purpose?',
+    'Maine jo report file kiya tha, uska status kya hai?',
+    'Main jisse baat kar raha hoon, unhe kya reply karoon?',
+    'Mujhe is app me ek kami lag rahi hai (Feedback)',
+    'UR-Heart ke unique features kya hain?',
+    'Tumhe kisne banaya hai?',
   ];
 
   @override
@@ -41,6 +42,20 @@ class _EvaSanctuaryScreenState extends ConsumerState<EvaSanctuaryScreen>
     if (widget.animateOrb) {
       _orbAnimController.repeat(reverse: true);
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map<String, dynamic>) {
+        ref.read(evaControllerProvider.notifier).setContext(
+          screen: args['screen']?.toString() ?? 'Sanctuary',
+          partnerName: args['partner_name']?.toString(),
+          activePartner: args['active_partner'] is Map<String, dynamic>
+              ? args['active_partner'] as Map<String, dynamic>
+              : null,
+          userTickets: args['user_tickets'] is List ? args['user_tickets'] as List : null,
+        );
+      }
+    });
   }
 
   @override
