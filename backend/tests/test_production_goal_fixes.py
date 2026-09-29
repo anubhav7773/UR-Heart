@@ -201,3 +201,39 @@ def test_web_sanctuary_store_flow():
     assert "1-Month Sovereign Pass" in data_comp["product_name"]
 
 
+def test_statutory_legal_and_deletion_portals():
+    """Verify live statutory legal URLs mandated for Google Play Store review."""
+    # 1. Privacy Policy
+    res_privacy = client.get("/privacy")
+    assert res_privacy.status_code == 200
+    assert "text/html" in res_privacy.headers["content-type"]
+    assert "Privacy Policy" in res_privacy.text
+    assert "DPDP Act" in res_privacy.text
+    assert "Kshtriya Anubhav" in res_privacy.text
+    assert "grievance@urheart.asiverticals.me" in res_privacy.text
+
+    # 2. Terms of Service & EULA
+    res_terms = client.get("/terms")
+    assert res_terms.status_code == 200
+    assert "text/html" in res_terms.headers["content-type"]
+    assert "Terms of Service" in res_terms.text
+    assert "Section 79" in res_terms.text
+    assert "Asiverticals" in res_terms.text
+
+    # 3. Google Play Mandated Data Deletion Portal
+    res_del = client.get("/delete-account")
+    assert res_del.status_code == 200
+    assert "text/html" in res_del.headers["content-type"]
+    assert "Account & Data Deletion" in res_del.text
+    assert "Google Play" in res_del.text
+
+    # 4. Web Deletion Request API
+    res_del_post = client.post("/api/v1/vault/request-web-deletion", json={
+        "email": "test-erasure@urheart.app",
+        "reason": "Graduated and taking mindful break."
+    })
+    assert res_del_post.status_code == 200
+    assert res_del_post.json()["status"] == "success"
+
+
+

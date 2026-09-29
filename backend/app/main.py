@@ -138,6 +138,11 @@ app.add_api_route("/auth/callback", handle_browser_magic_link_tap, methods=["GET
 from app.api.v1.endpoints.web_store import router as web_store_direct_router
 app.include_router(web_store_direct_router)
 
+# Mount Statutory Legal & Google Play Compliance Portals (/privacy, /terms, /delete-account)
+from app.api.v1.endpoints.statutory_pages import router as statutory_direct_router
+app.include_router(statutory_direct_router)
+
+
 
 # Mount Main API v1 Router
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
