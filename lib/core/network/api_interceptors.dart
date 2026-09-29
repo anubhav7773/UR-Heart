@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../security/installation_service.dart';
+import '../storage/secure_session_storage.dart';
 
 /// Interceptor that injects X-Installation-UUID header on every request
 /// and attaches Bearer authorization token when available
@@ -39,8 +40,7 @@ class ApiInterceptors extends Interceptor {
 
     if (token == null || token.isEmpty) {
       try {
-        final prefs = await SharedPreferences.getInstance();
-        token = prefs.getString('ur_heart_auth_token');
+        token = await SecureSessionStorage.instance.getAuthToken();
       } catch (_) {}
     }
 

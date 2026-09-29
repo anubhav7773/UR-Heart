@@ -336,6 +336,7 @@ CONTACT_SCRIPT = """
 """
 
 
+@router.get("/privacy-policy", response_class=HTMLResponse)
 @router.get("/privacy", response_class=HTMLResponse)
 async def serve_privacy_policy(request: Request):
     """

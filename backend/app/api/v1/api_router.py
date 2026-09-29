@@ -75,6 +75,7 @@ api_router.include_router(chat_api.router)
 
 # 12. Statutory Legal & DPDP Compliance (SEC-09)
 api_router.include_router(legal_compliance.router)
+api_router.include_router(legal_compliance.legal_router)
 
 # 13. Irrevocable Account Incinerator (SEC-06)
 api_router.include_router(account_incinerator.router)

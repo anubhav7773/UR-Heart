@@ -5,6 +5,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app/ur_heart_app.dart';
 import 'core/services/activity_logger_service.dart';
+import 'core/storage/secure_session_storage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +25,11 @@ Future<void> main() async {
                                (prefs.getString('profile_full_name')?.isNotEmpty ?? false) ||
                                (prefs.getString('profile_bio')?.isNotEmpty ?? false) ||
                                (prefs.getString('profile_photo_slot_1')?.isNotEmpty ?? false);
-    final hasAuth = (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
+    final secureToken = await SecureSessionStorage.instance.getAuthToken();
+    final secureEmail = await SecureSessionStorage.instance.getUserEmail();
+    final hasAuth = (secureToken != null && secureToken.isNotEmpty) ||
+                    (secureEmail != null && secureEmail.isNotEmpty) ||
+                    (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
                     (prefs.getString('auth_token')?.isNotEmpty ?? false) ||
                     (prefs.getString('ur_heart_user_email')?.isNotEmpty ?? false);
     final isConsentGiven = (prefs.getBool('urheart_theme_permanently_locked') ?? false) ||

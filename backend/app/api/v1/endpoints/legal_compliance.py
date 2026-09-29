@@ -22,6 +22,7 @@ from app.models.domain.legal import (
 )
 
 router = APIRouter(prefix="/vault", tags=["Statutory Legal & DPDP Compliance"])
+legal_router = APIRouter(prefix="/legal", tags=["Statutory Legal & Grievances"])
 
 
 # ---------------------------------------------------------------------------
@@ -485,4 +486,9 @@ async def unblock_user(
         await db.rollback()
 
     return {"status": "success", "message": f"User {blocked_user_id} unblocked."}
+ 
+ 
+# Alias routes for statutory /legal endpoint prefix
+legal_router.add_api_route("/grievance", submit_grievance_dossier, methods=["POST"], status_code=status.HTTP_201_CREATED)
+legal_router.add_api_route("/grievances", get_my_grievances, methods=["GET"], status_code=status.HTTP_200_OK)
 

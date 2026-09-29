@@ -168,6 +168,8 @@ app.include_router(web_store_direct_router)
 # Mount Statutory Legal & Google Play Compliance Portals (/privacy, /terms, /delete-account)
 from app.api.v1.endpoints.statutory_pages import router as statutory_direct_router
 app.include_router(statutory_direct_router)
+app.include_router(statutory_direct_router, prefix="/statutory")
+app.include_router(statutory_direct_router, prefix=f"{settings.API_V1_PREFIX}/statutory")
 
 
 

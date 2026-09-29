@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/secure_session_storage.dart';
 import 'google_auth_service.dart';
 
 /// Result wrapper for authentication operations
@@ -168,9 +169,10 @@ class AuthRepository {
     );
   }
 
-  /// Signs user out of Google and Firebase
+  /// Signs user out of Google and Firebase with atomic hardware session flush
   Future<void> signOut() async {
     await _googleAuthService.signOut();
+    await SecureSessionStorage.instance.clearAllSessionData();
   }
 
   /// Sends magic link or triggers passwordless verification
@@ -208,22 +210,17 @@ class AuthRepository {
         final data = response.data!;
         final tokenStr = data['access_token'] ?? data['token'];
         if (tokenStr != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
-          await prefs.setString('auth_token', tokenStr.toString());
+          // SEC-HIGH-05: Hardware-Backed Secure Session Storage
+          await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
           final matchedEmail = data['email']?.toString() ?? cleanEmail;
-          if (matchedEmail != null && matchedEmail.isNotEmpty) {
-            await prefs.setString('ur_heart_user_email', matchedEmail);
-            await prefs.setString('profile_email', matchedEmail);
-            if (matchedEmail.toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com') {
-              await prefs.setString('user_role', 'superadmin');
-            }
-          }
-
-          if (data['is_profile_completed'] == true) {
-            await prefs.setBool('ur_heart_profile_setup_completed', true);
-          }
+          final isSuperadmin = (matchedEmail?.toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com');
+          await SecureSessionStorage.instance.saveUserSession(
+            userId: data['user_id']?.toString() ?? data['id']?.toString(),
+            email: matchedEmail,
+            role: isSuperadmin ? 'superadmin' : 'user',
+            isProfileCompleted: data['is_profile_completed'] == true,
+          );
         }
         return data;
       }
@@ -253,17 +250,16 @@ class AuthRepository {
         if (data['is_verified'] == true) {
           final tokenStr = data['access_token'] ?? data['token'];
           if (tokenStr != null) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('ur_heart_auth_token', tokenStr.toString());
-            await prefs.setString('auth_token', tokenStr.toString());
-            await prefs.setString('ur_heart_user_email', cleanEmail);
-            await prefs.setString('profile_email', cleanEmail);
-            if (cleanEmail == 'kshtriyaanubhav9120@gmail.com') {
-              await prefs.setString('user_role', 'superadmin');
-            }
-            if (data['is_profile_completed'] == true) {
-              await prefs.setBool('ur_heart_profile_setup_completed', true);
-            }
+            // SEC-HIGH-05: Hardware-Backed Secure Session Storage
+            await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
+
+            final isSuperadmin = (cleanEmail == 'kshtriyaanubhav9120@gmail.com');
+            await SecureSessionStorage.instance.saveUserSession(
+              userId: data['user_id']?.toString() ?? data['id']?.toString(),
+              email: cleanEmail,
+              role: isSuperadmin ? 'superadmin' : 'user',
+              isProfileCompleted: data['is_profile_completed'] == true,
+            );
           }
         }
         return data;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../storage/secure_session_storage.dart';
 import '../../features/auth/presentation/screens/age_gate_auth_screen.dart';
 import '../../features/auth/presentation/screens/consent_screen.dart';
 import '../../features/auth/presentation/screens/magic_link_screen.dart';
@@ -156,7 +157,11 @@ class _SanctuaryAppGatewayState extends State<SanctuaryAppGateway> {
                                  (prefs.getString('profile_full_name')?.isNotEmpty ?? false) ||
                                  (prefs.getString('profile_bio')?.isNotEmpty ?? false) ||
                                  (prefs.getString('profile_photo_slot_1')?.isNotEmpty ?? false);
-      final hasAuth = (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
+      final secureToken = await SecureSessionStorage.instance.getAuthToken();
+      final secureEmail = await SecureSessionStorage.instance.getUserEmail();
+      final hasAuth = (secureToken != null && secureToken.isNotEmpty) ||
+                      (secureEmail != null && secureEmail.isNotEmpty) ||
+                      (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
                       (prefs.getString('auth_token')?.isNotEmpty ?? false) ||
                       (prefs.getString('ur_heart_user_email')?.isNotEmpty ?? false);
       final isConsentGiven = (prefs.getBool('urheart_theme_permanently_locked') ?? false) ||

@@ -50,6 +50,8 @@ app.*.map.json
 # Credentials & Keys
 *.keystore
 *.jks
+key.properties
+**/key.properties
 serviceAccountKey.json
 *service_account*.json
 .env

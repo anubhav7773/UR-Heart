@@ -1,0 +1,9 @@
+# UR-Heart Production Android Keystore Signing Configuration Template
+# DO NOT COMMIT ACTUAL PASSWORDS OR KEYSTORE FILES TO GIT REPOSITORY.
+# Copy this file to 'key.properties' in android/ or root directory for release signing:
+# cp key.properties.example key.properties
+
+storePassword=YOUR_SECURE_KEYSTORE_PASSWORD
+keyPassword=YOUR_SECURE_KEY_PASSWORD
+keyAlias=urheart_production_key
+storeFile=/absolute/or/relative/path/to/upload-keystore.jks

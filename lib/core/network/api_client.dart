@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_endpoints.dart';
+import '../storage/secure_session_storage.dart';
 import 'api_interceptors.dart';
 
 /// Configured Dio API Client with security interceptors and timeout protections
@@ -37,8 +38,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
         if (token != null && token.isNotEmpty) return token;
       } catch (_) {}
       try {
-        final prefs = await SharedPreferences.getInstance();
-        return prefs.getString('ur_heart_auth_token');
+        return await SecureSessionStorage.instance.getAuthToken();
       } catch (_) {}
       return null;
     },

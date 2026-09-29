@@ -202,6 +202,16 @@ async def send_chat_message(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required to send messages.")
 
+    # Pre-Storage Moderation Shield (IT Rules 2021 & IT Act 67/67A Intermediary Protection)
+    from app.services.chat_sanitizer import ChatSanitizerService
+    is_safe, sanitized_or_reason = ChatSanitizerService.sanitize_message(text_content)
+    if not is_safe:
+        raise HTTPException(
+            status_code=getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
+            detail=sanitized_or_reason
+        )
+    text_content = sanitized_or_reason
+
     msg = Message(
         match_id=match_uuid,
         sender_id=current_user.id,
@@ -240,6 +250,6 @@ async def send_chat_message(
         "match_id": str(msg.match_id),
         "sender_id": str(msg.sender_id),
         "content": msg.encrypted_text,
-        "timestamp": msg.created_at.strftime("%I:%M %p"),
+        "timestamp": msg.created_at.strftime("%I:%M %p") if msg.created_at else datetime.now().strftime("%I:%M %p"),
         "delivery_status": msg.status
     }

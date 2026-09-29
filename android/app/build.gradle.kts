@@ -15,7 +15,33 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // SEC-MED-03: Externalized Production Signing Architecture
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    val localKeystoreFile = project.file("key.properties")
+    val targetKeystoreFile = if (keystorePropertiesFile.exists()) keystorePropertiesFile else localKeystoreFile
+    val keystoreProperties = java.util.Properties()
+    val hasReleaseSigning = targetKeystoreFile.exists().also { exists ->
+        if (exists) {
+            java.io.FileInputStream(targetKeystoreFile).use { stream ->
+                keystoreProperties.load(stream)
+            }
+        }
+    }
+
     signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                val storeFilePath = keystoreProperties.getProperty("storeFile")
+                if (!storeFilePath.isNullOrBlank()) {
+                    storeFile = file(storeFilePath)
+                    storePassword = keystoreProperties.getProperty("storePassword")
+                    keyAlias = keystoreProperties.getProperty("keyAlias")
+                    keyPassword = keystoreProperties.getProperty("keyPassword")
+                    enableV1Signing = true
+                    enableV2Signing = true
+                }
+            }
+        }
         getByName("debug") {
             storeFile = file("debug.keystore")
             storePassword = "android"
@@ -37,9 +63,15 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // SEC-MED-03: Production Keystore Isolation. Debug signing is strictly detached.
+            signingConfig = if (hasReleaseSigning && !keystoreProperties.getProperty("storeFile").isNullOrBlank()) {
+                signingConfigs.getByName("release")
+            } else {
+                null
+            }
+            // SEC-MED-04: R8 Code Shrinking, Resource Optimization & Obfuscation
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

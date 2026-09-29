@@ -6,6 +6,7 @@ import '../../../core/crypto/sanctuary_crypto_vault.dart';
 import '../../../core/error/sanctuary_exceptions.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/security/installation_service.dart';
+import '../../../core/storage/secure_session_storage.dart';
 import '../domain/settings_models.dart';
 
 export '../domain/settings_models.dart';
@@ -175,8 +176,9 @@ class SettingsRepository {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      // 3. Purge all secure keystore storage
+      // 3. Purge all secure keystore storage & hardware session data
       await const FlutterSecureStorage().deleteAll();
+      await SecureSessionStorage.instance.clearAllSessionData();
 
       // 4. Clear in-memory settings
       _settings = const SanctuarySettings();

@@ -47,6 +47,45 @@ class GrievanceComplianceSection extends StatelessWidget {
             'Grievance & Compliance (IT Rules 2021)',
             style: AppTypography.titleH2.copyWith(fontSize: 16, color: headlineColor),
           ),
+          // Card 2.5: Designated Statutory Grievance Officer Transparency Card (IT Rules 2021 Rule 3(2))
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cardBorder, width: 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.gavel_rounded, size: 18, color: accentColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Statutory Grievance Officer',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: headlineColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Designated Officer: Anubhav Singh (Asiverticals)\n'
+                  'Registered Desk: District Court, Ayodhya, Uttar Pradesh - 224001\n'
+                  'Statutory Email: asiverticals@gmail.com\n'
+                  'Legal SLA: Formal acknowledgment within 24 hours, resolution within 15 days.',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: mutedColor,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
           // Card 3: Grievance Redressal Dossier
           Container(

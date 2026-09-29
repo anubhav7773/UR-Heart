@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/storage/secure_session_storage.dart';
 
 /// Result envelope for Google Sign-In operations
 class GoogleAuthResult {
@@ -139,19 +140,16 @@ class GoogleAuthService {
         }
       }
 
-      // Persist session to SharedPreferences for instant reconnect
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(keyUserId, userId);
-      await prefs.setString(keyUserEmail, email);
-      if (displayName != null) {
-        await prefs.setString(keyUserName, displayName);
-      }
-      if (photoUrl != null) {
-        await prefs.setString(keyUserPhoto, photoUrl);
-      }
+      // SEC-HIGH-05: Hardware-Backed Secure Session Storage Migration
       if (idToken != null) {
-        await prefs.setString(keyAuthToken, idToken);
+        await SecureSessionStorage.instance.saveAuthToken(idToken);
       }
+      await SecureSessionStorage.instance.saveUserSession(
+        userId: userId,
+        email: email,
+        displayName: displayName,
+        photoUrl: photoUrl,
+      );
 
       return GoogleAuthResult.success(
         userId: userId,
@@ -194,11 +192,7 @@ class GoogleAuthService {
       await _auth?.signOut();
     } catch (_) {}
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(keyUserId);
-    await prefs.remove(keyUserEmail);
-    await prefs.remove(keyUserName);
-    await prefs.remove(keyUserPhoto);
-    await prefs.remove(keyAuthToken);
+    // SEC-HIGH-05: Atomic hardware-backed keystore session purge
+    await SecureSessionStorage.instance.clearAllSessionData();
   }
 }
