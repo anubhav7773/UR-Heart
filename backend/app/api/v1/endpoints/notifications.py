@@ -55,12 +55,7 @@ async def get_notifications(
 ):
     """Returns list of notifications and unread count for current user."""
     if not current_user:
-        # Fetch last active user as fallback
-        res = await db.execute(select(User).order_by(User.updated_at.desc()).limit(1))
-        current_user = res.scalar_one_or_none()
-
-    if not current_user:
-        return {"notifications": [], "unread_count": 0}
+        return {"status": "success", "notifications": [], "unread_count": 0}
 
     user_key = str(current_user.id)
     items = NOTIFICATION_STORE.get(user_key, [])
@@ -80,11 +75,7 @@ async def mark_notifications_read(
     db: AsyncSession = Depends(get_db)
 ):
     if not current_user:
-        res = await db.execute(select(User).order_by(User.updated_at.desc()).limit(1))
-        current_user = res.scalar_one_or_none()
-
-    if not current_user:
-        return {"status": "ok"}
+        return {"status": "ok", "unread_count": 0}
 
     user_key = str(current_user.id)
     items = NOTIFICATION_STORE.get(user_key, [])
