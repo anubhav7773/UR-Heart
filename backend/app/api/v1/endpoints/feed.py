@@ -11,6 +11,7 @@ from app.core.security import get_current_user_optional
 from app.models.domain.user import User
 from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
+from app.services.streak_engine import StreakEngine
 
 router = APIRouter(tags=["Discovery Feed & Swipes"])
 
@@ -46,6 +47,9 @@ async def get_discovery_feed(
     )
 
     if current_user:
+        # Evaluate user's 24h streak decay and penalty before serving feed
+        await StreakEngine.evaluate_and_decay_streak(current_user, db)
+
         # Exclude current logged in user
         stmt = stmt.where(User.id != current_user.id)
 
@@ -59,7 +63,12 @@ async def get_discovery_feed(
         elif current_user.interested_in in ("Men", "Man"):
             stmt = stmt.where(User.gender.in_(["Man", "Men"]))
 
-    stmt = stmt.order_by(User.created_at.desc()).limit(limit)
+    # Priority Ranking: Boosted candidates with higher streak & boost points appear first!
+    stmt = stmt.order_by(
+        User.boost_points.desc(),
+        User.streak_count.desc(),
+        User.created_at.desc()
+    ).limit(limit)
     res = await db.execute(stmt)
     users = res.scalars().all()
 
@@ -85,6 +94,9 @@ async def get_discovery_feed(
             "tags": [u.profession, "Mindfulness", "Slow Living"] if u.profession else ["Mindfulness", "Art & Literature", "Stillness"],
             "photos": photos,
             "is_kyc_verified": u.kyc_status,
+            "streak_count": u.streak_count or 0,
+            "boost_points": u.boost_points or 0,
+            "is_boosted": bool((u.boost_points or 0) > 0),
             "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4"
         })
 

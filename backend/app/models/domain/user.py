@@ -42,6 +42,10 @@ class User(Base):
     preferred_age_max = Column(SmallInteger, nullable=False, default=35)
 
     streak_count = Column(SmallInteger, nullable=False, default=0)
+    boost_points = Column(Integer, nullable=False, default=0)
+    last_streak_ad_at = Column(DateTime(timezone=True), nullable=True)
+    streak_expires_at = Column(DateTime(timezone=True), nullable=True)
+    reveal_tokens_count = Column(SmallInteger, nullable=False, default=1)
     reward_balance = Column(Integer, nullable=False, default=0)
     swipes_remaining = Column(Integer, nullable=False, default=25)
     direct_letters_count = Column(Integer, nullable=False, default=1)

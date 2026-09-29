@@ -8,6 +8,8 @@ import '../../domain/candidate_profile.dart';
 import '../widgets/candidate_profile_card.dart';
 import '../widgets/feed_floating_action_bar.dart';
 import '../widgets/out_of_swipes_ad_modal.dart';
+import '../../growth/presentation/controllers/growth_hub_controller.dart';
+import '../../navigation/presentation/screens/sanctuary_navigation_shell.dart';
 
 /// Screen 05: Sanctuary Discovery Feed Scaffold
 /// Features 60fps drag physics, reciprocal orientation filtering, and quota gate
@@ -62,6 +64,45 @@ class FeedScreen extends ConsumerWidget {
           ),
         ),
         actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final growthState = ref.watch(growthHubControllerProvider);
+              final streak = growthState.streakCount;
+              final isSecured = growthState.isStreakActive;
+              return GestureDetector(
+                onTap: () {
+                  ref.read(navigationIndexProvider.notifier).state = 3;
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6.0, top: 12.0, bottom: 12.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                  decoration: BoxDecoration(
+                    color: isSecured ? const Color(0xFF2E6F5E).withValues(alpha: 0.25) : Colors.black26,
+                    borderRadius: BorderRadius.circular(12.0),
+                    border: Border.all(
+                      color: isSecured ? const Color(0xFFD4AF37) : Colors.white24,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('🔥', style: TextStyle(fontSize: 12.0)),
+                      const SizedBox(width: 4.0),
+                      Text(
+                        streak > 0 ? '$streak' : '0',
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.bold,
+                          color: isSecured ? const Color(0xFFD4AF37) : primaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(Icons.history_edu, color: primaryText),
             tooltip: 'Pass Vault',

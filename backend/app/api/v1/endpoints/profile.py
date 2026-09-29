@@ -7,6 +7,7 @@ from sqlalchemy import select, update
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.domain.user import User
+from app.services.streak_engine import StreakEngine
 
 router = APIRouter(prefix="/profile", tags=["User Profile Engine"])
 
@@ -66,6 +67,10 @@ async def get_my_authenticated_profile(
         except Exception:
             await db.rollback()
 
+    # Evaluate streak decay and get active countdown
+    await StreakEngine.evaluate_and_decay_streak(current_user, db)
+    streak_info = StreakEngine.get_user_streak_payload(current_user)
+
     return {
         "id": str(current_user.id),
         "full_name": current_user.full_name,
@@ -83,6 +88,12 @@ async def get_my_authenticated_profile(
         "reward_balance": current_user.reward_balance,
         "swipes_remaining": current_user.swipes_remaining,
         "direct_letters_count": current_user.direct_letters_count,
+        "streak_count": current_user.streak_count or 0,
+        "boost_points": current_user.boost_points or 0,
+        "last_streak_ad_at": current_user.last_streak_ad_at.isoformat() if current_user.last_streak_ad_at else None,
+        "streak_expires_at": current_user.streak_expires_at.isoformat() if current_user.streak_expires_at else None,
+        "reveal_tokens_count": current_user.reveal_tokens_count if current_user.reveal_tokens_count is not None else 1,
+        "streak_info": streak_info,
         "referral_code": current_user.referral_code,
         "is_profile_completed": current_user.is_profile_completed,
         "night_slumber": current_user.night_slumber,

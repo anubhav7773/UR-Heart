@@ -17,6 +17,7 @@ class AdPlacementTypes {
   static const String deepResonance = 'deep_resonance';
   static const String whatsappReveal = 'whatsapp_reveal';
   static const String morningHarvestUnlock = 'morning_harvest_unlock';
+  static const String dailyStreakBoost = 'daily_streak_boost';
 }
 
 /// Server-Side Verification (SSV) customData configuration

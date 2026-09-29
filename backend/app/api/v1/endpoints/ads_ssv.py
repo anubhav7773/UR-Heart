@@ -22,6 +22,7 @@ from app.models.domain.user import User
 from app.models.domain.ad_reward import AdRewardLedger, ProcessedAdTransaction
 from app.models.domain.match import Match
 from app.models.domain.whatsapp_token import WhatsAppRevealToken
+from app.services.streak_engine import StreakEngine
 
 router = APIRouter(prefix="/ads", tags=["Ad Server-Side Verification"])
 
@@ -298,6 +299,18 @@ async def claim_ad_reward(
         points_to_credit = 50
     elif payload.ad_type in ("whatsapp_reveal", "sacred_bridge_reveal"):
         points_to_credit = 30
+    elif payload.ad_type == "daily_streak_boost":
+        streak_result = await StreakEngine.claim_daily_streak_ad(target_user, db)
+        return {
+            "status": "success",
+            "ad_type": payload.ad_type,
+            "message": streak_result.get("message", "Daily streak boosted!"),
+            "streak_count": streak_result.get("streak_count", target_user.streak_count),
+            "boost_points": streak_result.get("boost_points", target_user.boost_points),
+            "reveal_tokens_count": streak_result.get("reveal_tokens_count", target_user.reveal_tokens_count),
+            "seconds_remaining": streak_result.get("seconds_remaining", 86400),
+            "streak_expires_at": streak_result.get("streak_expires_at")
+        }
 
     target_user.swipes_remaining = (target_user.swipes_remaining or 0) + swipes_to_grant
     target_user.direct_letters_count = (target_user.direct_letters_count or 0) + letters_to_grant
@@ -321,3 +334,28 @@ async def claim_ad_reward(
         "reward_balance": target_user.reward_balance,
         "message": f"Reward granted: +{swipes_to_grant} swipes, +{letters_to_grant} direct letters."
     }
+
+
+@router.get("/streak-status", status_code=status.HTTP_200_OK, summary="Get 24h Streak & Boost Status")
+async def get_current_streak_status(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    """Returns current user's streak count, boost points, and remaining countdown."""
+    if not current_user:
+        res = await db.execute(select(User).order_by(User.updated_at.desc()).limit(1))
+        current_user = res.scalar_one_or_none()
+
+    if not current_user:
+        return {
+            "streak_count": 0,
+            "boost_points": 0,
+            "reveal_tokens_count": 1,
+            "is_active": False,
+            "seconds_remaining": 0,
+            "can_claim_now": True
+        }
+
+    # Evaluate any decay
+    await StreakEngine.evaluate_and_decay_streak(current_user, db)
+    return StreakEngine.get_user_streak_payload(current_user)

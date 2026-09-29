@@ -8,6 +8,7 @@ import 'night_slumber_toggle_card.dart';
 import 'rewarded_placement_tile.dart';
 import 'sacred_kinship_card.dart';
 import 'zero_paywall_banner.dart';
+import 'mindful_streak_card.dart';
 
 /// Tab A: 100% Free Mindful Rewarded Ads View (< 190 lines)
 class FreeAdsTabView extends ConsumerWidget {
@@ -72,6 +73,9 @@ class FreeAdsTabView extends ConsumerWidget {
               ),
             ),
           ] else ...[
+            // Hero Placement: 24-Hour Mindful Streak & Boost
+            MindfulStreakCard(isDark: isDark, userId: userId),
+
             // Placement 1: Quick Reflection (10s)
             RewardedPlacementTile(
               isDark: isDark,

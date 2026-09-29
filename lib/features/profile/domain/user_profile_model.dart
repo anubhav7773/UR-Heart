@@ -25,6 +25,10 @@ class UserProfile {
   final bool nightSlumber;
   final String subscriptionTier;
   final int rewardBalance;
+  final int streakCount;
+  final int boostPoints;
+  final int revealTokensCount;
+  final int secondsRemaining;
 
   const UserProfile({
     required this.id,
@@ -52,7 +56,13 @@ class UserProfile {
     this.nightSlumber = false,
     this.subscriptionTier = 'free',
     this.rewardBalance = 0,
+    this.streakCount = 0,
+    this.boostPoints = 0,
+    this.revealTokensCount = 1,
+    this.secondsRemaining = 0,
   });
+
+  bool get isStreakActive => secondsRemaining > 0 && streakCount > 0;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
@@ -81,6 +91,12 @@ class UserProfile {
       nightSlumber: json['night_slumber'] as bool? ?? false,
       subscriptionTier: json['subscription_tier'] as String? ?? 'free',
       rewardBalance: json['reward_balance'] as int? ?? 0,
+      streakCount: json['streak_count'] as int? ?? 0,
+      boostPoints: json['boost_points'] as int? ?? 0,
+      revealTokensCount: json['reveal_tokens_count'] as int? ?? 1,
+      secondsRemaining: (json['streak_info'] is Map && json['streak_info']['seconds_remaining'] != null)
+          ? (json['streak_info']['seconds_remaining'] as int)
+          : (json['seconds_remaining'] as int? ?? 0),
     );
   }
 

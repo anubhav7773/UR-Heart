@@ -22,6 +22,11 @@ class GrowthHubState {
   final bool isWhatsappUnlocked;
   final String ephemeralWhatsappLink;
 
+  final int streakCount;
+  final int boostPoints;
+  final int revealTokensCount;
+  final int secondsRemaining;
+
   const GrowthHubState({
     this.userId = '',
     this.referralCode = '',
@@ -36,7 +41,13 @@ class GrowthHubState {
     this.peerWhatsappProgress = 1,
     this.isWhatsappUnlocked = false,
     this.ephemeralWhatsappLink = '',
+    this.streakCount = 0,
+    this.boostPoints = 0,
+    this.revealTokensCount = 1,
+    this.secondsRemaining = 0,
   });
+
+  bool get isStreakActive => secondsRemaining > 0 && streakCount > 0;
 
   GrowthHubState copyWith({
     String? userId,
@@ -52,6 +63,10 @@ class GrowthHubState {
     int? peerWhatsappProgress,
     bool? isWhatsappUnlocked,
     String? ephemeralWhatsappLink,
+    int? streakCount,
+    int? boostPoints,
+    int? revealTokensCount,
+    int? secondsRemaining,
   }) {
     return GrowthHubState(
       userId: userId ?? this.userId,
@@ -67,6 +82,10 @@ class GrowthHubState {
       peerWhatsappProgress: peerWhatsappProgress ?? this.peerWhatsappProgress,
       isWhatsappUnlocked: isWhatsappUnlocked ?? this.isWhatsappUnlocked,
       ephemeralWhatsappLink: ephemeralWhatsappLink ?? this.ephemeralWhatsappLink,
+      streakCount: streakCount ?? this.streakCount,
+      boostPoints: boostPoints ?? this.boostPoints,
+      revealTokensCount: revealTokensCount ?? this.revealTokensCount,
+      secondsRemaining: secondsRemaining ?? this.secondsRemaining,
     );
   }
 }
@@ -117,6 +136,10 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
             ? profile.subscriptionTier
             : (_billing?.activeTier ?? SanctuaryBillingService.instance.activeTier),
         isSlumberActive: profile.nightSlumber,
+        streakCount: profile.streakCount,
+        boostPoints: profile.boostPoints,
+        revealTokensCount: profile.revealTokensCount,
+        secondsRemaining: profile.secondsRemaining,
       );
     } catch (_) {}
   }
@@ -236,6 +259,13 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
         state = state.copyWith(
           swipesRemaining: state.swipesRemaining + 20,
           directLetters: state.directLetters + 2,
+        );
+        break;
+      case 'daily_streak_boost':
+        state = state.copyWith(
+          streakCount: state.streakCount + 1,
+          boostPoints: state.boostPoints + 1,
+          secondsRemaining: 86400,
         );
         break;
       case 'whatsapp_reveal':
