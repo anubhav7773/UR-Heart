@@ -156,3 +156,48 @@ def test_official_domain_web_and_root_landing():
     assert json_data["domain"] == "urheart.asiverticals.me"
     assert json_data["parent_entity"] == "asiverticals.me"
 
+
+def test_web_sanctuary_store_flow():
+    """Verify Web Sanctuary Store multi-step checkout workflow and deep links."""
+    # 1. Render Store Landing Page (GET /store)
+    res_store = client.get("/store")
+    assert res_store.status_code == 200
+    assert "text/html" in res_store.headers["content-type"]
+    assert "Sovereign Web Store" in res_store.text
+    assert "LIVE CHECKOUT STEP TRACKER" in res_store.text
+    assert "Step 1 of 4" in res_store.text
+    assert "1-Month Sovereign Pass" in res_store.text
+    assert "urheart.asiverticals.me" in res_store.text
+
+    # 2. Step 2: Verify Seeker User Account
+    res_user = client.post("/api/v1/store/verify-user", json={
+        "query": "seeker@urheart.app"
+    })
+    assert res_user.status_code == 200
+    assert res_user.json()["status"] == "verified"
+
+    # 3. Step 3: Create Checkout Order
+    res_order = client.post("/api/v1/store/create-order", json={
+        "product_id": "urheart_pass_monthly",
+        "user_query": "seeker@urheart.app",
+        "payment_method": "upi",
+        "currency": "INR"
+    })
+    assert res_order.status_code == 200
+    order_data = res_order.json()["order"]
+    order_id = order_data["order_id"]
+    assert order_id.startswith("ORD-UR-")
+    assert order_data["amount"] == 149
+
+    # 4. Step 4: Complete Sacred Payment Order
+    res_complete = client.post("/api/v1/store/complete-order", json={
+        "order_id": order_id,
+        "payment_reference": "UPI-TXN-998877"
+    })
+    assert res_complete.status_code == 200
+    data_comp = res_complete.json()
+    assert data_comp["status"] == "success"
+    assert "urheart://store/receipt" in data_comp["deep_link"]
+    assert "1-Month Sovereign Pass" in data_comp["product_name"]
+
+

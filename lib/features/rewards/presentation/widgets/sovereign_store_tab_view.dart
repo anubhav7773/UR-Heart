@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../controllers/growth_hub_controller.dart';
@@ -66,7 +65,7 @@ class SovereignStoreTabView extends ConsumerWidget {
           // Web Store Uplink Banner (10% Bonus / Sovereign Discount)
           InkWell(
             borderRadius: BorderRadius.circular(16.0),
-            onTap: () => launchUrl(Uri.parse(storeWebUrl), mode: LaunchMode.externalApplication),
+            onTap: () => ref.read(growthHubControllerProvider.notifier).openWebStore(null, context),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               decoration: BoxDecoration(
@@ -109,11 +108,11 @@ class SovereignStoreTabView extends ConsumerWidget {
           // A La Carte Micro-Store
           Text('A LA CARTE MICRO-PACKS', style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: subText, letterSpacing: 0.8)),
           const SizedBox(height: 10.0),
-          _buildMicroPackRow(ref, 'Instant Contact Key', 'Skip 3-ad ritual instantly', '\$1.49 / ₹29', 'urheart_key_instant_contact', surface, primaryText, subText, pine),
+          _buildMicroPackRow(context, ref, 'Instant Contact Key', 'Skip 3-ad ritual instantly', '\$1.49 / ₹29', 'urheart_key_instant_contact', surface, primaryText, subText, pine),
           const SizedBox(height: 8.0),
-          _buildMicroPackRow(ref, '3 Direct Letters Pack', 'Reach their private inbox', '\$1.99 / ₹49', 'urheart_pack_direct_letters', surface, primaryText, subText, pine),
+          _buildMicroPackRow(context, ref, '3 Direct Letters Pack', 'Reach their private inbox', '\$1.99 / ₹49', 'urheart_pack_direct_letters', surface, primaryText, subText, pine),
           const SizedBox(height: 8.0),
-          _buildMicroPackRow(ref, '48h Global Passport', 'Teleport to any global city', '\$2.99 / ₹79', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
+          _buildMicroPackRow(context, ref, '48h Global Passport', 'Teleport to any global city', '\$2.99 / ₹79', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
           const SizedBox(height: 18.0),
 
           // Google Play Policy Restore Purchases Link
@@ -127,6 +126,205 @@ class SovereignStoreTabView extends ConsumerWidget {
           const SizedBox(height: 20.0),
         ],
       ),
+    );
+  }
+
+  void _showCheckoutModal(
+    BuildContext context,
+    WidgetRef ref, {
+    required String productId,
+    required String title,
+    required String priceText,
+  }) {
+    final surface = isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard;
+    final primary = isDark ? DarkSanctuaryTokens.textHeadline : LightSanctuaryTokens.textHeadline;
+    final sub = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
+    final gold = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
+    final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(24.0),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24.0)),
+            border: Border.all(color: gold.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: sub.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Icon(Icons.workspace_premium, color: gold, size: 22),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Sovereign Access Gateway',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Unlock $title ($priceText). Choose your preferred checkout channel.',
+                style: TextStyle(fontSize: 13, color: sub, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+
+              // Option 1: Web Sanctuary Checkout (Recommended)
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  ref.read(growthHubControllerProvider.notifier).openWebStore(productId, context);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: pine.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: pine, width: 1.4),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: pine.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.language_rounded, color: gold, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Web Sanctuary Store',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: gold.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '+10% BONUS',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: gold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Instant checkout with UPI (GPay/PhonePe), Cards, & NetBanking at urheart.asiverticals.me/store.',
+                              style: TextStyle(fontSize: 11.5, color: sub),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: primary),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Option 2: Google Play Billing
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  if (productId.startsWith('urheart_pass_')) {
+                    ref.read(growthHubControllerProvider.notifier).purchasePackage(productId, context);
+                  } else {
+                    ref.read(growthHubControllerProvider.notifier).purchaseMicroPack(productId);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: sub.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: sub.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.shop_rounded, color: primary, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Google Play In-App Billing',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: primary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Standard in-app billing through your connected Google Play account.',
+                              style: TextStyle(fontSize: 11.5, color: sub),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: sub),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -146,27 +344,35 @@ class SovereignStoreTabView extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.0, color: primary)),
-                  const SizedBox(width: 8.0),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                    decoration: BoxDecoration(color: (isHighlighted ? gold : pine).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6.0)),
-                    child: Text(badgeText, style: TextStyle(color: isHighlighted ? gold : pine, fontSize: 10.0, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4.0),
-              Text(priceText, style: TextStyle(fontSize: 13.0, color: primary, fontWeight: FontWeight.w600)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.0, color: primary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8.0),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                      decoration: BoxDecoration(color: (isHighlighted ? gold : pine).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6.0)),
+                      child: Text(badgeText, style: TextStyle(color: isHighlighted ? gold : pine, fontSize: 10.0, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4.0),
+                Text(priceText, style: TextStyle(fontSize: 13.0, color: primary, fontWeight: FontWeight.w600)),
+              ],
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: isHighlighted ? gold : pine, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0))),
-            onPressed: () => ref.read(growthHubControllerProvider.notifier).purchasePackage(productId, context),
+            onPressed: () => _showCheckoutModal(context, ref, productId: productId, title: title, priceText: priceText),
             child: const Text('Unlock', style: TextStyle(color: Colors.white, fontSize: 12.0, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -174,20 +380,25 @@ class SovereignStoreTabView extends ConsumerWidget {
     );
   }
 
-  Widget _buildMicroPackRow(WidgetRef ref, String title, String subtitle, String price, String productId, Color surface, Color primary, Color sub, Color pine) {
+  Widget _buildMicroPackRow(BuildContext context, WidgetRef ref, String title, String subtitle, String price, String productId, Color surface, Color primary, Color sub, Color pine) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
       decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(14.0)),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.0, color: primary)),
-            Text(subtitle, style: TextStyle(fontSize: 11.0, color: sub)),
-          ]),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.0, color: primary)),
+                Text(subtitle, style: TextStyle(fontSize: 11.0, color: sub)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8.0),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: pine.withValues(alpha: 0.12), elevation: 0, visualDensity: VisualDensity.compact, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0))),
-            onPressed: () => ref.read(growthHubControllerProvider.notifier).purchaseMicroPack(productId),
+            onPressed: () => _showCheckoutModal(context, ref, productId: productId, title: title, priceText: price),
             child: Text(price, style: TextStyle(color: pine, fontSize: 12.0, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -195,3 +406,4 @@ class SovereignStoreTabView extends ConsumerWidget {
     );
   }
 }
+

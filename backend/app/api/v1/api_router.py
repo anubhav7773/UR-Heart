@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     kyc_verification,
     notifications,
     ai_sanctuary,
+    web_store,
 )
 
 api_router = APIRouter()
@@ -92,5 +93,8 @@ api_router.include_router(notifications.router)
 
 # 18. Eva AI Mindful Sanctuary Suite (Strictly Restricted by Asiverticals)
 api_router.include_router(ai_sanctuary.router)
+
+# 19. Web Sanctuary Store (10% Bonus Passes & Multi-Step Checkout)
+api_router.include_router(web_store.router)
 
 

@@ -5,13 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ur_heart/core/app/ur_heart_app.dart';
 import 'package:ur_heart/features/auth/presentation/screens/consent_screen.dart';
 import 'package:ur_heart/features/auth/presentation/screens/age_gate_auth_screen.dart';
-import 'package:ur_heart/features/profile_setup/presentation/screens/profile_setup_screen.dart';
 import 'package:ur_heart/features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
 import 'package:ur_heart/features/chat/presentation/screens/chat_dialogue_screen.dart';
 import 'package:ur_heart/features/rewards/presentation/widgets/sacred_kinship_card.dart';
 import 'package:ur_heart/features/auth/presentation/widgets/magic_link_passage_card.dart';
 import 'package:ur_heart/core/constants/api_endpoints.dart';
 import 'package:ur_heart/features/settings/presentation/widgets/official_web_sanctuary_card.dart';
+import 'package:ur_heart/features/rewards/presentation/widgets/sovereign_store_tab_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -217,6 +217,41 @@ void main() {
       expect(find.text('urheart.asiverticals.me'), findsOneWidget);
       expect(find.text('Visit urheart.asiverticals.me'), findsOneWidget);
       expect(find.byIcon(Icons.open_in_browser_rounded), findsOneWidget);
+    });
+
+    testWidgets('SovereignStoreTabView opens Sovereign Access Gateway modal with Web Store option', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SovereignStoreTabView(isDark: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify store banner and passes rendered
+      expect(find.text('Sanctuary Web Store (10% Extra Passes)'), findsOneWidget);
+      expect(find.text('1-Month Sovereign Pass'), findsOneWidget);
+
+      // Tap first Unlock button
+      final unlockBtn = find.text('Unlock').first;
+      await tester.tap(unlockBtn);
+      await tester.pumpAndSettle();
+
+      // Verify Sovereign Access Gateway modal bottom sheet rendered
+      expect(find.text('Sovereign Access Gateway'), findsOneWidget);
+      expect(find.text('Web Sanctuary Store'), findsOneWidget);
+      expect(find.text('+10% BONUS'), findsOneWidget);
+      expect(find.text('Google Play In-App Billing'), findsOneWidget);
     });
   });
 }

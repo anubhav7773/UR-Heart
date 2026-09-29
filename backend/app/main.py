@@ -134,6 +134,11 @@ from fastapi.responses import HTMLResponse
 app.add_api_route("/verify", handle_browser_magic_link_tap, methods=["GET"], response_class=HTMLResponse, tags=["Magic Link Direct"])
 app.add_api_route("/auth/callback", handle_browser_magic_link_tap, methods=["GET"], response_class=HTMLResponse, tags=["Magic Link Direct"])
 
+# Mount Web Sanctuary Store router directly at root for https://urheart.asiverticals.me/store
+from app.api.v1.endpoints.web_store import router as web_store_direct_router
+app.include_router(web_store_direct_router)
+
+
 # Mount Main API v1 Router
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
@@ -366,6 +371,7 @@ async def root_health_probe(request: Request):
 
       <div class="actions">
         <a class="btn btn-primary" href="urheart://open">Open UR-Heart App</a>
+        <a class="btn btn-secondary" href="/store">Sanctuary Web Store (10% Bonus) 🛒</a>
         <a class="btn btn-secondary" href="https://asiverticals.me" target="_blank" rel="noopener">Visit Asiverticals ↗</a>
       </div>
     </div>
