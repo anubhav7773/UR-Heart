@@ -11,6 +11,7 @@
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
 -keep class io.flutter.embedding.** { *; }
+-dontwarn com.google.android.play.core.**
 
 # 2. Hardware Secure Storage & AndroidX Security Crypto (SEC-HIGH-05)
 -keep class androidx.security.crypto.** { *; }
