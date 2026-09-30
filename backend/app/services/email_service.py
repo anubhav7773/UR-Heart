@@ -106,65 +106,20 @@ class EmailService:
 
         base_web = getattr(settings, "BASE_WEB_URL", "https://urheart.asiverticals.me")
 
-        # 3. Supabase Auth OTP Dispatch
-        supabase_dispatched = False
-        rate_limited = False
-        try:
-            if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.post(
-                        f"{settings.SUPABASE_URL}/auth/v1/otp",
-                        headers={
-                            "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
-                            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "email": clean_email,
-                            "create_user": True,
-                            "options": {
-                                "email_redirect_to": f"{base_web}/api/v1/auth/callback?email={clean_email}&token={token}"
-                            }
-                        },
-                    )
-                    if resp.status_code in [200, 201]:
-                        supabase_dispatched = True
-                        print(f"[EMAIL SERVICE] Dispatched email via Supabase to {clean_email}", flush=True)
-                    elif resp.status_code == 429:
-                        rate_limited = True
-                        print(f"[EMAIL SERVICE] Supabase rate limit exceeded (429) for {clean_email}: {resp.text}", flush=True)
-                    else:
-                        print(f"[EMAIL SERVICE] Supabase OTP response {resp.status_code}: {resp.text}", flush=True)
-        except Exception as e:
-            print(f"[EMAIL SERVICE] Supabase OTP exception: {e}", flush=True)
+        # 3. Firebase Auth Passwordless Link Generation
+        from app.services.firebase_auth_service import FirebaseAuthService
+        firebase_link = FirebaseAuthService.generate_firebase_email_link(clean_email)
+        firebase_dispatched = firebase_link is not None
 
-        # 4. Generate user shell in Supabase via admin generate_link (zero rate limit)
-        try:
-            if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    await client.post(
-                        f"{settings.SUPABASE_URL}/auth/v1/admin/generate_link",
-                        headers={
-                            "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
-                            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "type": "magiclink",
-                            "email": clean_email,
-                            "options": {
-                                "redirect_to": f"{base_web}/api/v1/auth/callback?email={clean_email}&token={token}"
-                            }
-                        }
-                    )
-        except Exception as e:
-            print(f"[EMAIL SERVICE] Supabase admin generate_link notice: {e}", flush=True)
+        effective_magic_link = firebase_link or magic_link
+        effective_deep_link = deep_link
 
         return {
-            "dispatched": supabase_dispatched,
-            "provider": "supabase" if supabase_dispatched else "direct_link",
-            "rate_limited": rate_limited,
-            "magic_link": magic_link,
-            "deep_link": deep_link,
-            "message": "Sacred verification link prepared." if rate_limited else "Sacred verification link dispatched."
+            "dispatched": firebase_dispatched,
+            "provider": "firebase" if firebase_dispatched else "direct_link",
+            "rate_limited": False,
+            "magic_link": effective_magic_link,
+            "firebase_link": firebase_link,
+            "deep_link": effective_deep_link,
+            "message": "Sacred Firebase verification link dispatched to your email."
         }

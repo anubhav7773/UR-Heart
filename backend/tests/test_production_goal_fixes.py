@@ -267,4 +267,49 @@ def test_statutory_legal_and_deletion_portals():
     assert res_del_post.json()["status"] == "success"
 
 
+def test_firebase_console_magic_link_verification():
+    """Verify magic link verification integrates directly with Firebase Auth Console."""
+    import uuid
+    from firebase_admin import auth as fb_admin_auth
+    from app.api.v1.endpoints.auth import EMAIL_VERIFICATION_STATUS
+
+    test_email = f"test.seeker.{uuid.uuid4().hex[:6]}@urheart.app"
+
+    # 1. Dispatch Magic Link
+    res_link = client.post("/api/v1/auth/send-magic-link", json={"email": test_email})
+    assert res_link.status_code == 200
+    link_data = res_link.json()
+    assert link_data["status"] == "sent"
+    assert "firebase_dispatched" in link_data
+
+    # Retrieve dispatched cryptographic token
+    status_entry = EMAIL_VERIFICATION_STATUS.get(test_email)
+    assert status_entry is not None
+    token = status_entry["token"]
+
+    # 2. Verify Magic Link
+    res_verify = client.post("/api/v1/auth/verify-magic-link", json={
+        "token": token,
+        "email": test_email
+    })
+    assert res_verify.status_code == 200
+    verify_data = res_verify.json()
+    assert verify_data["status"] == "authenticated"
+    assert "firebase_token" in verify_data
+    assert verify_data["firebase_token"] is not None
+    assert "firebase_uid" in verify_data
+    assert verify_data["firebase_uid"] is not None
+
+    fb_uid = verify_data["firebase_uid"]
+
+    # 3. Cryptographic Verification: Verify user directly in Firebase Console
+    fb_user = fb_admin_auth.get_user(fb_uid)
+    assert fb_user.email == test_email
+    assert fb_user.email_verified is True
+
+    # 4. Cleanup Firebase test user
+    fb_admin_auth.delete_user(fb_uid)
+
+
+
 

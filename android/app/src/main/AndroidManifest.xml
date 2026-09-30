@@ -67,6 +67,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="urheart.asiverticals.me" android:pathPrefix="/verify" />
             </intent-filter>
+            <!-- Firebase Console Authentication Passwordless Link -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="ur-heart-44b46.firebaseapp.com" />
+            </intent-filter>
             <!-- Web Store Deep Linking -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

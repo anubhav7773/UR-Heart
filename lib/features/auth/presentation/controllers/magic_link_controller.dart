@@ -56,7 +56,11 @@ class MagicLinkController extends StateNotifier<MagicLinkState> {
     state = state.copyWith(isVerifying: true);
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
-    if (url.contains('token=') || url.contains('urheart.asiverticals.me') || url.contains('urheart.app/auth')) {
+    if (url.contains('token=') ||
+        url.contains('oobCode=') ||
+        url.contains('firebaseapp.com') ||
+        url.contains('urheart.asiverticals.me') ||
+        url.contains('urheart.app/auth')) {
       state = state.copyWith(isVerifying: false, isVerified: true);
       return true;
     }

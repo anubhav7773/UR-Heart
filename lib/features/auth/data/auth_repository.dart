@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -209,6 +210,18 @@ class AuthRepository {
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data!;
         final tokenStr = data['access_token'] ?? data['token'];
+        final fbToken = data['firebase_token'] ?? data['firebase_custom_token'];
+
+        // Synchronize with Firebase Authentication Console
+        if (fbToken != null && fbToken.toString().isNotEmpty) {
+          try {
+            final userCred = await FirebaseAuth.instance.signInWithCustomToken(fbToken.toString());
+            debugPrint('[AUTH] Verified in Firebase Console: ${userCred.user?.uid}');
+          } catch (fbErr) {
+            debugPrint('[AUTH] Firebase signInWithCustomToken notice: $fbErr');
+          }
+        }
+
         if (tokenStr != null) {
           // SEC-HIGH-05: Hardware-Backed Secure Session Storage
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
@@ -248,6 +261,16 @@ class AuthRepository {
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data!;
         if (data['is_verified'] == true) {
+          final fbToken = data['firebase_token'] ?? data['firebase_custom_token'];
+          if (fbToken != null && fbToken.toString().isNotEmpty) {
+            try {
+              final userCred = await FirebaseAuth.instance.signInWithCustomToken(fbToken.toString());
+              debugPrint('[AUTH] Polling verified in Firebase Console: ${userCred.user?.uid}');
+            } catch (fbErr) {
+              debugPrint('[AUTH] Firebase polling signInWithCustomToken notice: $fbErr');
+            }
+          }
+
           final tokenStr = data['access_token'] ?? data['token'];
           if (tokenStr != null) {
             // SEC-HIGH-05: Hardware-Backed Secure Session Storage

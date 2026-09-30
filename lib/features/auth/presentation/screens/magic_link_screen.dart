@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/storage/secure_session_storage.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/magic_link_passage_card.dart';
@@ -96,8 +98,39 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
     _appLinks = AppLinks();
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) async {
+        final linkStr = uri.toString();
+
+        // 1. Native Firebase Auth Email Link Verification
+        if (FirebaseAuth.instance.isSignInWithEmailLink(linkStr)) {
+          final cleanEmail = widget.email ?? ref.read(authControllerProvider).email;
+          try {
+            final userCred = await FirebaseAuth.instance.signInWithEmailLink(
+              email: cleanEmail,
+              emailLink: linkStr,
+            );
+            if (userCred.user != null) {
+              final idToken = await userCred.user!.getIdToken();
+              if (idToken != null) {
+                await SecureSessionStorage.instance.saveAuthToken(idToken);
+              }
+              await SecureSessionStorage.instance.saveUserSession(
+                userId: userCred.user!.uid,
+                email: userCred.user!.email ?? cleanEmail,
+                isProfileCompleted: false,
+              );
+              await _onVerificationSuccess();
+              return;
+            }
+          } catch (e) {
+            debugPrint('[AUTH] Firebase signInWithEmailLink error: $e');
+          }
+        }
+
+        // 2. Sanctuary Cryptographic Deep Link Verification
         if ((uri.scheme == 'urheart' && uri.host == 'auth' && uri.path.contains('verify')) ||
-            ((uri.host.contains('urheart.asiverticals.me') || uri.host.contains('ur-heart.onrender.com')) &&
+            ((uri.host.contains('urheart.asiverticals.me') ||
+              uri.host.contains('ur-heart.onrender.com') ||
+              uri.host.contains('firebaseapp.com')) &&
              (uri.path.contains('auth') || uri.path.contains('verify')))) {
           final token = uri.queryParameters['token'] ?? uri.queryParameters['code'];
           if (token != null && token.isNotEmpty) {

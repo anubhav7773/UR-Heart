@@ -313,11 +313,12 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
         "status": "sent",
         "email": clean_email,
         "masked_email": masked_email,
-        "supabase_dispatched": dispatch_res.get("dispatched", False),
+        "firebase_dispatched": dispatch_res.get("dispatched", False),
+        "supabase_dispatched": False,
         "rate_limited": dispatch_res.get("rate_limited", False),
-        "provider": dispatch_res.get("provider", "direct_link"),
+        "provider": dispatch_res.get("provider", "firebase"),
         "expires_in_minutes": 15,
-        "message": dispatch_res.get("message", "A sacred verification link has been dispatched to your email address.")
+        "message": dispatch_res.get("message", "A sacred Firebase verification link has been dispatched to your email address.")
     }
 
     # Strict Security Guard: Only expose magic_link/deep_link in non-production or debug test environments
@@ -342,8 +343,10 @@ async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)
             "email": clean_email,
             "token": status_entry.get("access_token"),
             "access_token": status_entry.get("access_token"),
+            "firebase_token": status_entry.get("firebase_token"),
+            "firebase_uid": status_entry.get("firebase_uid"),
             "is_profile_completed": status_entry.get("is_profile_completed", False),
-            "message": "Sacred email verified. Proceeding to sanctuary."
+            "message": "Sacred email verified via Firebase. Proceeding to sanctuary."
         }
 
     return {
@@ -410,12 +413,24 @@ async def handle_browser_magic_link_tap(
             await db.rollback()
             user_uuid = str(new_uuid)
 
+    # SEC: Verify & provision user in Firebase Auth Console
+    from app.services.firebase_auth_service import FirebaseAuthService
+    fb_user = None
+    custom_token = None
+    try:
+        fb_user, custom_token = FirebaseAuthService.verify_or_create_firebase_user(clean_email)
+        print(f"[AUTH MAGIC LINK] Verified in Firebase Console: uid={fb_user.uid}", flush=True)
+    except Exception as e:
+        print(f"[AUTH MAGIC LINK] Firebase Console verification notice: {e}", flush=True)
+
     session_token = create_access_token({"sub": user_uuid, "email": clean_email})
 
     # Mark verified in global live polling state
     EMAIL_VERIFICATION_STATUS[clean_email] = {
         "is_verified": True,
         "access_token": session_token,
+        "firebase_token": custom_token,
+        "firebase_uid": fb_user.uid if fb_user else None,
         "is_profile_completed": is_completed
     }
 
@@ -579,6 +594,16 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
 
     print(f"[AUTH MAGIC LINK] Verified successfully: email={matched_email} user_id={user_uuid}", flush=True)
 
+    # SEC: Verify & provision user in Firebase Auth Console
+    from app.services.firebase_auth_service import FirebaseAuthService
+    fb_user = None
+    custom_token = None
+    try:
+        fb_user, custom_token = FirebaseAuthService.verify_or_create_firebase_user(matched_email)
+        print(f"[AUTH MAGIC LINK] Verified in Firebase Console: uid={fb_user.uid}", flush=True)
+    except Exception as e:
+        print(f"[AUTH MAGIC LINK] Firebase Console verification notice: {e}", flush=True)
+
     from app.core.security import create_access_token
     session_token = create_access_token({"sub": str(user_uuid), "email": matched_email})
 
@@ -586,6 +611,8 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
     EMAIL_VERIFICATION_STATUS[matched_email] = {
         "is_verified": True,
         "access_token": session_token,
+        "firebase_token": custom_token,
+        "firebase_uid": fb_user.uid if fb_user else None,
         "is_profile_completed": is_completed
     }
 
@@ -594,7 +621,9 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
         "email": matched_email,
         "token": session_token,
         "access_token": session_token,
+        "firebase_token": custom_token,
+        "firebase_uid": fb_user.uid if fb_user else None,
         "is_profile_completed": is_completed,
-        "message": "Sacred passage verified. Welcome to UR-Heart."
+        "message": "Sacred passage verified in Firebase. Welcome to UR-Heart."
     }
 

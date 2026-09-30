@@ -121,10 +121,11 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('Almost home.'), findsOneWidget);
-      expect(find.text('3-STEP MINDFUL PASSAGE'), findsOneWidget);
+      expect(find.text('LIVE STEP TRACKER'), findsOneWidget);
       expect(find.text('Resend link in 45s'), findsOneWidget);
     });
 
@@ -133,6 +134,17 @@ void main() {
       addTearDown(controller.dispose);
 
       final success = await controller.handleDeepLinkUrl('https://urheart.app/auth?token=valid_token');
+      expect(success, true);
+      expect(controller.state.isVerified, true);
+    });
+
+    test('MagicLinkController handles Firebase Authentication Email Link format', () async {
+      final controller = MagicLinkController();
+      addTearDown(controller.dispose);
+
+      final success = await controller.handleDeepLinkUrl(
+        'https://ur-heart-44b46.firebaseapp.com/__/auth/action?mode=signIn&oobCode=valid_firebase_code&apiKey=test_key',
+      );
       expect(success, true);
       expect(controller.state.isVerified, true);
     });
