@@ -85,7 +85,7 @@ class FirebaseAuthService:
         payload = {
             "requestType": "EMAIL_SIGNIN",
             "email": clean_email,
-            "continueUrl": f"https://{project_id}.firebaseapp.com",
+            "continueUrl": f"https://urheart.asiverticals.me/api/v1/auth/verify?email={clean_email}",
             "canHandleCodeInApp": True,
             "androidPackageName": "com.urheart.app",
             "androidInstallApp": True,
@@ -106,18 +106,28 @@ class FirebaseAuthService:
             return False
 
     @classmethod
+    def get_user_by_email(cls, email: str) -> Optional[Any]:
+        """
+        Retrieves user record from Firebase Auth Console by email.
+        """
+        clean_email = email.strip().lower()
+        try:
+            cls.get_app()
+            return auth.get_user_by_email(clean_email)
+        except Exception:
+            return None
+
+    @classmethod
     def generate_firebase_email_link(cls, email: str) -> Optional[str]:
         """
         Generates genuine Firebase Authentication Passwordless Email Sign-In Link.
         """
         clean_email = email.strip().lower()
-        settings = get_settings()
-        project_id = getattr(settings, "FIREBASE_PROJECT_ID", "ur-heart-44b46")
 
         try:
             cls.get_app()
             action_code_settings = auth.ActionCodeSettings(
-                url=f"https://{project_id}.firebaseapp.com",
+                url=f"https://urheart.asiverticals.me/api/v1/auth/verify?email={clean_email}",
                 handle_code_in_app=True,
                 android_package_name="com.urheart.app",
                 android_install_app=True,
@@ -127,8 +137,8 @@ class FirebaseAuthService:
             logger.info("Generated Firebase email sign-in link for %s", clean_email)
             return link
         except Exception as e:
-            logger.info("Admin SDK generate link notice: %s; falling back to Firebase dynamic action URL", e)
-            return f"https://{project_id}.firebaseapp.com/__/auth/action?mode=signIn&email={clean_email}"
+            logger.info("Admin SDK generate link notice: %s; falling back to official verification action URL", e)
+            return f"https://urheart.asiverticals.me/api/v1/auth/verify?email={clean_email}"
 
     @classmethod
     def verify_or_create_firebase_user(cls, email: str) -> Tuple[Any, Optional[str]]:
