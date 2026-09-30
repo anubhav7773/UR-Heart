@@ -27,7 +27,7 @@ class ChatDialogueArguments {
     required this.recipientName,
     this.recipientAge = 25,
     this.isOnline = true,
-    this.hasWaKey = true,
+    this.hasWaKey = false,
     this.sharedContextQuote = 'Sacred Mindful Dialogue',
   });
 }
@@ -143,7 +143,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
     final isOnline = args?.isOnline ?? (peer['is_online'] as bool? ?? true);
     final bridgeData = {
       ...dialogueState.bridgeData,
-      if (args != null) 'has_wa_key': args.hasWaKey,
+      if (args != null && args.hasWaKey) 'has_wa_key': true,
     };
     final promptText = args?.sharedContextQuote ?? dialogueState.sharedPrompt;
 

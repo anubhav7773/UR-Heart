@@ -253,3 +253,109 @@ async def send_chat_message(
         "timestamp": msg.created_at.strftime("%I:%M %p") if msg.created_at else datetime.now().strftime("%I:%M %p"),
         "delivery_status": msg.status
     }
+
+
+# Track unlocked contact bridges per (user_id, match_id)
+UNLOCKED_BRIDGES: set[tuple[str, str]] = set()
+
+
+@router.get("/threads/{match_id}/bridge", status_code=status.HTTP_200_OK, summary="Get Contact Bridge Status")
+async def get_match_bridge_status(
+    match_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns Sacred Contact Bridge status for a dialogue match.
+    Enforces strict privacy: Private handles are NEVER revealed without
+    mutual confirmation or a redeemed Reveal Token.
+    """
+    try:
+        match_uuid = UUID(match_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid match_id UUID.")
+
+    stmt = select(Match).where(
+        Match.id == match_uuid,
+        or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id)
+    )
+    res = await db.execute(stmt)
+    m = res.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Match not found.")
+
+    partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+    partner_res = await db.execute(select(User).where(User.id == partner_id))
+    partner = partner_res.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Dialogue peer not found.")
+
+    is_unlocked = (str(current_user.id), match_id) in UNLOCKED_BRIDGES
+    partner_platform = partner.contact_bridge_type or "whatsapp"
+    partner_handle = partner.contact_bridge_encrypted if is_unlocked else ""
+
+    return {
+        "match_id": match_id,
+        "is_unlocked": is_unlocked,
+        "has_wa_key": is_unlocked,
+        "platform": partner_platform,
+        "user_step": 3 if is_unlocked else 1,
+        "peer_step": 3 if is_unlocked else 1,
+        "handle": partner_handle,
+        "reveal_tokens_count": current_user.reveal_tokens_count or 0,
+    }
+
+
+@router.post("/threads/{match_id}/bridge/reveal", status_code=status.HTTP_200_OK, summary="Redeem Reveal Token for Social Handle")
+async def redeem_bridge_reveal_token(
+    match_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Spends 1 Sacred Bridge Reveal Token to unlock the peer's genuine social handle.
+    Requires reveal_tokens_count >= 1 (earned via 3 video reflections or sovereign pass).
+    """
+    try:
+        match_uuid = UUID(match_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid match_id UUID.")
+
+    stmt = select(Match).where(
+        Match.id == match_uuid,
+        or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id)
+    )
+    res = await db.execute(stmt)
+    m = res.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Match not found.")
+
+    partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+    partner_res = await db.execute(select(User).where(User.id == partner_id))
+    partner = partner_res.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Dialogue peer not found.")
+
+    current_tokens = current_user.reveal_tokens_count or 0
+    if current_tokens < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="A Sacred Bridge Reveal Token is required. Watch 3 reflections in the Growth Hub to earn 1 token."
+        )
+
+    # Deduct 1 reveal token
+    current_user.reveal_tokens_count = current_tokens - 1
+    await db.commit()
+    await db.refresh(current_user)
+
+    UNLOCKED_BRIDGES.add((str(current_user.id), match_id))
+
+    return {
+        "status": "unlocked",
+        "message": f"Sacred Contact Bridge unlocked for {partner.full_name}!",
+        "is_unlocked": True,
+        "has_wa_key": True,
+        "platform": partner.contact_bridge_type or "whatsapp",
+        "handle": partner.contact_bridge_encrypted or "",
+        "remaining_reveal_tokens": current_user.reveal_tokens_count,
+    }

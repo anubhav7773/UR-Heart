@@ -222,6 +222,33 @@ class ChatRepository {
     }
   }
 
+  /// Fetches live Sacred Bridge progression & genuine contact enclave status
+  Future<Map<String, dynamic>> fetchContactBridgeStatus(String matchId) async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/chat/threads/$matchId/bridge');
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'is_unlocked': false, 'platform': 'whatsapp', 'handle': '', 'has_wa_key': false, 'user_step': 1};
+    } catch (_) {
+      return {'is_unlocked': false, 'platform': 'whatsapp', 'handle': '', 'has_wa_key': false, 'user_step': 1};
+    }
+  }
+
+  /// Spends 1 Sacred Bridge Reveal Token to unlock peer contact enclave
+  Future<Map<String, dynamic>> redeemBridgeRevealToken(String matchId) async {
+    try {
+      final response = await _dio.post<dynamic>('/api/v1/chat/threads/$matchId/bridge/reveal');
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'is_unlocked': true, 'platform': 'whatsapp', 'handle': '', 'has_wa_key': true, 'user_step': 3};
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
   void _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
       throw const NetworkUnavailableException();

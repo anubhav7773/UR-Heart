@@ -6,6 +6,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app/ur_heart_app.dart';
 import 'core/services/activity_logger_service.dart';
+import 'core/services/sanctuary_notification_service.dart';
 import 'core/storage/secure_session_storage.dart';
 
 Future<void> main() async {
@@ -16,6 +17,11 @@ Future<void> main() async {
   } catch (_) {
     // Graceful fallback for environments without google-services.json
   }
+
+  // Initialize ultra-premium outside-the-app system tray push notifications
+  try {
+    await SanctuaryNotificationService.instance.initialize();
+  } catch (_) {}
 
   // Pre-resolve initial route from session storage to prevent flashes on app relaunch
   String? resolvedInitialRoute;

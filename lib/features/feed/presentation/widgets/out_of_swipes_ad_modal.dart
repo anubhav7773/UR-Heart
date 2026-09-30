@@ -22,7 +22,6 @@ class OutOfSwipesAdModal extends ConsumerWidget {
         child: OutOfSwipesModal(
           isDark: isDark,
           onWatchAdTriggered: () {
-            Navigator.of(context).pop();
             FeedActionHandlers.handleOutOfSwipesReward(
               context: context,
               ref: ref,

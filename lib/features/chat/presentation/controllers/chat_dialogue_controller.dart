@@ -36,10 +36,10 @@ class ChatDialogueState {
     this.bridgeData = const {
       'is_unlocked': false,
       'platform': 'whatsapp',
-      'user_step': 2,
+      'user_step': 1,
       'peer_step': 1,
-      'handle': '+919876543210',
-      'has_wa_key': true,
+      'handle': '',
+      'has_wa_key': false,
     },
     this.sharedPrompt = 'I loved that Haruki Murakami passage on quiet spaces.',
     this.icebreakers = const [
@@ -113,20 +113,15 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
   Future<void> _initDialogue() async {
     state = state.copyWith(isLoading: true);
 
-    // 1. Fetch historical thread messages
+    // 1. Fetch historical thread messages & live contact bridge status
     final history = await _chatRepository.fetchThreadMessages(state.matchId);
+    final bridge = await _chatRepository.fetchContactBridgeStatus(state.matchId);
+
     state = state.copyWith(
       messages: history,
       isLoading: false,
       isConnected: true,
-      bridgeData: {
-        'is_unlocked': false,
-        'platform': 'whatsapp',
-        'user_step': 2,
-        'peer_step': 1,
-        'handle': '+919876543210',
-        'has_wa_key': true,
-      },
+      bridgeData: bridge,
     );
 
     // 2. Listen to incoming E2EE WebSocket events
@@ -141,6 +136,17 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     });
 
     await _chatRepository.markMessagesAsRead(state.matchId);
+  }
+
+  /// Spends 1 Sacred Bridge Reveal Token to unlock the peer's genuine social handle
+  Future<bool> redeemBridgeRevealToken() async {
+    try {
+      final updatedBridge = await _chatRepository.redeemBridgeRevealToken(state.matchId);
+      state = state.copyWith(bridgeData: updatedBridge);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void setPeerProfile(Map<String, dynamic> profile) {

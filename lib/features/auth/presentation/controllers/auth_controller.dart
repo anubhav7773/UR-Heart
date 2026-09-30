@@ -79,6 +79,8 @@ class AuthState {
     return email.isNotEmpty && password.length >= 6;
   }
 
+  String get userId => authenticatedUserId ?? '';
+
   AuthState copyWith({
     bool? isSignInTab,
     int? selectedDay,

@@ -22,6 +22,9 @@ import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
 import '../theme/theme_controller.dart';
 
+/// Global navigator key for cross-screen and deep link navigation
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Root Application Widget wrapped in Riverpod Consumer
 /// Dynamically updates between Light Sanctuary and Dark Sanctuary ThemeData
 class URHeartApp extends ConsumerWidget {
@@ -36,6 +39,7 @@ class URHeartApp extends ConsumerWidget {
 
     return MaterialApp(
       title: 'UR-Heart',
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       theme: _buildLightTheme(),
@@ -63,19 +67,44 @@ class URHeartApp extends ConsumerWidget {
         EvaSanctuaryScreen.routeName: (context) => const EvaSanctuaryScreen(),
       },
       onGenerateRoute: (settings) {
-        if (settings.name == '/verify-email' || settings.name == '/magic-link') {
+        final routeName = settings.name ?? '';
+
+        // Handle magic links, verification links, and incoming Android Intent URLs
+        if (routeName.contains('/verify') ||
+            routeName.contains('magic-link') ||
+            routeName.contains('token=') ||
+            routeName.contains('code=') ||
+            routeName.startsWith('urheart://') ||
+            routeName.startsWith('http://') ||
+            routeName.startsWith('https://')) {
           String? email;
+          String? token;
+
+          try {
+            final uri = Uri.parse(routeName);
+            token = uri.queryParameters['token'] ?? uri.queryParameters['code'];
+            email = uri.queryParameters['email'];
+          } catch (_) {}
+
           if (settings.arguments is Map) {
-            email = (settings.arguments as Map)['email']?.toString();
+            email = email ?? (settings.arguments as Map)['email']?.toString();
+            token = token ?? (settings.arguments as Map)['token']?.toString();
           } else if (settings.arguments is String) {
-            email = settings.arguments as String;
+            email = email ?? settings.arguments as String;
           }
+
           return MaterialPageRoute(
-            builder: (context) => MagicLinkScreen(email: email),
+            builder: (context) => MagicLinkScreen(email: email, initialToken: token),
             settings: settings,
           );
         }
         return null;
+      },
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const SanctuaryAppGateway(),
+          settings: settings,
+        );
       },
     );
   }

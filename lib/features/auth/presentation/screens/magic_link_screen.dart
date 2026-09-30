@@ -23,8 +23,9 @@ import '../widgets/magic_link_passage_card.dart';
 /// Step 3: Verified & Sacred Sanctuary Entry
 class MagicLinkScreen extends ConsumerStatefulWidget {
   final String? email;
+  final String? initialToken;
 
-  const MagicLinkScreen({super.key, this.email});
+  const MagicLinkScreen({super.key, this.email, this.initialToken});
 
   static const String routeName = '/verify-email';
 
@@ -51,9 +52,13 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
     _startLiveStatusPolling();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialToken != null && widget.initialToken!.isNotEmpty) {
+        _verifyMagicLinkToken(widget.initialToken!);
+      }
+
       final state = ref.read(authControllerProvider);
       final email = widget.email ?? state.email;
-      if (email.isNotEmpty && state.resendCooldownSeconds == 0) {
+      if (email.isNotEmpty && state.resendCooldownSeconds == 0 && widget.initialToken == null) {
         ref.read(authControllerProvider.notifier).resendVerificationEmail(email);
       }
     });
@@ -96,46 +101,19 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
 
   void _initDeepLinkListener() {
     _appLinks = AppLinks();
+
+    // Check cold startup initial link
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null && mounted) {
+        _handleIncomingUri(uri);
+      }
+    }).catchError((_) {});
+
+    // Listen to foreground/background resumes
     _linkSubscription = _appLinks.uriLinkStream.listen(
-      (uri) async {
-        final linkStr = uri.toString();
-
-        // 1. Native Firebase Auth Email Link Verification
-        if (FirebaseAuth.instance.isSignInWithEmailLink(linkStr)) {
-          final cleanEmail = widget.email ?? ref.read(authControllerProvider).email;
-          try {
-            final userCred = await FirebaseAuth.instance.signInWithEmailLink(
-              email: cleanEmail,
-              emailLink: linkStr,
-            );
-            if (userCred.user != null) {
-              final idToken = await userCred.user!.getIdToken();
-              if (idToken != null) {
-                await SecureSessionStorage.instance.saveAuthToken(idToken);
-              }
-              await SecureSessionStorage.instance.saveUserSession(
-                userId: userCred.user!.uid,
-                email: userCred.user!.email ?? cleanEmail,
-                isProfileCompleted: false,
-              );
-              await _onVerificationSuccess();
-              return;
-            }
-          } catch (e) {
-            debugPrint('[AUTH] Firebase signInWithEmailLink error: $e');
-          }
-        }
-
-        // 2. Sanctuary Cryptographic Deep Link Verification
-        if ((uri.scheme == 'urheart' && uri.host == 'auth' && uri.path.contains('verify')) ||
-            ((uri.host.contains('urheart.asiverticals.me') ||
-              uri.host.contains('ur-heart.onrender.com') ||
-              uri.host.contains('firebaseapp.com')) &&
-             (uri.path.contains('auth') || uri.path.contains('verify')))) {
-          final token = uri.queryParameters['token'] ?? uri.queryParameters['code'];
-          if (token != null && token.isNotEmpty) {
-            await _verifyMagicLinkToken(token);
-          }
+      (uri) {
+        if (mounted) {
+          _handleIncomingUri(uri);
         }
       },
       onError: (_) {
@@ -144,6 +122,48 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
         }
       },
     );
+  }
+
+  Future<void> _handleIncomingUri(Uri uri) async {
+    final linkStr = uri.toString();
+
+    // 1. Native Firebase Auth Email Link Verification
+    if (FirebaseAuth.instance.isSignInWithEmailLink(linkStr)) {
+      final cleanEmail = widget.email ?? ref.read(authControllerProvider).email;
+      try {
+        final userCred = await FirebaseAuth.instance.signInWithEmailLink(
+          email: cleanEmail,
+          emailLink: linkStr,
+        );
+        if (userCred.user != null) {
+          final idToken = await userCred.user!.getIdToken();
+          if (idToken != null) {
+            await SecureSessionStorage.instance.saveAuthToken(idToken);
+          }
+          await SecureSessionStorage.instance.saveUserSession(
+            userId: userCred.user!.uid,
+            email: userCred.user!.email ?? cleanEmail,
+            isProfileCompleted: false,
+          );
+          await _onVerificationSuccess();
+          return;
+        }
+      } catch (e) {
+        debugPrint('[AUTH] Firebase signInWithEmailLink error: $e');
+      }
+    }
+
+    // 2. Sanctuary Cryptographic Deep Link Verification
+    if ((uri.scheme == 'urheart' && (uri.host == 'auth' || uri.path.contains('verify'))) ||
+        ((uri.host.contains('urheart.asiverticals.me') ||
+          uri.host.contains('ur-heart.onrender.com') ||
+          uri.host.contains('firebaseapp.com')) &&
+         (uri.path.contains('auth') || uri.path.contains('verify')))) {
+      final token = uri.queryParameters['token'] ?? uri.queryParameters['code'];
+      if (token != null && token.isNotEmpty) {
+        await _verifyMagicLinkToken(token);
+      }
+    }
   }
 
   Future<void> _verifyMagicLinkToken(String token) async {

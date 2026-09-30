@@ -9,6 +9,7 @@ import '../widgets/candidate_profile_card.dart';
 import '../widgets/feed_floating_action_bar.dart';
 import '../widgets/out_of_swipes_ad_modal.dart';
 import '../../../growth/presentation/controllers/growth_hub_controller.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../navigation/presentation/screens/sanctuary_navigation_shell.dart';
 
 /// Screen 05: Sanctuary Discovery Feed Scaffold
@@ -131,7 +132,7 @@ class FeedScreen extends ConsumerWidget {
                                 ok = await feedNotifier.swipePass();
                               }
                               if (!ok && context.mounted) {
-                                _showOutOfSwipes(context);
+                                _showOutOfSwipes(context, ref);
                               }
                             },
                           ),
@@ -170,14 +171,20 @@ class FeedScreen extends ConsumerWidget {
                 onPass: () async {
                   final ok = await feedNotifier.swipePass();
                   if (!ok && feedState.swipesRemaining <= 0 && context.mounted) {
-                    _showOutOfSwipes(context);
+                    _showOutOfSwipes(context, ref);
                   }
                 },
-                onResonate: () => _openDirectLetterModal(context, current, feedNotifier, isDark),
+                onResonate: () {
+                  if (feedState.directLettersCount <= 0) {
+                    _showOutOfDirectLetters(context, ref);
+                  } else {
+                    _openDirectLetterModal(context, current, feedNotifier, isDark, ref);
+                  }
+                },
                 onLike: () async {
                   final ok = await feedNotifier.swipeLike();
                   if (!ok && feedState.swipesRemaining <= 0 && context.mounted) {
-                    _showOutOfSwipes(context);
+                    _showOutOfSwipes(context, ref);
                   }
                 },
               ),
@@ -187,10 +194,68 @@ class FeedScreen extends ConsumerWidget {
     );
   }
 
-  void _showOutOfSwipes(BuildContext context) {
+  void _showOutOfSwipes(BuildContext context, WidgetRef ref) {
+    final currentUserId = ref.read(authControllerProvider).userId;
     showDialog<void>(
       context: context,
-      builder: (ctx) => const OutOfSwipesAdModal(),
+      builder: (ctx) => OutOfSwipesAdModal(
+        userId: currentUserId.isNotEmpty ? currentUserId : 'current_user',
+      ),
+    );
+  }
+
+  void _showOutOfDirectLetters(BuildContext context, WidgetRef ref) {
+    final isDark = ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E2824) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Text('💌', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
+            Text(
+              'Direct Letters Needed',
+              style: TextStyle(
+                fontFamily: 'Serif',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A2621),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Direct Sanctuary Letters deliver immediately to a seeker\'s dialogue without waiting for a mutual match. '
+          'You can earn free direct letters in the Growth Hub or use a standard Like ♡ for now.',
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark ? Colors.white70 : Colors.black87,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref.read(feedControllerProvider.notifier).swipeLike();
+            },
+            child: const Text('Send Like ♡ Instead'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2C5E43),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref.read(navigationIndexProvider.notifier).state = 3;
+            },
+            child: const Text('Earn in Growth Hub ➔', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -199,6 +264,7 @@ class FeedScreen extends ConsumerWidget {
     CandidateProfile candidate,
     FeedController feedNotifier,
     bool isDark,
+    WidgetRef ref,
   ) {
     final textController = TextEditingController();
     showModalBottomSheet<void>(
@@ -305,7 +371,7 @@ class FeedScreen extends ConsumerWidget {
                       Navigator.of(ctx).pop();
                       final ok = await feedNotifier.swipeDirectLetter(letterText: text);
                       if (!ok && context.mounted) {
-                        _showOutOfSwipes(context);
+                        _showOutOfDirectLetters(context, ref);
                       } else if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

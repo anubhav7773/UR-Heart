@@ -54,11 +54,15 @@ class _PhotoCarouselWithDotsState extends State<PhotoCarouselWithDots> {
             itemCount: photoList.length,
             onPageChanged: (i) => setState(() => _currentIndex = i),
             itemBuilder: (context, index) {
-              final photo = photoList[index];
+              final rawPhoto = photoList[index].trim();
+              String photo = rawPhoto;
+              if (photo.startsWith('/api/v1/') || photo.startsWith('/storage/')) {
+                photo = 'https://urheart.asiverticals.me$photo';
+              }
               return Container(
                 color: surfaceMuted,
                 child: photo.isNotEmpty
-                    ? (photo.startsWith('http')
+                    ? (photo.startsWith('http://') || photo.startsWith('https://')
                         ? Image.network(
                             photo,
                             fit: BoxFit.cover,

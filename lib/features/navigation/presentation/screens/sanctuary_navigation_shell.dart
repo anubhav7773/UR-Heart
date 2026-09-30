@@ -13,6 +13,7 @@ import '../../../profile/presentation/screens/my_persona_screen.dart';
 import '../../../resonances/presentation/screens/resonances_screen.dart';
 import '../../../rewards/presentation/screens/growth_hub_screen.dart';
 import '../../../ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
+import '../../../../core/services/sanctuary_notification_service.dart';
 import '../widgets/whatsapp_notification_banner.dart';
 
 /// Global Navigation Index State Provider for Tab Switching
@@ -87,13 +88,68 @@ class _SanctuaryNavigationShellState
         if (unreadList.isNotEmpty && mounted) {
           final isDark =
               ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
-          // Mark all unread notifications as seen in memory to strictly prevent duplicate notifications
+          // Mark all unread notifications as seen and dispatch to native Android system tray
           for (final notif in unreadList) {
             final notifId = notif['id']?.toString();
             if (notifId != null) _seenNotificationIds.add(notifId);
+
+            final nType = notif['type']?.toString().toLowerCase() ?? 'system';
+            final nTitle = notif['title']?.toString() ?? 'Sanctuary Resonance';
+            final nBody = notif['body']?.toString() ?? '';
+            final nData = notif['data'] as Map<String, dynamic>? ?? {};
+
+            try {
+              if (nType.contains('message') || nType.contains('chat')) {
+                final sName = nData['sender_name']?.toString() ??
+                    nTitle.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
+                final mId = nData['match_id']?.toString() ??
+                    notif['match_id']?.toString() ??
+                    'm_${DateTime.now().millisecondsSinceEpoch}';
+                final sId = nData['sender_id']?.toString() ?? 'user_peer';
+                SanctuaryNotificationService.instance.showDialogueMessageNotification(
+                  senderName: sName,
+                  messageText: nBody,
+                  matchId: mId,
+                  senderId: sId,
+                );
+              } else if (nType.contains('spark') || nType.contains('match')) {
+                final pName = nData['peer_name']?.toString() ?? nTitle;
+                final mId = nData['match_id']?.toString() ??
+                    'm_${DateTime.now().millisecondsSinceEpoch}';
+                final pId = nData['peer_id']?.toString() ?? 'peer_1';
+                SanctuaryNotificationService.instance.showMutualSparkNotification(
+                  peerName: pName,
+                  matchId: mId,
+                  peerId: pId,
+                );
+              } else if (nType.contains('direct')) {
+                final sName = nData['sender_name']?.toString() ?? 'Seeker';
+                final mId = nData['match_id']?.toString() ??
+                    'm_${DateTime.now().millisecondsSinceEpoch}';
+                final sId = nData['sender_id']?.toString() ?? 'user_peer';
+                SanctuaryNotificationService.instance.showDirectLetterNotification(
+                  senderName: sName,
+                  messageSnippet: nBody,
+                  matchId: mId,
+                  senderId: sId,
+                );
+              } else if (nType.contains('streak')) {
+                final streakVal = nData['streak_count'] as int? ?? 1;
+                SanctuaryNotificationService.instance.showStreakAlertNotification(
+                  streakCount: streakVal,
+                  hoursRemaining: 6,
+                );
+              } else {
+                SanctuaryNotificationService.instance.showSystemNotification(
+                  id: (notifId ?? 'notif').hashCode,
+                  title: nTitle,
+                  body: nBody,
+                );
+              }
+            } catch (_) {}
           }
 
-          // Show strictly only the single latest notification as an ultra-premium WhatsApp banner
+          // Show strictly only the single latest notification as an in-app banner
           final latestNotif = unreadList.last;
           _showWhatsAppNotification(latestNotif, isDark);
 

@@ -28,7 +28,7 @@ class CandidateProfile {
     required this.interests,
     required this.photoUrls,
     required this.blurHashes,
-    this.isVerified = true,
+    this.isVerified = false,
     this.isOnline = true,
   });
 
@@ -46,7 +46,7 @@ class CandidateProfile {
       interests: List<String>.from(json['interests'] as List? ?? ['Architecture', 'Tea']),
       photoUrls: List<String>.from(json['photo_urls'] as List? ?? json['photos'] as List? ?? []),
       blurHashes: List<String>.from(json['blur_hashes'] as List? ?? ['L6PZfSi_.AyE_3t7t7R**0o#DgR4']),
-      isVerified: json['is_verified'] as bool? ?? json['kyc_status'] as bool? ?? true,
+      isVerified: json['is_verified'] as bool? ?? json['is_kyc_verified'] as bool? ?? json['kyc_status'] as bool? ?? false,
       isOnline: json['is_online'] as bool? ?? true,
     );
   }

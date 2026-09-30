@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/feed_repository.dart';
 
 /// Immutable state container for Sanctuary Discovery Feed
@@ -58,10 +59,20 @@ class FeedController extends StateNotifier<FeedState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final deck = await _repository.fetchDiscoveryDeck();
+      final prefs = await SharedPreferences.getInstance();
+      final cachedLetters = prefs.getInt('ur_heart_direct_letters');
+      final resolvedLetters = (deck.directLettersCount != null && deck.directLettersCount! > 0)
+          ? deck.directLettersCount!
+          : (cachedLetters ?? state.directLettersCount);
+
+      if (deck.directLettersCount != null && deck.directLettersCount! > 0) {
+        await prefs.setInt('ur_heart_direct_letters', deck.directLettersCount!);
+      }
+
       state = state.copyWith(
         candidates: deck.candidates,
         swipesRemaining: deck.swipesRemaining ?? state.swipesRemaining,
-        directLettersCount: deck.directLettersCount ?? state.directLettersCount,
+        directLettersCount: resolvedLetters,
         isLoading: false,
       );
     } catch (e) {
@@ -151,6 +162,11 @@ class FeedController extends StateNotifier<FeedState> {
       candidates: updatedCandidates,
       directLettersCount: state.directLettersCount - 1,
     );
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('ur_heart_direct_letters', state.directLettersCount);
+    } catch (_) {}
 
     try {
       final remaining = await _repository.recordSwipe(
