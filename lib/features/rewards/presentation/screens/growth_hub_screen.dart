@@ -4,6 +4,7 @@ import '../../../../core/ads/ad_reward_models.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../controllers/growth_hub_controller.dart';
 import '../services/slumber_sensor_service.dart';
 import '../widgets/free_ads_tab_view.dart';
@@ -28,13 +29,25 @@ class GrowthHubScreen extends ConsumerStatefulWidget {
 class _GrowthHubScreenState extends ConsumerState<GrowthHubScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
+  String _getEffectiveUserId() {
+    if (widget.userId.isNotEmpty && widget.userId != '11111111-1111-1111-1111-111111111111') {
+      return widget.userId;
+    }
+    final authUid = ref.read(authControllerProvider).authenticatedUserId;
+    if (authUid != null && authUid.isNotEmpty) {
+      return authUid;
+    }
+    return widget.userId;
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _setupSlumberSensorListener();
     Future.microtask(() {
-      ref.read(growthHubControllerProvider.notifier).syncBalances(userId: widget.userId);
+      final uid = _getEffectiveUserId();
+      ref.read(growthHubControllerProvider.notifier).syncBalances(userId: uid);
     });
   }
 
@@ -48,9 +61,10 @@ class _GrowthHubScreenState extends ConsumerState<GrowthHubScreen> with SingleTi
           builder: (ctx) => MorningHarvestModal(
             isDark: isDark,
             onClaimHarvestTapped: () {
+              final uid = _getEffectiveUserId();
               ref.read(growthHubControllerProvider.notifier).triggerRewardedAd(
                     adType: AdPlacementTypes.morningHarvestUnlock,
-                    userId: widget.userId,
+                    userId: uid,
                     context: context,
                   );
             },
@@ -77,6 +91,11 @@ class _GrowthHubScreenState extends ConsumerState<GrowthHubScreen> with SingleTi
     final subText = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
     final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
     final surface = isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard;
+
+    final authUid = ref.watch(authControllerProvider).authenticatedUserId;
+    final effectiveUserId = (widget.userId.isNotEmpty && widget.userId != '11111111-1111-1111-1111-111111111111')
+        ? widget.userId
+        : (authUid != null && authUid.isNotEmpty ? authUid : widget.userId);
 
     return Scaffold(
       backgroundColor: bg,
@@ -139,7 +158,7 @@ class _GrowthHubScreenState extends ConsumerState<GrowthHubScreen> with SingleTi
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  FreeAdsTabView(isDark: isDark, userId: widget.userId),
+                  FreeAdsTabView(isDark: isDark, userId: effectiveUserId),
                   SovereignStoreTabView(isDark: isDark),
                 ],
               ),

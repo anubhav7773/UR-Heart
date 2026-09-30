@@ -101,7 +101,14 @@ async def get_discovery_feed(
         })
 
     print(f"[FEED DISCOVERY] Serving {len(cards)} live candidate cards from PostgreSQL to client", flush=True)
-    return {"candidates": cards, "data": cards}
+    return {
+        "candidates": cards,
+        "data": cards,
+        "swipes_remaining": current_user.swipes_remaining if current_user else 10,
+        "direct_letters_count": current_user.direct_letters_count if current_user else 0,
+        "streak_count": current_user.streak_count if current_user else 0,
+        "boost_points": current_user.boost_points if current_user else 0,
+    }
 
 
 @router.post("/swipes", status_code=status.HTTP_200_OK, summary="Record Profile Swipe Action")

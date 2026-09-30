@@ -57,8 +57,13 @@ class FeedController extends StateNotifier<FeedState> {
   Future<void> loadDiscoveryFeed() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final profiles = await _repository.getDiscoveryFeed();
-      state = state.copyWith(candidates: profiles, isLoading: false);
+      final deck = await _repository.fetchDiscoveryDeck();
+      state = state.copyWith(
+        candidates: deck.candidates,
+        swipesRemaining: deck.swipesRemaining ?? state.swipesRemaining,
+        directLettersCount: deck.directLettersCount ?? state.directLettersCount,
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }

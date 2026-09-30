@@ -6,15 +6,42 @@ import '../domain/candidate_profile.dart';
 
 export '../domain/candidate_profile.dart';
 
+/// Result container for discovery deck candidate cards and user balance quota
+class DiscoveryDeckResponse {
+  final List<CandidateProfile> candidates;
+  final int? swipesRemaining;
+  final int? directLettersCount;
+
+  const DiscoveryDeckResponse({
+    required this.candidates,
+    this.swipesRemaining,
+    this.directLettersCount,
+  });
+}
+
 /// Data repository for discovery feed, swipe actions, and pass vault
 class FeedRepository {
   final Dio _dio;
+  int? _lastSwipesRemaining;
+  int? _lastDirectLettersCount;
+
+  int? get lastSwipesRemaining => _lastSwipesRemaining;
+  int? get lastDirectLettersCount => _lastDirectLettersCount;
 
   FeedRepository([Dio? dio]) : _dio = dio ?? Dio();
 
-  /// Fetches real reciprocal discovery candidates from Supabase view.
+  /// Fetches real reciprocal discovery candidates from Supabase/PostgreSQL.
   /// Zero synthetic mock fallback.
   Future<List<CandidateProfile>> getDiscoveryFeed({
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final deck = await fetchDiscoveryDeck(limit: limit, cursor: cursor);
+    return deck.candidates;
+  }
+
+  /// Full 360-degree discovery deck fetch with live quota synchronization
+  Future<DiscoveryDeckResponse> fetchDiscoveryDeck({
     int limit = 20,
     String? cursor,
   }) async {
@@ -29,7 +56,17 @@ class FeedRepository {
           : {'candidates': response.data};
 
       final List<dynamic> data = body['candidates'] as List<dynamic>? ?? [];
-      return data.map((json) => CandidateProfile.fromJson(json as Map<String, dynamic>)).toList();
+      final candidates = data.map((json) => CandidateProfile.fromJson(json as Map<String, dynamic>)).toList();
+      final swipes = body['swipes_remaining'] as int?;
+      final letters = body['direct_letters_count'] as int?;
+      _lastSwipesRemaining = swipes;
+      _lastDirectLettersCount = letters;
+
+      return DiscoveryDeckResponse(
+        candidates: candidates,
+        swipesRemaining: swipes,
+        directLettersCount: letters,
+      );
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;

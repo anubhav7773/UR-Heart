@@ -23,6 +23,7 @@ from app.api.v1.endpoints import (
     notifications,
     ai_sanctuary,
     web_store,
+    media,
 )
 
 api_router = APIRouter()
@@ -97,5 +98,8 @@ api_router.include_router(ai_sanctuary.router)
 
 # 19. Web Sanctuary Store (10% Bonus Passes & Multi-Step Checkout)
 api_router.include_router(web_store.router)
+
+# 20. Cloudflare R2 & Sanctuary Direct Media Pipeline
+api_router.include_router(media.router)
 
 
