@@ -55,3 +55,7 @@ key.properties
 serviceAccountKey.json
 *service_account*.json
 .env
+
+# Graphify local cache & scratch (persisted in .planning/graphs/)
+graphify-out/
+
