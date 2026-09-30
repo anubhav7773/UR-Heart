@@ -67,6 +67,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
     } catch (_) {}
 
     Future.microtask(() {
+      if (!mounted) return;
       final mId = _resolveMatchId();
       final routeArgs = ModalRoute.of(context)?.settings.arguments;
       final notifier = ref.read(chatDialogueControllerProvider(mId).notifier);

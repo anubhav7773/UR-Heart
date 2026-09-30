@@ -37,7 +37,7 @@ void main() {
         minAgePref: 20,
         maxAgePref: 30,
         avatarUrl: 'https://cdn.example.com/avatar.webp',
-        momentPhotos: const [],
+        momentPhotos: [],
       );
 
       expect(profile.swipesRemaining, 10);

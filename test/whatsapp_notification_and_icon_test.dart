@@ -43,6 +43,7 @@ void main() {
         find.text('Hey, I felt a deep alignment with your reflections on literature.'),
         findsOneWidget,
       );
+      expect(dismissed, isFalse);
       expect(find.text('now'), findsOneWidget);
 
       // Verify WhatsApp green message badge icon is present
