@@ -113,15 +113,17 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
   Future<void> _initDialogue() async {
     state = state.copyWith(isLoading: true);
 
-    // 1. Fetch historical thread messages & live contact bridge status
+    // 1. Fetch historical thread messages & live contact bridge status & peer profile
     final history = await _chatRepository.fetchThreadMessages(state.matchId);
     final bridge = await _chatRepository.fetchContactBridgeStatus(state.matchId);
+    final peerData = await _chatRepository.fetchPeerProfile(state.matchId);
 
     state = state.copyWith(
       messages: history,
       isLoading: false,
       isConnected: true,
       bridgeData: bridge,
+      peerProfile: {...state.peerProfile, ...peerData},
     );
 
     // 2. Listen to incoming E2EE WebSocket events
@@ -228,6 +230,12 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
   }
 
   Future<void> _handleIncomingEncryptedMessage(Map<String, dynamic> rawEvent) async {
+    final senderId = rawEvent['sender_id'] as String? ?? '';
+    // Prevent duplicate bubbles by ignoring echoes of messages we sent ourselves
+    if (senderId.isNotEmpty && senderId == _currentUserId) {
+      return;
+    }
+
     final payloadType = rawEvent['payload_type'] as String? ?? '';
     String displayText = '';
 
@@ -243,18 +251,23 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       );
       displayText = decrypted ?? '[Encrypted Dialogue: Decryption Failed]';
     } else {
-      displayText = rawEvent['text'] as String? ?? '';
+      displayText = rawEvent['text'] as String? ?? rawEvent['content'] as String? ?? '';
+    }
+
+    final msgId = rawEvent['id'] as String? ?? rawEvent['message_id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
+    if (state.messages.any((m) => m.id == msgId)) {
+      return;
     }
 
     final newMsg = ChatMessage(
-      id: rawEvent['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: msgId,
       matchId: state.matchId,
-      senderId: rawEvent['sender_id'] as String? ?? '',
+      senderId: senderId,
       recipientId: _currentUserId,
       text: displayText,
       status: MessageDeliveryStatus.delivered,
       createdAt: DateTime.now(),
-      isMe: (rawEvent['sender_id'] as String?) == _currentUserId,
+      isMe: false,
     );
 
     state = state.copyWith(messages: [...state.messages, newMsg]);
@@ -283,15 +296,8 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
     state = state.copyWith(clearViolation: true);
 
-    // Cryptographically encrypt and dispatch via WSS
+    // Cryptographically encrypt and dispatch via WSS & persist exactly once
     await sendEncryptedMessage(trimmed);
-
-    // Also persist through repository for offline cache & audit
-    await _chatRepository.sendMessage(
-      matchId: state.matchId,
-      text: trimmed,
-      recipientId: recipientId,
-    );
 
     return true;
   }

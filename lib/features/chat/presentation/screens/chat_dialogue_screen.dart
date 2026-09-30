@@ -7,7 +7,6 @@ import '../../../../core/theme/theme_controller.dart';
 import '../../data/chat_repository.dart';
 import '../controllers/chat_dialogue_controller.dart';
 import '../widgets/ai_icebreaker_chips_row.dart';
-import '../widgets/chat_detail_action_bar.dart';
 import '../widgets/chat_safety_dialog.dart';
 import '../widgets/dialogue_message_bubble.dart';
 import '../widgets/nlp_warning_dialog.dart';
@@ -20,6 +19,12 @@ class ChatDialogueArguments {
   final String matchId, recipientId, recipientName, sharedContextQuote;
   final int recipientAge;
   final bool isOnline, hasWaKey;
+  final String recipientAvatarUrl;
+  final bool isVerified;
+  final String bio;
+  final String location;
+  final List<String> interests;
+  final String gender;
 
   const ChatDialogueArguments({
     required this.matchId,
@@ -28,6 +33,12 @@ class ChatDialogueArguments {
     this.recipientAge = 25,
     this.isOnline = true,
     this.hasWaKey = false,
+    this.recipientAvatarUrl = '',
+    this.isVerified = false,
+    this.bio = '',
+    this.location = '',
+    this.interests = const [],
+    this.gender = '',
     this.sharedContextQuote = 'Sacred Mindful Dialogue',
   });
 }
@@ -77,6 +88,13 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
           'recipient_id': routeArgs.recipientId,
           'age': routeArgs.recipientAge,
           'is_online': routeArgs.isOnline,
+          'avatar_url': routeArgs.recipientAvatarUrl,
+          'recipient_avatar_url': routeArgs.recipientAvatarUrl,
+          'is_verified': routeArgs.isVerified,
+          'bio': routeArgs.bio,
+          'location': routeArgs.location,
+          'interests': routeArgs.interests,
+          'gender': routeArgs.gender,
         });
       } else if (routeArgs is Map<String, dynamic>) {
         notifier.setPeerProfile({
@@ -84,7 +102,23 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
               routeArgs['peer_name'] ??
               routeArgs['name'],
           'recipient_id': routeArgs['partner_id'] ?? routeArgs['peer_id'],
-          'avatar_url': routeArgs['partner_photo'] ?? routeArgs['peer_photo'],
+          'avatar_url': routeArgs['partner_photo'] ??
+              routeArgs['peer_photo'] ??
+              routeArgs['recipient_avatar_url'] ??
+              routeArgs['avatar_url'],
+          'recipient_avatar_url': routeArgs['partner_photo'] ??
+              routeArgs['peer_photo'] ??
+              routeArgs['recipient_avatar_url'] ??
+              routeArgs['avatar_url'],
+          'age': routeArgs['partner_age'] ?? routeArgs['peer_age'] ?? routeArgs['age'],
+          'is_verified': routeArgs['is_verified'] ??
+              routeArgs['is_kyc_verified'] ??
+              routeArgs['kyc_status'] ??
+              false,
+          'bio': routeArgs['bio'] ?? '',
+          'location': routeArgs['location'] ?? routeArgs['city'] ?? '',
+          'interests': routeArgs['interests'] ?? routeArgs['passions'] ?? <String>[],
+          'gender': routeArgs['gender'] ?? '',
           'is_online': true,
         });
       }
@@ -135,6 +169,23 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
         mapArgs?['age'] ??
         peer['age'];
 
+    final avatarUrl = (args?.recipientAvatarUrl.isNotEmpty == true
+            ? args!.recipientAvatarUrl
+            : (peer['avatar_url'] as String? ??
+                peer['recipient_avatar_url'] as String? ??
+                peer['partner_photo'] as String? ??
+                peer['peer_photo'] as String? ??
+                peer['avatar'] as String? ??
+                ''))
+        .trim();
+    final hasValidAvatar = avatarUrl.isNotEmpty && avatarUrl.startsWith('http');
+
+    final isVerified = args?.isVerified ??
+        (peer['is_verified'] as bool? ??
+            peer['is_kyc_verified'] as bool? ??
+            peer['kyc_status'] as bool? ??
+            false);
+
     final displayName = args != null
         ? '${args.recipientName}, ${args.recipientAge}'
         : (fallbackAge != null
@@ -174,75 +225,93 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
         elevation: 0.5,
         leading: BackButton(color: primaryText),
         titleSpacing: 0,
-        title: Row(
-          children: [
-            Stack(
+        title: InkWell(
+          onTap: () => _showPeerProfileModal(
+            context: context,
+            isDark: isDark,
+            displayName: displayName,
+            avatarUrl: avatarUrl,
+            hasValidAvatar: hasValidAvatar,
+            isVerified: isVerified,
+            isOnline: isOnline,
+            peer: peer,
+            args: args,
+            pine: pine,
+            primaryText: primaryText,
+            subText: subText,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Row(
               children: [
-                CircleAvatar(
-                  radius: 19,
-                  backgroundColor: pine.withValues(alpha: 0.15),
-                  child: Text(displayName.isNotEmpty ? displayName[0] : 'S',
-                      style:
-                          TextStyle(color: pine, fontWeight: FontWeight.bold)),
-                ),
-                if (isOnline)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? DarkSanctuaryTokens.badgeOnline
-                            : LightSanctuaryTokens.badgeOnline,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 19,
+                      backgroundColor: pine.withValues(alpha: 0.15),
+                      backgroundImage:
+                          hasValidAvatar ? NetworkImage(avatarUrl) : null,
+                      child: !hasValidAvatar
+                          ? Text(displayName.isNotEmpty ? displayName[0] : 'S',
+                              style:
+                                  TextStyle(color: pine, fontWeight: FontWeight.bold))
+                          : null,
                     ),
+                    if (isOnline)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? DarkSanctuaryTokens.badgeOnline
+                                : LightSanctuaryTokens.badgeOnline,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              displayName,
+                              style: TextStyle(
+                                  fontFamily: 'Serif',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryText),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isVerified) ...[
+                            const SizedBox(width: 4),
+                            Icon(Icons.verified, size: 15, color: pine),
+                          ],
+                        ],
+                      ),
+                      Text(isOnline ? 'Quietly present' : 'Last seen recently',
+                          style: TextStyle(fontSize: 11, color: subText)),
+                    ],
                   ),
+                ),
               ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    displayName,
-                    style: TextStyle(
-                        fontFamily: 'Serif',
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: primaryText),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(isOnline ? 'Quietly present' : 'Last seen recently',
-                      style: TextStyle(fontSize: 11, color: subText)),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
         actions: [
-          ChatDetailActionBar(
-            bridgeStage: dialogueState.bridgeStage,
-            isDark: isDark,
-            onStartAudioCall: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text('Initiating Sacred Audio Whisper connection...')),
-              );
-            },
-            onSendMedia: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Opening Encrypted Moments Media Vault...')),
-              );
-            },
-          ),
           SacredBridgeAppBarAction(
             matchId: mId,
             isDark: isDark,
@@ -295,7 +364,22 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                       'peer_seeker');
               final rName = args?.recipientName ??
                   (peer['full_name'] as String? ?? 'Seeker');
-              if (val == 'report') {
+              if (val == 'info') {
+                _showPeerProfileModal(
+                  context: context,
+                  isDark: isDark,
+                  displayName: displayName,
+                  avatarUrl: avatarUrl,
+                  hasValidAvatar: hasValidAvatar,
+                  isVerified: isVerified,
+                  isOnline: isOnline,
+                  peer: peer,
+                  args: args,
+                  pine: pine,
+                  primaryText: primaryText,
+                  subText: subText,
+                );
+              } else if (val == 'report') {
                 ChatSafetyDialog.showReportSheet(
                   context: context,
                   ref: ref,
@@ -320,6 +404,23 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
               }
             },
             itemBuilder: (ctx) => [
+              PopupMenuItem<String>(
+                value: 'info',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.person_pin_outlined,
+                      size: 20,
+                      color: pine,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Seeker Profile Info',
+                      style: TextStyle(color: primaryText, fontSize: 13.5),
+                    ),
+                  ],
+                ),
+              ),
               PopupMenuItem<String>(
                 value: 'report',
                 child: Row(
@@ -415,6 +516,317 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showPeerProfileModal({
+    required BuildContext context,
+    required bool isDark,
+    required String displayName,
+    required String avatarUrl,
+    required bool hasValidAvatar,
+    required bool isVerified,
+    required bool isOnline,
+    required Map<String, dynamic> peer,
+    required ChatDialogueArguments? args,
+    required Color pine,
+    required Color primaryText,
+    required Color subText,
+  }) {
+    final bio = (args?.bio.isNotEmpty == true
+            ? args!.bio
+            : (peer['bio'] as String? ?? ''))
+        .trim();
+    final location = (args?.location.isNotEmpty == true
+            ? args!.location
+            : (peer['location'] as String? ??
+                peer['city'] as String? ??
+                'Ayodhya, Uttar Pradesh · GPS Verified'))
+        .trim();
+    final intentions = (peer['intentions'] as String? ??
+            'Appreciating intentional conversations and authentic connection.')
+        .trim();
+    final interestsList = (args?.interests.isNotEmpty == true
+        ? args!.interests
+        : ((peer['interests'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const <String>[]));
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final cardBg = isDark
+            ? DarkSanctuaryTokens.surfaceCard
+            : LightSanctuaryTokens.surfaceCard;
+        final cardBorder = isDark
+            ? DarkSanctuaryTokens.surfaceCardBorder
+            : LightSanctuaryTokens.surfaceCardBorder;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: subText.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 46,
+                        backgroundColor: pine.withValues(alpha: 0.15),
+                        backgroundImage:
+                            hasValidAvatar ? NetworkImage(avatarUrl) : null,
+                        child: !hasValidAvatar
+                            ? Text(
+                                displayName.isNotEmpty ? displayName[0] : 'S',
+                                style: TextStyle(
+                                  color: pine,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                      if (isOnline)
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? DarkSanctuaryTokens.badgeOnline
+                                : LightSanctuaryTokens.badgeOnline,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: cardBg, width: 2.5),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          displayName,
+                          style: TextStyle(
+                            fontFamily: 'Serif',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: primaryText,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isVerified) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.verified, size: 20, color: pine),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isVerified
+                          ? pine.withValues(alpha: 0.15)
+                          : subText.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isVerified
+                              ? Icons.check_circle_outline
+                              : Icons.shield_outlined,
+                          size: 13,
+                          color: isVerified ? pine : subText,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isVerified
+                              ? 'Identity Verified Seeker'
+                              : 'Sanctuary Seeker',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isVerified ? pine : subText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.location_on_outlined,
+                          size: 14, color: subText),
+                      const SizedBox(width: 4),
+                      Text(
+                        location.isNotEmpty
+                            ? location
+                            : 'Ayodhya, Uttar Pradesh · GPS Verified',
+                        style: TextStyle(fontSize: 12, color: subText),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Divider(color: cardBorder, height: 1),
+                  const SizedBox(height: 14),
+                  if (bio.isNotEmpty) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Sacred Reflection',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          color: pine,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? DarkSanctuaryTokens.inputBackground
+                            : LightSanctuaryTokens.chipBackground,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        bio,
+                        style: TextStyle(
+                            fontSize: 13, color: primaryText, height: 1.4),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Resonance Intentions',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        color: pine,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? DarkSanctuaryTokens.inputBackground
+                          : LightSanctuaryTokens.chipBackground,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      intentions,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: primaryText,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  if (interestsList.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Core Passions',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          color: pine,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: interestsList.map((interest) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: pine.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              interest,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: pine,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: pine,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Back to Dialogue',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

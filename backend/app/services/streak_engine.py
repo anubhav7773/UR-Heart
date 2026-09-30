@@ -32,7 +32,6 @@ class StreakEngine:
                 prev_streak = user.streak_count
                 user.streak_count = 0
                 user.boost_points = max(0, (user.boost_points or 0) - 2)
-                user.reveal_tokens_count = max(0, (user.reveal_tokens_count or 1) - 1)
                 user.streak_expires_at = None
 
                 try:
@@ -42,7 +41,7 @@ class StreakEngine:
                         user_id=str(user.id),
                         notif_type="streak_broken",
                         title="🥀 Streak Broken & Profile Downgraded",
-                        body=f"Your {prev_streak}-day sanctuary streak expired. Your profile discovery ranking was downgraded and 1 reveal token was consumed.",
+                        body=f"Your {prev_streak}-day sanctuary streak expired. Your profile discovery ranking was downgraded.",
                         data={
                             "action": "open_growth_hub",
                             "tab": "free_ads",

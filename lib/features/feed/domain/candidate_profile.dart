@@ -10,6 +10,7 @@ class CandidateProfile {
   final int resonanceScore;
   final String intentQuote;
   final List<String> interests;
+  final String avatarUrl;
   final List<String> photoUrls;
   final List<String> blurHashes;
   final bool isVerified;
@@ -26,13 +27,33 @@ class CandidateProfile {
     required this.resonanceScore,
     required this.intentQuote,
     required this.interests,
+    this.avatarUrl = '',
     required this.photoUrls,
     required this.blurHashes,
     this.isVerified = false,
     this.isOnline = true,
   });
 
+  List<String> get photos => photoUrls;
+
   factory CandidateProfile.fromJson(Map<String, dynamic> json) {
+    final avatar = json['avatar_url'] as String? ?? json['avatar'] as String? ?? '';
+    final rawPhotos = (json['photo_urls'] as List? ?? json['photos'] as List? ?? [])
+        .map((e) => e?.toString() ?? '')
+        .where((e) => e.trim().isNotEmpty)
+        .toList();
+    final allPhotos = <String>[];
+    if (avatar.trim().isNotEmpty) {
+      allPhotos.add(avatar.trim());
+    }
+    for (final p in rawPhotos) {
+      if (p.trim().isNotEmpty && !allPhotos.contains(p.trim())) {
+        allPhotos.add(p.trim());
+      }
+    }
+
+    final resolvedAvatar = avatar.trim().isNotEmpty ? avatar.trim() : (allPhotos.isNotEmpty ? allPhotos.first : '');
+
     return CandidateProfile(
       id: json['id'] as String? ?? json['user_id'] as String? ?? 'cand_${DateTime.now().millisecondsSinceEpoch}',
       fullName: json['full_name'] as String? ?? json['name'] as String? ?? 'Seeker',
@@ -44,7 +65,8 @@ class CandidateProfile {
       resonanceScore: json['resonance_score'] as int? ?? 90,
       intentQuote: json['intent_quote'] as String? ?? json['bio'] as String? ?? 'Authentic Intention: Seeking slow conversations.',
       interests: List<String>.from(json['interests'] as List? ?? ['Architecture', 'Tea']),
-      photoUrls: List<String>.from(json['photo_urls'] as List? ?? json['photos'] as List? ?? []),
+      avatarUrl: resolvedAvatar,
+      photoUrls: allPhotos,
       blurHashes: List<String>.from(json['blur_hashes'] as List? ?? ['L6PZfSi_.AyE_3t7t7R**0o#DgR4']),
       isVerified: json['is_verified'] as bool? ?? json['is_kyc_verified'] as bool? ?? json['kyc_status'] as bool? ?? false,
       isOnline: json['is_online'] as bool? ?? true,
@@ -62,6 +84,7 @@ class CandidateProfile {
     int? resonanceScore,
     String? intentQuote,
     List<String>? interests,
+    String? avatarUrl,
     List<String>? photoUrls,
     List<String>? blurHashes,
     bool? isVerified,
@@ -78,6 +101,7 @@ class CandidateProfile {
       resonanceScore: resonanceScore ?? this.resonanceScore,
       intentQuote: intentQuote ?? this.intentQuote,
       interests: interests ?? this.interests,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       photoUrls: photoUrls ?? this.photoUrls,
       blurHashes: blurHashes ?? this.blurHashes,
       isVerified: isVerified ?? this.isVerified,
@@ -98,6 +122,8 @@ class CandidateProfile {
     'intent_quote': intentQuote,
     'bio': intentQuote,
     'interests': interests,
+    'avatar_url': avatarUrl.isNotEmpty ? avatarUrl : (photoUrls.isNotEmpty ? photoUrls.first : ''),
+    'avatar': avatarUrl.isNotEmpty ? avatarUrl : (photoUrls.isNotEmpty ? photoUrls.first : ''),
     'photos': photoUrls,
     'photo_urls': photoUrls,
     'blur_hashes': blurHashes,

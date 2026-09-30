@@ -84,13 +84,21 @@ class RecentSparksCarousel extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.chipBackground,
                   border: Border.all(color: borderColor, width: 2.0),
+                  image: spark.avatarUrl.isNotEmpty && spark.avatarUrl.startsWith('http')
+                      ? DecorationImage(
+                          image: NetworkImage(spark.avatarUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: Center(
-                  child: Text(
-                    spark.name.isNotEmpty ? spark.name[0] : 'S',
-                    style: AppTypography.titleH2.copyWith(color: pine, fontSize: 20.0),
-                  ),
-                ),
+                child: (spark.avatarUrl.isEmpty || !spark.avatarUrl.startsWith('http'))
+                    ? Center(
+                        child: Text(
+                          spark.name.isNotEmpty ? spark.name[0] : 'S',
+                          style: AppTypography.titleH2.copyWith(color: pine, fontSize: 20.0),
+                        ),
+                      )
+                    : null,
               ),
               if (spark.isOnline)
                 Positioned(

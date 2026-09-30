@@ -329,7 +329,7 @@ async def claim_ad_reward(
         if cycle_count == 0:
             target_user.reveal_tokens_count = (target_user.reveal_tokens_count or 0) + 1
             token_granted = True
-            whatsapp_progress = 3
+            whatsapp_progress = 0
             reward_msg = f"Sacred Bridge ritual complete (3/3)! +1 Reveal Token credited! Total Tokens: {target_user.reveal_tokens_count}"
         else:
             token_granted = False

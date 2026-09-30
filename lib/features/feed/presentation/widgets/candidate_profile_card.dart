@@ -45,15 +45,19 @@ class _CandidateProfileCardState extends State<CandidateProfileCard> {
         ? DarkSanctuaryTokens.accentTerracotta
         : LightSanctuaryTokens.accentTerracotta;
 
-    final rawPhotos = (widget.candidate['photos'] as List<dynamic>?)?.cast<String>() ??
-        (widget.candidate['photo_urls'] as List<dynamic>?)?.cast<String>() ??
+    final rawPhotos = (widget.candidate['photos'] as List<dynamic>?)?.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList() ??
+        (widget.candidate['photo_urls'] as List<dynamic>?)?.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList() ??
         [];
-    final avatar = widget.candidate['avatar_url'] as String? ?? widget.candidate['avatar'] as String?;
+    final avatar = (widget.candidate['avatar_url'] as String? ?? widget.candidate['avatar'] as String?)?.trim();
     final photos = <String>[];
-    if (avatar != null && avatar.isNotEmpty && !rawPhotos.contains(avatar)) {
+    if (avatar != null && avatar.isNotEmpty) {
       photos.add(avatar);
     }
-    photos.addAll(rawPhotos.where((p) => p.isNotEmpty));
+    for (final p in rawPhotos) {
+      if (!photos.contains(p)) {
+        photos.add(p);
+      }
+    }
     final blurHashes = (widget.candidate['blur_hashes'] as List<dynamic>?)?.cast<String>() ?? [];
 
     return Listener(

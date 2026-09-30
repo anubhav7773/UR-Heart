@@ -41,7 +41,8 @@ class _PhotoCarouselWithDotsState extends State<PhotoCarouselWithDots> {
     final surfaceMuted = widget.isDark
         ? DarkSanctuaryTokens.surfaceMuted
         : LightSanctuaryTokens.surfaceMuted;
-    final photoList = widget.photos.isNotEmpty ? widget.photos : [''];
+    final validPhotos = widget.photos.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    final photoList = validPhotos.isNotEmpty ? validPhotos : [''];
 
     return SizedBox(
       height: 380,

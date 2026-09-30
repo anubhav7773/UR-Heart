@@ -33,11 +33,15 @@ class ChatMessage {
       matchId: json['match_id'] as String? ?? '',
       senderId: json['sender_id'] as String? ?? '',
       recipientId: json['recipient_id'] as String? ?? '',
-      text: json['text'] as String? ?? json['message'] as String? ?? '',
+      text: json['text'] as String? ??
+          json['content'] as String? ??
+          json['message'] as String? ??
+          json['encrypted_text'] as String? ??
+          '',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      status: _parseDeliveryStatus(json['status']),
+      status: _parseDeliveryStatus(json['status'] ?? json['delivery_status']),
       isMe: json['is_me'] as bool? ?? false,
     );
   }
@@ -81,12 +85,18 @@ class ChatConversation {
   final String recipientAvatarUrl;
   final bool isOnline;
   final bool hasWaKey;
+  final bool isVerified;
   final String lastMessageText;
   final DateTime lastMessageTimestamp;
   final MessageDeliveryStatus lastMessageStatus;
   final int unreadCount;
   final String categoryTag;
   final String sharedContextQuote;
+  final String bio;
+  final String location;
+  final String gender;
+  final List<String> interests;
+  final String intentions;
 
   const ChatConversation({
     required this.matchId,
@@ -96,23 +106,55 @@ class ChatConversation {
     required this.recipientAvatarUrl,
     required this.isOnline,
     required this.hasWaKey,
+    this.isVerified = false,
     required this.lastMessageText,
     required this.lastMessageTimestamp,
     required this.lastMessageStatus,
     required this.unreadCount,
     required this.categoryTag,
     required this.sharedContextQuote,
+    this.bio = '',
+    this.location = '',
+    this.gender = '',
+    this.interests = const [],
+    this.intentions = '',
   });
 
   factory ChatConversation.fromJson(Map<String, dynamic> json) {
     return ChatConversation(
       matchId: json['match_id'] as String? ?? json['id'] as String? ?? '',
-      recipientId: json['recipient_id'] as String? ?? json['partner_id'] as String? ?? '',
-      recipientName: json['recipient_name'] as String? ?? json['full_name'] as String? ?? 'Sanctuary Seeker',
-      recipientAge: json['recipient_age'] as int? ?? json['age'] as int? ?? 24,
-      recipientAvatarUrl: json['recipient_avatar_url'] as String? ?? json['avatar_url'] as String? ?? '',
-      isOnline: json['is_online'] as bool? ?? false,
+      recipientId: json['recipient_id'] as String? ??
+          json['peer_id'] as String? ??
+          json['partner_id'] as String? ??
+          '',
+      recipientName: json['recipient_name'] as String? ??
+          json['peer_name'] as String? ??
+          json['partner_name'] as String? ??
+          json['full_name'] as String? ??
+          json['name'] as String? ??
+          'Sanctuary Seeker',
+      recipientAge: json['recipient_age'] as int? ??
+          json['peer_age'] as int? ??
+          json['partner_age'] as int? ??
+          json['age'] as int? ??
+          24,
+      recipientAvatarUrl: json['recipient_avatar_url'] as String? ??
+          json['peer_photo'] as String? ??
+          json['partner_photo'] as String? ??
+          json['avatar_url'] as String? ??
+          json['avatar'] as String? ??
+          '',
+      isOnline: json['is_online'] as bool? ?? true,
       hasWaKey: json['has_wa_key'] as bool? ?? false,
+      isVerified: json['is_verified'] as bool? ??
+          json['is_kyc_verified'] as bool? ??
+          json['kyc_status'] as bool? ??
+          false,
+      bio: json['bio'] as String? ?? '',
+      location: json['location'] as String? ?? json['city'] as String? ?? '',
+      gender: json['gender'] as String? ?? '',
+      interests: (json['interests'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      intentions: json['intentions'] as String? ?? '',
       lastMessageText: json['last_message_text'] as String? ?? json['last_message'] as String? ?? '',
       lastMessageTimestamp: json['last_message_timestamp'] != null
           ? DateTime.tryParse(json['last_message_timestamp'].toString()) ?? DateTime.now()
@@ -132,12 +174,18 @@ class ChatConversation {
     String? recipientAvatarUrl,
     bool? isOnline,
     bool? hasWaKey,
+    bool? isVerified,
     String? lastMessageText,
     DateTime? lastMessageTimestamp,
     MessageDeliveryStatus? lastMessageStatus,
     int? unreadCount,
     String? categoryTag,
     String? sharedContextQuote,
+    String? bio,
+    String? location,
+    String? gender,
+    List<String>? interests,
+    String? intentions,
   }) {
     return ChatConversation(
       matchId: matchId ?? this.matchId,
@@ -147,12 +195,18 @@ class ChatConversation {
       recipientAvatarUrl: recipientAvatarUrl ?? this.recipientAvatarUrl,
       isOnline: isOnline ?? this.isOnline,
       hasWaKey: hasWaKey ?? this.hasWaKey,
+      isVerified: isVerified ?? this.isVerified,
       lastMessageText: lastMessageText ?? this.lastMessageText,
       lastMessageTimestamp: lastMessageTimestamp ?? this.lastMessageTimestamp,
       lastMessageStatus: lastMessageStatus ?? this.lastMessageStatus,
       unreadCount: unreadCount ?? this.unreadCount,
       categoryTag: categoryTag ?? this.categoryTag,
       sharedContextQuote: sharedContextQuote ?? this.sharedContextQuote,
+      bio: bio ?? this.bio,
+      location: location ?? this.location,
+      gender: gender ?? this.gender,
+      interests: interests ?? this.interests,
+      intentions: intentions ?? this.intentions,
     );
   }
 }
@@ -167,6 +221,12 @@ class SparkProfile {
   final String avatarUrl;
   final bool isOnline;
   final String matchType; // 'MUTUAL' or 'DIRECT MSG'
+  final bool isVerified;
+  final String bio;
+  final String location;
+  final String gender;
+  final List<String> interests;
+  final String intentions;
 
   const SparkProfile({
     required this.id,
@@ -175,16 +235,34 @@ class SparkProfile {
     required this.avatarUrl,
     required this.isOnline,
     required this.matchType,
+    this.isVerified = false,
+    this.bio = '',
+    this.location = '',
+    this.gender = '',
+    this.interests = const [],
+    this.intentions = '',
   });
 
   factory SparkProfile.fromJson(Map<String, dynamic> json) {
     return SparkProfile(
-      id: json['id'] as String? ?? '',
+      id: json['id'] as String? ?? json['match_id'] as String? ?? '',
       name: json['name'] as String? ?? json['full_name'] as String? ?? 'Seeker',
       age: json['age'] as int? ?? 24,
-      avatarUrl: json['avatar_url'] as String? ?? json['photo_url'] as String? ?? '',
+      avatarUrl: json['avatar_url'] as String? ??
+          json['recipient_avatar_url'] as String? ??
+          json['photo_url'] as String? ??
+          '',
       isOnline: json['is_online'] as bool? ?? true,
       matchType: json['match_type'] as String? ?? 'MUTUAL',
+      isVerified: json['is_verified'] as bool? ??
+          json['is_kyc_verified'] as bool? ??
+          json['kyc_status'] as bool? ??
+          false,
+      bio: json['bio'] as String? ?? '',
+      location: json['location'] as String? ?? json['city'] as String? ?? '',
+      gender: json['gender'] as String? ?? '',
+      interests: (json['interests'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      intentions: json['intentions'] as String? ?? '',
     );
   }
 }

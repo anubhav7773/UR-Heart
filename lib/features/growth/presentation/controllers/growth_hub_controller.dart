@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -121,11 +122,22 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       if (cached != null && cached.isNotEmpty && state.referralCode.isEmpty) {
         state = state.copyWith(referralCode: cached);
       }
+      final localTokens = prefs.getInt('ur_heart_reveal_tokens') ?? state.revealTokensCount;
+      final localProg = prefs.getInt('ur_heart_whatsapp_progress') ?? state.whatsappProgress;
+      state = state.copyWith(
+        revealTokensCount: localTokens,
+        whatsappProgress: localProg,
+      );
     } catch (_) {}
 
     if (_profileRepo == null) return;
     try {
       final profile = await _profileRepo!.fetchMyProfile();
+      final prefs = await SharedPreferences.getInstance();
+      final localTokens = prefs.getInt('ur_heart_reveal_tokens') ?? 0;
+      final effectiveTokens = math.max(localTokens, profile.revealTokensCount);
+      await prefs.setInt('ur_heart_reveal_tokens', effectiveTokens);
+
       state = state.copyWith(
         userId: profile.id,
         referralCode: profile.referralCode,
@@ -138,7 +150,7 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
         isSlumberActive: profile.nightSlumber,
         streakCount: profile.streakCount,
         boostPoints: profile.boostPoints,
-        revealTokensCount: profile.revealTokensCount,
+        revealTokensCount: effectiveTokens,
         secondsRemaining: profile.secondsRemaining,
       );
     } catch (_) {}
@@ -236,10 +248,14 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
               rewardNotice = map['message'].toString();
             }
             if (map['reveal_tokens_count'] != null) {
-              state = state.copyWith(revealTokensCount: map['reveal_tokens_count'] as int);
+              final sTokens = map['reveal_tokens_count'] as int;
+              state = state.copyWith(revealTokensCount: sTokens);
+              SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_reveal_tokens', sTokens));
             }
             if (map['whatsapp_progress'] != null) {
-              state = state.copyWith(whatsappProgress: map['whatsapp_progress'] as int);
+              final sProg = map['whatsapp_progress'] as int;
+              state = state.copyWith(whatsappProgress: sProg);
+              SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_whatsapp_progress', sProg));
             }
           }
         } catch (e) {
@@ -288,15 +304,24 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       case 'sacred_bridge_reveal':
         final currentProg = state.whatsappProgress;
         if (currentProg >= 2) {
+          final nextTokens = state.revealTokensCount + 1;
           state = state.copyWith(
-            whatsappProgress: 3,
-            revealTokensCount: state.revealTokensCount + 1,
+            whatsappProgress: 0,
+            revealTokensCount: nextTokens,
             isWhatsappUnlocked: true,
           );
+          SharedPreferences.getInstance().then((p) {
+            p.setInt('ur_heart_reveal_tokens', nextTokens);
+            p.setInt('ur_heart_whatsapp_progress', 0);
+          });
         } else {
+          final nextProg = currentProg + 1;
           state = state.copyWith(
-            whatsappProgress: currentProg + 1,
+            whatsappProgress: nextProg,
           );
+          SharedPreferences.getInstance().then((p) {
+            p.setInt('ur_heart_whatsapp_progress', nextProg);
+          });
         }
         break;
     }

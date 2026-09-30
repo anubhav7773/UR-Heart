@@ -249,6 +249,17 @@ class ChatRepository {
     }
   }
 
+  /// Fetches peer seeker profile details for a match
+  Future<Map<String, dynamic>> fetchPeerProfile(String matchId) async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/chat/threads/$matchId/peer');
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return {};
+  }
+
   void _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
       throw const NetworkUnavailableException();

@@ -74,9 +74,11 @@ async def get_discovery_feed(
 
     cards = []
     for u in users:
-        photos = list(u.photos or [])
-        if not photos and u.avatar_url:
-            photos.append(u.avatar_url)
+        clean_photos = [p for p in (u.photos or []) if p and str(p).strip()]
+        if u.avatar_url and u.avatar_url.strip() and u.avatar_url.strip() not in clean_photos:
+            clean_photos.insert(0, u.avatar_url.strip())
+
+        primary_avatar = u.avatar_url.strip() if (u.avatar_url and u.avatar_url.strip()) else (clean_photos[0] if clean_photos else "")
 
         age = _calculate_age(u.dob)
         cards.append({
@@ -92,7 +94,10 @@ async def get_discovery_feed(
             "ai_resonance_insight": "Shared reverence for depth, patience, and authentic conversation.",
             "authentic_intention": u.bio or "Looking for an intentional sanctuary.",
             "tags": [u.profession, "Mindfulness", "Slow Living"] if u.profession else ["Mindfulness", "Art & Literature", "Stillness"],
-            "photos": photos,
+            "avatar_url": primary_avatar,
+            "avatar": primary_avatar,
+            "photos": clean_photos,
+            "photo_urls": clean_photos,
             "is_kyc_verified": bool(u.kyc_status),
             "is_verified": bool(u.kyc_status),
             "kyc_status": bool(u.kyc_status),
