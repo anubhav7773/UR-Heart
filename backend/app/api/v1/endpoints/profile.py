@@ -43,6 +43,9 @@ class ProfileUpdateRequest(BaseModel):
     avatar_url: Optional[str] = None
     preferred_age_min: Optional[int] = Field(None, ge=18, le=100)
     preferred_age_max: Optional[int] = Field(None, ge=18, le=100)
+    dob: Optional[str] = None
+    birth_date: Optional[str] = None
+    age: Optional[int] = None
     email: Optional[str] = None
 
     model_config = ConfigDict(extra="ignore")
@@ -92,7 +95,7 @@ async def get_my_authenticated_profile(
         "boost_points": current_user.boost_points or 0,
         "last_streak_ad_at": current_user.last_streak_ad_at.isoformat() if current_user.last_streak_ad_at else None,
         "streak_expires_at": current_user.streak_expires_at.isoformat() if current_user.streak_expires_at else None,
-        "reveal_tokens_count": current_user.reveal_tokens_count if current_user.reveal_tokens_count is not None else 1,
+        "reveal_tokens_count": current_user.reveal_tokens_count if current_user.reveal_tokens_count is not None else 0,
         "streak_info": streak_info,
         "referral_code": current_user.referral_code,
         "is_profile_completed": current_user.is_profile_completed,
@@ -210,6 +213,38 @@ async def update_my_profile(
 
     update_data.pop("photo_slots_count", None)
     email_val = update_data.pop("email", None)
+
+    # Normalize gender to satisfy PostgreSQL users_gender_check constraint
+    if "gender" in update_data and update_data["gender"]:
+        g = str(update_data["gender"]).strip().lower()
+        if g in ("male", "man", "men"):
+            update_data["gender"] = "Male"
+        elif g in ("female", "woman", "women"):
+            update_data["gender"] = "Female"
+        elif g in ("other", "non-binary", "nonbinary", "queer", "transgender"):
+            update_data["gender"] = "Other"
+        else:
+            update_data["gender"] = "Unspecified"
+
+    # Robust DOB & Age parsing
+    from datetime import datetime
+    raw_dob = update_data.pop("dob", None) or update_data.pop("birth_date", None)
+    age_val = update_data.pop("age", None)
+    parsed_dob = None
+    if raw_dob:
+        raw_dob_clean = str(raw_dob).strip()
+        for fmt in ("%Y-%m-%d", "%d %b %Y", "%d %B %Y", "%d/%m/%Y", "%Y/%m/%d", "%b %d, %Y"):
+            try:
+                parsed_dob = datetime.strptime(raw_dob_clean, fmt).date()
+                break
+            except ValueError:
+                pass
+    if not parsed_dob and age_val and isinstance(age_val, int) and 18 <= age_val <= 100:
+        today_d = date.today()
+        parsed_dob = date(today_d.year - age_val, 1, 1)
+
+    if parsed_dob:
+        update_data["dob"] = parsed_dob
 
     # SEC-MED-05: Geolocation Precision Truncation (Fuzzy ~1.1km radius, 2 decimal places for DPDP compliance)
     if "latitude" in update_data and update_data["latitude"] is not None:

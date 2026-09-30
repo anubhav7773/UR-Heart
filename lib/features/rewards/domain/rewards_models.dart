@@ -11,14 +11,14 @@ class RewardHubState {
   final String? ephemeralWhatsappLink;
 
   const RewardHubState({
-    this.swipesRemaining = 25,
-    this.directLettersCount = 1,
-    this.whatsappProgress = 2,
-    this.peerWhatsappProgress = 2,
+    this.swipesRemaining = 10,
+    this.directLettersCount = 0,
+    this.whatsappProgress = 0,
+    this.peerWhatsappProgress = 0,
     this.isSlumberActive = false,
-    this.referralCode = 'SANCTUARY-09',
-    this.activeMatchId = 'match-sacred-enclave-01',
-    this.activeMatchName = 'Ananya',
+    this.referralCode = '',
+    this.activeMatchId = '',
+    this.activeMatchName = '',
     this.ephemeralWhatsappLink,
   });
 

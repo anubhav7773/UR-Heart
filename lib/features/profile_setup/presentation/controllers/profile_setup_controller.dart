@@ -2,11 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/media/media_compressor.dart';
 import '../../../../core/media/supabase_media_uploader.dart';
 import '../../../../core/services/activity_logger_service.dart';
 import '../../../../core/services/image_moderation_service.dart';
 import '../../../../core/services/real_gps_location_service.dart';
+import '../../../../core/storage/secure_session_storage.dart';
 import '../../data/profile_repository.dart';
 
 class ProfileSetupState {
@@ -244,8 +246,12 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     try {
       final processed = await MediaCompressor.processPortraitPhoto(rawFile);
       final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('ur_heart_user_email') ?? userId;
-      final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final authUid = FirebaseAuth.instance.currentUser?.uid;
+      final secureEmail = await SecureSessionStorage.instance.getUserEmail();
+      final userEmail = prefs.getString('ur_heart_user_email') ?? secureEmail ?? (authUid != null ? 'uid_$authUid' : userId);
+      final safeUserUuid = (authUid != null && authUid.isNotEmpty)
+          ? authUid
+          : userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
 
       String finalUrl = rawFile.path;
       if (processed != null) {
@@ -300,6 +306,18 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     state = state.copyWith(fullName: name);
     SharedPreferences.getInstance().then((prefs) {
       prefs.setString('profile_full_name', name);
+    });
+  }
+
+  void setDob(String dob, [int? age]) {
+    state = state.copyWith(dobString: dob);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('profile_dob', dob);
+      prefs.setString('ur_heart_selected_dob', dob);
+      if (age != null && age > 0) {
+        prefs.setInt('profile_age', age);
+        prefs.setInt('ur_heart_user_age', age);
+      }
     });
   }
 
@@ -438,9 +456,13 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       },
     );
 
+    final savedAge = prefs.getInt('profile_age') ?? prefs.getInt('ur_heart_user_age');
     final success = await _repository.saveUserProfile({
       'full_name': state.fullName,
       'gender': state.gender,
+      'dob': state.dobString,
+      'birth_date': state.dobString,
+      if (savedAge != null && savedAge > 0) 'age': savedAge,
       'interested_in': interestedInStr,
       'bio': state.bio,
       'profession': state.profession,

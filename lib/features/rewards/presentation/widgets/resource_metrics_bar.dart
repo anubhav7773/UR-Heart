@@ -16,7 +16,7 @@ class ResourceMetricsBar extends StatelessWidget {
     required this.isDark,
     required this.swipesRemaining,
     required this.directLetters,
-    this.revealTokens = 1,
+    this.revealTokens = 0,
     required this.isAdFree,
   });
 

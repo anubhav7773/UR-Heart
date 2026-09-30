@@ -129,11 +129,14 @@ class SanctuarySettingsScreen extends ConsumerWidget {
               SovereignControlSection(
                 isDark: isDark,
                 isIncinerating: state.isIncinerating,
-                onLogOut: () {
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/consent',
-                    (route) => false,
-                  );
+                onLogOut: () async {
+                  await notifier.logout();
+                  if (context.mounted) {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/consent',
+                      (route) => false,
+                    );
+                  }
                 },
                 onConfirmErasure: () async {
                   final ok = await notifier.incinerateAccount();

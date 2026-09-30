@@ -14,8 +14,8 @@ class FeedState {
   const FeedState({
     this.candidates = const [],
     this.passedProfiles = const [],
-    this.swipesRemaining = 25,
-    this.directLettersCount = 1,
+    this.swipesRemaining = 10,
+    this.directLettersCount = 0,
     this.isLoading = false,
     this.isOutOfSwipesModalVisible = false,
     this.errorMessage,

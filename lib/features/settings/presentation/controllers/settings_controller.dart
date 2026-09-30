@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/storage/secure_session_storage.dart';
 import '../../data/settings_repository.dart';
 
 class SettingsState {
@@ -157,6 +159,37 @@ class SettingsController extends StateNotifier<SettingsState> {
   Future<void> rotateEncryptionKeys([dynamic context]) => rotateKey();
   Future<bool> executePermanentAccountErasure([dynamic context]) => incinerateAccount();
   Future<void> logout([dynamic context]) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+    try {
+      await SecureSessionStorage.instance.clearAllSessionData();
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('ur_heart_profile_setup_completed');
+      await prefs.remove('ur_heart_has_entered_sanctuary');
+      await prefs.remove('ur_heart_auth_token');
+      await prefs.remove('auth_token');
+      await prefs.remove('ur_heart_user_email');
+      await prefs.remove('ur_heart_user_name');
+      await prefs.remove('ur_heart_user_id');
+      await prefs.remove('profile_full_name');
+      await prefs.remove('profile_dob');
+      await prefs.remove('ur_heart_selected_dob');
+      await prefs.remove('profile_age');
+      await prefs.remove('ur_heart_user_age');
+      await prefs.remove('profile_gender');
+      await prefs.remove('profile_location');
+      await prefs.remove('profile_bio');
+      await prefs.remove('profile_profession');
+      await prefs.remove('profile_education');
+      await prefs.remove('profile_contact_bridge_platform');
+      await prefs.remove('profile_contact_bridge_handle');
+      for (int i = 1; i <= 5; i++) {
+        await prefs.remove('profile_photo_slot_$i');
+      }
+    } catch (_) {}
     state = state.copyWith(successMessage: 'Logged out of Sanctuary');
   }
 

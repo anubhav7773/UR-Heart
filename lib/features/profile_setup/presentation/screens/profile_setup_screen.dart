@@ -126,22 +126,49 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               // Verified Locked DOB
               Text('VERIFIED DATE OF BIRTH (LOCKED)', style: AppTypography.accordionCategory.copyWith(color: mutedColor)),
               const SizedBox(height: 6.0),
-              Container(
-                height: 44.0,
-                padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(12.0),
-                  border: Border.all(color: cardBorder),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock_outline, size: 16.0, color: mutedColor),
-                    const SizedBox(width: 8.0),
-                    Text(state.dobString, style: AppTypography.bodySmall.copyWith(color: titleColor, fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    Icon(Icons.verified, size: 16.0, color: verifiedTeal),
-                  ],
+              InkWell(
+                borderRadius: BorderRadius.circular(12.0),
+                onTap: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime(now.year - 24, 1, 1),
+                    firstDate: DateTime(1940),
+                    lastDate: DateTime(now.year - 18, now.month, now.day),
+                  );
+                  if (picked != null) {
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    final formatted = '${picked.day} ${months[picked.month - 1]} ${picked.year}';
+                    int age = now.year - picked.year;
+                    if (now.month < picked.month || (now.month == picked.month && now.day < picked.day)) {
+                      age--;
+                    }
+                    notifier.setDob(formatted, age);
+                  }
+                },
+                child: Container(
+                  height: 44.0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(12.0),
+                    border: Border.all(color: cardBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 16.0, color: mutedColor),
+                      const SizedBox(width: 8.0),
+                      Text(
+                        state.dobString.isNotEmpty ? state.dobString : 'Tap to select Date of Birth',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: state.dobString.isNotEmpty ? titleColor : mutedColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.verified, size: 16.0, color: verifiedTeal),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16.0),

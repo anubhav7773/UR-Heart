@@ -72,9 +72,12 @@ class PersonaController extends StateNotifier<PersonaState> {
       final mergedProfile = remote.copyWith(
         avatarUrl: mergedAvatar,
         momentPhotos: mergedMoments,
-        dobVerificationPill: cached.dobVerificationPill.isNotEmpty
+        age: (remote.age > 0 && remote.age != 24)
+            ? remote.age
+            : (cached.age > 0 ? cached.age : remote.age),
+        dobVerificationPill: (cached.dobVerificationPill.isNotEmpty && !cached.dobVerificationPill.contains('DigiLocker'))
             ? cached.dobVerificationPill
-            : remote.dobVerificationPill,
+            : (remote.dobVerificationPill.isNotEmpty ? remote.dobVerificationPill : cached.dobVerificationPill),
         gender: remote.gender.isNotEmpty ? remote.gender : cached.gender,
         interestedIn: remote.interestedIn.isNotEmpty ? remote.interestedIn : cached.interestedIn,
       );

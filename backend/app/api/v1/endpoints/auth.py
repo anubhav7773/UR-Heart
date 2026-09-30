@@ -419,6 +419,9 @@ async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)
                 location_name="Saket, Ayodhya",
                 referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
                 is_profile_completed=False,
+                swipes_remaining=10,
+                direct_letters_count=0,
+                reveal_tokens_count=0,
             )
             db.add(user_row)
             try:
@@ -513,6 +516,9 @@ async def handle_browser_magic_link_tap(
             location_name="Saket, Ayodhya",
             referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
             is_profile_completed=False,
+            swipes_remaining=10,
+            direct_letters_count=0,
+            reveal_tokens_count=0,
         )
         db.add(user_row)
         try:

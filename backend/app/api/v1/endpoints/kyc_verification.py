@@ -35,4 +35,15 @@ async def verify_live_kyc(
         frames_b64=frames,
         db_session=db
     )
+
+    if evaluation.status == "approved" or (evaluation.is_live_human and evaluation.face_match_score >= 70):
+        current_user.kyc_status = True
+        try:
+            await db.commit()
+            await db.refresh(current_user)
+            print(f"[KYC VERIFY] User {current_user.id} ({current_user.email}) marked kyc_status=True in DB", flush=True)
+        except Exception as e:
+            await db.rollback()
+            print(f"[KYC VERIFY] DB commit notice: {e}", flush=True)
+
     return evaluation

@@ -46,10 +46,10 @@ class User(Base):
     boost_points = Column(Integer, nullable=False, default=0)
     last_streak_ad_at = Column(DateTime(timezone=True), nullable=True)
     streak_expires_at = Column(DateTime(timezone=True), nullable=True)
-    reveal_tokens_count = Column(SmallInteger, nullable=False, default=1)
+    reveal_tokens_count = Column(SmallInteger, nullable=False, default=0)
     reward_balance = Column(Integer, nullable=False, default=0)
-    swipes_remaining = Column(Integer, nullable=False, default=25)
-    direct_letters_count = Column(Integer, nullable=False, default=1)
+    swipes_remaining = Column(Integer, nullable=False, default=10)
+    direct_letters_count = Column(Integer, nullable=False, default=0)
     last_installation_uuid = Column(String(64), nullable=True)
     referral_code = Column(String(16), unique=True, nullable=False)
 
