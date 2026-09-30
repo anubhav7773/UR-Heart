@@ -349,71 +349,100 @@ async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)
             "message": "Sacred email verified via Firebase. Proceeding to sanctuary."
         }
 
-    # Live check directly with Firebase Authentication Console
-    # Catches the exact moment Google marks email_verified=True when user taps link in email
+    # 1. Live Check directly with Supabase Auth (auth.users table)
+    # Catches the exact moment user taps "Confirm email address" in Supabase Auth email
+    is_verified_detected = False
+    detected_auth_id = None
     try:
-        from app.services.firebase_auth_service import FirebaseAuthService
-        from app.core.security import create_access_token
-        fb_user = FirebaseAuthService.get_user_by_email(clean_email)
-        if fb_user and fb_user.email_verified:
-            # Sync user entity in DB
-            res = await db.execute(select(User).where(User.email == clean_email))
-            user_row = res.scalar_one_or_none()
-            is_completed = False
-            if user_row:
-                is_completed = bool(user_row.is_profile_completed)
-                user_uuid = str(user_row.id)
-            else:
-                import uuid as _uuid
-                from datetime import date as _date
-                new_uuid = _uuid.uuid4()
-                user_row = User(
-                    id=new_uuid,
-                    auth_id=_uuid.uuid4(),
-                    email=clean_email,
-                    full_name="Sanctuary Seeker",
-                    dob=_date(2000, 1, 1),
-                    gender="Unspecified",
-                    interested_in="Everyone",
-                    contact_bridge_type="whatsapp",
-                    contact_bridge_encrypted="",
-                    location_name="Saket, Ayodhya",
-                    referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
-                    is_profile_completed=False,
-                )
-                db.add(user_row)
-                try:
-                    await db.commit()
-                except Exception:
-                    await db.rollback()
-                user_uuid = str(new_uuid)
-
-            session_token = create_access_token({"sub": user_uuid, "email": clean_email})
-            _, custom_token = FirebaseAuthService.verify_or_create_firebase_user(clean_email)
-
-            EMAIL_VERIFICATION_STATUS[clean_email] = {
-                "is_verified": True,
-                "access_token": session_token,
-                "firebase_token": custom_token,
-                "firebase_uid": fb_user.uid,
-                "is_profile_completed": is_completed
-            }
-
-            print(f"[AUTH VERIFY] Polling detected Firebase verification for {clean_email} (uid={fb_user.uid})", flush=True)
-
-            return {
-                "status": "success",
-                "is_verified": True,
-                "email": clean_email,
-                "token": session_token,
-                "access_token": session_token,
-                "firebase_token": custom_token,
-                "firebase_uid": fb_user.uid,
-                "is_profile_completed": is_completed,
-                "message": "Sacred email verified via Firebase Console. Proceeding to sanctuary."
-            }
+        from sqlalchemy import text
+        res_auth = await db.execute(
+            text("SELECT id, email_confirmed_at FROM auth.users WHERE lower(email) = :email"),
+            {"email": clean_email}
+        )
+        auth_row = res_auth.fetchone()
+        if auth_row and auth_row[1] is not None:
+            is_verified_detected = True
+            detected_auth_id = auth_row[0]
+            print(f"[AUTH VERIFY] Polling detected Supabase verification for {clean_email} (confirmed_at={auth_row[1]})", flush=True)
     except Exception as e:
-        print(f"[AUTH VERIFY] Firebase live polling check notice: {e}", flush=True)
+        print(f"[AUTH VERIFY] Supabase auth.users check notice: {e}", flush=True)
+
+    # 2. Live Check directly with Firebase Authentication Console
+    # Catches the exact moment Google marks email_verified=True when user taps link in Firebase email
+    fb_user = None
+    if not is_verified_detected:
+        try:
+            from app.services.firebase_auth_service import FirebaseAuthService
+            fb_user = FirebaseAuthService.get_user_by_email(clean_email)
+            if fb_user and fb_user.email_verified:
+                is_verified_detected = True
+                print(f"[AUTH VERIFY] Polling detected Firebase verification for {clean_email} (uid={fb_user.uid})", flush=True)
+        except Exception as e:
+            print(f"[AUTH VERIFY] Firebase live polling check notice: {e}", flush=True)
+
+    if is_verified_detected:
+        # Sync user entity in DB
+        res = await db.execute(select(User).where(User.email == clean_email))
+        user_row = res.scalar_one_or_none()
+        is_completed = False
+        if user_row:
+            is_completed = bool(user_row.is_profile_completed)
+            user_uuid = str(user_row.id)
+        else:
+            import uuid as _uuid
+            from datetime import date as _date
+            new_uuid = _uuid.uuid4()
+            user_row = User(
+                id=new_uuid,
+                auth_id=detected_auth_id or _uuid.uuid4(),
+                email=clean_email,
+                full_name="Sanctuary Seeker",
+                dob=_date(2000, 1, 1),
+                gender="Unspecified",
+                interested_in="Everyone",
+                contact_bridge_type="whatsapp",
+                contact_bridge_encrypted="",
+                location_name="Saket, Ayodhya",
+                referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
+                is_profile_completed=False,
+            )
+            db.add(user_row)
+            try:
+                await db.commit()
+            except Exception:
+                await db.rollback()
+            user_uuid = str(new_uuid)
+
+        from app.core.security import create_access_token
+        from app.services.firebase_auth_service import FirebaseAuthService
+        session_token = create_access_token({"sub": user_uuid, "email": clean_email})
+        custom_token = None
+        fb_uid = None
+        try:
+            fb_res_user, custom_token = FirebaseAuthService.verify_or_create_firebase_user(clean_email)
+            fb_uid = fb_res_user.uid if fb_res_user else None
+        except Exception:
+            pass
+
+        EMAIL_VERIFICATION_STATUS[clean_email] = {
+            "is_verified": True,
+            "access_token": session_token,
+            "firebase_token": custom_token,
+            "firebase_uid": fb_uid,
+            "is_profile_completed": is_completed
+        }
+
+        return {
+            "status": "success",
+            "is_verified": True,
+            "email": clean_email,
+            "token": session_token,
+            "access_token": session_token,
+            "firebase_token": custom_token,
+            "firebase_uid": fb_uid,
+            "is_profile_completed": is_completed,
+            "message": "Sacred email verified. Proceeding to sanctuary."
+        }
 
     return {
         "status": "pending",
