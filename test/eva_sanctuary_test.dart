@@ -144,8 +144,8 @@ void main() {
             aiSanctuaryRepositoryProvider.overrideWithValue(mockRepo),
           ],
           child: const MaterialApp(
-            home: const Scaffold(
-              body: const AiGrievanceAssistantSheet(
+            home: Scaffold(
+              body: AiGrievanceAssistantSheet(
                 offenderName: 'Rohan',
                 isDark: true,
               ),

@@ -1,0 +1,28 @@
+# BrowserStack App Automate Configuration for UR-Heart Flutter Android Application
+# Compatible with BrowserStack Test Companion & GitHub Student Developer Pack
+
+userName: "${BROWSERSTACK_USERNAME}"
+accessKey: "${BROWSERSTACK_ACCESS_KEY}"
+
+app: "build/app/outputs/flutter-apk/app-release.apk"
+
+platforms:
+  - platformName: android
+    deviceName: Google Pixel 8
+    platformVersion: "14.0"
+  - platformName: android
+    deviceName: Samsung Galaxy S23
+    platformVersion: "13.0"
+  - platformName: android
+    deviceName: OnePlus 11
+    platformVersion: "13.0"
+
+framework: flutter
+buildName: "UR-Heart Production Verification Build"
+projectName: "UR-Heart"
+sessionName: "E2E Live Sanctuary & Magic Link Flow"
+
+networkLogs: true
+deviceLogs: true
+video: true
+appProfiling: true
