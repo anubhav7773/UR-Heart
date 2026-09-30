@@ -56,7 +56,19 @@
 -keepattributes EnclosingMethod
 -keepattributes SourceFile,LineNumberTable
 
-# 11. Serialization & JSON Enums Preservation
+# 11. AndroidX WorkManager, Room & App Startup (Required by Google Mobile Ads)
+-keep class androidx.startup.** { *; }
+-keep class * extends androidx.startup.Initializer { *; }
+-keep class androidx.work.** { *; }
+-keep class androidx.work.impl.** { *; }
+-keep class * extends androidx.work.Worker { *; }
+-keep class * extends androidx.work.ListenableWorker { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
+-dontwarn androidx.work.**
+-dontwarn androidx.room.**
+-dontwarn androidx.startup.**
+
+# 12. Serialization & JSON Enums Preservation
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);
@@ -64,7 +76,3 @@
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
-
-# 12. Attack Surface Reduction & Obfuscation
--repackageclasses ''
--allowaccessmodification

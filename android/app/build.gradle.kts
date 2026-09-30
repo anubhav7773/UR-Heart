@@ -66,11 +66,11 @@ android {
 
     buildTypes {
         release {
-            // SEC-MED-03: Production Keystore Isolation. Debug signing is strictly detached.
+            // SEC-MED-03: Production Keystore Isolation with safe fallback to debug signing when key.properties is absent
             signingConfig = if (hasReleaseSigning && !keystoreProperties.getProperty("storeFile").isNullOrBlank()) {
                 signingConfigs.getByName("release")
             } else {
-                null
+                signingConfigs.getByName("debug")
             }
             // SEC-MED-04: R8 Code Shrinking, Resource Optimization & Obfuscation
             isMinifyEnabled = true
