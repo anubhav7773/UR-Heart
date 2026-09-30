@@ -60,10 +60,19 @@ class _BioEditorWithAiState extends ConsumerState<BioEditorWithAi> {
               onPressed: setupState.isBioPolishing
                   ? null
                   : () async {
-                      if (_controller.text.trim().isEmpty) return;
+                      final words = _controller.text.trim();
+                      if (words.isEmpty || words.length < 3) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Apne baare mein thoda kuch likhiye (tooti-footi baatein bhi chalegi), fir Eva unhe top-class bio banayegi ✨'),
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                        return;
+                      }
                       final polished = await ref
                           .read(profileSetupControllerProvider.notifier)
-                          .polishBioWithEvaAi(_controller.text.trim());
+                          .polishBioWithEvaAi(words);
                       if (polished != null && mounted) {
                         setState(() => _controller.text = polished);
                       }

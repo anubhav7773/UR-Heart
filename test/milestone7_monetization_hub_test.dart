@@ -92,7 +92,15 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
-      final container = ProviderContainer();
+      final container = ProviderContainer(
+        overrides: [
+          growthHubControllerProvider.overrideWith(
+            (ref) => GrowthHubController(
+              const GrowthHubState(swipesRemaining: 25, directLetters: 1),
+            ),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
 
       await tester.pumpWidget(

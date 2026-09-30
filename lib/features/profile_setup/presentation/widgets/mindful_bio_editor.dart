@@ -78,7 +78,17 @@ class _MindfulBioEditorState extends ConsumerState<MindfulBioEditor> {
               onPressed: profileState.isPolishingBio
                   ? null
                   : () async {
-                      await notifier.polishBioWithEvaAi(_bioController.text.trim());
+                      final words = _bioController.text.trim();
+                      if (words.isEmpty || words.length < 3) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Apne baare mein thoda kuch likhiye (tooti-footi baatein bhi chalegi), fir Eva unhe top-class bio banayegi ✨'),
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                        return;
+                      }
+                      await notifier.polishBioWithEvaAi(words);
                     },
               icon: profileState.isPolishingBio
                   ? SizedBox(

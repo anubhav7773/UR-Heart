@@ -222,7 +222,23 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
     db.add(ledger_entry)
     db.add(processed_entry)
 
-    # 6. Sacred Bridge / WhatsApp Reveal Unlock Handshake
+    # 6. Sacred Bridge / WhatsApp Reveal Unlock Handshake & Token Grant
+    if ad_type in ("whatsapp_reveal", "sacred_bridge_reveal"):
+        ad_count_res = await db.execute(
+            select(func.count(AdRewardLedger.id))
+            .where(
+                AdRewardLedger.user_id == user_uuid,
+                AdRewardLedger.ad_type.in_(["whatsapp_reveal", "sacred_bridge_reveal"])
+            )
+        )
+        total_reveal_ads = ad_count_res.scalar() or 0
+        if total_reveal_ads > 0 and total_reveal_ads % 3 == 0:
+            await db.execute(
+                update(User)
+                .where(User.id == user_uuid)
+                .values(reveal_tokens_count=User.reveal_tokens_count + 1)
+            )
+
     if ad_type in ("whatsapp_reveal", "sacred_bridge_reveal") and target_id != "none":
         try:
             match_uuid = UUID(target_id)
@@ -273,6 +289,10 @@ async def claim_ad_reward(
     letters_to_grant = 0
     points_to_credit = 10
 
+    whatsapp_progress = 0
+    token_granted = False
+    reward_msg = ""
+
     if payload.ad_type == "quick_reflection":
         swipes_to_grant = 10
         points_to_credit = 10
@@ -285,6 +305,60 @@ async def claim_ad_reward(
         points_to_credit = 50
     elif payload.ad_type in ("whatsapp_reveal", "sacred_bridge_reveal"):
         points_to_credit = 30
+        
+        # Track in AdRewardLedger
+        ledger_entry = AdRewardLedger(
+            user_id=target_user.id,
+            ssv_transaction_id=f"direct-claim-{uuid.uuid4().hex[:12]}",
+            network="admob_client",
+            ad_type=payload.ad_type,
+            reward_points=points_to_credit
+        )
+        db.add(ledger_entry)
+
+        # Count total ads watched for reveal by this user
+        ad_count_res = await db.execute(
+            select(func.count(AdRewardLedger.id))
+            .where(
+                AdRewardLedger.user_id == target_user.id,
+                AdRewardLedger.ad_type.in_(["whatsapp_reveal", "sacred_bridge_reveal"])
+            )
+        )
+        total_reveal_ads = (ad_count_res.scalar() or 0) + 1
+        cycle_count = total_reveal_ads % 3
+        if cycle_count == 0:
+            target_user.reveal_tokens_count = (target_user.reveal_tokens_count or 0) + 1
+            token_granted = True
+            whatsapp_progress = 3
+            reward_msg = f"Sacred Bridge ritual complete (3/3)! +1 Reveal Token credited! Total Tokens: {target_user.reveal_tokens_count}"
+        else:
+            token_granted = False
+            whatsapp_progress = cycle_count
+            reward_msg = f"Sacred Bridge ritual recorded: {cycle_count}/3 videos watched. Watch {3 - cycle_count} more to earn 1 Reveal Token!"
+
+        # Handle bilateral match progression if target_id provided
+        if payload.target_id and payload.target_id != "none":
+            try:
+                match_uuid = UUID(payload.target_id)
+                row = (await db.execute(
+                    select(WhatsAppRevealToken, Match).join(Match, Match.id == WhatsAppRevealToken.match_id)
+                    .where(WhatsAppRevealToken.match_id == match_uuid)
+                )).first()
+                if row:
+                    token_rec, match_rec = row
+                    if match_rec.user1_id == target_user.id and token_rec.user1_ads_count < 3:
+                        token_rec.user1_ads_count += 1
+                    elif match_rec.user2_id == target_user.id and token_rec.user2_ads_count < 3:
+                        token_rec.user2_ads_count += 1
+                    if token_rec.user1_ads_count >= 3 and token_rec.user2_ads_count >= 3 and not token_rec.is_unlocked:
+                        import secrets
+                        from datetime import timedelta, timezone
+                        token_rec.is_unlocked = True
+                        token_rec.ephemeral_token = secrets.token_urlsafe(32)
+                        token_rec.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+            except Exception:
+                pass
+
     elif payload.ad_type == "daily_streak_boost":
         streak_result = await StreakEngine.claim_daily_streak_ad(target_user, db)
         return {
@@ -308,7 +382,7 @@ async def claim_ad_reward(
     print(
         f"[AD REWARD CLAIMED] user={target_user.email} ad_type={payload.ad_type} "
         f"swipes={target_user.swipes_remaining} letters={target_user.direct_letters_count} "
-        f"balance={target_user.reward_balance}",
+        f"tokens={target_user.reveal_tokens_count} balance={target_user.reward_balance}",
         flush=True
     )
 
@@ -318,7 +392,10 @@ async def claim_ad_reward(
         "swipes_remaining": target_user.swipes_remaining,
         "direct_letters_count": target_user.direct_letters_count,
         "reward_balance": target_user.reward_balance,
-        "message": f"Reward granted: +{swipes_to_grant} swipes, +{letters_to_grant} direct letters."
+        "reveal_tokens_count": target_user.reveal_tokens_count or 0,
+        "whatsapp_progress": whatsapp_progress,
+        "token_granted": token_granted,
+        "message": reward_msg if reward_msg else f"Reward granted: +{swipes_to_grant} swipes, +{letters_to_grant} direct letters."
     }
 
 

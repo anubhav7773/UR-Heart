@@ -10,7 +10,7 @@ class PreferencesSliderCard extends StatefulWidget {
   final bool isPolishing;
   final bool isSaving;
   final VoidCallback onUpdateGps;
-  final VoidCallback onPolishBio;
+  final void Function(String currentBio) onPolishBio;
   final void Function(String bio) onBioChanged;
   final void Function(String profession) onProfessionChanged;
   final void Function(String education) onEducationChanged;
@@ -40,6 +40,7 @@ class _PreferencesSliderCardState extends State<PreferencesSliderCard> {
   late TextEditingController _bioController;
   late TextEditingController _profController;
   late TextEditingController _eduController;
+  late FocusNode _bioFocusNode;
   late RangeValues _ageRange;
   bool _isUpdatingGps = false;
 
@@ -49,13 +50,14 @@ class _PreferencesSliderCardState extends State<PreferencesSliderCard> {
     _bioController = TextEditingController(text: widget.profile.bio);
     _profController = TextEditingController(text: widget.profile.profession);
     _eduController = TextEditingController(text: widget.profile.education);
+    _bioFocusNode = FocusNode();
     _ageRange = RangeValues(widget.profile.minAgePref, widget.profile.maxAgePref);
   }
 
   @override
   void didUpdateWidget(covariant PreferencesSliderCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.profile.bio != _bioController.text) {
+    if (widget.profile.bio != _bioController.text && !_bioFocusNode.hasFocus) {
       _bioController.text = widget.profile.bio;
     }
     if (widget.profile.profession != _profController.text) {
@@ -72,6 +74,7 @@ class _PreferencesSliderCardState extends State<PreferencesSliderCard> {
 
   @override
   void dispose() {
+    _bioFocusNode.dispose();
     _bioController.dispose();
     _profController.dispose();
     _eduController.dispose();
@@ -207,18 +210,33 @@ class _PreferencesSliderCardState extends State<PreferencesSliderCard> {
                   style: AppTypography.bodySmall.copyWith(
                       color: mutedColor, fontWeight: FontWeight.w600, fontSize: 11)),
               TextButton.icon(
-                onPressed: widget.isPolishing ? null : widget.onPolishBio,
+                onPressed: widget.isPolishing
+                    ? null
+                    : () {
+                        final rawWords = _bioController.text.trim();
+                        if (rawWords.isEmpty || rawWords.length < 3) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Apne baare mein thoda kuch likhiye (tooti-footi baatein bhi chalegi), fir Eva unhe top-class bio banayegi ✨'),
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                          return;
+                        }
+                        widget.onPolishBio(rawWords);
+                      },
                 icon: widget.isPolishing
                     ? const SizedBox(
                         width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.auto_awesome, size: 14),
-                label: Text(widget.isPolishing ? 'Refining...' : 'EVA AI Polish ✨',
+                label: Text(widget.isPolishing ? 'Analyzing & Refining...' : 'EVA AI Polish ✨',
                     style: const TextStyle(fontSize: 12)),
               ),
             ],
           ),
           TextField(
             controller: _bioController,
+            focusNode: _bioFocusNode,
             maxLength: 500,
             maxLines: 3,
             onChanged: widget.onBioChanged,
@@ -228,6 +246,8 @@ class _PreferencesSliderCardState extends State<PreferencesSliderCard> {
               fillColor: inputBg,
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              hintText: 'Apne baare mein kuch likhein (e.g. hobbies, dreams, pasand)...',
+              hintStyle: TextStyle(fontSize: 12, color: mutedColor.withValues(alpha: 0.6)),
             ),
           ),
           const SizedBox(height: 8),

@@ -64,14 +64,34 @@ class StatutoryVaultController extends StateNotifier<StatutoryVaultState> {
     try {
       final exportRecord = await _repo.requestDataExport();
       state = state.copyWith(
-        activeExport: exportRecord,
+        activeExport: exportRecord.copyWith(status: ExportStatus.ready),
         isExporting: false,
-        successMessage: 'Signed archive generated! Download ready for 7 days.',
+        successMessage: 'Signed archive generated! Downloading PDF dossier...',
       );
+      await downloadAndShareArchive();
     } catch (_) {
       state = state.copyWith(
         isExporting: false,
         errorMessage: 'Unable to request data archive. Try again later.',
+      );
+    }
+  }
+
+  Future<void> downloadAndShareArchive() async {
+    state = state.copyWith(isExporting: true, errorMessage: null);
+    try {
+      final reqId = state.activeExport?.id ?? 'exp-statutory-current';
+      final ok = await _repo.downloadAndShareArchive(reqId);
+      state = state.copyWith(
+        isExporting: false,
+        successMessage: ok
+            ? 'Statutory PDF dossier generated & saved successfully.'
+            : 'Unable to download PDF dossier.',
+      );
+    } catch (_) {
+      state = state.copyWith(
+        isExporting: false,
+        errorMessage: 'Failed to download data archive.',
       );
     }
   }

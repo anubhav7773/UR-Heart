@@ -56,10 +56,12 @@ class VaultController extends StateNotifier<VaultState> {
     try {
       final exportRecord = await _repo.requestDataExport();
       state = state.copyWith(
-        activeExport: exportRecord,
+        activeExport: exportRecord.copyWith(status: ExportStatus.ready),
         isExporting: false,
-        successMessage: 'Signed archive generated! Ready for download / sharing.',
+        successMessage: 'Signed archive generated! Downloading PDF dossier...',
       );
+      // Automatically trigger PDF download and save prompt
+      await downloadAndShareArchive();
     } catch (_) {
       state = state.copyWith(
         isExporting: false,
@@ -75,7 +77,7 @@ class VaultController extends StateNotifier<VaultState> {
       final ok = await _repo.downloadAndShareArchive(reqId);
       state = state.copyWith(
         isExporting: false,
-        successMessage: ok ? 'JSON archive downloaded & shared successfully.' : 'Unable to share archive.',
+        successMessage: ok ? 'Statutory PDF dossier generated & saved successfully.' : 'Unable to download PDF dossier.',
       );
     } catch (_) {
       state = state.copyWith(

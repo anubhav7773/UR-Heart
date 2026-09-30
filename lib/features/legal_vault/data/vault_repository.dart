@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,22 +57,38 @@ class VaultRepository {
     }
   }
 
-  /// DPDP Sec 11: Fetches payload archive, saves to local temp file, and triggers native share/download
+  /// DPDP Sec 11: Fetches signed PDF dossier from backend, saves to local temp file, and triggers native save/share
   Future<bool> downloadAndShareArchive(String requestId) async {
     try {
-      final response = await _dio.get<dynamic>('/api/v1/vault/export-status/$requestId');
-      final data = response.data as Map<String, dynamic>;
-      final payload = data['payload'] ?? data;
-      final jsonStr = const JsonEncoder.withIndent('  ').convert(payload);
+      final endpoint = (requestId.isNotEmpty && requestId != 'exp-statutory-current')
+          ? '/api/v1/vault/export-pdf/$requestId'
+          : '/api/v1/vault/export-pdf';
+      final response = await _dio.get<List<int>>(
+        endpoint,
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final pdfBytes = response.data;
+      if (pdfBytes == null || pdfBytes.isEmpty) {
+        return false;
+      }
 
       final tempDir = Directory.systemTemp;
-      final file = File('${tempDir.path}/urheart_dpdp_archive_${requestId.substring(0, 8)}.json');
-      await file.writeAsString(jsonStr);
+      final file = File('${tempDir.path}/UR_Heart_Statutory_Data_Dossier.pdf');
+      await file.writeAsBytes(pdfBytes, flush: true);
 
-      final xfile = XFile(file.path, mimeType: 'application/json', name: 'urheart_dpdp_data_archive.json');
-      await Share.shareXFiles([xfile], text: 'UR-Heart DPDP Act 2023 Statutory Data Export Archive');
+      final xfile = XFile(
+        file.path,
+        mimeType: 'application/pdf',
+        name: 'UR_Heart_Statutory_Data_Dossier.pdf',
+      );
+      await Share.shareXFiles(
+        [xfile],
+        text: 'UR-Heart DPDP Act 2023 Statutory Data Export Dossier (PDF)',
+      );
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[VaultRepository] PDF export download error: $e');
       return false;
     }
   }

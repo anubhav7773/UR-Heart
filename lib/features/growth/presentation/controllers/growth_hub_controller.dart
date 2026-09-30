@@ -220,8 +220,9 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       targetId: targetId,
       onRewardGranted: () async {
         applyReward(adType, targetId: targetId);
+        String rewardNotice = 'Verified reward applied for: $adType';
         try {
-          await DioClient().dio.post<dynamic>(
+          final res = await DioClient().dio.post<dynamic>(
             '/api/v1/ads/claim-reward',
             data: {
               'ad_type': adType,
@@ -229,13 +230,28 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
               'user_id': effectiveUserId,
             },
           );
+          if (res.data != null && res.data is Map<String, dynamic>) {
+            final map = res.data as Map<String, dynamic>;
+            if (map['message'] != null) {
+              rewardNotice = map['message'].toString();
+            }
+            if (map['reveal_tokens_count'] != null) {
+              state = state.copyWith(revealTokensCount: map['reveal_tokens_count'] as int);
+            }
+            if (map['whatsapp_progress'] != null) {
+              state = state.copyWith(whatsappProgress: map['whatsapp_progress'] as int);
+            }
+          }
         } catch (e) {
           debugPrint('[GrowthHubController] Claim reward sync notice: $e');
         }
         await syncUserData();
         if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Verified reward applied for: $adType')),
+            SnackBar(
+              content: Text(rewardNotice),
+              duration: const Duration(seconds: 4),
+            ),
           );
         }
       },
@@ -270,12 +286,18 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
         break;
       case 'whatsapp_reveal':
       case 'sacred_bridge_reveal':
-        final nextProgress = (state.whatsappProgress + 1).clamp(1, 3);
-        final isUnlocked = nextProgress >= 3 && state.peerWhatsappProgress >= 3;
-        state = state.copyWith(
-          whatsappProgress: nextProgress,
-          isWhatsappUnlocked: isUnlocked,
-        );
+        final currentProg = state.whatsappProgress;
+        if (currentProg >= 2) {
+          state = state.copyWith(
+            whatsappProgress: 3,
+            revealTokensCount: state.revealTokensCount + 1,
+            isWhatsappUnlocked: true,
+          );
+        } else {
+          state = state.copyWith(
+            whatsappProgress: currentProg + 1,
+          );
+        }
         break;
     }
   }

@@ -81,7 +81,7 @@ class DataRightsSection extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Download a cryptographically signed JSON archive of all your moments, logs, and reflections.',
+                  'Download a cryptographically signed PDF dossier of all your moments, logs, and reflections.',
                   style: AppTypography.bodySmall.copyWith(color: mutedColor),
                 ),
                 const SizedBox(height: 12),
@@ -132,7 +132,7 @@ class DataRightsSection extends StatelessWidget {
                           )
                         : Text(
                             activeExport != null && activeExport?.status == ExportStatus.ready
-                                ? 'Download / Share Archive (.JSON) ➔'
+                                ? 'Download / Save PDF Dossier ➔'
                                 : 'Request Export ➔',
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),

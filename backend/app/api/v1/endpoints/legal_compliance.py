@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 from uuid import UUID
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, text
@@ -164,6 +164,87 @@ async def check_export_status(
         "checksum_sha256": res.checksum_sha256,
         "payload": res.export_payload if res.status == "completed" else None
     }
+
+
+@router.get("/export-pdf/{request_id}", status_code=status.HTTP_200_OK)
+@router.get("/export-pdf", status_code=status.HTTP_200_OK)
+async def download_export_pdf(
+    request_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    DPDP Act 2023 Section 11: Generates and streams a signed, formal PDF dossier
+    of the user's personal data principal archive for immediate local saving and sharing.
+    """
+    from datetime import timezone
+    from app.services.pdf_generator import StatutoryPdfGenerator
+
+    payload = None
+    if request_id and request_id != "current":
+        try:
+            req_uuid = UUID(request_id)
+            stmt = select(DataExportRequest).where(
+                DataExportRequest.id == req_uuid,
+                DataExportRequest.user_id == current_user.id
+            )
+            res = (await db.execute(stmt)).scalar_one_or_none()
+            if res and res.export_payload:
+                payload = res.export_payload
+        except Exception:
+            pass
+
+    if not payload:
+        nominee = (await db.execute(select(DataNominee).where(DataNominee.user_id == current_user.id))).scalar_one_or_none()
+        consent_logs = (await db.execute(
+            select(ConsentAuditLog).where(ConsentAuditLog.user_id == current_user.id)
+        )).scalars().all()
+
+        payload = {
+            "statutory_authority": "Digital Personal Data Protection Act, 2023 (India)",
+            "export_metadata": {
+                "user_id": str(current_user.id),
+                "export_generated_at": datetime.now(timezone.utc).isoformat(),
+                "statutory_retention_days": 7
+            },
+            "profile_persona": {
+                "full_name": current_user.full_name,
+                "dob": current_user.dob.isoformat() if current_user.dob else None,
+                "gender": current_user.gender,
+                "interested_in": current_user.interested_in,
+                "bio": current_user.bio,
+                "location_name": current_user.location_name,
+                "profession": current_user.profession,
+                "education": current_user.education,
+                "kyc_verified": current_user.kyc_status,
+                "subscription_tier": current_user.subscription_tier,
+                "account_created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+                "photos": current_user.photos or []
+            },
+            "data_nominee": {
+                "nominee_name": nominee.nominee_name if nominee else None,
+                "relationship": nominee.relationship if nominee else None,
+                "contact_masked": nominee.nominee_contact[:4] + "****" if nominee else None
+            } if nominee else None,
+            "consent_audit_history": [
+                {
+                    "purpose": log.consent_purpose_id,
+                    "granted": log.is_granted,
+                    "timestamp": log.consented_at.isoformat() if log.consented_at else None
+                } for log in consent_logs
+            ]
+        }
+
+    pdf_bytes = StatutoryPdfGenerator.generate_dossier_pdf(payload)
+    filename = f"UR_Heart_DPDP_Dossier_{str(current_user.id)[:8]}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/pdf"
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

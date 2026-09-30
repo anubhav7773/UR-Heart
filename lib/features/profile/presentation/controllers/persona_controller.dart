@@ -106,10 +106,13 @@ class PersonaController extends StateNotifier<PersonaState> {
     );
   }
 
-  Future<void> polishBioWithEvaAi() async {
+  Future<void> polishBioWithEvaAi([String? customBio]) async {
     state = state.copyWith(isPolishing: true);
     try {
-      final polished = await _repo.polishBioWithEvaAi(state.profile.bio);
+      final bioToPolish = (customBio != null && customBio.trim().isNotEmpty)
+          ? customBio.trim()
+          : state.profile.bio;
+      final polished = await _repo.polishBioWithEvaAi(bioToPolish);
       state = state.copyWith(
         profile: state.profile.copyWith(bio: polished),
         isPolishing: false,
@@ -120,7 +123,7 @@ class PersonaController extends StateNotifier<PersonaState> {
     }
   }
 
-  Future<void> polishBioWithGroq() => polishBioWithEvaAi();
+  Future<void> polishBioWithGroq([String? customBio]) => polishBioWithEvaAi(customBio);
 
   Future<void> refreshLocation() async {
     final loc = await _repo.refreshGpsLocation();

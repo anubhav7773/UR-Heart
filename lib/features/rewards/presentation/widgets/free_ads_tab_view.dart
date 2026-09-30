@@ -119,9 +119,11 @@ class FreeAdsTabView extends ConsumerWidget {
               isDark: isDark,
               title: 'Sacred Bridge Reveal (30s Ritual)',
               durationTag: '30s',
-              rewardDescription: '+1 Step towards contact unmasking (3/3)',
+              rewardDescription: (growthState.whatsappProgress > 0)
+                  ? '+1 Step towards contact unmasking (${growthState.whatsappProgress}/3) · Tokens: ${growthState.revealTokensCount}'
+                  : 'Watch 3 videos to earn 1 Reveal Token (0/3) · Tokens: ${growthState.revealTokensCount}',
               icon: Icons.lock_open_rounded,
-              buttonText: 'Watch',
+              buttonText: growthState.whatsappProgress >= 2 ? 'Final Ad (3/3)' : 'Watch (${growthState.whatsappProgress}/3)',
               onTap: () {
                 notifier.triggerRewardedAd(
                   adType: AdPlacementTypes.whatsappReveal,

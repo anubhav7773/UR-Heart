@@ -444,7 +444,7 @@ async def serve_privacy_policy(request: Request):
       <h2>2. Categories of Personal Data Processed</h2>
       <p>We process only data strictly necessary for conscious, intentional human connection:</p>
       <ul>
-        <li><strong>Profile & Persona Data:</strong> Chosen display name, date of birth (DOB for adult age verification), gender, romantic preferences, values, lifestyle prompts, and up to 6 user-uploaded moment photos.</li>
+        <li><strong>Profile & Persona Data:</strong> Chosen display name, date of birth (DOB for adult age verification), gender, romantic preferences, values, lifestyle prompts, and up to 5 user-uploaded moment photos.</li>
         <li><strong>Encrypted Contact Bridge:</strong> Private contact handles (such as WhatsApp numbers) are stored strictly using <strong>AES-256 cryptographic encryption</strong>. Your handle is NEVER made public and is only revealed when both seekers mutually confirm Stage 3 graduated bridge unlock.</li>
         <li><strong>Fuzzy Geolocation (1.1 km Shield):</strong> We respect your spatial privacy. We compute approximate proximity using a <strong>1.1-kilometer fuzzy radius truncation</strong>. Your precise real-time GPS coordinates are never stored, tracked, or broadcast to other users.</li>
         <li><strong>Eva Live 3-Second Biometric KYC Liveness:</strong> To eliminate bots, catfish, and fake profiles, users undergo an active 3-second liveness challenge (micro-gestures: blink, smile, head turn). <em>Crucially, raw video and selfie frames are verified ephemerally in real-time and immediately discarded.</em> We do not maintain or commercialize biometric facial databases.</li>

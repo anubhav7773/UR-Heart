@@ -251,22 +251,24 @@ class ProfileRepository {
             'Content-Type': 'application/json',
           },
           body: jsonEncode({
-            'model': 'openai/gpt-oss-120b',
+            'model': 'llama-3.3-70b-versatile',
             'messages': [
               {
                 'role': 'system',
                 'content':
-                    'You are EVA AI, the poetic and mindful AI companion for UR-Heart dating sanctuary. '
-                    'Rewrite the user bio with elegance, mindfulness, and authenticity in 35-50 words. '
-                    'Keep the user core interests unchanged. Return ONLY the polished bio text, no explanations.'
+                    'You are EVA AI, the poetic and empathetic Wordsmith for UR-Heart dating sanctuary. '
+                    'The user has shared raw, broken, or informal thoughts about themselves. '
+                    'Deeply analyze their specific words, extract their true passions and personality, '
+                    'and craft a top-class, soulful, authentic dating bio (35-50 words). '
+                    'Base the bio strictly on the user expressed thoughts. Return ONLY the polished bio text, no explanations.'
               },
               {
                 'role': 'user',
-                'content': 'Please polish this dating bio: "$rawText"'
+                'content': 'Please polish my raw thoughts into an authentic dating bio: "$rawText"'
               }
             ],
-            'temperature': 0.8,
-            'max_tokens': 120,
+            'temperature': 0.75,
+            'max_tokens': 140,
           }),
         ).timeout(const Duration(seconds: 8));
 
@@ -291,12 +293,12 @@ class ProfileRepository {
       }
     }
 
-    // Dynamic poetic fallback rotation so user never gets identical repetitive bio
+    // Dynamic poetic fallback rotation incorporating the user's specific words
     final fallbacks = [
-      '$rawText · Grounded in quiet rituals, genuine curiosity, and heartfelt presence.',
-      'Appreciating intentional conversations and slow mornings. $rawText — here for honest connection.',
+      'Passionate about $rawText. Grounded in quiet rituals, genuine curiosity, and heartfelt presence.',
+      'Drawn to $rawText — appreciating intentional conversations, slow mornings, and authentic connection.',
       '$rawText · Believer in slow connections, sincere laughter, and peaceful spaces.',
-      'Guided by kindness and authentic depth. $rawText · Seeking a mindful companion.',
+      'Guided by kindness and authentic depth. Inspired by $rawText · Seeking a mindful companion.',
     ];
     fallbacks.shuffle();
     return fallbacks.first;
