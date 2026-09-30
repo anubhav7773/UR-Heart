@@ -3,11 +3,12 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 
-/// Resource Status Metrics Bar displaying swipes, direct letters & ad-free badge (< 130 lines)
+/// Resource Status Metrics Bar displaying swipes, direct letters, social reveal tokens & status badge (< 130 lines)
 class ResourceMetricsBar extends StatelessWidget {
   final bool isDark;
   final int swipesRemaining;
   final int directLetters;
+  final int revealTokens;
   final bool isAdFree;
 
   const ResourceMetricsBar({
@@ -15,6 +16,7 @@ class ResourceMetricsBar extends StatelessWidget {
     required this.isDark,
     required this.swipesRemaining,
     required this.directLetters,
+    this.revealTokens = 1,
     required this.isAdFree,
   });
 
@@ -26,56 +28,75 @@ class ResourceMetricsBar extends StatelessWidget {
     final muted = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
     final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
     final gold = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
+    final coral = isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 6.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(16.0),
         border: Border.all(color: cardBorder, width: 1.0),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Swipes metric
-          _buildPill(
-            icon: Icons.auto_awesome,
-            iconColor: pine,
-            label: 'Swipes Remaining',
-            countText: isAdFree ? '∞' : '$swipesRemaining',
-            headlineColor: headline,
-            mutedColor: muted,
+          // 1. Swipes / Profile Skips metric
+          Expanded(
+            child: _buildPill(
+              icon: Icons.auto_awesome,
+              iconColor: pine,
+              label: 'Profile Skips',
+              countText: isAdFree ? '∞' : '$swipesRemaining',
+              headlineColor: headline,
+              mutedColor: muted,
+            ),
           ),
-          Container(width: 1.0, height: 28.0, color: cardBorder),
-          // Direct letters metric
-          _buildPill(
-            icon: Icons.mail_outline,
-            iconColor: gold,
-            label: 'Direct Letters',
-            countText: '$directLetters',
-            headlineColor: headline,
-            mutedColor: muted,
+          Container(width: 1.0, height: 26.0, color: cardBorder, margin: const EdgeInsets.symmetric(horizontal: 6.0)),
+
+          // 2. Direct letters / msgs metric
+          Expanded(
+            child: _buildPill(
+              icon: Icons.mail_outline,
+              iconColor: gold,
+              label: 'Direct Msgs',
+              countText: '$directLetters',
+              headlineColor: headline,
+              mutedColor: muted,
+            ),
           ),
-          Container(width: 1.0, height: 28.0, color: cardBorder),
-          // Sovereign status badge
+          Container(width: 1.0, height: 26.0, color: cardBorder, margin: const EdgeInsets.symmetric(horizontal: 6.0)),
+
+          // 3. Social Handle Reveal Token metric
+          Expanded(
+            child: _buildPill(
+              icon: Icons.key_rounded,
+              iconColor: coral,
+              label: 'Social Reveals',
+              countText: isAdFree ? '∞' : '$revealTokens',
+              headlineColor: headline,
+              mutedColor: muted,
+            ),
+          ),
+          Container(width: 1.0, height: 26.0, color: cardBorder, margin: const EdgeInsets.symmetric(horizontal: 6.0)),
+
+          // 4. Sovereign status badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9.0, vertical: 5.0),
+            padding: const EdgeInsets.symmetric(horizontal: 7.0, vertical: 5.0),
             decoration: BoxDecoration(
               color: (isAdFree ? gold : pine).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12.0),
+              borderRadius: BorderRadius.circular(10.0),
               border: Border.all(color: (isAdFree ? gold : pine).withValues(alpha: 0.35)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(isAdFree ? Icons.verified : Icons.spa_outlined, size: 12.0, color: isAdFree ? gold : pine),
-                const SizedBox(width: 4.0),
+                Icon(isAdFree ? Icons.verified : Icons.spa_outlined, size: 11.0, color: isAdFree ? gold : pine),
+                const SizedBox(width: 3.0),
                 Text(
                   isAdFree ? 'Sovereign' : 'Mindful',
                   style: TextStyle(
                     color: isAdFree ? gold : pine,
-                    fontSize: 11.0,
+                    fontSize: 10.0,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -100,14 +121,33 @@ class ResourceMetricsBar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13.0, color: iconColor),
-            const SizedBox(width: 4.0),
-            Text(countText, style: AppTypography.titleH2.copyWith(color: headlineColor, fontSize: 15.0)),
+            Icon(icon, size: 12.0, color: iconColor),
+            const SizedBox(width: 3.0),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  countText,
+                  style: AppTypography.titleH2.copyWith(
+                    color: headlineColor,
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 2.0),
-        Text(label, style: TextStyle(color: mutedColor, fontSize: 10.5, fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: mutedColor, fontSize: 9.5, fontWeight: FontWeight.w500),
+        ),
       ],
     );
   }

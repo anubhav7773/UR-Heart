@@ -17,7 +17,8 @@ class MockAiSanctuaryRepository extends AiSanctuaryRepository {
     Map<String, dynamic>? context,
   }) async {
     return {
-      'reply': 'Namaste. Mujhe Asiverticals ne banaya hai. Main aapki mindful companion hoon.',
+      'reply':
+          'Namaste. Mujhe Asiverticals ne banaya hai. Main aapki mindful companion hoon.',
       'is_guarded': false,
       'status': 'success',
     };
@@ -51,7 +52,9 @@ void main() {
   });
 
   group('Eva AI Sanctuary Frontend Suite Verification', () {
-    testWidgets('EvaSanctuaryScreen renders glowing orb, Asiverticals attribution, and prompt chips', (tester) async {
+    testWidgets(
+        'EvaSanctuaryScreen renders glowing orb, Asiverticals attribution, and prompt chips',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -77,7 +80,8 @@ void main() {
 
       // Verify welcoming greeting with Asiverticals attribution
       expect(
-        find.textContaining('Asiverticals dwara banayi gayi aapki mindful AI companion'),
+        find.textContaining(
+            'Asiverticals dwara banayi gayi aapki mindful AI companion'),
         findsOneWidget,
       );
 
@@ -85,7 +89,9 @@ void main() {
       expect(find.text('Sacred Resonance Space'), findsOneWidget);
 
       // Verify quick action chips
-      expect(find.text('How should I reply to my match without sounding eager?'), findsOneWidget);
+      expect(
+          find.text('How should I reply to my match without sounding eager?'),
+          findsOneWidget);
 
       // Verify text input field and send button
       expect(find.byType(TextField), findsOneWidget);
@@ -93,7 +99,9 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('AiDialogueCoachSheet renders partner quote and Asiverticals attribution', (tester) async {
+    testWidgets(
+        'AiDialogueCoachSheet renders partner quote and Asiverticals attribution',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -103,7 +111,8 @@ void main() {
             home: Scaffold(
               body: AiDialogueCoachSheet(
                 partnerName: 'Ananya',
-                lastIncomingMessage: 'I love slow Sunday mornings with hot tea.',
+                lastIncomingMessage:
+                    'I love slow Sunday mornings with hot tea.',
                 onApplyReply: (_) {},
                 isDark: true,
               ),
@@ -114,23 +123,29 @@ void main() {
       await tester.pump();
 
       expect(find.text('Eva Dialogue Wingman'), findsOneWidget);
-      expect(find.text('Authentic communication coach by Asiverticals'), findsOneWidget);
-      expect(find.textContaining('Ananya: "I love slow Sunday mornings with hot tea."'), findsOneWidget);
+      expect(find.text('Authentic communication coach by Asiverticals'),
+          findsOneWidget);
+      expect(
+          find.textContaining(
+              'Ananya: "I love slow Sunday mornings with hot tea."'),
+          findsOneWidget);
       expect(find.text('Mindful Guidance & Reply Ideas:'), findsOneWidget);
       expect(find.text('Polish'), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('AiGrievanceAssistantSheet renders IT Rules 2021 assistance and Asiverticals attribution', (tester) async {
+    testWidgets(
+        'AiGrievanceAssistantSheet renders IT Rules 2021 assistance and Asiverticals attribution',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             aiSanctuaryRepositoryProvider.overrideWithValue(mockRepo),
           ],
-          child: MaterialApp(
-            home: Scaffold(
-              body: AiGrievanceAssistantSheet(
+          child: const MaterialApp(
+            home: const Scaffold(
+              body: const AiGrievanceAssistantSheet(
                 offenderName: 'Rohan',
                 isDark: true,
               ),
@@ -141,7 +156,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('Eva Safety & Grievance Concierge'), findsOneWidget);
-      expect(find.text('Statutory Reporting Assistant by Asiverticals'), findsOneWidget);
+      expect(find.text('Statutory Reporting Assistant by Asiverticals'),
+          findsOneWidget);
       expect(find.textContaining('IT Rules 2021'), findsOneWidget);
       expect(find.text('Analyze & Guide My Report'), findsOneWidget);
 

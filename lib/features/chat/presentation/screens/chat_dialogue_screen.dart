@@ -79,7 +79,9 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
         });
       } else if (routeArgs is Map<String, dynamic>) {
         notifier.setPeerProfile({
-          'full_name': routeArgs['partner_name'] ?? routeArgs['peer_name'] ?? routeArgs['name'],
+          'full_name': routeArgs['partner_name'] ??
+              routeArgs['peer_name'] ??
+              routeArgs['name'],
           'recipient_id': routeArgs['partner_id'] ?? routeArgs['peer_id'],
           'avatar_url': routeArgs['partner_photo'] ?? routeArgs['peer_photo'],
           'is_online': true,
@@ -108,19 +110,35 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
     final dialogueState = ref.watch(chatDialogueControllerProvider(mId));
     final notifier = ref.read(chatDialogueControllerProvider(mId).notifier);
 
-    final bg = isDark ? DarkSanctuaryTokens.background : LightSanctuaryTokens.background;
-    final primaryText = isDark ? DarkSanctuaryTokens.textHeadline : LightSanctuaryTokens.textHeadline;
-    final subText = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
-    final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
+    final bg = isDark
+        ? DarkSanctuaryTokens.background
+        : LightSanctuaryTokens.background;
+    final primaryText = isDark
+        ? DarkSanctuaryTokens.textHeadline
+        : LightSanctuaryTokens.textHeadline;
+    final subText =
+        isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
+    final pine = isDark
+        ? DarkSanctuaryTokens.sanctuaryPine
+        : LightSanctuaryTokens.sanctuaryPine;
 
     final peer = dialogueState.peerProfile;
     final mapArgs = routeArgs is Map<String, dynamic> ? routeArgs : null;
-    final fallbackName = mapArgs?['partner_name'] ?? mapArgs?['peer_name'] ?? mapArgs?['name'] ?? peer['full_name'] ?? 'Mindful Seeker';
-    final fallbackAge = mapArgs?['partner_age'] ?? mapArgs?['peer_age'] ?? mapArgs?['age'] ?? peer['age'];
+    final fallbackName = mapArgs?['partner_name'] ??
+        mapArgs?['peer_name'] ??
+        mapArgs?['name'] ??
+        peer['full_name'] ??
+        'Mindful Seeker';
+    final fallbackAge = mapArgs?['partner_age'] ??
+        mapArgs?['peer_age'] ??
+        mapArgs?['age'] ??
+        peer['age'];
 
     final displayName = args != null
         ? '${args.recipientName}, ${args.recipientAge}'
-        : (fallbackAge != null ? '$fallbackName, $fallbackAge' : '$fallbackName');
+        : (fallbackAge != null
+            ? '$fallbackName, $fallbackAge'
+            : '$fallbackName');
     final isOnline = args?.isOnline ?? (peer['is_online'] as bool? ?? true);
     final bridgeData = {
       ...dialogueState.bridgeData,
@@ -149,7 +167,9 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
       backgroundColor: bg,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard,
+        backgroundColor: isDark
+            ? DarkSanctuaryTokens.surfaceCard
+            : LightSanctuaryTokens.surfaceCard,
         elevation: 0.5,
         leading: BackButton(color: primaryText),
         titleSpacing: 0,
@@ -161,7 +181,8 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                   radius: 19,
                   backgroundColor: pine.withValues(alpha: 0.15),
                   child: Text(displayName.isNotEmpty ? displayName[0] : 'S',
-                      style: TextStyle(color: pine, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(color: pine, fontWeight: FontWeight.bold)),
                 ),
                 if (isOnline)
                   Positioned(
@@ -171,7 +192,9 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: isDark ? DarkSanctuaryTokens.badgeOnline : LightSanctuaryTokens.badgeOnline,
+                        color: isDark
+                            ? DarkSanctuaryTokens.badgeOnline
+                            : LightSanctuaryTokens.badgeOnline,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
@@ -186,11 +209,16 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                 children: [
                   Text(
                     displayName,
-                    style: TextStyle(fontFamily: 'Serif', fontSize: 15, fontWeight: FontWeight.bold, color: primaryText),
+                    style: TextStyle(
+                        fontFamily: 'Serif',
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: primaryText),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(isOnline ? 'Quietly present' : 'Last seen recently', style: TextStyle(fontSize: 11, color: subText)),
+                  Text(isOnline ? 'Quietly present' : 'Last seen recently',
+                      style: TextStyle(fontSize: 11, color: subText)),
                 ],
               ),
             ),
@@ -202,12 +230,15 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
             isDark: isDark,
             onStartAudioCall: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Initiating Sacred Audio Whisper connection...')),
+                const SnackBar(
+                    content:
+                        Text('Initiating Sacred Audio Whisper connection...')),
               );
             },
             onSendMedia: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Opening Encrypted Moments Media Vault...')),
+                const SnackBar(
+                    content: Text('Opening Encrypted Moments Media Vault...')),
               );
             },
           ),
@@ -220,20 +251,22 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
           IconButton(
             icon: Container(
               padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
                     DarkSanctuaryTokens.primaryCoral,
-                    const Color(0xFF4E9F76),
+                    Color(0xFF4E9F76),
                   ],
                 ),
               ),
-              child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+              child:
+                  const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
             ),
             tooltip: 'Eva Dialogue Wingman',
             onPressed: () {
-              final rName = args?.recipientName ?? (peer['full_name'] as String? ?? 'Seeker');
+              final rName = args?.recipientName ??
+                  (peer['full_name'] as String? ?? 'Seeker');
               final lastMsg = dialogueState.messages.isNotEmpty
                   ? dialogueState.messages.last.text
                   : 'Start a thoughtful, slow dialogue.';
@@ -248,12 +281,19 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
           ),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert_rounded, color: primaryText),
-            color: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            color: isDark
+                ? DarkSanctuaryTokens.surfaceCard
+                : LightSanctuaryTokens.surfaceCard,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tooltip: 'Safety & Protection',
             onSelected: (val) {
-              final rId = args?.recipientId ?? (peer['id'] as String? ?? peer['user_id'] as String? ?? 'peer_seeker');
-              final rName = args?.recipientName ?? (peer['full_name'] as String? ?? 'Seeker');
+              final rId = args?.recipientId ??
+                  (peer['id'] as String? ??
+                      peer['user_id'] as String? ??
+                      'peer_seeker');
+              final rName = args?.recipientName ??
+                  (peer['full_name'] as String? ?? 'Seeker');
               if (val == 'report') {
                 ChatSafetyDialog.showReportSheet(
                   context: context,
@@ -286,7 +326,9 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                     Icon(
                       Icons.flag_outlined,
                       size: 20,
-                      color: isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent,
+                      color: isDark
+                          ? DarkSanctuaryTokens.primaryCoral
+                          : LightSanctuaryTokens.terracottaAccent,
                     ),
                     const SizedBox(width: 10),
                     Text(
@@ -303,13 +345,17 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                     Icon(
                       Icons.block_rounded,
                       size: 20,
-                      color: isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent,
+                      color: isDark
+                          ? DarkSanctuaryTokens.primaryCoral
+                          : LightSanctuaryTokens.terracottaAccent,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Block User',
                       style: TextStyle(
-                        color: isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent,
+                        color: isDark
+                            ? DarkSanctuaryTokens.primaryCoral
+                            : LightSanctuaryTokens.terracottaAccent,
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
                       ),
@@ -327,7 +373,8 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
           children: [
             if (promptText.isNotEmpty)
               SharedContextPromptCard(isDark: isDark, promptText: promptText),
-            if (dialogueState.messages.isEmpty && dialogueState.icebreakers.isNotEmpty)
+            if (dialogueState.messages.isEmpty &&
+                dialogueState.icebreakers.isNotEmpty)
               AiIcebreakerChipsRow(
                 isDark: isDark,
                 icebreakers: dialogueState.icebreakers,
@@ -338,12 +385,16 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                   ? Center(
                       child: Text(
                         'Begin with intention. Conversations here flow unhurried.',
-                        style: TextStyle(fontSize: 13, color: subText, fontStyle: FontStyle.italic),
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: subText,
+                            fontStyle: FontStyle.italic),
                       ),
                     )
                   : ListView.builder(
                       controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       itemCount: dialogueState.messages.length,
                       itemBuilder: (context, index) {
                         final msg = dialogueState.messages[index];

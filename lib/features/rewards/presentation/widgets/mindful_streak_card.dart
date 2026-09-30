@@ -24,14 +24,22 @@ class MindfulStreakCard extends ConsumerWidget {
     final state = ref.watch(growthHubControllerProvider);
     final notifier = ref.read(growthHubControllerProvider.notifier);
 
-    final gold = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
-    final surface = isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard;
-    final headline = isDark ? DarkSanctuaryTokens.textHeadline : LightSanctuaryTokens.textHeadline;
-    final muted = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
-    final coral = const Color(0xFFE06D53);
-    final emerald = const Color(0xFF4E9F76);
+    final gold = isDark
+        ? DarkSanctuaryTokens.goldAccent
+        : LightSanctuaryTokens.goldAccent;
+    final surface = isDark
+        ? DarkSanctuaryTokens.surfaceCard
+        : LightSanctuaryTokens.surfaceCard;
+    final headline = isDark
+        ? DarkSanctuaryTokens.textHeadline
+        : LightSanctuaryTokens.textHeadline;
+    final muted =
+        isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
+    const coral = Color(0xFFE06D53);
+    const emerald = Color(0xFF4E9F76);
 
-    final isExpiringSoon = state.isStreakActive && state.secondsRemaining <= 4 * 3600;
+    final isExpiringSoon =
+        state.isStreakActive && state.secondsRemaining <= 4 * 3600;
     final timerText = _formatSeconds(state.secondsRemaining);
 
     return Container(
@@ -44,7 +52,9 @@ class MindfulStreakCard extends ConsumerWidget {
         border: Border.all(
           color: isExpiringSoon
               ? coral
-              : (state.isStreakActive ? gold.withValues(alpha: 0.6) : Colors.white12),
+              : (state.isStreakActive
+                  ? gold.withValues(alpha: 0.6)
+                  : Colors.white12),
           width: 1.5,
         ),
         boxShadow: [
@@ -64,59 +74,73 @@ class MindfulStreakCard extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8.0),
-                    decoration: BoxDecoration(
-                      color: coral.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: coral.withValues(alpha: 0.5)),
-                    ),
-                    child: Text(
-                      '🔥',
-                      style: const TextStyle(fontSize: 18.0),
-                    ),
-                  ),
-                  const SizedBox(width: 10.0),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        state.streakCount > 0
-                            ? 'DAY ${state.streakCount} MINDFUL STREAK'
-                            : '24-HOUR MINDFUL STREAK',
-                        style: TextStyle(
-                          fontFamily: 'Serif',
-                          color: gold,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.0,
-                          letterSpacing: 0.5,
-                        ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        color: coral.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: coral.withValues(alpha: 0.5)),
                       ),
-                      Text(
-                        state.isStreakActive
-                            ? 'Secured • $timerText left'
-                            : 'Inactive • Resurrect today',
-                        style: TextStyle(
-                          color: isExpiringSoon ? coral : (state.isStreakActive ? emerald : muted),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: const Text(
+                        '🔥',
+                        style: TextStyle(fontSize: 18.0),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(width: 10.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            state.streakCount > 0
+                                ? 'DAY ${state.streakCount} MINDFUL STREAK'
+                                : '24-HOUR MINDFUL STREAK',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Serif',
+                              color: gold,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.0,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Text(
+                            state.isStreakActive
+                                ? 'Secured • $timerText left'
+                                : 'Inactive • Resurrect today',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isExpiringSoon
+                                  ? coral
+                                  : (state.isStreakActive ? emerald : muted),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8.0),
               // Boost Pill
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                 decoration: BoxDecoration(
                   color: gold.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10.0),
                   border: Border.all(color: gold.withValues(alpha: 0.4)),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.trending_up, color: gold, size: 14.0),
                     const SizedBox(width: 4.0),
@@ -152,7 +176,7 @@ class MindfulStreakCard extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.shield_outlined, color: coral, size: 18.0),
+                const Icon(Icons.shield_outlined, color: coral, size: 18.0),
                 const SizedBox(width: 8.0),
                 Expanded(
                   child: Text(
@@ -182,7 +206,9 @@ class MindfulStreakCard extends ConsumerWidget {
                 );
               },
               icon: Icon(
-                state.isStreakActive ? Icons.lock_clock : Icons.play_arrow_rounded,
+                state.isStreakActive
+                    ? Icons.lock_clock
+                    : Icons.play_arrow_rounded,
                 size: 18.0,
                 color: Colors.white,
               ),
@@ -197,7 +223,8 @@ class MindfulStreakCard extends ConsumerWidget {
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: state.isStreakActive ? const Color(0xFF2E6F5E) : coral,
+                backgroundColor:
+                    state.isStreakActive ? const Color(0xFF2E6F5E) : coral,
                 padding: const EdgeInsets.symmetric(vertical: 13.0),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),

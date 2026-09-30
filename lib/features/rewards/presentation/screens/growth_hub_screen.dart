@@ -97,6 +97,7 @@ class _GrowthHubScreenState extends ConsumerState<GrowthHubScreen> with SingleTi
               isDark: isDark,
               swipesRemaining: growthState.swipesRemaining,
               directLetters: growthState.directLetters,
+              revealTokens: growthState.revealTokensCount,
               isAdFree: growthState.isAdFree,
             ),
             const SizedBox(height: 10.0),

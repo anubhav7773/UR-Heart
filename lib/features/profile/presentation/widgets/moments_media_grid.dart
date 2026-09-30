@@ -73,7 +73,7 @@ class MomentsMediaGrid extends StatelessWidget {
               crossAxisCount: 2,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              childAspectRatio: 1.1,
+              childAspectRatio: 1.0,
             ),
             itemBuilder: (context, index) {
               final hasPhoto = index < photos.length && photos[index].isNotEmpty;

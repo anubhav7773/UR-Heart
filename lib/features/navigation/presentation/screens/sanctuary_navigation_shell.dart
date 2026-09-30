@@ -72,16 +72,21 @@ class _SanctuaryNavigationShellState
   Future<void> _pollNotifications() async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.dio.get<Map<String, dynamic>>('/api/v1/notifications');
+      final response = await apiClient.dio
+          .get<Map<String, dynamic>>('/api/v1/notifications');
       if (response.statusCode == 200 && response.data != null) {
-        final notifications = response.data!['notifications'] as List<dynamic>? ?? [];
+        final notifications =
+            response.data!['notifications'] as List<dynamic>? ?? [];
         final unreadList = notifications
             .cast<Map<String, dynamic>>()
-            .where((n) => n['is_read'] != true && !_seenNotificationIds.contains(n['id']?.toString()))
+            .where((n) =>
+                n['is_read'] != true &&
+                !_seenNotificationIds.contains(n['id']?.toString()))
             .toList();
 
         if (unreadList.isNotEmpty && mounted) {
-          final isDark = ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
+          final isDark =
+              ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
           // Mark all unread notifications as seen in memory to strictly prevent duplicate notifications
           for (final notif in unreadList) {
             final notifId = notif['id']?.toString();
@@ -116,11 +121,15 @@ class _SanctuaryNavigationShellState
 
     // 1. Direct 1:1 Message / Chat -> Direct jump into ChatDialogueScreen
     if (notifType.contains('message') || notifType.contains('chat')) {
-      final matchId = notifData['match_id']?.toString() ?? notif['match_id']?.toString();
-      final senderId = notifData['sender_id']?.toString() ?? notif['sender_id']?.toString() ?? 'user_peer';
+      final matchId =
+          notifData['match_id']?.toString() ?? notif['match_id']?.toString();
+      final senderId = notifData['sender_id']?.toString() ??
+          notif['sender_id']?.toString() ??
+          'user_peer';
       final rawSenderName = notifData['sender_name']?.toString() ??
           title.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
-      final senderName = rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
+      final senderName =
+          rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
 
       ref.read(navigationIndexProvider.notifier).state = 2;
 
@@ -143,11 +152,18 @@ class _SanctuaryNavigationShellState
 
     // 2. Sacred Match Ignited -> Direct jump to ChatDialogueScreen
     if (notifType.contains('match')) {
-      final matchId = notifData['match_id']?.toString() ?? notif['match_id']?.toString();
-      final partnerId = notifData['partner_id']?.toString() ?? notif['partner_id']?.toString() ?? 'partner_user';
+      final matchId =
+          notifData['match_id']?.toString() ?? notif['match_id']?.toString();
+      final partnerId = notifData['partner_id']?.toString() ??
+          notif['partner_id']?.toString() ??
+          'partner_user';
       final rawPartnerName = notifData['partner_name']?.toString() ??
-          title.replaceAll('Sacred Match Ignited', '').replaceAll('💫', '').trim();
-      final partnerName = rawPartnerName.isNotEmpty ? rawPartnerName : 'Soul Seeker';
+          title
+              .replaceAll('Sacred Match Ignited', '')
+              .replaceAll('💫', '')
+              .trim();
+      final partnerName =
+          rawPartnerName.isNotEmpty ? rawPartnerName : 'Soul Seeker';
 
       ref.read(navigationIndexProvider.notifier).state = 2;
 
@@ -169,19 +185,26 @@ class _SanctuaryNavigationShellState
     }
 
     // 3. New incoming like / direct resonate letter -> Jump to Resonances screen (tab 1)
-    if (notifType.contains('like') || notifType.contains('direct') || notifType.contains('resonate')) {
+    if (notifType.contains('like') ||
+        notifType.contains('direct') ||
+        notifType.contains('resonate')) {
       ref.read(navigationIndexProvider.notifier).state = 1;
       return;
     }
 
     // 4. Kinship referral reward / ad reward -> Jump to Growth PRO hub (tab 3)
-    if (notifType.contains('referral') || notifType.contains('reward') || notifType.contains('growth') || notifType.contains('ad')) {
+    if (notifType.contains('referral') ||
+        notifType.contains('reward') ||
+        notifType.contains('growth') ||
+        notifType.contains('ad')) {
       ref.read(navigationIndexProvider.notifier).state = 3;
       return;
     }
 
     // 5. KYC / Persona / Profile status notification -> Jump to Persona (tab 4)
-    if (notifType.contains('kyc') || notifType.contains('profile') || notifType.contains('persona')) {
+    if (notifType.contains('kyc') ||
+        notifType.contains('profile') ||
+        notifType.contains('persona')) {
       ref.read(navigationIndexProvider.notifier).state = 4;
       return;
     }
@@ -224,7 +247,8 @@ class _SanctuaryNavigationShellState
 
     final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
     final rawTitle = notif['title']?.toString() ?? 'Sanctuary Resonance';
-    final message = notif['message']?.toString() ?? notif['body']?.toString() ?? '';
+    final message =
+        notif['message']?.toString() ?? notif['body']?.toString() ?? '';
     final notifId = notif['id']?.toString();
     final notifData = notif['data'] as Map<String, dynamic>? ?? {};
 
@@ -233,7 +257,8 @@ class _SanctuaryNavigationShellState
     if (notifType.contains('message') || notifType.contains('chat')) {
       final rawSenderName = notifData['sender_name']?.toString() ??
           rawTitle.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
-      displayTitle = rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
+      displayTitle =
+          rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
     }
 
     final avatarUrl = notifData['sender_avatar']?.toString() ??
@@ -245,7 +270,10 @@ class _SanctuaryNavigationShellState
         final apiClient = ref.read(apiClientProvider);
         apiClient.dio.post<dynamic>(
           '/api/v1/notifications/mark-read',
-          data: {'notification_ids': [notifId], 'notification_id': notifId},
+          data: {
+            'notification_ids': [notifId],
+            'notification_id': notifId
+          },
         );
       } catch (_) {}
     }
@@ -285,21 +313,17 @@ class _SanctuaryNavigationShellState
     final currentIndex = ref.watch(navigationIndexProvider);
     final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
 
-    final navBg = isDark
-        ? const Color(0xFF121815)
-        : const Color(0xFFFAF8F5);
+    final navBg = isDark ? const Color(0xFF121815) : const Color(0xFFFAF8F5);
 
-    final borderColor = isDark
-        ? const Color(0xFF1E2B23)
-        : const Color(0xFFE8E3DA);
+    final borderColor =
+        isDark ? const Color(0xFF1E2B23) : const Color(0xFFE8E3DA);
 
     final activeColor = isDark
         ? DarkSanctuaryTokens.primaryCoral
         : LightSanctuaryTokens.primaryPine;
 
-    final inactiveColor = isDark
-        ? const Color(0xFF718096)
-        : const Color(0xFF8C9B90);
+    final inactiveColor =
+        isDark ? const Color(0xFF718096) : const Color(0xFF8C9B90);
 
     return PopScope(
       canPop: false,
@@ -359,16 +383,17 @@ class _SanctuaryNavigationShellState
             ),
             icon: Container(
               padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
                     DarkSanctuaryTokens.primaryCoral,
-                    const Color(0xFF4E9F76),
+                    Color(0xFF4E9F76),
                   ],
                 ),
               ),
-              child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+              child:
+                  const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
             ),
             label: Text(
               'Eva AI',
@@ -497,7 +522,8 @@ class _SanctuaryNavigationShellState
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? activeColor.withOpacity(isDark ? 0.16 : 0.12)

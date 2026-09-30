@@ -8,7 +8,8 @@ import 'package:ur_heart/core/ads/ad_reward_models.dart';
 
 void main() {
   group('Mindful Streak & Profile Boost Domain & State Tests', () {
-    test('UserProfile.fromJson parses streak, boost points, and reveal tokens', () {
+    test('UserProfile.fromJson parses streak, boost points, and reveal tokens',
+        () {
       final json = {
         'id': 'user-123',
         'full_name': 'Test Seeker',
@@ -32,9 +33,11 @@ void main() {
       expect(profile.isStreakActive, isTrue);
     });
 
-    test('GrowthHubController increments streak and boost on daily_streak_boost reward', () {
+    test(
+        'GrowthHubController increments streak and boost on daily_streak_boost reward',
+        () {
       final controller = GrowthHubController(
-        GrowthHubState(
+        const GrowthHubState(
           streakCount: 3,
           boostPoints: 2,
           secondsRemaining: 10000,
@@ -54,7 +57,9 @@ void main() {
   });
 
   group('MindfulStreakCard Widget Tests', () {
-    testWidgets('MindfulStreakCard renders day count, boost percentage, and ad trigger', (tester) async {
+    testWidgets(
+        'MindfulStreakCard renders day count, boost percentage, and ad trigger',
+        (tester) async {
       final container = ProviderContainer(
         overrides: [
           growthHubControllerProvider.overrideWith(
@@ -89,7 +94,8 @@ void main() {
       expect(find.textContaining('15h 0m left'), findsOneWidget);
 
       // Verify loss aversion warning
-      expect(find.textContaining('Missing 24h forfeits 1 Social Reveal Token'), findsOneWidget);
+      expect(find.textContaining('Missing 24h forfeits 1 Social Reveal Token'),
+          findsOneWidget);
 
       // Verify action button
       expect(find.text('Reinforce Streak & Boost (30s)'), findsOneWidget);

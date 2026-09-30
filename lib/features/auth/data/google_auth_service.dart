@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/storage/secure_session_storage.dart';
 
 /// Result envelope for Google Sign-In operations
@@ -80,7 +79,8 @@ class GoogleAuthService {
       _firebaseAuth = FirebaseAuth.instance;
       return _firebaseAuth;
     } catch (e) {
-      debugPrint('[GoogleAuthService] FirebaseAuth not initialized or unavailable: $e');
+      debugPrint(
+          '[GoogleAuthService] FirebaseAuth not initialized or unavailable: $e');
       return null;
     }
   }
@@ -159,7 +159,8 @@ class GoogleAuthService {
         idToken: idToken,
       );
     } on GoogleSignInException catch (e) {
-      debugPrint('[GoogleAuthService] GoogleSignInException: ${e.code} - ${e.description}');
+      debugPrint(
+          '[GoogleAuthService] GoogleSignInException: ${e.code} - ${e.description}');
       if (e.code == GoogleSignInExceptionCode.canceled) {
         return GoogleAuthResult.cancelled();
       }
@@ -167,7 +168,8 @@ class GoogleAuthService {
         e.description ?? 'Google Sign-In was not completed. Please try again.',
       );
     } on FirebaseAuthException catch (e) {
-      debugPrint('[GoogleAuthService] FirebaseAuthException: ${e.code} - ${e.message}');
+      debugPrint(
+          '[GoogleAuthService] FirebaseAuthException: ${e.code} - ${e.message}');
       return GoogleAuthResult.failure(
         e.message ?? 'Authentication service error. Please try again.',
       );

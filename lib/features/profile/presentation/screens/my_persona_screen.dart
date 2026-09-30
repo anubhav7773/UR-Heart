@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -10,6 +11,7 @@ import '../widgets/locked_credentials_card.dart';
 import '../widgets/moments_media_grid.dart';
 import '../widgets/persona_header_card.dart';
 import '../widgets/persona_tabs_header.dart';
+import '../widgets/photo_adjuster_dialog.dart';
 import '../widgets/preferences_slider_card.dart';
 
 /// Screen 11: My Persona View & Editor
@@ -130,6 +132,15 @@ class MyPersonaScreen extends ConsumerWidget {
     int slotIndex, {
     required bool isAvatar,
   }) {
+    final profile = ref.read(personaControllerProvider).profile;
+    final String currentPhoto = isAvatar
+        ? profile.avatarUrl
+        : (slotIndex >= 0 && slotIndex < profile.momentPhotos.length
+            ? profile.momentPhotos[slotIndex]
+            : '');
+    final bool hasExistingPhoto = currentPhoto.isNotEmpty;
+    final gold = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: isDark
@@ -140,14 +151,14 @@ class MyPersonaScreen extends ConsumerWidget {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 isAvatar
-                    ? 'Update Sanctuary Avatar'
-                    : 'Replace Sacred Moment #${slotIndex + 1}',
+                    ? 'Sanctuary Avatar'
+                    : 'Sacred Moment #${slotIndex + 1}',
                 style: AppTypography.titleH2.copyWith(
                   fontSize: 18,
                   color: isDark
@@ -155,9 +166,9 @@ class MyPersonaScreen extends ConsumerWidget {
                       : LightSanctuaryTokens.textHeadline,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                'Automatic WebP <100KB compression & OCR moderation applied.',
+                'Adjust framing, pan & zoom so your face displays clearly.',
                 style: AppTypography.bodySmall.copyWith(
                   color: isDark
                       ? DarkSanctuaryTokens.textMuted
@@ -165,30 +176,64 @@ class MyPersonaScreen extends ConsumerWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Option 1: Adjust Existing Photo (if present)
+              if (hasExistingPhoto) ...[
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: gold.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.crop_rotate_rounded, color: gold, size: 20),
+                  ),
+                  title: const Text('Adjust / Reframe Current Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Pan, zoom, & center so it is clean & visible'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _adjustExistingPhoto(
+                      context,
+                      ref,
+                      currentPhoto,
+                      isDark,
+                      isAvatar: isAvatar,
+                      slotIndex: slotIndex,
+                    );
+                  },
+                ),
+                const Divider(height: 8),
+              ],
+
+              // Option 2: Camera Capture
               ListTile(
                 leading: const Icon(Icons.photo_camera_rounded),
-                title: const Text('Capture with Camera'),
+                title: Text(hasExistingPhoto ? 'Replace with Camera' : 'Capture with Camera'),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _pickAndProcessPhoto(
                     context,
                     ref,
                     ImageSource.camera,
+                    isDark: isDark,
                     isAvatar: isAvatar,
                     slotIndex: slotIndex,
                   );
                 },
               ),
+
+              // Option 3: Gallery Select
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded),
-                title: const Text('Select from Gallery'),
+                title: Text(hasExistingPhoto ? 'Replace from Gallery' : 'Select from Gallery'),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _pickAndProcessPhoto(
                     context,
                     ref,
                     ImageSource.gallery,
+                    isDark: isDark,
                     isAvatar: isAvatar,
                     slotIndex: slotIndex,
                   );
@@ -201,10 +246,66 @@ class MyPersonaScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _adjustExistingPhoto(
+    BuildContext context,
+    WidgetRef ref,
+    String photoPathOrUrl,
+    bool isDark, {
+    required bool isAvatar,
+    int slotIndex = 0,
+  }) async {
+    try {
+      File fileToAdjust;
+      if (photoPathOrUrl.startsWith('http://') || photoPathOrUrl.startsWith('https://')) {
+        // Download remote photo to temporary storage for lossless adjustment
+        final tempDir = Directory.systemTemp;
+        final tempPath = '${tempDir.path}/existing_slot_${slotIndex}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final response = await http.get(Uri.parse(photoPathOrUrl));
+        if (response.statusCode != 200) {
+          throw Exception('Unable to fetch image from network (HTTP ${response.statusCode})');
+        }
+        fileToAdjust = File(tempPath);
+        await fileToAdjust.writeAsBytes(response.bodyBytes);
+      } else {
+        fileToAdjust = File(photoPathOrUrl);
+        if (!fileToAdjust.existsSync()) {
+          throw Exception('Local photo file not found at path');
+        }
+      }
+
+      if (!context.mounted) return;
+      final adjustedFile = await SanctuaryPhotoAdjusterDialog.show(
+        context,
+        file: fileToAdjust,
+        isDark: isDark,
+        isAvatar: isAvatar,
+        targetAspectRatio: 1.0,
+      );
+      if (adjustedFile == null) return; // User cancelled
+
+      final notifier = ref.read(personaControllerProvider.notifier);
+      if (isAvatar) {
+        await notifier.updateAvatarFile(adjustedFile);
+      } else {
+        await notifier.updateMomentSlotFile(slotIndex, adjustedFile);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not adjust photo: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _pickAndProcessPhoto(
     BuildContext context,
     WidgetRef ref,
     ImageSource source, {
+    required bool isDark,
     required bool isAvatar,
     int slotIndex = 0,
   }) async {
@@ -212,17 +313,28 @@ class MyPersonaScreen extends ConsumerWidget {
     try {
       final XFile? file = await picker.pickImage(
         source: source,
-        maxWidth: 1080,
-        maxHeight: 1350,
-        imageQuality: 85,
+        maxWidth: 1440,
+        maxHeight: 1800,
+        imageQuality: 90,
       );
       if (file == null) return;
 
+      if (!context.mounted) return;
+      // Allow user to interactively pan, zoom, rotate, and frame the photo
+      final adjustedFile = await SanctuaryPhotoAdjusterDialog.show(
+        context,
+        file: File(file.path),
+        isDark: isDark,
+        isAvatar: isAvatar,
+        targetAspectRatio: 1.0,
+      );
+      if (adjustedFile == null) return; // User cancelled adjustment
+
       final notifier = ref.read(personaControllerProvider.notifier);
       if (isAvatar) {
-        await notifier.updateAvatarFile(File(file.path));
+        await notifier.updateAvatarFile(adjustedFile);
       } else {
-        await notifier.updateMomentSlotFile(slotIndex, File(file.path));
+        await notifier.updateMomentSlotFile(slotIndex, adjustedFile);
       }
     } catch (e) {
       if (context.mounted) {
