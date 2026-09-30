@@ -201,6 +201,8 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
                   _buildFooterLink(context, 'Terms & EULA', ApiEndpoints.termsOfServiceUrl, cornerTextColor),
                   Text('•', style: TextStyle(color: cornerTextColor, fontSize: 11)),
                   _buildFooterLink(context, 'Delete Account', ApiEndpoints.deleteAccountUrl, cornerTextColor),
+                  Text('•', style: TextStyle(color: cornerTextColor, fontSize: 11)),
+                  _buildFooterLink(context, 'Web Sanctuary', ApiEndpoints.webSanctuaryUrl, cornerTextColor),
                 ],
               ),
               const SizedBox(height: 20.0),

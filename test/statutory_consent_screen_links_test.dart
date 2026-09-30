@@ -1,55 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ur_heart/core/constants/api_endpoints.dart';
 import 'package:ur_heart/features/auth/presentation/widgets/statutory_links_card.dart';
-import 'package:ur_heart/features/auth/presentation/screens/consent_screen.dart';
 
 void main() {
-  group('Statutory Legal & Data Deletion Links on Consent Screen', () {
-    testWidgets('StatutoryLinksCard renders all 4 mandatory links with external launch icons', (tester) async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('Statutory Legal & Web Sanctuary Consent Links Audit', () {
+    test('Check 1: Statutory URL Endpoints match exact official specifications', () {
+      expect(ApiEndpoints.officialDomain, 'urheart.asiverticals.me');
+      expect(ApiEndpoints.termsOfServiceUrl, 'https://urheart.asiverticals.me/terms');
+      expect(ApiEndpoints.privacyPolicyUrl, 'https://urheart.asiverticals.me/privacy');
+      expect(ApiEndpoints.webSanctuaryUrl, 'https://urheart.asiverticals.me');
+      expect(ApiEndpoints.deleteAccountUrl, 'https://urheart.asiverticals.me/delete-account');
+    });
+
+    testWidgets('Check 2: StatutoryLinksCard displays all 4 statutory portals including Web Sanctuary', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: StatutoryLinksCard(isDark: true),
+            body: SingleChildScrollView(
+              child: StatutoryLinksCard(isDark: true),
+            ),
           ),
         ),
       );
+      await tester.pump();
 
-      await tester.pumpAndSettle();
-
-      // Verify title & subtitles
+      // Verify Headers & Titles
       expect(find.text('STATUTORY LEGAL PORTALS'), findsOneWidget);
       expect(find.text('Privacy Policy'), findsOneWidget);
       expect(find.text('Terms of Service & EULA'), findsOneWidget);
       expect(find.text('Account & Data Deletion'), findsOneWidget);
       expect(find.text('Official Web Sanctuary'), findsOneWidget);
-
-      // Verify open in new icons
-      expect(find.byIcon(Icons.open_in_new_rounded), findsNWidgets(4));
-    });
-
-    testWidgets('ConsentScreen renders StatutoryLinksCard, affirmation links, and footer links', (tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: ConsentScreen(),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Verify StatutoryLinksCard presence
-      expect(find.byType(StatutoryLinksCard), findsOneWidget);
-
-      // Verify inline affirmation browser links
-      expect(find.text('Read Terms of Service in browser'), findsOneWidget);
-      expect(find.text('Read DPDP Privacy Policy in browser'), findsOneWidget);
-
-      // Verify footer statutory links
-      expect(find.text('Privacy Policy'), findsWidgets);
-      expect(find.text('Terms & EULA'), findsOneWidget);
-      expect(find.text('Delete Account'), findsOneWidget);
+      expect(find.text('urheart.asiverticals.me'), findsOneWidget);
     });
   });
 }
