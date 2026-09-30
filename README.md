@@ -354,7 +354,7 @@ Output path: `build/app/outputs/bundle/release/app-release.aab`
 - **Founder & Chief Architect**: Anubhav Singh
 - **Official Production Portal**: [https://urheart.asiverticals.me](https://urheart.asiverticals.me)
 - **Web Sanctuary Store**: [https://urheart.asiverticals.me/store](https://urheart.asiverticals.me/store)
-- **Data Protection & Grievance Officer**: `kshtriyaanubhav9120@gmail.com`
+- **Data Protection & Grievance Officer**: `asiverticals@gmail.com`
 - **Postal / Legal Jurisdiction**: Lucknow, Uttar Pradesh, Republic of India
 
 ---
