@@ -74,9 +74,25 @@ class EmailService:
             except Exception as e:
                 print(f"[EMAIL SERVICE] SMTP dispatch error: {e}", flush=True)
 
-        # 2. Resend API Dispatch (if key configured)
-        resend_key = os.getenv("RESEND_API_KEY")
+        # 2. Resend API Dispatch (Production-grade transactional delivery)
+        resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
         if resend_key:
+            from_sender = os.getenv("RESEND_FROM", "UR-Heart <onboarding@resend.dev>")
+            email_html = f"""<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 24px; background-color: #0A0F0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E8EDE9;">
+  <div style="max-width: 480px; margin: 0 auto; background: #131F19; border: 1px solid #22362C; border-radius: 20px; padding: 32px 24px; text-align: center;">
+    <div style="font-size: 32px; margin-bottom: 12px;">✨</div>
+    <h1 style="color: #FFFFFF; font-size: 22px; font-weight: 600; margin: 0 0 10px 0;">Almost home.</h1>
+    <p style="color: #4E9F76; font-style: italic; font-size: 16px; margin: 0 0 18px 0;">Verify your sanctuary.</p>
+    <p style="color: #9DB3A8; font-size: 13px; line-height: 1.5; margin: 0 0 24px 0;">
+      We received a request to access UR-Heart for <strong>{clean_email}</strong>.<br>Tap the button below to verify your genuine space:
+    </p>
+    <a href="{magic_link}" style="display: block; background: #C94A29; color: #FFFFFF; text-decoration: none; padding: 14px 24px; border-radius: 24px; font-weight: bold; font-size: 14px; margin-bottom: 18px;">Verify & Enter Sanctuary ➔</a>
+    <p style="color: #61786D; font-size: 11px; margin: 0;">This invitation expires in 15 minutes.<br>If you did not request this, you can safely ignore this email.</p>
+  </div>
+</body>
+</html>"""
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     res = await client.post(
@@ -86,21 +102,24 @@ class EmailService:
                             "Content-Type": "application/json"
                         },
                         json={
-                            "from": "UR-Heart <onboarding@resend.dev>",
+                            "from": from_sender,
                             "to": [clean_email],
                             "subject": "Your Sacred UR-Heart Verification Link ✨",
-                            "html": f'<p>Tap to enter UR-Heart Sanctuary: <a href="{magic_link}">{magic_link}</a></p>'
+                            "html": email_html
                         }
                     )
                     if res.status_code in [200, 201]:
-                        print(f"[EMAIL SERVICE] Successfully sent email via Resend to {clean_email}", flush=True)
+                        print(f"[EMAIL SERVICE] Successfully sent email via Resend to {clean_email} (id={res.json().get('id')})", flush=True)
                         return {
                             "dispatched": True,
                             "provider": "resend",
                             "rate_limited": False,
                             "magic_link": magic_link,
+                            "deep_link": deep_link,
                             "message": "Sacred verification email delivered via Resend."
                         }
+                    else:
+                        print(f"[EMAIL SERVICE] Resend notice ({res.status_code}): {res.text}", flush=True)
             except Exception as e:
                 print(f"[EMAIL SERVICE] Resend dispatch error: {e}", flush=True)
 

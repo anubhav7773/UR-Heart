@@ -33,9 +33,12 @@ def test_notifications_both_routes_200():
 
 def test_magic_link_intent_and_dispatch():
     """Problem 2: Verify register-intent and send-magic-link endpoints."""
+    import uuid
+    test_email = f"seeker_{uuid.uuid4().hex[:6]}@urheart.app"
+
     # 1. Register Intent
     res_intent = client.post("/api/v1/auth/register-intent", json={
-        "email": "seeker@urheart.app",
+        "email": test_email,
         "dob": "2000-01-01",
         "calculated_age": 26
     })
@@ -44,7 +47,7 @@ def test_magic_link_intent_and_dispatch():
 
     # 2. Send Magic Link
     res_link = client.post("/api/v1/auth/send-magic-link", json={
-        "email": "seeker@urheart.app"
+        "email": test_email
     })
     assert res_link.status_code == 200
     data = res_link.json()
@@ -55,21 +58,21 @@ def test_magic_link_intent_and_dispatch():
     assert "masked_email" in data
 
     # 3. Check Initial Live Polling Status (Should be pending)
-    res_poll_init = client.get("/api/v1/auth/verification-status?email=seeker@urheart.app")
+    res_poll_init = client.get(f"/api/v1/auth/verification-status?email={test_email}")
     assert res_poll_init.status_code == 200
     assert res_poll_init.json()["is_verified"] is False
     assert res_poll_init.json()["status"] == "pending"
 
     # 4. Simulate User Tapping Link in Dispatched Email (retrieved securely from vault)
     from app.api.v1.endpoints.auth import EMAIL_VERIFICATION_STATUS
-    token = EMAIL_VERIFICATION_STATUS["seeker@urheart.app"]["token"]
-    res_tap = client.get(f"/api/v1/auth/verify?token={token}&email=seeker@urheart.app")
+    token = EMAIL_VERIFICATION_STATUS[test_email]["token"]
+    res_tap = client.get(f"/api/v1/auth/verify?token={token}&email={test_email}")
     assert res_tap.status_code == 200
     assert "text/html" in res_tap.headers["content-type"]
     assert "Sanctuary Verified" in res_tap.text
 
     # 5. Check Live Polling Status After Tap (Instantly verified)
-    res_poll_after = client.get("/api/v1/auth/verification-status?email=seeker@urheart.app")
+    res_poll_after = client.get(f"/api/v1/auth/verification-status?email={test_email}")
     assert res_poll_after.status_code == 200
     assert res_poll_after.json()["is_verified"] is True
     assert res_poll_after.json()["token"] is not None

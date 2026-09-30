@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     FIREBASE_STORAGE_BUCKET: str = "ur-heart-44b46.firebasestorage.app"
     FIREBASE_CREDENTIALS_PATH: str = "serviceAccountKey.json"
 
+    # Resend Email Delivery Engine
+    RESEND_API_KEY: str = ""
+
     # Cloudflare R2 / S3 Fallback
     CLOUDFLARE_ACCOUNT_ID: str = ""
     R2_ACCESS_KEY_ID: str = ""
