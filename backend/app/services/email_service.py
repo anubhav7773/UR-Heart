@@ -106,17 +106,17 @@ class EmailService:
 
         base_web = getattr(settings, "BASE_WEB_URL", "https://urheart.asiverticals.me")
 
-        # 3. Firebase Auth Passwordless Link Generation
+        # 3. Firebase Auth Direct Email Dispatch via Identity Toolkit API
         from app.services.firebase_auth_service import FirebaseAuthService
+        firebase_sent = await FirebaseAuthService.dispatch_firebase_email(clean_email)
         firebase_link = FirebaseAuthService.generate_firebase_email_link(clean_email)
-        firebase_dispatched = firebase_link is not None
 
         effective_magic_link = firebase_link or magic_link
         effective_deep_link = deep_link
 
         return {
-            "dispatched": firebase_dispatched,
-            "provider": "firebase" if firebase_dispatched else "direct_link",
+            "dispatched": firebase_sent or (firebase_link is not None),
+            "provider": "firebase" if (firebase_sent or firebase_link) else "direct_link",
             "rate_limited": False,
             "magic_link": effective_magic_link,
             "firebase_link": firebase_link,

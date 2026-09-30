@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ur_heart/core/app/ur_heart_app.dart';
 import 'package:ur_heart/features/auth/presentation/screens/consent_screen.dart';
 import 'package:ur_heart/features/auth/presentation/screens/age_gate_auth_screen.dart';
@@ -15,6 +16,10 @@ import 'package:ur_heart/features/rewards/presentation/widgets/sovereign_store_t
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+  });
 
   group('Problem 2 Verification: Session Persistence & Startup Routing', () {
     testWidgets('Cold start with completed profile routes directly to /main', (tester) async {
@@ -59,8 +64,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
 
       expect(find.byType(SanctuaryNavigationShell), findsOneWidget);
 
@@ -80,8 +84,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
 
       expect(find.byType(AgeGateAuthScreen), findsOneWidget);
     });
@@ -179,12 +182,15 @@ void main() {
       expect(find.text('Sacred Link Dispatched'), findsOneWidget);
       expect(find.text('Delivered'), findsOneWidget);
 
-      // 3. Step 2: Live Listening with formatted elapsed time
+      // 3. Step 2: Live Listening with formatted elapsed time and clean disclaimer
       expect(find.text('Open Email & Tap Sacred Link'), findsOneWidget);
       expect(find.text('Listening: 00:15'), findsOneWidget);
-      expect(find.text('Open Email App Now ➔'), findsOneWidget);
-      expect(find.text('Open Link in Browser Directly ➔'), findsOneWidget);
-      expect(find.text('Copy Verification Link'), findsOneWidget);
+      expect(find.text('Email Verification Required'), findsOneWidget);
+
+      // Verify dummy buttons are 100% REMOVED as requested
+      expect(find.text('Open Email App Now ➔'), findsNothing);
+      expect(find.text('Open Link in Browser Directly ➔'), findsNothing);
+      expect(find.text('Copy Verification Link'), findsNothing);
 
       // 4. Step 3: Enter Profile Sanctuary
       expect(find.text('Enter Profile Sanctuary'), findsOneWidget);

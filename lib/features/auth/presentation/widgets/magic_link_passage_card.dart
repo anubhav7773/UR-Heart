@@ -14,7 +14,7 @@ class MagicLinkPassageCard extends ConsumerWidget {
   final int currentStep;
   final int elapsedSeconds;
   final String targetEmail;
-  final VoidCallback onOpenEmailApp;
+  final VoidCallback? onOpenEmailApp;
   final VoidCallback? onOpenDirectLink;
   final VoidCallback? onCopyLink;
   final VoidCallback onResend;
@@ -24,7 +24,7 @@ class MagicLinkPassageCard extends ConsumerWidget {
     required this.currentStep,
     required this.elapsedSeconds,
     required this.targetEmail,
-    required this.onOpenEmailApp,
+    this.onOpenEmailApp,
     this.onOpenDirectLink,
     this.onCopyLink,
     required this.onResend,
@@ -269,100 +269,51 @@ class MagicLinkPassageCard extends ConsumerWidget {
             actionWidget: currentStep == 2
                 ? Padding(
                     padding: const EdgeInsets.only(top: 10.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          height: 40,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: pineColor,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: onOpenEmailApp,
-                            icon: const Icon(Icons.mail_outline, size: 16, color: Colors.white),
-                            label: const Text(
-                              'Open Email App Now ➔',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: pineColor.withValues(alpha: isDark ? 0.12 : 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: pineColor.withValues(alpha: isDark ? 0.35 : 0.25),
+                          width: 1,
                         ),
-                        if (onOpenDirectLink != null) ...[
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            height: 38,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: accentColor, width: 1.2),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: onOpenDirectLink,
-                              icon: Icon(Icons.open_in_browser, size: 16, color: accentColor),
-                              label: Text(
-                                'Open Link in Browser Directly ➔',
-                                style: TextStyle(
-                                  color: accentColor,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (onCopyLink != null) ...[
-                          const SizedBox(height: 6),
-                          Center(
-                            child: TextButton.icon(
-                              onPressed: onCopyLink,
-                              icon: Icon(Icons.copy_rounded, size: 13, color: mutedColor),
-                              label: Text(
-                                'Copy Verification Link',
-                                style: TextStyle(
-                                  color: mutedColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        Container(
-                          margin: const EdgeInsets.only(top: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: isDark ? 0.08 : 0.05),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Colors.amber.withValues(alpha: 0.25),
-                            ),
-                          ),
-                          child: Row(
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              const Icon(Icons.info_outline, size: 14, color: Colors.amber),
+                              Icon(
+                                Icons.mark_email_unread_outlined,
+                                size: 16,
+                                color: pineColor,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Gmail delay or rate-limit? Tap "Open Link in Browser Directly" above to verify instantly without waiting!',
+                                  'Email Verification Required',
                                   style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: isDark ? const Color(0xFFFFD166) : const Color(0xFF8C5800),
-                                    height: 1.3,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: titleColor,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 6),
+                          Text(
+                            'Please open your email inbox and tap the verification link to proceed into UR-Heart.\n\nNote: If you do not see the email in your primary inbox, please check your Spam or Promotions folder.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: bodyColor.withValues(alpha: 0.9),
+                              height: 1.45,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : null,

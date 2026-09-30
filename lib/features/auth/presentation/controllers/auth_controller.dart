@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/activity_logger_service.dart';
@@ -305,7 +307,7 @@ class AuthController extends StateNotifier<AuthState> {
     );
 
     if (result.isSuccess) {
-      // Dispatch real magic link & passkey to user's inbox
+      // 1. Dispatch backend magic link
       final magicRes = await _repository.sendMagicLink(state.email);
       final passkey = magicRes?['passkey']?.toString();
       final magicUrl = magicRes?['magic_link']?.toString();
@@ -313,6 +315,24 @@ class AuthController extends StateNotifier<AuthState> {
         dispatchedPasskey: passkey,
         magicLinkUrl: magicUrl,
       );
+
+      // 2. Direct Mobile Client Dispatch via Firebase Console
+      try {
+        await FirebaseAuth.instance.sendSignInLinkToEmail(
+          email: state.email,
+          actionCodeSettings: ActionCodeSettings(
+            url: 'https://ur-heart-44b46.firebaseapp.com',
+            handleCodeInApp: true,
+            androidPackageName: 'com.urheart.app',
+            androidInstallApp: true,
+            androidMinimumVersion: '21',
+          ),
+        );
+        debugPrint('[AUTH] Firebase client-side email link dispatched to: ${state.email}');
+      } catch (fbErr) {
+        debugPrint('[AUTH] Firebase client sendSignInLinkToEmail notice: $fbErr');
+      }
+
       startCooldownTimer();
       return true;
     }
@@ -343,6 +363,24 @@ class AuthController extends StateNotifier<AuthState> {
       dispatchedPasskey: passkey,
       magicLinkUrl: magicUrl,
     );
+
+    // Direct Mobile Client Dispatch via Firebase Console
+    try {
+      await FirebaseAuth.instance.sendSignInLinkToEmail(
+        email: targetEmail,
+        actionCodeSettings: ActionCodeSettings(
+          url: 'https://ur-heart-44b46.firebaseapp.com',
+          handleCodeInApp: true,
+          androidPackageName: 'com.urheart.app',
+          androidInstallApp: true,
+          androidMinimumVersion: '21',
+        ),
+      );
+      debugPrint('[AUTH] Firebase client-side email link resent to: $targetEmail');
+    } catch (fbErr) {
+      debugPrint('[AUTH] Firebase client sendSignInLinkToEmail notice: $fbErr');
+    }
+
     startCooldownTimer();
   }
 

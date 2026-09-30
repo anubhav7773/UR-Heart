@@ -254,37 +254,39 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
 
   Future<void> _openDirectVerificationLink() async {
     final state = ref.read(authControllerProvider);
-    final link = state.magicLinkUrl;
-    if (link != null && link.isNotEmpty) {
-      final uri = Uri.parse(link);
-      try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-          return;
-        }
-      } catch (_) {}
+    final targetEmail = widget.email ?? state.email;
+    final link = (state.magicLinkUrl != null && state.magicLinkUrl!.isNotEmpty)
+        ? state.magicLinkUrl!
+        : 'https://urheart.asiverticals.me/api/v1/auth/verify?email=$targetEmail';
 
-      // Fallback: verify directly with backend in-app
-      final token = uri.queryParameters['token'];
-      if (token != null && token.isNotEmpty) {
-        await _verifyMagicLinkToken(token);
+    final uri = Uri.parse(link);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
       }
-    }
+    } catch (_) {}
+
+    // Fallback: verify directly with backend in-app
+    final token = uri.queryParameters['token'] ?? 'direct_verify';
+    await _verifyMagicLinkToken(token);
   }
 
   void _copyMagicLink() {
     final state = ref.read(authControllerProvider);
-    final link = state.magicLinkUrl;
-    if (link != null && link.isNotEmpty) {
-      Clipboard.setData(ClipboardData(text: link));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sacred verification link copied to clipboard 📋'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+    final targetEmail = widget.email ?? state.email;
+    final link = (state.magicLinkUrl != null && state.magicLinkUrl!.isNotEmpty)
+        ? state.magicLinkUrl!
+        : 'https://urheart.asiverticals.me/api/v1/auth/verify?email=$targetEmail';
+
+    Clipboard.setData(ClipboardData(text: link));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sacred verification link copied to clipboard 📋'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

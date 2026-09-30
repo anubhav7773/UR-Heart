@@ -429,3 +429,25 @@ async def root_health_probe(request: Request):
         },
         headers={"X-Sanctuary-Alive": "true", "Cache-Control": "no-cache"}
     )
+
+
+@app.get("/.well-known/assetlinks.json", summary="Android Digital Asset Links Verification")
+async def get_assetlinks():
+    """
+    Serves official Google Digital Asset Links for seamless Android App Links verification.
+    """
+    return JSONResponse(
+        content=[
+            {
+                "relation": ["delegate_permission/common.handle_all_urls"],
+                "target": {
+                    "namespace": "android_app",
+                    "package_name": "com.urheart.app",
+                    "sha256_cert_fingerprints": [
+                        "FB:7F:D1:D6:8E:F6:FA:48:A0:34:EE:B7:09:C0:F2:01:84:4D:C9:D5:2B:37:8F:4A:67:98:62:21:61:4F:90:D6"
+                    ]
+                }
+            }
+        ],
+        headers={"Content-Type": "application/json", "Cache-Control": "public, max-age=86400"}
+    )
