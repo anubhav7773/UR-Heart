@@ -22,10 +22,19 @@ class FirebaseMediaUploader {
     required String userUuid,
     required int slotNumber,
     required Uint8List webpBytes,
+    String? userName,
   }) async {
     if (slotNumber < 1 || slotNumber > 5) return null;
 
-    final String path = 'users/$userUuid/moments/slot_$slotNumber.webp';
+    final String folder;
+    if (userName != null && userName.trim().isNotEmpty) {
+      final safeName = userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      folder = userUuid.startsWith(safeName) ? userUuid : '${safeName}_$userUuid';
+    } else {
+      folder = userUuid;
+    }
+
+    final String path = 'users/$folder/moments/slot_$slotNumber.webp';
 
     try {
       final Reference ref = _storage.ref().child(path);
@@ -35,6 +44,7 @@ class FirebaseMediaUploader {
         cacheControl: 'public, max-age=2592000', // 30-Day Client Disk Cache
         customMetadata: {
           'slot_index': slotNumber.toString(),
+          if (userName != null) 'user_name': userName,
           'uploaded_at': DateTime.now().toIso8601String(),
         },
       );
@@ -48,6 +58,7 @@ class FirebaseMediaUploader {
         userUuid: userUuid,
         slotNumber: slotNumber,
         webpBytes: webpBytes,
+        userName: userName,
       );
     }
   }

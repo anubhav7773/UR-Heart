@@ -169,14 +169,14 @@ class FeedScreen extends ConsumerWidget {
                 isDark: isDark,
                 onPass: () async {
                   final ok = await feedNotifier.swipePass();
-                  if (!ok && feedNotifier.state.swipesRemaining <= 0 && context.mounted) {
+                  if (!ok && feedState.swipesRemaining <= 0 && context.mounted) {
                     _showOutOfSwipes(context);
                   }
                 },
                 onResonate: () => _openDirectLetterModal(context, current, feedNotifier, isDark),
                 onLike: () async {
                   final ok = await feedNotifier.swipeLike();
-                  if (!ok && feedNotifier.state.swipesRemaining <= 0 && context.mounted) {
+                  if (!ok && feedState.swipesRemaining <= 0 && context.mounted) {
                     _showOutOfSwipes(context);
                   }
                 },

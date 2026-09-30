@@ -20,14 +20,28 @@ class SupabaseMediaUploader {
   }
 
   /// Uploads compressed WebP direct to user moment slot (1 through 5)
+  /// Incorporates user's name for identifiable and organized cloud storage
   static Future<String?> uploadProfileSlot({
     required String userUuid,
     required int slotNumber,
     required Uint8List webpBytes,
+    String? userName,
   }) async {
     if (slotNumber < 1 || slotNumber > 5) return null;
 
-    final String objectPath = 'users/$userUuid/moments/slot_$slotNumber.webp';
+    final String folder;
+    if (userName != null && userName.trim().isNotEmpty) {
+      final safeName = userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      if (!userUuid.startsWith(safeName)) {
+        folder = '${safeName}_$userUuid';
+      } else {
+        folder = userUuid;
+      }
+    } else {
+      folder = userUuid;
+    }
+
+    final String objectPath = 'users/$folder/moments/slot_$slotNumber.webp';
     final Uri uploadUri = Uri.parse(
       '$supabaseUrl/storage/v1/object/$bucketName/$objectPath',
     );
@@ -63,8 +77,20 @@ class SupabaseMediaUploader {
   static String getPublicUrl({
     required String userUuid,
     required int slotNumber,
+    String? userName,
   }) {
-    final String objectPath = 'users/$userUuid/moments/slot_$slotNumber.webp';
+    final String folder;
+    if (userName != null && userName.trim().isNotEmpty) {
+      final safeName = userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      if (!userUuid.startsWith(safeName)) {
+        folder = '${safeName}_$userUuid';
+      } else {
+        folder = userUuid;
+      }
+    } else {
+      folder = userUuid;
+    }
+    final String objectPath = 'users/$folder/moments/slot_$slotNumber.webp';
     return '$supabaseUrl/storage/v1/object/public/$bucketName/$objectPath';
   }
 }

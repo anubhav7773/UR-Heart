@@ -19,7 +19,7 @@ void main() {
 
   group('Problem 5: Strict 10 Swipes, 0 Direct Letters, 0 Social Reveals Defaults', () {
     test('UserProfileModel defaults to 10 swipes, 0 letters, 0 reveal tokens', () {
-      final profile = UserProfile(
+      const profile = UserProfile(
         id: 'user_1',
         fullName: 'Aarav',
         email: 'aarav@test.com',

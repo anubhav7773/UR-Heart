@@ -260,6 +260,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
             userUuid: safeUserUuid,
             slotNumber: slotNumber,
             webpBytes: processed.webpBytes,
+            userName: state.fullName.isNotEmpty ? state.fullName : prefs.getString('profile_full_name'),
           );
           if (cloudUrl != null && cloudUrl.isNotEmpty) {
             finalUrl = cloudUrl;

@@ -173,6 +173,7 @@ class PersonaController extends StateNotifier<PersonaState> {
             userUuid: safeUserUuid.isNotEmpty ? safeUserUuid : 'seeker_1',
             slotNumber: 1,
             webpBytes: processed.webpBytes,
+            userName: state.profile.fullName,
           );
           if (cloudUrl != null && cloudUrl.isNotEmpty) {
             finalUrl = cloudUrl;
@@ -226,6 +227,7 @@ class PersonaController extends StateNotifier<PersonaState> {
             userUuid: safeUserUuid.isNotEmpty ? safeUserUuid : 'seeker_1',
             slotNumber: slotIndex + 2,
             webpBytes: processed.webpBytes,
+            userName: state.profile.fullName,
           );
           if (cloudUrl != null && cloudUrl.isNotEmpty) {
             finalUrl = cloudUrl;
