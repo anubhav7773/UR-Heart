@@ -109,17 +109,56 @@ class EmailService:
         # 3. Firebase Auth Direct Email Dispatch via Identity Toolkit API
         from app.services.firebase_auth_service import FirebaseAuthService
         firebase_sent = await FirebaseAuthService.dispatch_firebase_email(clean_email)
-        firebase_link = FirebaseAuthService.generate_firebase_email_link(clean_email)
+        if firebase_sent:
+            return {
+                "dispatched": True,
+                "provider": "firebase",
+                "rate_limited": False,
+                "magic_link": magic_link,
+                "deep_link": deep_link,
+                "message": "Sacred Firebase verification link dispatched to your email."
+            }
 
-        effective_magic_link = firebase_link or magic_link
-        effective_deep_link = deep_link
+        # 4. Supabase OTP Email Dispatch Fallback (when Firebase hits QUOTA_EXCEEDED)
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        if supabase_url and supabase_key:
+            try:
+                headers = {
+                    "apikey": supabase_key,
+                    "Authorization": f"Bearer {supabase_key}",
+                    "Content-Type": "application/json"
+                }
+                otp_payload = {
+                    "email": clean_email,
+                    "create_user": True,
+                    "options": {
+                        "email_redirect_to": f"{base_web}/api/v1/auth/verify?email={clean_email}"
+                    }
+                }
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(f"{supabase_url}/auth/v1/otp", headers=headers, json=otp_payload)
+                    if res.status_code == 200:
+                        print(f"[EMAIL SERVICE] Dispatched via Supabase fallback to {clean_email}", flush=True)
+                        return {
+                            "dispatched": True,
+                            "provider": "supabase",
+                            "rate_limited": False,
+                            "magic_link": magic_link,
+                            "deep_link": deep_link,
+                            "message": "Sacred verification email dispatched via Supabase fallback."
+                        }
+                    else:
+                        print(f"[EMAIL SERVICE] Supabase fallback notice ({res.status_code}): {res.text}", flush=True)
+            except Exception as e:
+                print(f"[EMAIL SERVICE] Supabase fallback error: {e}", flush=True)
 
+        # 5. Direct verification link (fallback)
         return {
-            "dispatched": firebase_sent or (firebase_link is not None),
-            "provider": "firebase" if (firebase_sent or firebase_link) else "direct_link",
-            "rate_limited": False,
-            "magic_link": effective_magic_link,
-            "firebase_link": firebase_link,
-            "deep_link": effective_deep_link,
-            "message": "Sacred Firebase verification link dispatched to your email."
+            "dispatched": False,
+            "provider": "direct_link",
+            "rate_limited": True,
+            "magic_link": magic_link,
+            "deep_link": deep_link,
+            "message": "Verification link generated. Email providers temporarily rate-limited."
         }
