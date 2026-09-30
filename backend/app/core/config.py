@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     # Resend Email Delivery Engine
     RESEND_API_KEY: str = ""
+    RESEND_FROM: str = "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
 
     # Cloudflare R2 / S3 Fallback
     CLOUDFLARE_ACCOUNT_ID: str = ""

@@ -211,6 +211,7 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     }
 
 
+import asyncio
 import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
@@ -355,9 +356,12 @@ async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)
     detected_auth_id = None
     try:
         from sqlalchemy import text
-        res_auth = await db.execute(
-            text("SELECT id, email_confirmed_at FROM auth.users WHERE lower(email) = :email"),
-            {"email": clean_email}
+        res_auth = await asyncio.wait_for(
+            db.execute(
+                text("SELECT id, email_confirmed_at FROM auth.users WHERE lower(email) = :email"),
+                {"email": clean_email}
+            ),
+            timeout=2.0
         )
         auth_row = res_auth.fetchone()
         if auth_row and auth_row[1] is not None:
@@ -367,18 +371,28 @@ async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)
     except Exception as e:
         print(f"[AUTH VERIFY] Supabase auth.users check notice: {e}", flush=True)
 
-    # 2. Live Check directly with Firebase Authentication Console
-    # Catches the exact moment Google marks email_verified=True when user taps link in Firebase email
-    fb_user = None
+    # 2. Live Check directly with Firebase Authentication Console (non-blocking, rate-limited)
     if not is_verified_detected:
-        try:
-            from app.services.firebase_auth_service import FirebaseAuthService
-            fb_user = FirebaseAuthService.get_user_by_email(clean_email)
-            if fb_user and fb_user.email_verified:
-                is_verified_detected = True
-                print(f"[AUTH VERIFY] Polling detected Firebase verification for {clean_email} (uid={fb_user.uid})", flush=True)
-        except Exception as e:
-            print(f"[AUTH VERIFY] Firebase live polling check notice: {e}", flush=True)
+        import time
+        last_fb_check = 0
+        if status_entry:
+            last_fb_check = status_entry.get("last_fb_check", 0)
+        now = time.time()
+        # Only poll Firebase every 10 seconds per email to avoid blocking the event loop or exhausting quotas
+        if now - last_fb_check > 10.0:
+            if status_entry:
+                status_entry["last_fb_check"] = now
+            try:
+                from app.services.firebase_auth_service import FirebaseAuthService
+                fb_user = await asyncio.wait_for(
+                    asyncio.to_thread(FirebaseAuthService.get_user_by_email, clean_email),
+                    timeout=2.0
+                )
+                if fb_user and fb_user.email_verified:
+                    is_verified_detected = True
+                    print(f"[AUTH VERIFY] Polling detected Firebase verification for {clean_email} (uid={fb_user.uid})", flush=True)
+            except Exception as e:
+                print(f"[AUTH VERIFY] Firebase live polling check notice: {e}", flush=True)
 
     if is_verified_detected:
         # Sync user entity in DB

@@ -77,7 +77,7 @@ class EmailService:
         # 2. Resend API Dispatch (Production-grade transactional delivery)
         resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
         if resend_key:
-            from_sender = os.getenv("RESEND_FROM", "UR-Heart <onboarding@resend.dev>")
+            from_sender = os.getenv("RESEND_FROM") or getattr(settings, "RESEND_FROM", "") or "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
             email_html = f"""<!DOCTYPE html>
 <html>
 <body style="margin: 0; padding: 24px; background-color: #0A0F0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E8EDE9;">
