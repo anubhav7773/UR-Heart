@@ -218,10 +218,12 @@ async def update_my_profile(
     if "gender" in update_data and update_data["gender"]:
         g = str(update_data["gender"]).strip().lower()
         if g in ("male", "man", "men"):
-            update_data["gender"] = "Male"
+            update_data["gender"] = "Man"
         elif g in ("female", "woman", "women"):
-            update_data["gender"] = "Female"
-        elif g in ("other", "non-binary", "nonbinary", "queer", "transgender"):
+            update_data["gender"] = "Woman"
+        elif g in ("non-binary", "nonbinary"):
+            update_data["gender"] = "Non-Binary"
+        elif g in ("other", "queer", "transgender"):
             update_data["gender"] = "Other"
         else:
             update_data["gender"] = "Unspecified"
