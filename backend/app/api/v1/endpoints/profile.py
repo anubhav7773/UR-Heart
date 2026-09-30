@@ -228,9 +228,21 @@ async def update_my_profile(
         else:
             update_data["gender"] = "Unspecified"
 
+    # Normalize interested_in to satisfy PostgreSQL users_interested_in_check constraint
+    if "interested_in" in update_data and update_data["interested_in"]:
+        lf = str(update_data["interested_in"]).strip().lower()
+        if lf in ("men", "man", "male"):
+            update_data["interested_in"] = "Men"
+        elif lf in ("women", "woman", "female"):
+            update_data["interested_in"] = "Women"
+        else:
+            update_data["interested_in"] = "Everyone"
+
     # Robust DOB & Age parsing
     from datetime import datetime
-    raw_dob = update_data.pop("dob", None) or update_data.pop("birth_date", None)
+    raw_dob = update_data.pop("dob", None)
+    raw_birth_date = update_data.pop("birth_date", None)
+    raw_dob = raw_dob or raw_birth_date
     age_val = update_data.pop("age", None)
     parsed_dob = None
     if raw_dob:
@@ -257,10 +269,14 @@ async def update_my_profile(
     # Mark profile completed in database (Fixes DUM-17 volatile memory set)
     update_data["is_profile_completed"] = True
 
+    # Defense-in-depth: Retain only attributes matching User database columns
+    valid_cols = {c.name for c in User.__table__.columns}
+    sanitized_values = {k: v for k, v in update_data.items() if k in valid_cols}
+
     await db.execute(
         update(User)
         .where(User.id == current_user.id)
-        .values(**update_data)
+        .values(**sanitized_values)
     )
     await db.commit()
 
@@ -343,9 +359,26 @@ async def create_or_update_profile(
     if payload.full_name:
         up_vals["full_name"] = payload.full_name
     if payload.gender:
-        up_vals["gender"] = payload.gender
+        g = str(payload.gender).strip().lower()
+        if g in ("male", "man", "men"):
+            up_vals["gender"] = "Man"
+        elif g in ("female", "woman", "women"):
+            up_vals["gender"] = "Woman"
+        elif g in ("non-binary", "nonbinary"):
+            up_vals["gender"] = "Non-Binary"
+        elif g in ("other", "queer", "transgender"):
+            up_vals["gender"] = "Other"
+        else:
+            up_vals["gender"] = "Unspecified"
+
     if payload.looking_for:
-        up_vals["interested_in"] = payload.looking_for
+        lf = str(payload.looking_for).strip().lower()
+        if lf in ("men", "man", "male"):
+            up_vals["interested_in"] = "Men"
+        elif lf in ("women", "woman", "female"):
+            up_vals["interested_in"] = "Women"
+        else:
+            up_vals["interested_in"] = "Everyone"
     if payload.bio:
         up_vals["bio"] = payload.bio
     if payload.profession:

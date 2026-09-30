@@ -38,9 +38,12 @@ def push_notification(
         "created_at": datetime.utcnow().isoformat()
     }
     NOTIFICATION_STORE[user_key].insert(0, entry)
-    if len(NOTIFICATION_STORE[user_key]) > 50:
-        NOTIFICATION_STORE[user_key] = NOTIFICATION_STORE[user_key][:50]
-    print(f"[NOTIFICATION ENQUEUED] user={user_key} type={notif_type} title='{title}'", flush=True)
+    try:
+        print(f"[NOTIFICATION ENQUEUED] user={user_key} type={notif_type} title='{title}'", flush=True)
+    except Exception:
+        # Fallback for environments with strict ASCII/charmap stdout
+        safe_title = title.encode("ascii", "replace").decode("ascii")
+        print(f"[NOTIFICATION ENQUEUED] user={user_key} type={notif_type} title='{safe_title}'", flush=True)
 
 
 class MarkReadRequest(BaseModel):

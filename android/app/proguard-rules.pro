@@ -76,3 +76,7 @@
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+
+# 13. Repackage Classes for Obfuscation
+-repackageclasses
+

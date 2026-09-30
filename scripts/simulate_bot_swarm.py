@@ -34,8 +34,7 @@ BACKEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 load_dotenv(os.path.join(BACKEND_DIR, ".env"))
 
 BASE_URL = os.getenv("APP_HOST_URL", "https://ur-heart.onrender.com")
-# Fallback to localhost if testing against local backend
-if len(sys.argv) > 1 and sys.argv[1] == "--local":
+if "--local" in sys.argv:
     BASE_URL = "http://127.0.0.1:8000"
 
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -205,6 +204,8 @@ class SwarmBot:
                 self.user_id = data.get("id")
                 self.swipes_remaining = data.get("swipes_remaining", 10)
                 return True
+            else:
+                print(f"[BOT-{self.index}] Setup HTTP {res.status_code}: {res.text}")
         except Exception as e:
             print(f"[BOT-{self.index}] Setup error: {e}")
         return False
@@ -292,21 +293,21 @@ async def run_simulation(bot_count: int = 25):
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Phase 1: Bootstrapping and creating profiles
-        print(f"\n[PHASE 1] Bootstrapping {bot_count} Mindful Personas...")
+        print(f"\n[PHASE 1] Bootstrapping {bot_count} Mindful Personas...", flush=True)
         bots: List[SwarmBot] = []
         for i in range(min(bot_count, len(PERSONAS))):
             bot = SwarmBot(i + 1, PERSONAS[i])
             success = await bot.register_and_bootstrap(client)
             if success:
-                print(f"  ✓ [{i+1:02d}/{bot_count}] {bot.persona['name']} ({bot.persona['gender']}, {bot.persona['age']}) · {bot.persona['city']}")
+                print(f"  ✓ [{i+1:02d}/{bot_count}] {bot.persona['name']} ({bot.persona['gender']}, {bot.persona['age']}) · {bot.persona['city']}", flush=True)
                 bots.append(bot)
             else:
-                print(f"  ✗ [{i+1:02d}/{bot_count}] Setup failed for {bot.persona['name']}")
+                print(f"  ✗ [{i+1:02d}/{bot_count}] Setup failed for {bot.persona['name']}", flush=True)
 
-        print(f"\n[SUCCESS] Successfully provisioned {len(bots)} active seeker profiles!")
+        print(f"\n[SUCCESS] Successfully provisioned {len(bots)} active seeker profiles!", flush=True)
 
         # Phase 2: Feed Discovery & Autonomous Swipes
-        print("\n[PHASE 2] Executing Autonomous AI Swipes, Matches & Direct Letters...")
+        print("\n[PHASE 2] Executing Autonomous AI Swipes, Matches & Direct Letters...", flush=True)
         total_swipes = 0
         total_likes = 0
         total_passes = 0
@@ -320,31 +321,33 @@ async def run_simulation(bot_count: int = 25):
             total_passes += stats["passes"]
             total_directs += stats["directs"]
             total_matches += stats["matches"]
-            print(f"  ⚡ {bot.persona['name']}: {stats['likes']} Likes, {stats['directs']} Directs, {stats['passes']} Passes (Matches: {stats['matches']})")
+            print(f"  ⚡ {bot.persona['name']}: {stats['likes']} Likes, {stats['directs']} Directs, {stats['passes']} Passes (Matches: {stats['matches']})", flush=True)
 
         # Phase 3: Conversational Mindful Dialogues
-        print("\n[PHASE 3] Simulating Mindful Reciprocal Chat Dialogues...")
+        print("\n[PHASE 3] Simulating Mindful Reciprocal Chat Dialogues...", flush=True)
         messages_sent = 0
         for i, bot in enumerate(bots[:6]):
             peer = bots[(i + 1) % len(bots)]
             ai_text = await generate_ai_message(bot.persona["name"], peer.persona["name"], peer.persona["bio"], is_first=True)
-            print(f"  💬 [{bot.persona['name']} ➔ {peer.persona['name']}]: \"{ai_text}\"")
+            print(f"  💬 [{bot.persona['name']} ➔ {peer.persona['name']}]: \"{ai_text}\"", flush=True)
             messages_sent += 1
 
         # Summary
-        print("\n" + "=" * 70)
-        print("📊 BOT SWARM SIMULATION COMPLETED SUCCESSFULLY")
-        print(f"• Total Personas Active       : {len(bots)}")
-        print(f"• Total Swipes Processed      : {total_swipes}")
-        print(f"• Total Direct Letters Sent   : {total_directs}")
-        print(f"• Total Reciprocal Matches    : {total_matches}")
-        print(f"• AI Mindful Messages Exchanged: {messages_sent}")
-        print(f"• Photo Storage Convention     : users/{{Name}}_{{Id}}/moments/slot_1.webp")
-        print("=" * 70)
+        print("\n" + "=" * 70, flush=True)
+        print("📊 BOT SWARM SIMULATION COMPLETED SUCCESSFULLY", flush=True)
+        print(f"• Total Personas Active       : {len(bots)}", flush=True)
+        print(f"• Total Swipes Processed      : {total_swipes}", flush=True)
+        print(f"• Total Direct Letters Sent   : {total_directs}", flush=True)
+        print(f"• Total Reciprocal Matches    : {total_matches}", flush=True)
+        print(f"• AI Mindful Messages Exchanged: {messages_sent}", flush=True)
+        print(f"• Photo Storage Convention     : users/{{Name}}_{{Id}}/moments/slot_1.webp", flush=True)
+        print("=" * 70, flush=True)
 
 
 if __name__ == "__main__":
     count = 25
-    if len(sys.argv) > 1 and sys.argv[1].isdigit():
-        count = int(sys.argv[1])
+    for arg in sys.argv[1:]:
+        if arg.isdigit():
+            count = int(arg)
+            break
     asyncio.run(run_simulation(count))
