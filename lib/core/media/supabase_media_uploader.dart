@@ -8,8 +8,10 @@ class SupabaseMediaUploader {
   SupabaseMediaUploader._();
 
   static const String supabaseUrl = 'https://fmedkihgcvvzcekwybhe.supabase.co';
-  static const String anonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtZWRraWhnY3Z2emNla3d5YmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzMjU1NzEsImV4cCI6MjEwNTkwMTU3MX0.BKYfJW8rh-eP1fRdaEGmeELoS5s2aQpuIROpiRDgVFU';
+  static const String anonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: '',
+  );
   static const String bucketName = 'ur-heart-media';
 
   static http.Client? _customClient;

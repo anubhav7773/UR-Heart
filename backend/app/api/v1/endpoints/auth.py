@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from typing import Optional, Dict, Any, List
 from uuid import UUID
@@ -552,6 +553,11 @@ async def handle_browser_magic_link_tap(
     resolved_token = token or session_token
     deep_link_url = f"urheart://auth/verify?token={resolved_token}&email={clean_email}"
 
+    import html as _html
+    safe_email = _html.escape(clean_email)
+    safe_deep_link = _html.escape(deep_link_url, quote=True)
+    js_safe_url = json.dumps(deep_link_url)
+
     html_content = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -631,15 +637,15 @@ async def handle_browser_magic_link_tap(
   <div class="card">
     <div class="badge">✨</div>
     <h1>Sanctuary Verified</h1>
-    <p>Your genuine space has been authenticated for <strong>{clean_email}</strong>.<br>You are now ready to step into your sanctuary profile.</p>
-    <a class="btn" href="{deep_link_url}">Open UR-Heart Sanctuary ➔</a>
+    <p>Your genuine space has been authenticated for <strong>{safe_email}</strong>.<br>You are now ready to step into your sanctuary profile.</p>
+    <a class="btn" href="{safe_deep_link}">Open UR-Heart Sanctuary ➔</a>
     <div class="subtext">
       Your mobile app will automatically advance to profile setup in real time.<br>If the app does not open automatically, tap the button above.
     </div>
   </div>
   <script>
     setTimeout(function() {{
-      window.location.href = "{deep_link_url}";
+      window.location.href = {js_safe_url};
     }}, 400);
   </script>
 </body>

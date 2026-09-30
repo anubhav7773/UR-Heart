@@ -37,7 +37,7 @@ FIREBASE_ISSUER = f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"
 GOOGLE_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
 
 _raw_jwt = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or _settings.JWT_SECRET_KEY
-if not _raw_jwt or len(_raw_jwt.strip()) < 32:
+if not _raw_jwt or len(_raw_jwt.strip()) < 32 or (_raw_jwt == "dev-insecure-test-jwt-secret-key-32-chars-long" and (_settings.ENVIRONMENT or "").lower() == "production"):
     if (_settings.ENVIRONMENT or "").lower() == "production":
         raise RuntimeError("FATAL PRODUCTION SECURITY ERROR: JWT_SECRET_KEY is missing or insecure (<32 bytes). Refusing boot.")
     _raw_jwt = "dev-insecure-test-jwt-secret-key-32-chars-long"

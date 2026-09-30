@@ -9,7 +9,11 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-FIREBASE_WEB_API_KEY = os.getenv("FIREBASE_WEB_API_KEY", "AIzaSyBlKy9rPprSKhrrMuXZLppiupVOV8Fr5W0")
+def _get_api_key() -> str:
+    s = get_settings()
+    return getattr(s, "FIREBASE_WEB_API_KEY", "") or os.getenv("FIREBASE_WEB_API_KEY", "")
+
+FIREBASE_WEB_API_KEY = _get_api_key()
 
 class FirebaseAuthService:
     """

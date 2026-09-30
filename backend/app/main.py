@@ -9,7 +9,7 @@ if hasattr(sys.stdout, "reconfigure"):
 import time
 from contextlib import asynccontextmanager
 import httpx
-from fastapi import FastAPI, Request, Response, status
+from fastapi import FastAPI, Request, Response, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -151,6 +151,20 @@ async def sanctuary_exception_handler(request: Request, exc: SanctuaryException)
             "success": False,
             "error_code": exc.error_code,
             "message": exc.detail
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    print(f"[UNHANDLED EXCEPTION] {request.method} {request.url.path} -> {exc}", flush=True)
+    msg = str(exc) if getattr(settings, "DEBUG", False) else "An unexpected error occurred in the Sanctuary. Please try again later."
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "success": False,
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": msg
         }
     )
 

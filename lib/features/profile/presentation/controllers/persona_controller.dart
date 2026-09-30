@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/media/media_compressor.dart';
 import '../../../../core/media/supabase_media_uploader.dart';
 import '../../../../core/services/image_moderation_service.dart';
+import '../../../../core/storage/secure_session_storage.dart';
 import '../../data/profile_repository.dart';
 
 class PersonaState {
@@ -162,8 +163,9 @@ class PersonaController extends StateNotifier<PersonaState> {
       }
 
       final processed = await MediaCompressor.processPortraitPhoto(rawFile);
+      final secureEmail = await SecureSessionStorage.instance.getUserEmail();
       final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('ur_heart_user_email') ?? state.profile.email;
+      final userEmail = secureEmail ?? prefs.getString('ur_heart_user_email') ?? state.profile.email;
       final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
 
       String finalUrl = rawFile.path;
@@ -216,8 +218,9 @@ class PersonaController extends StateNotifier<PersonaState> {
       }
 
       final processed = await MediaCompressor.processPortraitPhoto(rawFile);
+      final secureEmail = await SecureSessionStorage.instance.getUserEmail();
       final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('ur_heart_user_email') ?? state.profile.email;
+      final userEmail = secureEmail ?? prefs.getString('ur_heart_user_email') ?? state.profile.email;
       final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
 
       String finalUrl = rawFile.path;

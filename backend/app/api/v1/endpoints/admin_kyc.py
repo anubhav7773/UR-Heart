@@ -15,13 +15,16 @@ from app.services.kyc_purge import purge_ephemeral_kyc_video
 
 router = APIRouter(prefix="/admin/kyc", tags=["Superadmin KYC Sentinel"])
 settings = get_settings()
-ADMIN_EMAILS = {"asiverticals@gmail.com", "kshtriyaanubhav9120@gmail.com"}
+def get_admin_emails() -> set[str]:
+    emails = {"asiverticals@gmail.com", "kshtriyaanubhav9120@gmail.com"}
+    if getattr(settings, "SUPERADMIN_EMAIL", None):
+        emails.add(settings.SUPERADMIN_EMAIL.strip().lower())
+    return emails
 
 
 def verify_superadmin_guard(user: User = Depends(get_current_user)) -> User:
     user_email = (getattr(user, "email", "") or "").strip().lower()
-    user_role = getattr(user, "role", "user") or "user"
-    if user_email not in ADMIN_EMAILS:
+    if user_email not in get_admin_emails():
         raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to the Sovereign Sanctuary Sentinel.")
     return user
 

@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = "ur-heart-44b46"
     FIREBASE_STORAGE_BUCKET: str = "ur-heart-44b46.firebasestorage.app"
     FIREBASE_CREDENTIALS_PATH: str = "serviceAccountKey.json"
+    FIREBASE_WEB_API_KEY: str = ""
 
     # Resend Email Delivery Engine
     RESEND_API_KEY: str = ""
@@ -80,8 +81,8 @@ class Settings(BaseSettings):
         if env == "production":
             jwt_key = self.JWT_SECRET_KEY or os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or ""
             missing = []
-            if not jwt_key or len(jwt_key.strip()) < 32:
-                missing.append("JWT_SECRET_KEY (must be present and >= 32 characters)")
+            if not jwt_key or len(jwt_key.strip()) < 32 or jwt_key in {"dev-insecure-test-jwt-secret-key-32-chars-long"}:
+                missing.append("JWT_SECRET_KEY (must be present, dedicated, and >= 32 characters)")
             if not self.FIREBASE_PROJECT_ID or not self.FIREBASE_PROJECT_ID.strip():
                 missing.append("FIREBASE_PROJECT_ID")
             if not self.SUPABASE_SERVICE_ROLE_KEY or not self.SUPABASE_SERVICE_ROLE_KEY.strip():
