@@ -40,7 +40,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "--local":
 
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_KEY = os.getenv("GROQ_API_KEY", "")
-JWT_SECRET = os.getenv("JWT_SECRET_KEY", "4f8a3c8e9d2b1f7a6e5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e")
+JWT_SECRET = os.getenv("JWT_SECRET_KEY", "")
 
 # 25 Diverse Mindful Seeker Personas
 PERSONAS = [
