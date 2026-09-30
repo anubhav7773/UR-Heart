@@ -80,3 +80,7 @@
 # 13. Repackage Classes for Obfuscation
 -repackageclasses
 
+# 14. Flutter Local Notifications
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
+-dontwarn com.dexterous.flutterlocalnotifications.**
+
