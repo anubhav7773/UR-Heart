@@ -15,6 +15,7 @@ from app.core.security import get_current_user
 from app.models.domain.user import User
 from app.models.domain.match import Match
 from app.models.domain.message import Message
+from app.models.domain.whatsapp_token import WhatsAppRevealToken
 
 router = APIRouter(prefix="/chat", tags=["1:1 Encrypted Dialogues"])
 
@@ -389,12 +390,28 @@ async def send_chat_message(
     await db.commit()
     await db.refresh(msg)
 
-    # Find recipient from match and push notification
+    # Find recipient from match and push notification + real-time WebSocket delivery
     try:
         match_res = await db.execute(select(Match).where(Match.id == match_uuid))
         m = match_res.scalar_one_or_none()
         if m:
             recipient_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+            
+            # 1. Instant WebSocket Direct Message Delivery
+            from app.services.chat_manager import manager
+            ws_msg = {
+                "type": "dialogue_message",
+                "match_id": str(match_uuid),
+                "sender_id": str(current_user.id),
+                "recipient_id": str(recipient_id),
+                "payload_type": "unencrypted_fallback",
+                "text": text_content.strip(),
+                "created_at": msg.created_at.isoformat() if msg.created_at else datetime.utcnow().isoformat(),
+                "id": str(msg.id),
+            }
+            await manager.send_direct_message(str(recipient_id), ws_msg)
+
+            # 2. Push Notification & FCM Engine
             from app.api.v1.endpoints.notifications import push_notification
             push_notification(
                 user_id=str(recipient_id),
@@ -424,10 +441,6 @@ async def send_chat_message(
     }
 
 
-# Track unlocked contact bridges per (user_id, match_id)
-UNLOCKED_BRIDGES: set[tuple[str, str]] = set()
-
-
 @router.get("/threads/{match_id}/bridge", status_code=status.HTTP_200_OK, summary="Get Contact Bridge Status")
 async def get_match_bridge_status(
     match_id: str,
@@ -437,7 +450,7 @@ async def get_match_bridge_status(
     """
     Returns Sacred Contact Bridge status for a dialogue match.
     Enforces strict privacy: Private handles are NEVER revealed without
-    mutual confirmation or a redeemed Reveal Token.
+    mutual confirmation or bilateral consent.
     """
     try:
         match_uuid = _clean_match_uuid(match_id)
@@ -459,7 +472,18 @@ async def get_match_bridge_status(
     if not partner:
         raise HTTPException(status_code=404, detail="Dialogue peer not found.")
 
-    is_unlocked = (str(current_user.id), match_id) in UNLOCKED_BRIDGES
+    # Check bilateral consent in WhatsAppRevealToken
+    token_stmt = select(WhatsAppRevealToken).where(WhatsAppRevealToken.match_id == match_uuid)
+    token_res = await db.execute(token_stmt)
+    token_rec = token_res.scalar_one_or_none()
+    if not isinstance(token_rec, WhatsAppRevealToken):
+        token_rec = None
+
+    is_user1 = (m.user1_id == current_user.id)
+    my_consent = bool(token_rec.user1_consent if is_user1 else token_rec.user2_consent) if token_rec else False
+    peer_consent = bool(token_rec.user2_consent if is_user1 else token_rec.user1_consent) if token_rec else False
+    is_unlocked = bool(token_rec and (token_rec.is_unlocked or (my_consent and peer_consent)))
+
     partner_platform = partner.contact_bridge_type or "whatsapp"
     partner_handle = partner.contact_bridge_encrypted if is_unlocked else ""
 
@@ -468,8 +492,12 @@ async def get_match_bridge_status(
         "is_unlocked": is_unlocked,
         "has_wa_key": is_unlocked,
         "platform": partner_platform,
-        "user_step": 3 if is_unlocked else 1,
-        "peer_step": 3 if is_unlocked else 1,
+        "my_consent": my_consent,
+        "peer_consent": peer_consent,
+        "pending_peer_consent": my_consent and not peer_consent,
+        "peer_requested_consent": peer_consent and not my_consent,
+        "user_step": 3 if is_unlocked else (2 if my_consent else 1),
+        "peer_step": 3 if is_unlocked else (2 if peer_consent else 1),
         "handle": partner_handle,
         "reveal_tokens_count": current_user.reveal_tokens_count or 0,
     }
@@ -482,8 +510,9 @@ async def redeem_bridge_reveal_token(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Spends 1 Sacred Bridge Reveal Token to unlock the peer's genuine social handle.
-    Requires reveal_tokens_count >= 1 (earned via 3 video reflections or sovereign pass).
+    Redeems 1 Sacred Bridge Reveal Token to initiate or complete bilateral contact reveal.
+    If the peer has NOT yet consented, sets status to pending_peer_consent and notifies peer.
+    Private handles are NEVER unsealed unilaterally without mutual consent!
     """
     try:
         match_uuid = _clean_match_uuid(match_id)
@@ -505,27 +534,250 @@ async def redeem_bridge_reveal_token(
     if not partner:
         raise HTTPException(status_code=404, detail="Dialogue peer not found.")
 
-    current_tokens = current_user.reveal_tokens_count or 0
-    if current_tokens < 1:
-        raise HTTPException(
-            status_code=400,
-            detail="A Sacred Bridge Reveal Token is required. Watch 3 reflections in the Growth Hub to earn 1 token."
+    # Get or create WhatsAppRevealToken record
+    token_stmt = select(WhatsAppRevealToken).where(WhatsAppRevealToken.match_id == match_uuid)
+    token_res = await db.execute(token_stmt)
+    token_rec = token_res.scalar_one_or_none()
+
+    if not token_rec or not isinstance(token_rec, WhatsAppRevealToken):
+        token_rec = WhatsAppRevealToken(
+            match_id=match_uuid,
+            user1_consent=False,
+            user2_consent=False,
+            is_unlocked=False
+        )
+        db.add(token_rec)
+        await db.flush()
+
+    is_user1 = (m.user1_id == current_user.id)
+    my_consent = token_rec.user1_consent if is_user1 else token_rec.user2_consent
+    peer_consent = token_rec.user2_consent if is_user1 else token_rec.user1_consent
+
+    # If already unlocked, return unsealed handle immediately
+    if token_rec.is_unlocked:
+        return {
+            "status": "unlocked",
+            "message": f"Sacred Contact Bridge is already unlocked for {partner.full_name}!",
+            "is_unlocked": True,
+            "has_wa_key": True,
+            "platform": partner.contact_bridge_type or "whatsapp",
+            "handle": partner.contact_bridge_encrypted or "",
+            "remaining_reveal_tokens": current_user.reveal_tokens_count,
+            "reveal_tokens_count": current_user.reveal_tokens_count,
+        }
+
+    # Only debit token if user hasn't already committed consent
+    if not my_consent:
+        current_tokens = current_user.reveal_tokens_count or 0
+        if current_tokens < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="A Sacred Bridge Reveal Token is required. Watch 3 reflections in the Growth Hub to earn 1 token."
+            )
+        current_user.reveal_tokens_count = current_tokens - 1
+        if is_user1:
+            token_rec.user1_consent = True
+        else:
+            token_rec.user2_consent = True
+
+    from app.services.chat_manager import manager
+    from app.api.v1.endpoints.notifications import push_notification
+
+    # Check if peer has already consented (mutual consent satisfied!)
+    if peer_consent:
+        token_rec.is_unlocked = True
+        await db.commit()
+        await db.refresh(current_user)
+
+        # Notify partner in real time
+        await manager.send_direct_message(str(partner_id), {
+            "type": "bridge_unlocked",
+            "match_id": match_id,
+            "partner_id": str(current_user.id),
+            "partner_name": current_user.full_name,
+        })
+        push_notification(
+            user_id=str(partner_id),
+            notif_type="bridge_unlocked",
+            title="Sacred Bridge Unsealed! 🕊️",
+            body=f"{current_user.full_name} confirmed mutual reveal. Genuine contact handle is now visible.",
+            data={"match_id": match_id, "target_route": "/chat-dialogue"}
         )
 
-    # Deduct 1 reveal token
-    current_user.reveal_tokens_count = current_tokens - 1
+        return {
+            "status": "unlocked",
+            "message": f"Bilateral mutual consent confirmed! Contact handle unsealed for {partner.full_name}.",
+            "is_unlocked": True,
+            "has_wa_key": True,
+            "platform": partner.contact_bridge_type or "whatsapp",
+            "handle": partner.contact_bridge_encrypted or "",
+            "remaining_reveal_tokens": current_user.reveal_tokens_count,
+            "reveal_tokens_count": current_user.reveal_tokens_count,
+        }
+
+    # Peer has not consented yet: enforce mutual consent gate
     await db.commit()
     await db.refresh(current_user)
 
-    UNLOCKED_BRIDGES.add((str(current_user.id), match_id))
+    # Dispatch real-time prompt & notification to peer
+    await manager.send_direct_message(str(partner_id), {
+        "type": "bridge_reveal_request",
+        "match_id": match_id,
+        "initiator_id": str(current_user.id),
+        "initiator_name": current_user.full_name,
+    })
+    push_notification(
+        user_id=str(partner_id),
+        notif_type="bridge_request",
+        title="Sacred Contact Reveal Request 🕊️",
+        body=f"{current_user.full_name} redeemed a token to request mutual contact reveal. Do you consent?",
+        data={"match_id": match_id, "action": "bridge_consent", "target_route": "/chat-dialogue"}
+    )
 
     return {
-        "status": "unlocked",
-        "message": f"Sacred Contact Bridge unlocked for {partner.full_name}!",
-        "is_unlocked": True,
-        "has_wa_key": True,
+        "status": "pending_peer_consent",
+        "message": f"Reveal Token committed. Awaiting {partner.full_name}'s mutual consent before contact handle can be viewed.",
+        "is_unlocked": False,
+        "has_wa_key": False,
+        "my_consent": True,
+        "peer_consent": False,
         "platform": partner.contact_bridge_type or "whatsapp",
-        "handle": partner.contact_bridge_encrypted or "",
+        "handle": "",
         "remaining_reveal_tokens": current_user.reveal_tokens_count,
         "reveal_tokens_count": current_user.reveal_tokens_count,
     }
+
+
+class BridgeConsentRequest(BaseModel):
+    action: str = Field(..., description="'accept' or 'decline'")
+
+
+@router.post("/threads/{match_id}/bridge/consent", status_code=status.HTTP_200_OK, summary="Respond to Sacred Bridge Reveal Request")
+async def respond_to_bridge_consent(
+    match_id: str,
+    payload: BridgeConsentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Accepts or declines a Sacred Bridge reveal request.
+    If declined, any token spent by the requester is refunded.
+    If accepted and peer has consented, handles are unsealed for both seekers.
+    """
+    try:
+        match_uuid = _clean_match_uuid(match_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid match_id UUID.")
+
+    stmt = select(Match).where(
+        Match.id == match_uuid,
+        or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id)
+    )
+    res = await db.execute(stmt)
+    m = res.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Match not found.")
+
+    partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+    partner_res = await db.execute(select(User).where(User.id == partner_id))
+    partner = partner_res.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Dialogue peer not found.")
+
+    token_stmt = select(WhatsAppRevealToken).where(WhatsAppRevealToken.match_id == match_uuid)
+    token_res = await db.execute(token_stmt)
+    token_rec = token_res.scalar_one_or_none()
+    if not isinstance(token_rec, WhatsAppRevealToken):
+        token_rec = None
+
+    if not token_rec:
+        token_rec = WhatsAppRevealToken(
+            match_id=match_uuid,
+            user1_consent=False,
+            user2_consent=False,
+            is_unlocked=False
+        )
+        db.add(token_rec)
+        await db.flush()
+
+    is_user1 = (m.user1_id == current_user.id)
+    from app.services.chat_manager import manager
+    from app.api.v1.endpoints.notifications import push_notification
+
+    action = payload.action.strip().lower()
+
+    if action == "accept":
+        if is_user1:
+            token_rec.user1_consent = True
+        else:
+            token_rec.user2_consent = True
+
+        peer_consent = token_rec.user2_consent if is_user1 else token_rec.user1_consent
+        if peer_consent:
+            token_rec.is_unlocked = True
+
+        await db.commit()
+
+        if token_rec.is_unlocked:
+            # Broadcast unlock to peer
+            await manager.send_direct_message(str(partner_id), {
+                "type": "bridge_unlocked",
+                "match_id": match_id,
+                "partner_id": str(current_user.id),
+                "partner_name": current_user.full_name,
+            })
+            push_notification(
+                user_id=str(partner_id),
+                notif_type="bridge_unlocked",
+                title="Sacred Bridge Mutual Consent Accepted! ✨",
+                body=f"{current_user.full_name} accepted your contact reveal request. Handles are unsealed.",
+                data={"match_id": match_id, "target_route": "/chat-dialogue"}
+            )
+
+        return {
+            "status": "unlocked" if token_rec.is_unlocked else "accepted",
+            "is_unlocked": token_rec.is_unlocked,
+            "has_wa_key": token_rec.is_unlocked,
+            "platform": partner.contact_bridge_type or "whatsapp",
+            "handle": partner.contact_bridge_encrypted if token_rec.is_unlocked else "",
+            "message": "Sacred Contact Bridge unsealed!" if token_rec.is_unlocked else "Consent recorded.",
+        }
+
+    elif action == "decline":
+        # Reset consent and refund peer token if peer had consented
+        peer_had_consented = token_rec.user2_consent if is_user1 else token_rec.user1_consent
+        if is_user1:
+            token_rec.user1_consent = False
+            token_rec.user2_consent = False
+        else:
+            token_rec.user2_consent = False
+            token_rec.user1_consent = False
+        token_rec.is_unlocked = False
+
+        if peer_had_consented:
+            # Refund 1 reveal token to partner
+            partner.reveal_tokens_count = (partner.reveal_tokens_count or 0) + 1
+
+        await db.commit()
+
+        # Notify peer of gentle decline and token refund
+        await manager.send_direct_message(str(partner_id), {
+            "type": "bridge_declined",
+            "match_id": match_id,
+            "message": f"{current_user.full_name} prefers to build more rapport before exchanging contact handles.",
+        })
+        push_notification(
+            user_id=str(partner_id),
+            notif_type="bridge_declined",
+            title="Sacred Bridge Notice 🍃",
+            body=f"{current_user.full_name} prefers more mindful rapport. Your Reveal Token has been refunded.",
+            data={"match_id": match_id}
+        )
+
+        return {
+            "status": "declined",
+            "is_unlocked": False,
+            "message": "You gently declined the contact reveal. No contact handles were shared."
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action. Use 'accept' or 'decline'.")

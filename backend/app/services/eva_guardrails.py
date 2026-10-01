@@ -95,6 +95,10 @@ _OUT_OF_DOMAIN_PATTERNS = [
 
 class EvaGuardrails:
     @classmethod
+    def check_message(cls, raw_user_text: str) -> Tuple[bool, Optional[str]]:
+        return cls.evaluate_query(raw_user_text)
+
+    @classmethod
     def evaluate_query(cls, raw_user_text: str) -> Tuple[bool, Optional[str]]:
         """
         Evaluates incoming user text against strict security guardrails.

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/crypto/sanctuary_crypto_vault.dart';
@@ -128,6 +129,8 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     _initDialogue();
   }
 
+  Timer? _activeDialoguePoller;
+
   Future<void> initializeDialogue() async {
     await _initDialogue();
   }
@@ -155,9 +158,18 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     // 2. Listen to incoming E2EE WebSocket events
     _wsService.messageStream.listen((event) async {
       final type = event['type'] as String?;
-      if (type == 'dialogue_message' && event['match_id'] == state.matchId) {
+      final rawMid = event['match_id']?.toString() ?? '';
+      final cleanMid = cleanMatchId(rawMid);
+      final isTargetMatch = cleanMid == state.matchId || rawMid == state.matchId;
+
+      if (type == 'dialogue_message' && isTargetMatch) {
         await _handleIncomingEncryptedMessage(event);
-      } else if (type == 'stage_advanced' && event['match_id'] == state.matchId) {
+      } else if ((type == 'bridge_unlocked' || type == 'bridge_reveal_request' || type == 'bridge_declined') && isTargetMatch) {
+        try {
+          final bridge = await _chatRepository.fetchContactBridgeStatus(state.matchId);
+          state = state.copyWith(bridgeData: bridge);
+        } catch (_) {}
+      } else if (type == 'stage_advanced' && isTargetMatch) {
         final newStage = event['new_stage'] as int? ?? 1;
         state = state.copyWith(bridgeStage: newStage);
       }
@@ -171,9 +183,29 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     if (state.messages.isNotEmpty) {
       _fetchBondingSparksQuietly();
     }
+
+    // 3. Start resilient 4-second active dialogue sync poller
+    _startActiveDialoguePoller();
   }
 
-  /// Spends 1 Sacred Bridge Reveal Token to unlock the peer's genuine social handle
+  void _startActiveDialoguePoller() {
+    _activeDialoguePoller?.cancel();
+    _activeDialoguePoller = Timer.periodic(const Duration(seconds: 4), (_) async {
+      if (!mounted) return;
+      try {
+        final freshMessages = await _chatRepository.fetchThreadMessages(state.matchId);
+        if (freshMessages.isNotEmpty && mounted) {
+          final existingIds = state.messages.map((m) => m.id).toSet();
+          final newArrivals = freshMessages.where((m) => !existingIds.contains(m.id)).toList();
+          if (newArrivals.isNotEmpty) {
+            state = state.copyWith(messages: [...state.messages, ...newArrivals]);
+          }
+        }
+      } catch (_) {}
+    });
+  }
+
+  /// Spends 1 Sacred Bridge Reveal Token to unlock or request mutual contact reveal
   Future<bool> redeemBridgeRevealToken() async {
     try {
       final updatedBridge = await _chatRepository.redeemBridgeRevealToken(state.matchId);
@@ -185,6 +217,18 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
         await prefs.setInt('ur_heart_reveal_tokens', rem);
       }
       return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Responds to peer's Sacred Bridge reveal request ('accept' or 'decline')
+  Future<bool> respondToBridgeConsent(String action) async {
+    try {
+      final updated = await _chatRepository.respondToBridgeConsent(state.matchId, action);
+      final freshBridge = await _chatRepository.fetchContactBridgeStatus(state.matchId);
+      state = state.copyWith(bridgeData: freshBridge);
+      return updated['is_unlocked'] == true || updated['status'] == 'unlocked' || updated['status'] == 'declined';
     } catch (_) {
       return false;
     }
@@ -404,5 +448,11 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
   Future<void> markAsRead() async {
     await _chatRepository.markMessagesAsRead(state.matchId);
+  }
+
+  @override
+  void dispose() {
+    _activeDialoguePoller?.cancel();
+    super.dispose();
   }
 }

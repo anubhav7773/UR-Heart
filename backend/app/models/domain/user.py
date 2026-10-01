@@ -60,6 +60,7 @@ class User(Base):
     is_profile_completed = Column(Boolean, nullable=False, default=False)
     public_encryption_key = Column(String(64), nullable=True, default=None)
     push_notifications_enabled = Column(Boolean, nullable=False, default=True)
+    fcm_token = Column(String(255), nullable=True)
 
     subscription_tier = Column(String(20), nullable=False, default="free")
     subscription_expires_at = Column(DateTime(timezone=True), nullable=True)

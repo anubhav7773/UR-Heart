@@ -10,7 +10,7 @@ import '../../../growth/presentation/controllers/growth_hub_controller.dart';
 
 /// Progress badge & multi-platform deep-linker for Sacred Contact Bridge
 /// Enforces DPDP Act Section 11 & IT Rules 2021: Contact handle is NEVER revealed
-/// without mutual Stage 3 confirmation or 1 verified Reveal Token (earned via 3 video ads).
+/// without bilateral mutual consent, even when a Reveal Token is redeemed.
 class SacredBridgeAppBarAction extends ConsumerWidget {
   final String matchId;
   final bool isDark;
@@ -35,27 +35,87 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
     final platform = (bridgeData['platform'] as String? ?? 'whatsapp').toLowerCase();
     final userStep = bridgeData['user_step'] as int? ?? 1;
     final rawHandle = bridgeData['handle'] as String? ?? '';
+    final pendingPeerConsent = bridgeData['pending_peer_consent'] as bool? ?? false;
+    final peerRequestedConsent = bridgeData['peer_requested_consent'] as bool? ?? false;
 
-    // If bridge is NOT yet unlocked, display lock badge with step progression
-    if (!isUnlocked) {
+    // 1. Unlocked: Display verified external enclave button
+    if (isUnlocked) {
+      return Center(
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: pine,
+            elevation: 0,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          icon: const Icon(Icons.open_in_new, color: Colors.white, size: 12),
+          label: Text(
+            'Open ${platform.isNotEmpty ? platform[0].toUpperCase() + platform.substring(1) : "Bridge"}',
+            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+          ),
+          onPressed: () {
+            if (rawHandle.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Contact handle not yet configured by your partner.')),
+              );
+              return;
+            }
+            _launchSacredBridgeIntent(platform, rawHandle);
+          },
+        ),
+      );
+    }
+
+    // 2. Peer Requested Consent: Show urgent action badge to respond
+    if (peerRequestedConsent) {
       return Center(
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => _showProgressionDialog(context, ref),
+          onTap: () => _showPeerRequestDialog(context, ref),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFB8860B).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFB8860B), width: 1.2),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('🕊️', style: TextStyle(fontSize: 12)),
+                SizedBox(width: 4),
+                Text(
+                  'Accept Reveal',
+                  style: TextStyle(color: Color(0xFFB8860B), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 3. User Requested Reveal: Waiting for peer consent
+    if (pendingPeerConsent) {
+      return Center(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _showPendingConsentDialog(context),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: surfaceMuted,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: gold.withValues(alpha: 0.4)),
+              border: Border.all(color: gold.withValues(alpha: 0.6)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.lock_outline, size: 12, color: gold),
+                Icon(Icons.hourglass_top_rounded, size: 12, color: gold),
                 const SizedBox(width: 4),
                 Text(
-                  'Bridge ($userStep/3)',
+                  'Awaiting Peer',
                   style: TextStyle(color: gold, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -65,30 +125,128 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
       );
     }
 
-    // Unlocked: Display verified external enclave button
+    // 4. Default: Display locked progression badge (1/3 or 2/3)
     return Center(
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: pine,
-          elevation: 0,
-          visualDensity: VisualDensity.compact,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _showProgressionDialog(context, ref),
+        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          decoration: BoxDecoration(
+            color: surfaceMuted,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: gold.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline, size: 12, color: gold),
+              const SizedBox(width: 4),
+              Text(
+                'Bridge ($userStep/3)',
+                style: TextStyle(color: gold, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
         ),
-        icon: const Icon(Icons.open_in_new, color: Colors.white, size: 12),
-        label: Text(
-          'Open ${platform.isNotEmpty ? platform[0].toUpperCase() + platform.substring(1) : "Bridge"}',
-          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  void _showPeerRequestDialog(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Text('🕊️', style: TextStyle(fontSize: 20)),
+            SizedBox(width: 8),
+            Text('Mutual Reveal Request', style: TextStyle(fontFamily: 'Serif', fontSize: 18)),
+          ],
         ),
-        onPressed: () {
-          if (rawHandle.trim().isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Contact handle not yet configured by your partner.')),
-            );
-            return;
-          }
-          _launchSacredBridgeIntent(platform, rawHandle);
-        },
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your dialogue partner has committed a Sacred Bridge Reveal Token to exchange contact details.\n\n'
+              'Under DPDP Act privacy rules, contact handles are only unsealed if YOU mutually consent.',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              await ref
+                  .read(chatDialogueControllerProvider(matchId).notifier)
+                  .respondToBridgeConsent('decline');
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Reveal request declined. Your partner has been refunded their token.')),
+                );
+              }
+            },
+            child: const Text('Decline (Refund Token)', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1B4332),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.check_circle_outline, size: 14, color: Colors.white),
+            label: const Text('Accept & Reveal 🕊️', style: TextStyle(color: Colors.white)),
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              final ok = await ref
+                  .read(chatDialogueControllerProvider(matchId).notifier)
+                  .respondToBridgeConsent('accept');
+              if (context.mounted) {
+                if (ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Sacred Bridge Unsealed! Both contact handles revealed. ✨'),
+                      backgroundColor: Color(0xFF1B4332),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to record consent. Please try again.')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPendingConsentDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Text('⏳', style: TextStyle(fontSize: 20)),
+            SizedBox(width: 8),
+            Text('Awaiting Peer Consent', style: TextStyle(fontFamily: 'Serif', fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'Your Reveal Token is safely committed.\n\n'
+          'To preserve privacy and mutual safety, the genuine contact handle will unseal the moment your partner confirms mutual consent.',
+          style: TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Understood'),
+          ),
+        ],
       ),
     );
   }
@@ -113,7 +271,7 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
           children: [
             const Text(
               'Private contact handles (such as WhatsApp) are protected under AES-256 encryption. '
-              'They are only unsealed when both seekers mutually confirm Stage 3 OR when you redeem 1 Sacred Bridge Reveal Token.',
+              'They are only unsealed when both seekers mutually confirm Stage 3 OR when you redeem 1 Reveal Token with mutual consent.',
               style: TextStyle(fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 14),
@@ -149,7 +307,7 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               icon: const Icon(Icons.key, size: 14, color: Colors.white),
-              label: const Text('Unlock with 1 Token 🌟', style: TextStyle(color: Colors.white)),
+              label: const Text('Request Reveal (1 Token) 🌟', style: TextStyle(color: Colors.white)),
               onPressed: () async {
                 Navigator.of(dialogCtx).pop();
                 final ok = await ref
@@ -162,15 +320,25 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
                 }
                 if (context.mounted) {
                   if (ok) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Sacred Bridge Unlocked! Genuine contact handle revealed. ✨'),
-                        backgroundColor: Color(0xFF1B4332),
-                      ),
-                    );
+                    final freshBridge = ref.read(chatDialogueControllerProvider(matchId)).bridgeData;
+                    if (freshBridge['is_unlocked'] == true) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Sacred Bridge Unsealed! Both seekers mutually confirmed. ✨'),
+                          backgroundColor: Color(0xFF1B4332),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Reveal Token committed! Awaiting partner mutual consent before handles unseal. 🕊️'),
+                          backgroundColor: Color(0xFF1B4332),
+                        ),
+                      );
+                    }
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Unable to unlock bridge. Please try again.')),
+                      const SnackBar(content: Text('Unable to redeem token. Please try again.')),
                     );
                   }
                 }

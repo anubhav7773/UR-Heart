@@ -138,7 +138,9 @@ def test_chat_reveal_token_redemption_with_prefix():
         res = client.post(f"/api/v1/chat/threads/match-{match_uuid}/bridge/reveal")
         assert res.status_code == 200
         data = res.json()
-        assert data["is_unlocked"] is True
+        assert data["status"] == "pending_peer_consent"
+        assert data["is_unlocked"] is False
+        assert data["handle"] == ""
         assert data["reveal_tokens_count"] == 1
         assert dummy_user.reveal_tokens_count == 1
     finally:

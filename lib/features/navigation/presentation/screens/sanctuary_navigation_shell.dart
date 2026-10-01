@@ -61,6 +61,11 @@ class _SanctuaryNavigationShellState
       await prefs.setBool('ur_heart_has_entered_sanctuary', true);
       final storedSeen = prefs.getStringList('sanctuary_seen_notification_ids') ?? [];
       _seenNotificationIds.addAll(storedSeen);
+
+      final authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+      if (authToken != null && authToken.isNotEmpty) {
+        SanctuaryNotificationService.syncStoredFcmToken(authToken);
+      }
     } catch (_) {}
 
     if (mounted) {
@@ -73,7 +78,7 @@ class _SanctuaryNavigationShellState
 
   void _startNotificationPoller() {
     _pollNotifications();
-    _notificationPoller = Timer.periodic(const Duration(seconds: 12), (_) {
+    _notificationPoller = Timer.periodic(const Duration(seconds: 10), (_) {
       _pollNotifications();
     });
   }

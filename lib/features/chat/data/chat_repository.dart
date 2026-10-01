@@ -249,6 +249,23 @@ class ChatRepository {
     }
   }
 
+  /// Responds to a bilateral Sacred Bridge reveal request ('accept' or 'decline')
+  Future<Map<String, dynamic>> respondToBridgeConsent(String matchId, String action) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/api/v1/chat/threads/$matchId/bridge/consent',
+        data: {'action': action},
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'status': action == 'accept' ? 'unlocked' : 'declined'};
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
   /// Fetches peer seeker profile details for a match
   Future<Map<String, dynamic>> fetchPeerProfile(String matchId) async {
     try {

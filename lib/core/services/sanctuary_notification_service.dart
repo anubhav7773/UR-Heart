@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../app/ur_heart_app.dart';
 
 /// Ultra-Premium Outside-the-App Notification Service
@@ -26,7 +29,7 @@ class SanctuaryNotificationService {
   static const String presenceChannelDesc =
       'Mindful reminders for daily reflections, streaks, and sovereign sanctuary milestones.';
 
-  /// Initialize local notification engine and register Android 13+ channels
+  /// Initialize local notification engine, register Android 13+ channels, and initialize FCM
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -72,6 +75,47 @@ class SanctuaryNotificationService {
         await androidPlatform.createNotificationChannel(presenceChannel);
       }
 
+      // Initialize Firebase Cloud Messaging for outside-the-app push notifications
+      try {
+        final fcm = FirebaseMessaging.instance;
+        await fcm.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          provisional: false,
+        );
+
+        final token = await fcm.getToken();
+        if (token != null && token.isNotEmpty) {
+          debugPrint('[FCM] Device Token: ...${token.substring(token.length - 8)}');
+          _registerFcmTokenWithBackend(token);
+        }
+
+        fcm.onTokenRefresh.listen((newToken) {
+          _registerFcmTokenWithBackend(newToken);
+        });
+
+        // Foreground push message listener: Show system notification immediately
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          final notif = message.notification;
+          if (notif != null) {
+            showSystemNotification(
+              id: message.hashCode,
+              title: notif.title ?? 'UR-Heart Notification',
+              body: notif.body ?? '',
+              payload: jsonEncode(message.data),
+            );
+          }
+        });
+
+        // Background push tapped
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+          _handleNavigationData(message.data);
+        });
+      } catch (fcmError) {
+        debugPrint('[FCM INIT NOTICE] $fcmError');
+      }
+
       _isInitialized = true;
       debugPrint('[NOTIFICATIONS] SanctuaryNotificationService initialized successfully.');
     } catch (e) {
@@ -79,14 +123,40 @@ class SanctuaryNotificationService {
     }
   }
 
-  void _onNotificationTapped(NotificationResponse response) {
-    final payloadStr = response.payload;
-    if (payloadStr == null || payloadStr.isEmpty) return;
-
+  static Future<void> _registerFcmTokenWithBackend(String token) async {
     try {
-      final data = jsonDecode(payloadStr) as Map<String, dynamic>;
-      final targetRoute = data['target_route'] as String? ?? '/main';
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('ur_heart_fcm_token', token);
+      final authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+      if (authToken != null && authToken.isNotEmpty) {
+        final dio = Dio(BaseOptions(
+          baseUrl: 'https://urheart.asiverticals.me',
+          headers: {'Authorization': 'Bearer $authToken'},
+        ));
+        await dio.post<dynamic>('/api/v1/notifications/register-token', data: {'fcm_token': token});
+        debugPrint('[FCM REGISTER] Token registered with backend successfully.');
+      }
+    } catch (e) {
+      debugPrint('[FCM REGISTER NOTICE] $e');
+    }
+  }
 
+  static void syncStoredFcmToken(String authToken) {
+    SharedPreferences.getInstance().then((prefs) {
+      final token = prefs.getString('ur_heart_fcm_token');
+      if (token != null && token.isNotEmpty) {
+        final dio = Dio(BaseOptions(
+          baseUrl: 'https://urheart.asiverticals.me',
+          headers: {'Authorization': 'Bearer $authToken'},
+        ));
+        dio.post<dynamic>('/api/v1/notifications/register-token', data: {'fcm_token': token}).ignore();
+      }
+    });
+  }
+
+  void _handleNavigationData(Map<String, dynamic> data) {
+    try {
+      final targetRoute = data['target_route'] as String? ?? '/main';
       if (targetRoute == '/chat-dialogue') {
         appNavigatorKey.currentState?.pushNamed(
           '/chat-dialogue',
@@ -102,6 +172,18 @@ class SanctuaryNotificationService {
       }
     } catch (e) {
       debugPrint('[NOTIFICATIONS] Navigation payload dispatch error: $e');
+    }
+  }
+
+  void _onNotificationTapped(NotificationResponse response) {
+    final payloadStr = response.payload;
+    if (payloadStr == null || payloadStr.isEmpty) return;
+
+    try {
+      final data = jsonDecode(payloadStr) as Map<String, dynamic>;
+      _handleNavigationData(data);
+    } catch (e) {
+      debugPrint('[NOTIFICATIONS] Tap decode error: $e');
     }
   }
 
