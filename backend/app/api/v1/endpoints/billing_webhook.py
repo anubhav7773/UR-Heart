@@ -53,7 +53,7 @@ async def process_revenuecat_event(
 
     try:
         user_uuid = UUID(user_id_str)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
         return {"status": "ignored", "reason": "Invalid UUID format"}
 
     # 1. Idempotency Check
@@ -157,7 +157,10 @@ async def process_razorpay_webhook(
         if not user_uuid_str or not payment_id:
             return {"status": "ignored"}
 
-        user_uuid = UUID(user_uuid_str)
+        try:
+            user_uuid = UUID(user_uuid_str)
+        except (ValueError, TypeError, AttributeError):
+            return {"status": "ignored", "reason": "Invalid user UUID format"}
         amount_inr = float(payment_entity.get("amount", 0)) / 100.0
         fee = round(amount_inr * 0.02, 2)  # Razorpay 2% fee
         net = round(amount_inr - fee, 2)

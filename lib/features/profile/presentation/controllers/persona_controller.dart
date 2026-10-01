@@ -72,6 +72,15 @@ class PersonaController extends StateNotifier<PersonaState> {
           ? remote.avatarUrl
           : cached.avatarUrl;
 
+      // Defense-in-depth: Ensure avatar is never mirrored into moment slots
+      if (mergedAvatar.isNotEmpty) {
+        for (int i = 0; i < mergedMoments.length; i++) {
+          if (mergedMoments[i] == mergedAvatar) {
+            mergedMoments[i] = '';
+          }
+        }
+      }
+
       final mergedProfile = remote.copyWith(
         avatarUrl: mergedAvatar,
         momentPhotos: mergedMoments,
@@ -169,15 +178,21 @@ class PersonaController extends StateNotifier<PersonaState> {
 
       final processed = await MediaCompressor.processPortraitPhoto(rawFile);
       final secureEmail = await SecureSessionStorage.instance.getUserEmail();
+      final secureUserId = await SecureSessionStorage.instance.getUserId();
       final prefs = await SharedPreferences.getInstance();
       final userEmail = secureEmail ?? prefs.getString('ur_heart_user_email') ?? state.profile.email;
-      final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final rawUid = state.profile.id.isNotEmpty
+          ? state.profile.id
+          : (secureUserId ?? prefs.getString('ur_heart_user_id') ?? userEmail);
+      final safeUserUuid = rawUid.isNotEmpty
+          ? rawUid.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')
+          : (prefs.getString('ur_heart_installation_id') ?? 'seeker_${state.profile.fullName.hashCode.abs()}');
 
       String finalUrl = rawFile.path;
       if (processed != null) {
         try {
           final cloudUrl = await SupabaseMediaUploader.uploadProfileSlot(
-            userUuid: safeUserUuid.isNotEmpty ? safeUserUuid : 'seeker_1',
+            userUuid: safeUserUuid,
             slotNumber: 1,
             webpBytes: processed.webpBytes,
             userName: state.profile.fullName,
@@ -190,7 +205,12 @@ class PersonaController extends StateNotifier<PersonaState> {
 
       await prefs.setString('profile_photo_slot_1', finalUrl);
 
-      final updatedProfile = state.profile.copyWith(avatarUrl: finalUrl);
+      // Clean moments to ensure avatar is never in moment slots
+      final cleanMoments = state.profile.momentPhotos.map((m) => m == finalUrl ? '' : m).toList();
+      final updatedProfile = state.profile.copyWith(
+        avatarUrl: finalUrl,
+        momentPhotos: cleanMoments,
+      );
       state = state.copyWith(
         profile: updatedProfile,
         isSaving: false,
@@ -224,15 +244,21 @@ class PersonaController extends StateNotifier<PersonaState> {
 
       final processed = await MediaCompressor.processPortraitPhoto(rawFile);
       final secureEmail = await SecureSessionStorage.instance.getUserEmail();
+      final secureUserId = await SecureSessionStorage.instance.getUserId();
       final prefs = await SharedPreferences.getInstance();
       final userEmail = secureEmail ?? prefs.getString('ur_heart_user_email') ?? state.profile.email;
-      final safeUserUuid = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final rawUid = state.profile.id.isNotEmpty
+          ? state.profile.id
+          : (secureUserId ?? prefs.getString('ur_heart_user_id') ?? userEmail);
+      final safeUserUuid = rawUid.isNotEmpty
+          ? rawUid.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')
+          : (prefs.getString('ur_heart_installation_id') ?? 'seeker_${state.profile.fullName.hashCode.abs()}');
 
       String finalUrl = rawFile.path;
       if (processed != null) {
         try {
           final cloudUrl = await SupabaseMediaUploader.uploadProfileSlot(
-            userUuid: safeUserUuid.isNotEmpty ? safeUserUuid : 'seeker_1',
+            userUuid: safeUserUuid,
             slotNumber: slotIndex + 2,
             webpBytes: processed.webpBytes,
             userName: state.profile.fullName,

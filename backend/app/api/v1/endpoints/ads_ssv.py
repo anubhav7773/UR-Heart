@@ -5,12 +5,14 @@ import base64
 import time
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse, parse_qsl, urlencode
+import uuid
 from uuid import UUID
+from datetime import datetime, timezone, timedelta
 import httpx
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_der_public_key
@@ -102,7 +104,7 @@ def verify_admob_ecdsa(query_string: str) -> bool:
         # Verify ECDSA P-256 with SHA-256
         public_key.verify(signature_der, canonical_message, ec.ECDSA(hashes.SHA256()))
         return True
-    except (InvalidSignature, Exception):
+    except (InvalidSignature, ValueError, TypeError):
         return False
 
 
@@ -192,7 +194,7 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
     # 5. Atomic Balance Credit & Audit Commit
     try:
         user_uuid = UUID(user_id_str)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
         raise HTTPException(status_code=400, detail="Invalid user UUID in custom_data.")
 
     await db.execute(
@@ -324,7 +326,9 @@ async def claim_ad_reward(
                 AdRewardLedger.ad_type.in_(["whatsapp_reveal", "sacred_bridge_reveal"])
             )
         )
-        total_reveal_ads = (ad_count_res.scalar() or 0) + 1
+        total_reveal_ads = ad_count_res.scalar() or 0
+        if total_reveal_ads == 0:
+            total_reveal_ads = 1
         cycle_count = total_reveal_ads % 3
         if cycle_count == 0:
             target_user.reveal_tokens_count = (target_user.reveal_tokens_count or 0) + 1
@@ -338,26 +342,31 @@ async def claim_ad_reward(
 
         # Handle bilateral match progression if target_id provided
         if payload.target_id and payload.target_id != "none":
+            match_uuid = None
             try:
                 match_uuid = UUID(payload.target_id)
-                row = (await db.execute(
-                    select(WhatsAppRevealToken, Match).join(Match, Match.id == WhatsAppRevealToken.match_id)
-                    .where(WhatsAppRevealToken.match_id == match_uuid)
-                )).first()
-                if row:
-                    token_rec, match_rec = row
-                    if match_rec.user1_id == target_user.id and token_rec.user1_ads_count < 3:
-                        token_rec.user1_ads_count += 1
-                    elif match_rec.user2_id == target_user.id and token_rec.user2_ads_count < 3:
-                        token_rec.user2_ads_count += 1
-                    if token_rec.user1_ads_count >= 3 and token_rec.user2_ads_count >= 3 and not token_rec.is_unlocked:
-                        import secrets
-                        from datetime import timedelta, timezone
-                        token_rec.is_unlocked = True
-                        token_rec.ephemeral_token = secrets.token_urlsafe(32)
-                        token_rec.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-            except Exception:
+            except (ValueError, TypeError, AttributeError):
                 pass
+            if match_uuid:
+                try:
+                    row = (await db.execute(
+                        select(WhatsAppRevealToken, Match).join(Match, Match.id == WhatsAppRevealToken.match_id)
+                        .where(WhatsAppRevealToken.match_id == match_uuid)
+                    )).first()
+                    if row:
+                        token_rec, match_rec = row
+                        if match_rec.user1_id == target_user.id and token_rec.user1_ads_count < 3:
+                            token_rec.user1_ads_count += 1
+                        elif match_rec.user2_id == target_user.id and token_rec.user2_ads_count < 3:
+                            token_rec.user2_ads_count += 1
+                        if token_rec.user1_ads_count >= 3 and token_rec.user2_ads_count >= 3 and not token_rec.is_unlocked:
+                            import secrets
+                            from datetime import timedelta, timezone
+                            token_rec.is_unlocked = True
+                            token_rec.ephemeral_token = secrets.token_urlsafe(32)
+                            token_rec.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+                except Exception:
+                    pass
 
     elif payload.ad_type == "daily_streak_boost":
         streak_result = await StreakEngine.claim_daily_streak_ad(target_user, db)

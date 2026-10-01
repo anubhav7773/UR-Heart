@@ -65,6 +65,45 @@ class UserProfile {
   bool get isStreakActive => secondsRemaining > 0 && streakCount > 0;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final rawAvatar = (json['avatar_url'] as String? ?? '').trim();
+    final rawPhotos = (json['photos'] is List
+            ? (json['photos'] as List<dynamic>)
+            : (json['moment_photos'] is List
+                ? (json['moment_photos'] as List<dynamic>)
+                : const <dynamic>[]))
+        .map((e) => e?.toString().trim() ?? '')
+        .toList();
+
+    String resolvedAvatar = rawAvatar;
+    List<String> resolvedMoments = [];
+
+    if (rawPhotos.length == 5) {
+      // Legacy 5-slot structure: slot 1 is avatar, slots 2-5 are moments
+      if (resolvedAvatar.isEmpty && rawPhotos[0].isNotEmpty) {
+        resolvedAvatar = rawPhotos[0];
+      }
+      resolvedMoments = rawPhotos.sublist(1);
+    } else {
+      if (resolvedAvatar.isEmpty && rawPhotos.isNotEmpty) {
+        resolvedAvatar = rawPhotos[0];
+        resolvedMoments = rawPhotos.sublist(1);
+      } else {
+        // If photos contains the avatar at index 0, strip it to prevent duplicate display in Moments #1
+        if (rawPhotos.isNotEmpty && rawPhotos[0] == resolvedAvatar) {
+          resolvedMoments = rawPhotos.sublist(1);
+        } else {
+          resolvedMoments = List<String>.from(rawPhotos);
+        }
+      }
+    }
+
+    while (resolvedMoments.length < 4) {
+      resolvedMoments.add('');
+    }
+    if (resolvedMoments.length > 4) {
+      resolvedMoments = resolvedMoments.sublist(0, 4);
+    }
+
     return UserProfile(
       id: json['id'] as String? ?? '',
       fullName: json['full_name'] as String? ?? 'Seeker',
@@ -82,8 +121,8 @@ class UserProfile {
       education: json['education'] as String? ?? '',
       minAgePref: (json['preferred_age_min'] as num?)?.toDouble() ?? 18.0,
       maxAgePref: (json['preferred_age_max'] as num?)?.toDouble() ?? 35.0,
-      avatarUrl: json['avatar_url'] as String? ?? (json['photos'] is List && (json['photos'] as List).isNotEmpty ? (json['photos'] as List).first as String : ''),
-      momentPhotos: List<String>.from(json['photos'] as List? ?? json['moment_photos'] as List? ?? []),
+      avatarUrl: resolvedAvatar,
+      momentPhotos: resolvedMoments,
       referralCode: json['referral_code'] as String? ?? '',
       swipesRemaining: json['swipes_remaining'] as int? ?? 10,
       directLettersCount: json['direct_letters_count'] as int? ?? 0,

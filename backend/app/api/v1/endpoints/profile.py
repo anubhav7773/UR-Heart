@@ -108,7 +108,11 @@ async def get_my_authenticated_profile(
             if current_user.contact_bridge_encrypted
             else ""
         ),
-        "photos": current_user.photos or [],
+        "photos": (
+            [p for p in (current_user.photos or []) if p and str(p).strip()][1:]
+            if (current_user.avatar_url and (current_user.photos or []) and str((current_user.photos or [])[0]).strip() == str(current_user.avatar_url).strip())
+            else [p for p in (current_user.photos or []) if p and str(p).strip()]
+        ),
         "avatar_url": current_user.avatar_url or "",
         "preferred_age_min": current_user.preferred_age_min,
         "preferred_age_max": current_user.preferred_age_max,
@@ -266,6 +270,14 @@ async def update_my_profile(
     if "longitude" in update_data and update_data["longitude"] is not None:
         update_data["longitude"] = round(float(update_data["longitude"]), 2)
 
+    # SEC-DATA: Ensure avatar is not duplicated into photos (moments)
+    if "photos" in update_data and update_data["photos"]:
+        clean_photos = [p for p in update_data["photos"] if p and str(p).strip()]
+        eff_avatar = str(update_data.get("avatar_url") or current_user.avatar_url or "").strip()
+        if eff_avatar and clean_photos and clean_photos[0] == eff_avatar:
+            clean_photos = clean_photos[1:]
+        update_data["photos"] = clean_photos
+
     # Mark profile completed in database (Fixes DUM-17 volatile memory set)
     update_data["is_profile_completed"] = True
 
@@ -408,8 +420,11 @@ async def create_or_update_profile(
 
     if payload.photos:
         clean_photos = [p for p in payload.photos if p and str(p).strip()]
+        eff_avatar = str(payload.avatar_url or current_user.avatar_url or "").strip()
+        if eff_avatar and clean_photos and clean_photos[0] == eff_avatar:
+            clean_photos = clean_photos[1:]
         up_vals["photos"] = clean_photos
-        if not payload.avatar_url and clean_photos:
+        if not payload.avatar_url and not current_user.avatar_url and clean_photos:
             up_vals["avatar_url"] = clean_photos[0]
     if payload.avatar_url and str(payload.avatar_url).strip():
         up_vals["avatar_url"] = str(payload.avatar_url).strip()

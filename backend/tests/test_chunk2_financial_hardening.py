@@ -3,6 +3,7 @@ import pytest
 from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.main import app
 from app.core.security import get_current_user
@@ -310,6 +311,211 @@ def test_stateless_persistence_across_restarts():
         res_data = get_res.json()
         assert res_data["order"]["order_id"] == order_id
         assert res_data["order"]["status"] == "pending_verification"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
+# ==============================================================================
+# 5. TEST Jules Hardening: UUID parse exceptions & WebStore DB persistence error handling
+# ==============================================================================
+def test_revenuecat_webhook_malformed_uuid():
+    """RevenueCat webhook with invalid UUID string or type should return ignored status, not 500."""
+    from app.api.v1.endpoints.billing_webhook import REVENUECAT_SECRET
+    mock_db = AsyncMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        # Non-UUID string
+        res = client.post(
+            "/api/v1/billing/webhook/revenuecat",
+            headers={"Authorization": f"Bearer {REVENUECAT_SECRET}"},
+            json={
+                "event": {
+                    "type": "INITIAL_PURCHASE",
+                    "app_user_id": "not-a-valid-uuid",
+                    "id": "tx_123"
+                }
+            }
+        )
+        assert res.status_code == 200
+        assert res.json() == {"status": "ignored", "reason": "Invalid UUID format"}
+
+        # Integer/non-string
+        res2 = client.post(
+            "/api/v1/billing/webhook/revenuecat",
+            headers={"Authorization": f"Bearer {REVENUECAT_SECRET}"},
+            json={
+                "event": {
+                    "type": "INITIAL_PURCHASE",
+                    "app_user_id": 9999999,
+                    "id": "tx_124"
+                }
+            }
+        )
+        assert res2.status_code == 200
+        assert res2.json() == {"status": "ignored", "reason": "Invalid UUID format"}
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_razorpay_webhook_malformed_uuid():
+    """Razorpay webhook with invalid user_id UUID should return ignored without 500."""
+    import hmac
+    import hashlib
+    import json
+    from app.api.v1.endpoints.billing_webhook import RAZORPAY_WEBHOOK_SECRET
+    mock_db = AsyncMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        body = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_test_123",
+                        "amount": 14900,
+                        "notes": {
+                            "user_id": "invalid-uuid-format",
+                            "product_id": "urheart_pass_monthly"
+                        }
+                    }
+                }
+            }
+        }
+        body_bytes = json.dumps(body).encode("utf-8")
+        sig = hmac.new(RAZORPAY_WEBHOOK_SECRET.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+
+        res = client.post(
+            "/api/v1/billing/webhook/razorpay",
+            headers={"x-razorpay-signature": sig, "content-type": "application/json"},
+            content=body_bytes
+        )
+        assert res.status_code == 200
+        assert res.json() == {"status": "ignored", "reason": "Invalid user UUID format"}
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_ads_ssv_malformed_custom_data_and_signature():
+    """Ads SSV endpoint should handle malformed custom data and signature decoding cleanly."""
+    import hmac
+    import hashlib
+    from app.api.v1.endpoints.ads_ssv import verify_admob_ecdsa, NETWORK_SECRETS
+
+    # 1. Direct unit test of verify_admob_ecdsa with malformed base64 signature
+    assert verify_admob_ecdsa("signature=invalid!!base64==&key_id=123") is False
+    assert verify_admob_ecdsa("signature=short&key_id=123") is False
+
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_res
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        secret = NETWORK_SECRETS.get("inmobi", "inmobi_ssv_secret_sanctuary_2026")
+
+        # 2. Valid signature, but custom_data lacks colons (malformed)
+        bad_custom_data = "single_string_no_colons"
+        canonical_query = f"network=inmobi&transaction_id=tx_malformed_1&custom_data={bad_custom_data}"
+        sig = hmac.new(secret.encode("utf-8"), canonical_query.encode("utf-8"), hashlib.sha256).hexdigest()
+
+        res = client.get(
+            "/api/v1/ads/verify-reward",
+            params={
+                "network": "inmobi",
+                "transaction_id": "tx_malformed_1",
+                "custom_data": bad_custom_data,
+                "signature": sig
+            }
+        )
+        assert res.status_code == 400
+        assert "Malformed custom_data" in res.json()["detail"]
+
+        # 3. Valid signature, but user_id is not a valid UUID
+        bad_uuid_custom_data = "not-a-valid-uuid:quick_reflection:none"
+        canonical_query2 = f"network=inmobi&transaction_id=tx_malformed_2&custom_data={bad_uuid_custom_data}"
+        sig2 = hmac.new(secret.encode("utf-8"), canonical_query2.encode("utf-8"), hashlib.sha256).hexdigest()
+
+        res2 = client.get(
+            "/api/v1/ads/verify-reward",
+            params={
+                "network": "inmobi",
+                "transaction_id": "tx_malformed_2",
+                "custom_data": bad_uuid_custom_data,
+                "signature": sig2
+            }
+        )
+        assert res2.status_code == 400
+        assert "Invalid user UUID" in res2.json()["detail"]
+
+        # 4. Non-UUID target_id in claim-reward should not crash with 500
+        user = create_mock_user()
+        app.dependency_overrides[get_current_user] = lambda: user
+        res_claim = client.post(
+            "/api/v1/ads/claim-reward",
+            headers={"Authorization": "Bearer mock_token"},
+            json={
+                "ad_type": "sacred_bridge_reveal",
+                "reward_points": 10,
+                "target_id": "not-a-valid-uuid"
+            }
+        )
+        assert res_claim.status_code == 200
+        assert res_claim.json()["status"] == "success"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_web_store_db_persistence_error_raises_500():
+    """Web store endpoints must raise 500 and rollback when database persistence fails."""
+    user = create_mock_user()
+    mock_db = AsyncMock()
+    # Mock commit to raise SQLAlchemyError
+    mock_db.commit.side_effect = SQLAlchemyError("Database connection dropped")
+
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = user
+    mock_db.execute.return_value = mock_res
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    try:
+        # 1. create-order should raise 500 when DB commit fails
+        res = client.post(
+            "/api/v1/store/create-order",
+            json={
+                "product_id": "urheart_pass_monthly",
+                "user_query": str(user.id),
+                "payment_method": "upi",
+                "currency": "INR"
+            }
+        )
+        assert res.status_code == 500
+        assert "Failed to persist order to database." in res.json()["detail"]
+        mock_db.rollback.assert_called()
+
+        # 2. complete-order failure test:
+        # Ensure UTR duplicate check returns None (no duplicate) so it reaches DB commit
+        mock_res.scalar_one_or_none.return_value = None
+        order_id = "URH-STORE-TEST-FAIL-99"
+        web_store.WEB_STORE_ORDERS[order_id] = {
+            "order_id": order_id,
+            "product_id": "urheart_pass_monthly",
+            "amount": 149.0,
+            "currency": "INR",
+            "status": "pending_payment"
+        }
+        res_comp = client.post(
+            "/api/v1/store/complete-order",
+            json={
+                "order_id": order_id,
+                "payment_reference": f"UTR_UNIQUE_{uuid.uuid4().hex[:10]}"
+            }
+        )
+        assert res_comp.status_code == 500
+        assert "Failed to persist order update to database." in res_comp.json()["detail"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         app.dependency_overrides.pop(get_db, None)

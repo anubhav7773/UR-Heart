@@ -525,7 +525,6 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'is_kyc': state.isKycVerified,
       'photo_slots_count': state.photoSlots.length,
       'photos': [
-        state.photoSlots[1] ?? '',
         state.photoSlots[2] ?? '',
         state.photoSlots[3] ?? '',
         state.photoSlots[4] ?? '',

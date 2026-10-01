@@ -127,6 +127,25 @@ class SecureSessionStorage {
     return null;
   }
 
+  /// Retrieves user ID with legacy fallback.
+  Future<String?> getUserId() async {
+    try {
+      final uid = await _secureStorage.read(key: keyUserId);
+      if (uid != null && uid.isNotEmpty) return uid;
+
+      final prefs = await SharedPreferences.getInstance();
+      final legacy = prefs.getString(keyUserId);
+      if (legacy != null && legacy.isNotEmpty) {
+        await _secureStorage.write(key: keyUserId, value: legacy);
+        await prefs.remove(keyUserId);
+        return legacy;
+      }
+    } catch (e) {
+      debugPrint('[SecureSessionStorage] Error reading user ID: $e');
+    }
+    return null;
+  }
+
   /// Retrieves user role.
   Future<String?> getUserRole() async {
     try {

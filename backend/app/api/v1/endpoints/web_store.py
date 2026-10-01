@@ -118,12 +118,15 @@ async def verify_store_user(payload: VerifyUserRequest, db: AsyncSession = Depen
 
     # Try UUID, referral code, or email
     user = None
+    parsed_uuid = None
     try:
         parsed_uuid = uuid.UUID(q)
+    except (ValueError, TypeError, AttributeError):
+        pass
+
+    if parsed_uuid:
         res = await db.execute(select(User).where(User.id == parsed_uuid))
         user = res.scalar_one_or_none()
-    except (ValueError, TypeError):
-        pass
 
     if not user:
         res = await db.execute(select(User).where(User.referral_code == q.upper()))
@@ -188,12 +191,15 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
     # Resolve user if available to bind ledger entry in PostgreSQL
     user_query = payload.user_query.strip()
     user = None
+    parsed_uuid = None
     try:
         parsed_uuid = uuid.UUID(user_query)
+    except (ValueError, TypeError, AttributeError):
+        pass
+
+    if parsed_uuid:
         res = await db.execute(select(User).where(User.id == parsed_uuid))
         user = res.scalar_one_or_none()
-    except (ValueError, TypeError):
-        pass
 
     if not user:
         res = await db.execute(select(User).where(User.referral_code == user_query.upper()))
@@ -222,6 +228,7 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         await db.commit()
     except SQLAlchemyError as e:
         await db.rollback()
+        print(f"[STORE ORDER PERSISTENCE ERROR] {e}", flush=True)
         raise HTTPException(status_code=500, detail="Failed to persist order to database.")
 
     return {
@@ -306,7 +313,8 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
         await db.commit()
     except SQLAlchemyError as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to update order status.")
+        print(f"[STORE ORDER UPDATE ERROR] {e}", flush=True)
+        raise HTTPException(status_code=500, detail="Failed to persist order update to database.")
 
     tx_hash = f"0x{uuid.uuid4().hex[:16]}"
     deep_link = f"urheart://store/receipt?order_id={payload.order_id}&status=pending_verification"
@@ -358,12 +366,15 @@ async def approve_store_order(
     user = None
     user_query = order.get("user_query", "").strip() if order else ""
     if user_query:
+        parsed_uuid = None
         try:
             parsed_uuid = uuid.UUID(user_query)
+        except (ValueError, TypeError, AttributeError):
+            pass
+
+        if parsed_uuid:
             res = await db.execute(select(User).where(User.id == parsed_uuid))
             user = res.scalar_one_or_none()
-        except (ValueError, TypeError):
-            pass
 
         if not user and "@" in user_query:
             res = await db.execute(select(User).where(User.email == user_query.lower()))

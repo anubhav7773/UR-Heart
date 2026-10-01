@@ -137,3 +137,76 @@ async def test_ad_ssv_idempotency_workflow():
         assert user_state["swipes_remaining"] == 35  # NOT double credited!
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_ad_claim_reward_whatsapp_reveal_cycle():
+    """
+    Test POST /api/v1/ads/claim-reward for whatsapp_reveal.
+    Verifies that uuid, func, and datetime execute cleanly without 500 NameError,
+    and increments reveal_tokens_count when 3 ads are reached.
+    """
+    test_user = User(
+        id=uuid.uuid4(),
+        auth_id=uuid.uuid4(),
+        full_name="Mindful Seeker",
+        email="seeker@example.com",
+        reveal_tokens_count=0,
+        reward_balance=0,
+        swipes_remaining=10,
+        direct_letters_count=0
+    )
+
+    recorded_ads = []
+
+    async def mock_get_current_user():
+        return test_user
+
+    async def mock_db():
+        mock_session = AsyncMock()
+
+        async def mock_exec(stmt):
+            mock_res = MagicMock()
+            # For select(func.count(AdRewardLedger.id))
+            mock_res.scalar.return_value = len(recorded_ads)
+            return mock_res
+
+        def mock_add(entity):
+            recorded_ads.append(entity)
+
+        mock_session.execute = AsyncMock(side_effect=mock_exec)
+        mock_session.add = MagicMock(side_effect=mock_add)
+        mock_session.commit = AsyncMock()
+        mock_session.refresh = AsyncMock()
+        yield mock_session
+
+    from app.core.security import get_current_user as core_get_current_user
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[core_get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_db] = mock_db
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Ad 1
+        res1 = await client.post("/api/v1/ads/claim-reward", json={"ad_type": "whatsapp_reveal"})
+        assert res1.status_code == 200, f"Error: {res1.text}"
+        data1 = res1.json()
+        assert data1["status"] == "success"
+        assert data1["whatsapp_progress"] == 1
+        assert data1["reveal_tokens_count"] == 0
+
+        # Ad 2
+        res2 = await client.post("/api/v1/ads/claim-reward", json={"ad_type": "whatsapp_reveal"})
+        assert res2.status_code == 200
+        data2 = res2.json()
+        assert data2["whatsapp_progress"] == 2
+        assert data2["reveal_tokens_count"] == 0
+
+        # Ad 3 (completes cycle -> grants 1 token)
+        res3 = await client.post("/api/v1/ads/claim-reward", json={"ad_type": "whatsapp_reveal"})
+        assert res3.status_code == 200
+        data3 = res3.json()
+        assert data3["token_granted"] is True
+        assert data3["reveal_tokens_count"] == 1
+
+    app.dependency_overrides.clear()
