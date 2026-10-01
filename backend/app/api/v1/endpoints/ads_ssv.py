@@ -207,11 +207,14 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
         )
     )
 
+    db_ad_type = "sacred_bridge_reveal" if ad_type in ("whatsapp_reveal", "sacred_bridge_reveal") else ad_type
+    valid_network = network if network in ('admob', 'inmobi', 'meta', 'unity', 'applovin') else 'admob'
+
     ledger_entry = AdRewardLedger(
         user_id=user_uuid,
         ssv_transaction_id=transaction_id,
-        network=network,
-        ad_type=ad_type,
+        network=valid_network,
+        ad_type=db_ad_type,
         reward_points=points_to_credit
     )
     processed_entry = ProcessedAdTransaction(
@@ -308,15 +311,17 @@ async def claim_ad_reward(
     elif payload.ad_type in ("whatsapp_reveal", "sacred_bridge_reveal"):
         points_to_credit = 30
         
-        # Track in AdRewardLedger
+        # Track in AdRewardLedger with DB-safe check constraint values
+        db_ad_type = "sacred_bridge_reveal" if payload.ad_type in ("whatsapp_reveal", "sacred_bridge_reveal") else payload.ad_type
         ledger_entry = AdRewardLedger(
             user_id=target_user.id,
             ssv_transaction_id=f"direct-claim-{uuid.uuid4().hex[:12]}",
-            network="admob_client",
-            ad_type=payload.ad_type,
+            network="admob",
+            ad_type=db_ad_type,
             reward_points=points_to_credit
         )
         db.add(ledger_entry)
+        await db.flush()
 
         # Count total ads watched for reveal by this user
         ad_count_res = await db.execute(
