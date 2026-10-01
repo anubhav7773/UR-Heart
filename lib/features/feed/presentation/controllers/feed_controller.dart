@@ -60,11 +60,15 @@ class FeedController extends StateNotifier<FeedState> {
     try {
       final deck = await _repository.fetchDiscoveryDeck();
       final prefs = await SharedPreferences.getInstance();
-      final cachedLetters = prefs.getInt('ur_heart_direct_letters');
-      final resolvedLetters = deck.directLettersCount ?? cachedLetters ?? state.directLettersCount;
+      final cachedLetters = prefs.getInt('ur_heart_direct_letters') ?? 0;
+      final serverLetters = deck.directLettersCount ?? 0;
+      // Defense-in-depth: Never overwrite positive locally-cached letters with an unauthenticated 0
+      final resolvedLetters = serverLetters > 0
+          ? serverLetters
+          : (cachedLetters > 0 ? cachedLetters : state.directLettersCount);
 
-      if (deck.directLettersCount != null) {
-        await prefs.setInt('ur_heart_direct_letters', deck.directLettersCount!);
+      if (resolvedLetters > 0) {
+        await prefs.setInt('ur_heart_direct_letters', resolvedLetters);
       }
 
       // Client-side defense-in-depth orientation filter
@@ -161,7 +165,10 @@ class FeedController extends StateNotifier<FeedState> {
 
   /// Handles Direct Letter (Up swipe)
   Future<bool> swipeDirectLetter({String? letterText}) async {
-    if (state.directLettersCount <= 0) {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedLetters = prefs.getInt('ur_heart_direct_letters') ?? 0;
+    final currentLetters = state.directLettersCount > 0 ? state.directLettersCount : cachedLetters;
+    if (currentLetters <= 0) {
       return false;
     }
     final candidate = state.currentCandidate;
@@ -170,14 +177,14 @@ class FeedController extends StateNotifier<FeedState> {
     final updatedCandidates = List<CandidateProfile>.from(state.candidates)
       ..removeAt(0);
 
+    final nextLetters = currentLetters - 1;
     state = state.copyWith(
       candidates: updatedCandidates,
-      directLettersCount: state.directLettersCount - 1,
+      directLettersCount: nextLetters,
     );
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('ur_heart_direct_letters', state.directLettersCount);
+      await prefs.setInt('ur_heart_direct_letters', nextLetters);
     } catch (_) {}
 
     try {
@@ -192,6 +199,12 @@ class FeedController extends StateNotifier<FeedState> {
       await loadDiscoveryFeed();
       return false;
     }
+  }
+
+  /// Explicit setter to synchronize direct letters balance from rewards/growth hub
+  void setDirectLettersCount(int count) {
+    state = state.copyWith(directLettersCount: count);
+    SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', count));
   }
 
   /// Prepend restored profile back to the top of the feed deck from Screen 6

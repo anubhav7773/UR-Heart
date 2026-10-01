@@ -152,23 +152,52 @@ async def record_swipe(
         target_uuid = None
 
     if current_user and target_uuid:
-        # Record swipe in public.swipes
-        swipe = Swipe(
-            actor_id=current_user.id,
-            target_id=target_uuid,
-            swipe_type=payload.swipe_type.lower()
+        swipe_type_clean = payload.swipe_type.lower()
+
+        # Record or update swipe in public.swipes safely without uq_actor_target violation
+        existing_swipe_res = await db.execute(
+            select(Swipe).where(Swipe.actor_id == current_user.id, Swipe.target_id == target_uuid)
         )
-        db.add(swipe)
+        existing_swipe = existing_swipe_res.scalar_one_or_none()
+        if existing_swipe:
+            existing_swipe.swipe_type = swipe_type_clean
+        else:
+            swipe = Swipe(
+                actor_id=current_user.id,
+                target_id=target_uuid,
+                swipe_type=swipe_type_clean
+            )
+            db.add(swipe)
 
         # Decrement swipes_remaining on like/direct
         if current_user.swipes_remaining > 0:
             current_user.swipes_remaining = max(0, current_user.swipes_remaining - 1)
 
         # Decrement direct_letters_count on direct letters in PostgreSQL
-        swipe_type_clean = payload.swipe_type.lower()
         if swipe_type_clean == "direct":
             if (current_user.direct_letters_count or 0) > 0:
                 current_user.direct_letters_count = max(0, current_user.direct_letters_count - 1)
+
+        # Send pass/ignore notification
+        if swipe_type_clean == "pass":
+            from app.api.v1.endpoints.notifications import push_notification
+            sender_photo = current_user.avatar_url or next((p for p in (current_user.photos or []) if p and str(p).strip()), "")
+            push_notification(
+                user_id=str(target_uuid),
+                notif_type="pass",
+                title="Profile Passed 🍃",
+                body=f"{current_user.full_name} passed your profile.",
+                data={
+                    "actor_id": str(current_user.id),
+                    "actor_name": current_user.full_name,
+                    "sender_id": str(current_user.id),
+                    "sender_name": current_user.full_name,
+                    "sender_avatar": sender_photo,
+                    "avatar_url": sender_photo,
+                    "swipe_type": "pass",
+                    "target_route": "/resonances"
+                }
+            )
 
         # Check for mutual like or direct resonate
         if swipe_type_clean in ("like", "direct", "superlike"):

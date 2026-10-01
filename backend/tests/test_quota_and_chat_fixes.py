@@ -191,3 +191,50 @@ def test_chat_peer_profile_resolution_with_prefix():
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         app.dependency_overrides.pop(get_db, None)
+
+
+def test_pass_swipe_upserts_and_sends_notification():
+    """Verify that pass swipe updates existing swipe safely and dispatches pass notification to target."""
+    from app.api.v1.endpoints.notifications import NOTIFICATION_STORE
+    user_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    target_id = uuid.UUID("44444444-4444-4444-4444-444444444444")
+
+    dummy_user = User(
+        id=user_id,
+        email="passer@urheart.app",
+        full_name="Kabir Das",
+        swipes_remaining=10,
+        avatar_url="https://urheart.app/media/kabir.webp"
+    )
+
+    mock_db = AsyncMock()
+    # Simulate existing swipe to test idempotent upsert
+    from app.models.domain.swipe import Swipe
+    existing_swipe = Swipe(actor_id=user_id, target_id=target_id, swipe_type="like")
+    
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = existing_swipe
+    mock_db.execute = AsyncMock(return_value=mock_result)
+    mock_db.commit = AsyncMock()
+
+    app.dependency_overrides[get_current_user_optional] = lambda: dummy_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    try:
+        res = client.post("/api/v1/swipes", json={
+            "target_id": str(target_id),
+            "swipe_type": "pass"
+        })
+        assert res.status_code == 200
+        assert existing_swipe.swipe_type == "pass"
+
+        # Verify pass notification was recorded for target user
+        target_notifs = NOTIFICATION_STORE.get(str(target_id), [])
+        assert len(target_notifs) > 0
+        assert target_notifs[0]["type"] == "pass"
+        assert "Profile Passed" in target_notifs[0]["title"]
+        assert "Kabir Das passed your profile" in target_notifs[0]["body"]
+    finally:
+        app.dependency_overrides.pop(get_current_user_optional, None)
+        app.dependency_overrides.pop(get_db, None)
+

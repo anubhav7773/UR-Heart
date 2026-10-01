@@ -1,5 +1,7 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
@@ -172,13 +174,35 @@ class FeedScreen extends ConsumerWidget {
                   final ok = await feedNotifier.swipePass();
                   if (!ok && feedState.swipesRemaining <= 0 && context.mounted) {
                     _showOutOfSwipes(context, ref);
+                  } else if (ok && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Profile passed 🍃'),
+                        duration: Duration(milliseconds: 1200),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                   }
                 },
-                onResonate: () {
-                  if (feedState.directLettersCount <= 0) {
-                    _showOutOfDirectLetters(context, ref);
+                onResonate: () async {
+                  final growthLetters = ref.read(growthHubControllerProvider).directLetters;
+                  final prefs = await SharedPreferences.getInstance();
+                  final cachedLetters = prefs.getInt('ur_heart_direct_letters') ?? 0;
+                  final effectiveLetters = math.max(
+                    feedState.directLettersCount,
+                    math.max(growthLetters, cachedLetters),
+                  );
+                  if (effectiveLetters <= 0) {
+                    if (context.mounted) {
+                      _showOutOfDirectLetters(context, ref);
+                    }
                   } else {
-                    _openDirectLetterModal(context, current, feedNotifier, isDark, ref);
+                    if (feedState.directLettersCount < effectiveLetters) {
+                      feedNotifier.setDirectLettersCount(effectiveLetters);
+                    }
+                    if (context.mounted) {
+                      _openDirectLetterModal(context, current, feedNotifier, isDark, ref);
+                    }
                   }
                 },
                 onLike: () async {
@@ -373,6 +397,8 @@ class FeedScreen extends ConsumerWidget {
                       if (!ok && context.mounted) {
                         _showOutOfDirectLetters(context, ref);
                       } else if (context.mounted) {
+                        final remaining = ref.read(feedControllerProvider).directLettersCount;
+                        ref.read(growthHubControllerProvider.notifier).updateDirectLetters(remaining);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Direct letter dispatched to ${candidate.fullName} ✨'),

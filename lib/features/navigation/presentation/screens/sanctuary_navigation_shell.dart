@@ -51,18 +51,24 @@ class _SanctuaryNavigationShellState
   @override
   void initState() {
     super.initState();
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('ur_heart_profile_setup_completed', true);
-      prefs.setBool('ur_heart_has_entered_sanctuary', true);
+    _initializeSeenAndStartPoller();
+  }
+
+  Future<void> _initializeSeenAndStartPoller() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('ur_heart_profile_setup_completed', true);
+      await prefs.setBool('ur_heart_has_entered_sanctuary', true);
       final storedSeen = prefs.getStringList('sanctuary_seen_notification_ids') ?? [];
       _seenNotificationIds.addAll(storedSeen);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    } catch (_) {}
+
+    if (mounted) {
       if (widget.initialIndex != 0) {
         ref.read(navigationIndexProvider.notifier).state = widget.initialIndex;
       }
       _startNotificationPoller();
-    });
+    }
   }
 
   void _startNotificationPoller() {
@@ -152,6 +158,15 @@ class _SanctuaryNavigationShellState
                 SanctuaryNotificationService.instance.showStreakAlertNotification(
                   streakCount: streakVal,
                   hoursRemaining: 6,
+                );
+              } else if (nType.contains('pass')) {
+                final aName = nData['sender_name']?.toString() ??
+                    nData['actor_name']?.toString() ??
+                    'A seeker';
+                SanctuaryNotificationService.instance.showSystemNotification(
+                  id: (notifId ?? 'notif').hashCode,
+                  title: 'Profile Passed 🍃',
+                  body: '$aName passed your resonance card.',
                 );
               } else {
                 SanctuaryNotificationService.instance.showSystemNotification(
@@ -310,7 +325,7 @@ class _SanctuaryNavigationShellState
       return;
     }
 
-    if (notifType.contains('like') || notifType.contains('resonate')) {
+    if (notifType.contains('like') || notifType.contains('resonate') || notifType.contains('pass')) {
       ref.read(navigationIndexProvider.notifier).state = 1;
       return;
     }

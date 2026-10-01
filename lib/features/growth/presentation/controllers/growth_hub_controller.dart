@@ -247,6 +247,16 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
             if (map['message'] != null) {
               rewardNotice = map['message'].toString();
             }
+            if (map['direct_letters_count'] != null) {
+              final sLetters = map['direct_letters_count'] as int;
+              state = state.copyWith(directLetters: sLetters);
+              SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', sLetters));
+            }
+            if (map['swipes_remaining'] != null) {
+              final sSwipes = map['swipes_remaining'] as int;
+              state = state.copyWith(swipesRemaining: sSwipes);
+              SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_swipes_remaining', sSwipes));
+            }
             if (map['reveal_tokens_count'] != null) {
               final sTokens = map['reveal_tokens_count'] as int;
               state = state.copyWith(revealTokensCount: sTokens);
@@ -282,16 +292,26 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
   void applyReward(String adType, {String targetId = 'none'}) {
     switch (adType) {
       case 'quick_reflection':
-        state = state.copyWith(swipesRemaining: state.swipesRemaining + 10);
+        final nextSwipes = state.swipesRemaining + 10;
+        state = state.copyWith(swipesRemaining: nextSwipes);
+        SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_swipes_remaining', nextSwipes));
         break;
       case 'deep_resonance':
-        state = state.copyWith(directLetters: state.directLetters + 1);
+        final nextLetters = state.directLetters + 1;
+        state = state.copyWith(directLetters: nextLetters);
+        SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', nextLetters));
         break;
       case 'morning_harvest_unlock':
+        final harvestSwipes = state.swipesRemaining + 20;
+        final harvestLetters = state.directLetters + 2;
         state = state.copyWith(
-          swipesRemaining: state.swipesRemaining + 20,
-          directLetters: state.directLetters + 2,
+          swipesRemaining: harvestSwipes,
+          directLetters: harvestLetters,
         );
+        SharedPreferences.getInstance().then((p) {
+          p.setInt('ur_heart_swipes_remaining', harvestSwipes);
+          p.setInt('ur_heart_direct_letters', harvestLetters);
+        });
         break;
       case 'daily_streak_boost':
         state = state.copyWith(
