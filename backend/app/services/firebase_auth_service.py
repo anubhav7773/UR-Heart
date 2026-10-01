@@ -48,19 +48,30 @@ def _sanitize_credential_dict(cred_dict: Dict[str, Any]) -> Dict[str, Any]:
         pk_clean = pk_clean.replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
 
         # 3. Handle PEM boundaries & strip any non-base64 characters in key body
-        header_match = re.search(r"-----BEGIN [A-Z0-9 _-]+ PRIVATE KEY-----", pk_clean)
-        footer_match = re.search(r"-----END [A-Z0-9 _-]+ PRIVATE KEY-----", pk_clean)
+        header_match = re.search(r"-----BEGIN (?:[A-Z0-9 _-]+ )?PRIVATE KEY-----", pk_clean)
+        footer_match = re.search(r"-----END (?:[A-Z0-9 _-]+ )?PRIVATE KEY-----", pk_clean)
 
         if header_match and footer_match:
             header = header_match.group(0)
             footer = footer_match.group(0)
             raw_body = pk_clean[header_match.end():footer_match.start()]
 
-            # Filter strictly valid base64 chars for the PEM body
-            pure_b64 = re.sub(r"[^A-Za-z0-9+/=]", "", raw_body)
+            # Strip all padding and non-base64 characters first
+            pure_b64 = re.sub(r"[^A-Za-z0-9+/]", "", raw_body)
+            # Re-pad strictly to a multiple of 4
+            pad_needed = (4 - (len(pure_b64) % 4)) % 4
+            if pad_needed:
+                pure_b64 += "=" * pad_needed
             # Reformat into standard 64-char lines
             body_lines = [pure_b64[i:i+64] for i in range(0, len(pure_b64), 64)]
             cred["private_key"] = f"{header}\n" + "\n".join(body_lines) + f"\n{footer}\n"
+        elif "PRIVATE KEY" not in pk_clean and len(pk_clean) > 200:
+            pure_b64 = re.sub(r"[^A-Za-z0-9+/]", "", pk_clean)
+            pad_needed = (4 - (len(pure_b64) % 4)) % 4
+            if pad_needed:
+                pure_b64 += "=" * pad_needed
+            body_lines = [pure_b64[i:i+64] for i in range(0, len(pure_b64), 64)]
+            cred["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(body_lines) + "\n-----END PRIVATE KEY-----\n"
         else:
             cred["private_key"] = pk_clean
 

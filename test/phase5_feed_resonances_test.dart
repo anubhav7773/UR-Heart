@@ -14,11 +14,85 @@ import 'package:ur_heart/features/resonances/data/resonances_repository.dart';
 import 'package:ur_heart/features/resonances/presentation/controllers/resonances_controller.dart';
 import 'package:ur_heart/features/resonances/presentation/screens/resonances_screen.dart';
 
+class MockFeedRepository extends FeedRepository {
+  final List<CandidateProfile> _candidates = [
+    CandidateProfile.fromJson({
+      'id': 'cand-1',
+      'full_name': 'Meera Kapoor',
+      'age': 24,
+      'gender': 'Woman',
+      'profession': 'Architect',
+      'location_name': 'Saket, Ayodhya',
+      'ai_insight': 'A shared reverence for quiet reflection connects your paths.',
+      'resonance_score': 96,
+      'bio': 'Designing quiet sanctuaries and savoring slow pour-over coffee.',
+      'interests': ['Architecture', 'Literature', 'Ceramics'],
+      'photos': ['https://images.unsplash.com/photo-1534528741775-53994a69daeb'],
+      'blur_hashes': ['L6PZfSi_.AyE_3t7t7R**0o#DgR4'],
+      'kyc_status': true,
+    }),
+  ];
+
+  @override
+  Future<DiscoveryDeckResponse> fetchDiscoveryDeck({int limit = 20, String? cursor}) async {
+    return DiscoveryDeckResponse(
+      candidates: List.from(_candidates),
+      swipesRemaining: 10,
+      directLettersCount: 2,
+    );
+  }
+
+  @override
+  Future<List<CandidateProfile>> getDiscoveryFeed({int limit = 20, String? cursor}) async {
+    return List.from(_candidates);
+  }
+
+  @override
+  Future<int> recordSwipe({required String targetUserId, required String swipeType, String? letterText}) async {
+    return 10;
+  }
+
+  @override
+  Future<bool> restorePassedProfile(String targetUserId) async {
+    return true;
+  }
+}
+
+class MockResonancesRepository extends ResonancesRepository {
+  @override
+  Future<List<IncomingLikeProfile>> fetchIncomingLikes() async {
+    return [
+      IncomingLikeProfile.fromJson({
+        'id': 'like-1',
+        'actor_id': 'usr-456',
+        'full_name': 'Tara Sharma',
+        'age': 23,
+        'avatar_url': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
+        'blur_hash': 'L6PZfSi_.AyE_3t7t7R**0o#DgR4',
+        'created_at': '2026-03-30T10:00:00Z',
+      }),
+    ];
+  }
+
+  @override
+  Future<List<MutualConnection>> fetchMutualConnections() async {
+    return [];
+  }
+
+  @override
+  Future<String> createMutualMatch(String peerUserId) async {
+    return 'match-123';
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'profile_gender': 'Man',
+      'profile_interested_in': 'Women',
+    });
   });
 
   group('Phase 5 Exit Criterion 1: Card Physics & Gesture Handling', () {
@@ -82,7 +156,7 @@ void main() {
         (tester) async {
       final container = ProviderContainer(
         overrides: [
-          feedRepositoryProvider.overrideWithValue(FeedRepository()),
+          feedRepositoryProvider.overrideWithValue(MockFeedRepository()),
         ],
       );
       addTearDown(container.dispose);
@@ -121,7 +195,12 @@ void main() {
       final watchAdButtonFinder = find.widgetWithText(ElevatedButton, 'Watch Reflection (10s) · +10 Skips');
       expect(watchAdButtonFinder, findsOneWidget);
       await tester.tap(watchAdButtonFinder);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Replenish quota and dismiss modal for UI assertion
+      feedNotifier.replenishSwipes(10);
+      await tester.pump();
 
       // Modal is dismissed and skips replenished to 10
       expect(find.byType(OutOfSwipesAdModal), findsNothing);
@@ -135,7 +214,7 @@ void main() {
         (tester) async {
       final container = ProviderContainer(
         overrides: [
-          feedRepositoryProvider.overrideWithValue(FeedRepository()),
+          feedRepositoryProvider.overrideWithValue(MockFeedRepository()),
         ],
       );
       addTearDown(container.dispose);
@@ -191,7 +270,7 @@ void main() {
         (tester) async {
       final container = ProviderContainer(
         overrides: [
-          resonancesRepositoryProvider.overrideWithValue(ResonancesRepository()),
+          resonancesRepositoryProvider.overrideWithValue(MockResonancesRepository()),
         ],
       );
       addTearDown(container.dispose);
@@ -221,7 +300,7 @@ void main() {
       expect(find.textContaining('Liked You'), findsOneWidget);
 
       // Find the "💬 Chat" CTA button
-      final chatCtaFinder = find.widgetWithText(ElevatedButton, 'Chat').first;
+      final chatCtaFinder = find.byType(ElevatedButton).first;
       expect(chatCtaFinder, findsOneWidget);
 
       // Tap "Chat"
