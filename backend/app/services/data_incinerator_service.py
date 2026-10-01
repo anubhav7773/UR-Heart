@@ -263,6 +263,12 @@ class DataIncineratorService:
         if not target_tokens:
             return []
 
+        safe_name = (
+            re.sub(r"[^a-zA-Z0-9_-]", "_", display_name.strip())
+            if display_name and display_name.strip()
+            else None
+        )
+
         deleted_total: List[str] = []
 
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -282,8 +288,12 @@ class DataIncineratorService:
                             items = list_res.json()
                             for item in items:
                                 item_name = item.get("name", "")
-                                # Check if folder or file matches any target token
+                                # Check if folder or file matches any target token or user safe name
                                 matched = any(token in item_name for token in target_tokens)
+                                if not matched and safe_name and len(safe_name) >= 3:
+                                    if item_name.startswith(f"{safe_name}_") or item_name == safe_name:
+                                        matched = True
+
                                 if matched:
                                     full_subprefix = f"{top_prefix}/{item_name}"
                                     if item.get("id") or item.get("metadata"):
@@ -298,34 +308,26 @@ class DataIncineratorService:
                     except Exception as e:
                         logger.warning(f"[STORAGE INCINERATOR] Discovery error in {bucket}/{top_prefix}: {e}")
 
-                # 2. Add deterministic paths as fail-safe
-                safe_name = (
-                    re.sub(r"[^a-zA-Z0-9_-]", "_", display_name.strip())
-                    if display_name and display_name.strip()
-                    else None
-                )
-
-                candidate_folders: Set[str] = set()
-                for token in target_tokens:
-                    candidate_folders.add(token)
-                    if safe_name:
-                        candidate_folders.add(f"{safe_name}_{token}")
-
-                for folder in candidate_folders:
-                    for slot in range(1, 11):
-                        file_keys_to_delete.add(f"users/{folder}/moments/slot_{slot}.webp")
-                        file_keys_to_delete.add(f"users/{folder}/moments/slot_{slot}.jpg")
-                        file_keys_to_delete.add(f"users/{folder}/moments/slot_{slot}.png")
-                    file_keys_to_delete.add(f"kyc_ephemeral/{folder}/kyc_video.mp4")
-                    file_keys_to_delete.add(f"audio_bio/{folder}.mp3")
-                    file_keys_to_delete.add(f"audio_bio/{folder}.m4a")
-
-                # Parse known_photos URLs if provided
+                # 2. Add known_photos URLs if provided
                 if known_photos:
                     for photo_url in known_photos:
                         if photo_url and f"/{bucket}/" in photo_url:
                             extracted = photo_url.split(f"/{bucket}/")[-1].split("?")[0]
                             file_keys_to_delete.add(extracted)
+
+                # 3. Fail-safe targeted paths ONLY if nothing was discovered dynamically
+                if not file_keys_to_delete:
+                    candidate_folders: Set[str] = set()
+                    for token in target_tokens:
+                        candidate_folders.add(token)
+                        if safe_name:
+                            candidate_folders.add(f"{safe_name}_{token}")
+
+                    for folder in candidate_folders:
+                        for slot in range(1, 6):
+                            file_keys_to_delete.add(f"users/{folder}/moments/slot_{slot}.webp")
+                        file_keys_to_delete.add(f"kyc_ephemeral/{folder}/kyc_video.mp4")
+                        file_keys_to_delete.add(f"audio_bio/{folder}.mp3")
 
                 if not file_keys_to_delete:
                     continue

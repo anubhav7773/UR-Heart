@@ -61,7 +61,22 @@ class FirebaseAuthService:
                 except Exception as e:
                     logger.warning("serviceAccountKey.json load error: %s", e)
 
-            # 3. Fallback: Initialize with explicit Project ID options
+            # 3. Check base64 encoded env var
+            raw_b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64")
+            if raw_b64 and raw_b64.strip():
+                try:
+                    import base64
+                    decoded = base64.b64decode(raw_b64.strip()).decode("utf-8")
+                    cred_dict = json.loads(decoded)
+                    cred = credentials.Certificate(cred_dict)
+                    return firebase_admin.initialize_app(cred, {
+                        "projectId": project_id,
+                        "storageBucket": storage_bucket
+                    })
+                except Exception as e:
+                    logger.warning("FIREBASE_SERVICE_ACCOUNT_B64 parse error: %s", e)
+
+            # 5. Last-resort fallback: Initialize with explicit Project ID options
             try:
                 return firebase_admin.initialize_app(options={
                     "projectId": project_id,

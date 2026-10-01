@@ -1180,3 +1180,9 @@ async def get_assetlinks():
         ],
         headers={"Content-Type": "application/json", "Cache-Control": "public, max-age=86400"}
     )
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Return 204 No Content for browser favicon requests to avoid 404 noise."""
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
