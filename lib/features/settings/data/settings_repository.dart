@@ -87,6 +87,59 @@ class SettingsRepository {
     }
   }
 
+  /// Fetches persistent preferences from server and hardware crypto vault
+  Future<SanctuarySettings> fetchSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedIncognito = prefs.getBool('pref_is_incognito');
+    final cachedFp = prefs.getString('pref_active_key_fp');
+
+    if (cachedIncognito != null || cachedFp != null) {
+      _settings = _settings.copyWith(
+        isIncognito: cachedIncognito ?? _settings.isIncognito,
+        activeKeyFingerprint: cachedFp ?? _settings.activeKeyFingerprint,
+      );
+    }
+
+    try {
+      final res = await _dio.get<dynamic>('/api/v1/user/preferences');
+      if (res.statusCode == 200 && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        final p = (data['preferences'] as Map<String, dynamic>?) ?? {};
+        final serverIncognito = p['is_incognito'] as bool? ?? false;
+        var serverFp = p['key_fingerprint'] as String? ?? '';
+        final serverKey = p['public_encryption_key'] as String?;
+
+        if (serverKey == null || serverKey.isEmpty || serverFp.contains('INITIALIZING')) {
+          // Hardware vault: export or generate genuine key and register
+          final localKeyBase64 = await SanctuaryCryptoVault.instance.exportPublicKeyBase64();
+          await registerRotatedPublicKey(localKeyBase64);
+          if (localKeyBase64.length >= 12) {
+            serverFp = 'X25519-${localKeyBase64.substring(0, 6)}...${localKeyBase64.substring(localKeyBase64.length - 4)}';
+          }
+        }
+
+        _settings = _settings.copyWith(
+          isIncognito: serverIncognito,
+          activeKeyFingerprint: serverFp.isNotEmpty ? serverFp : _settings.activeKeyFingerprint,
+        );
+
+        await prefs.setBool('pref_is_incognito', serverIncognito);
+        if (serverFp.isNotEmpty) {
+          await prefs.setString('pref_active_key_fp', serverFp);
+        }
+      }
+    } catch (_) {
+      try {
+        final localKey = await SanctuaryCryptoVault.instance.exportPublicKeyBase64();
+        if (localKey.length >= 12) {
+          final localFp = 'X25519-${localKey.substring(0, 6)}...${localKey.substring(localKey.length - 4)}';
+          _settings = _settings.copyWith(activeKeyFingerprint: localFp);
+        }
+      } catch (_) {}
+    }
+    return _settings;
+  }
+
   /// Backward-compatible updateSettings
   Future<SanctuarySettings> updateSettings({
     bool? masterResonance,
@@ -101,8 +154,13 @@ class SettingsRepository {
       isIncognito: isIncognito,
     );
 
+    final prefs = await SharedPreferences.getInstance();
+    if (isIncognito != null) {
+      await prefs.setBool('pref_is_incognito', isIncognito);
+    }
+
     try {
-      await _dio.put<dynamic>(
+      final res = await _dio.put<dynamic>(
         '/api/v1/user/preferences',
         data: {
           'discreet_mode': _settings.discreetMode,
@@ -110,6 +168,14 @@ class SettingsRepository {
           'push_notifications_enabled': _settings.masterResonance,
         },
       );
+      if (res.statusCode == 200 && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        final fp = data['key_fingerprint'] as String?;
+        if (fp != null && fp.isNotEmpty && !fp.contains('INITIALIZING')) {
+          _settings = _settings.copyWith(activeKeyFingerprint: fp);
+          await prefs.setString('pref_active_key_fp', fp);
+        }
+      }
       return _settings;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -126,8 +192,13 @@ class SettingsRepository {
       );
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        final fp = data['key_fingerprint'] as String? ?? 'ROTATED';
+        final fp = data['key_fingerprint'] as String? ??
+            (publicKeyBase64.length >= 12
+                ? 'X25519-${publicKeyBase64.substring(0, 6)}...${publicKeyBase64.substring(publicKeyBase64.length - 4)}'
+                : 'X25519-ROTATED');
         _settings = _settings.copyWith(activeKeyFingerprint: fp);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pref_active_key_fp', fp);
         return true;
       }
       return false;
@@ -148,8 +219,13 @@ class SettingsRepository {
         data: {'public_key_base64': base64Key},
       );
       final data = response.data as Map<String, dynamic>;
-      final fp = data['key_fingerprint'] as String? ?? (base64Key.length >= 8 ? base64Key.substring(0, 8) : 'ROTATED-X25519');
+      final fp = data['key_fingerprint'] as String? ??
+          (base64Key.length >= 12
+              ? 'X25519-${base64Key.substring(0, 6)}...${base64Key.substring(base64Key.length - 4)}'
+              : 'X25519-ROTATED');
       _settings = _settings.copyWith(activeKeyFingerprint: fp);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pref_active_key_fp', fp);
       return fp;
     } on DioException catch (e) {
       _handleDioError(e);

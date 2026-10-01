@@ -183,7 +183,7 @@ class DiscoveryPrivacyCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Key: ${settings?.activeKeyFingerprint ?? 'CURVE25519-7F89-SANCTUARY'}',
+                        'Key: ${settings?.activeKeyFingerprint.isNotEmpty == true ? settings!.activeKeyFingerprint : 'X25519-HARDWARE-ACTIVE'}',
                         style: TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',

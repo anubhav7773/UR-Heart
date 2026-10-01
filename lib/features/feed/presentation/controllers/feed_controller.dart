@@ -99,6 +99,15 @@ class FeedController extends StateNotifier<FeedState> {
   /// Alias for refresh and external callers (ACT-23)
   Future<void> loadFeed() => loadDiscoveryFeed();
 
+  /// Prunes a candidate by ID (e.g., when a direct letter or match is formed with that user)
+  void removeCandidateById(String candidateId) {
+    if (state.candidates.isEmpty) return;
+    final updated = state.candidates.where((c) => c.id != candidateId).toList();
+    if (updated.length != state.candidates.length) {
+      state = state.copyWith(candidates: updated);
+    }
+  }
+
   /// Handles Pass swipe (Left swipe)
   Future<bool> swipePass() async {
     if (state.swipesRemaining <= 0) {

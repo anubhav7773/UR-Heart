@@ -59,6 +59,14 @@ class SettingsController extends StateNotifier<SettingsState> {
   SettingsController(this._repo, [this._ref])
       : super(SettingsState(settings: _repo.getSettings())) {
     _loadUserRoleAndEmail();
+    loadSettings();
+  }
+
+  Future<void> loadSettings() async {
+    try {
+      final updated = await _repo.fetchSettings();
+      state = state.copyWith(settings: updated);
+    } catch (_) {}
   }
 
   Future<void> _loadUserRoleAndEmail() async {

@@ -17,6 +17,36 @@ class PreferencesUpdateRequest(BaseModel):
     push_notifications_enabled: Optional[bool] = None
 
 
+def _format_key_fingerprint(pub_key: Optional[str]) -> str:
+    if not pub_key:
+        return "X25519-INITIALIZING"
+    clean = pub_key.strip()
+    if len(clean) >= 12:
+        return f"X25519-{clean[:6]}...{clean[-4:]}"
+    return f"X25519-{clean}"
+
+
+@router.get("/preferences", status_code=status.HTTP_200_OK)
+async def get_user_preferences(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns the authenticated user's current persistent privacy settings,
+    including Ghost Cloak incognito status and active X25519 public key fingerprint.
+    """
+    return {
+        "status": "success",
+        "preferences": {
+            "is_incognito": bool(current_user.is_incognito),
+            "discreet_mode": bool(current_user.discreet_mode),
+            "push_notifications_enabled": bool(current_user.push_notifications_enabled if current_user.push_notifications_enabled is not None else True),
+            "public_encryption_key": current_user.public_encryption_key,
+            "key_fingerprint": _format_key_fingerprint(current_user.public_encryption_key),
+        }
+    }
+
+
 @router.put("/preferences", status_code=status.HTTP_200_OK)
 async def update_user_preferences(
     payload: PreferencesUpdateRequest,
@@ -37,9 +67,15 @@ async def update_user_preferences(
         .where(User.id == current_user.id)
         .values(**update_data)
     )
+    for k, v in update_data.items():
+        setattr(current_user, k, v)
+
     await db.commit()
 
     return {
         "status": "success",
-        "updated_preferences": update_data
+        "updated_preferences": update_data,
+        "is_incognito": bool(current_user.is_incognito),
+        "key_fingerprint": _format_key_fingerprint(current_user.public_encryption_key),
     }
+

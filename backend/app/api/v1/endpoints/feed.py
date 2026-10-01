@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, not_
+from sqlalchemy import select, and_, not_, or_
 
 from app.core.database import get_db
 from app.core.security import get_current_user_optional
@@ -39,11 +39,13 @@ async def get_discovery_feed(
 ):
     """
     Returns verified candidate profiles from PostgreSQL for the discovery deck
-    with reciprocal orientation matching, excluding already swiped profiles.
+    with reciprocal orientation matching, excluding already swiped profiles,
+    direct-letter senders, active matches, and incognito (Ghost Cloak) users.
     """
     stmt = select(User).where(
         User.deleted_at.is_(None),
-        User.is_profile_completed == True
+        User.is_profile_completed == True,
+        or_(User.is_incognito.is_(False), User.is_incognito.is_(None))
     )
 
     if current_user:
@@ -56,6 +58,19 @@ async def get_discovery_feed(
         # Exclude candidates already swiped by current user
         swiped_subq = select(Swipe.target_id).where(Swipe.actor_id == current_user.id)
         stmt = stmt.where(not_(User.id.in_(swiped_subq)))
+
+        # Exclude candidates who already sent a direct letter / superlike to current user
+        direct_senders_subq = select(Swipe.actor_id).where(
+            Swipe.target_id == current_user.id,
+            Swipe.swipe_type.in_(["direct", "superlike", "direct_letter"])
+        )
+        stmt = stmt.where(not_(User.id.in_(direct_senders_subq)))
+
+        # Exclude candidates with whom current user already has an active Match/dialogue
+        matched_u1_subq = select(Match.user1_id).where(Match.user2_id == current_user.id, Match.is_active == True)
+        matched_u2_subq = select(Match.user2_id).where(Match.user1_id == current_user.id, Match.is_active == True)
+        stmt = stmt.where(not_(User.id.in_(matched_u1_subq)))
+        stmt = stmt.where(not_(User.id.in_(matched_u2_subq)))
 
         # Orientation matching — bidirectional algorithm
         # Direction 1: User's preference → filter candidate's gender
