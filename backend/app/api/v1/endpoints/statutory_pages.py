@@ -11,6 +11,7 @@ from sqlalchemy import select, update, delete
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.domain.user import User
+from app.services.data_incinerator_service import DataIncineratorService
 
 settings = get_settings()
 router = APIRouter(tags=["Statutory Legal & Policy Portals"])
@@ -867,23 +868,18 @@ class WebDeletionRequest(BaseModel):
 async def process_web_deletion_request(payload: WebDeletionRequest, db: AsyncSession = Depends(get_db)):
     """
     Processes web deletion request from Google Play public deletion page.
-    Deletes the user and data from DB if exists.
+    Irrevocably incinerates the user identity across Firebase Auth, Supabase Storage,
+    Supabase Auth, and the PostgreSQL database.
     """
     clean_email = payload.email.strip().lower()
-    res = await db.execute(select(User).where(User.email == clean_email))
-    user = res.scalar_one_or_none()
-
-    if user:
-        # Cascade delete user
-        await db.execute(delete(User).where(User.id == user.id))
-        try:
-            await db.commit()
-            print(f"[DATA INCINERATOR] Web erasure executed for: {clean_email}", flush=True)
-        except Exception as e:
-            await db.rollback()
-            print(f"[DATA INCINERATOR ERROR] {e}", flush=True)
+    audit = await DataIncineratorService.incinerate_user(
+        email=clean_email,
+        db=db
+    )
+    print(f"[DATA INCINERATOR] Web erasure executed for: {clean_email} | Result: {audit}", flush=True)
 
     return {
         "status": "success",
-        "message": f"Account deletion request for {clean_email} accepted. All associated records purged."
+        "message": f"Account deletion request for {clean_email} accepted. All associated records purged.",
+        "audit": audit
     }

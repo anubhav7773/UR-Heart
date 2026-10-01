@@ -195,3 +195,37 @@ class FirebaseAuthService:
             logger.warning("Firebase REST user sync error: %s", rest_err)
 
         return type("FirebaseUser", (), {"uid": f"fb_{clean_email}", "email": clean_email, "email_verified": True})(), None
+
+    @classmethod
+    def delete_user_account(cls, uid: Optional[str] = None, email: Optional[str] = None) -> bool:
+        """
+        Irrevocably deletes a user from Firebase Authentication Console.
+        Supports deletion by UID or email address.
+        """
+        app = cls.get_app()
+        target_uid = uid
+
+        if not target_uid and email:
+            clean_email = email.strip().lower()
+            try:
+                user_rec = auth.get_user_by_email(clean_email, app=app)
+                target_uid = user_rec.uid
+            except auth.UserNotFoundError:
+                logger.info(f"Firebase user {clean_email} already non-existent in Firebase Auth.")
+                return True
+            except Exception as e:
+                logger.warning(f"Error resolving Firebase user by email {clean_email}: {e}")
+
+        if target_uid:
+            try:
+                auth.delete_user(target_uid, app=app)
+                logger.info(f"[FIREBASE INCINERATOR] Purged user {target_uid} from Firebase Auth.")
+                return True
+            except auth.UserNotFoundError:
+                logger.info(f"Firebase user {target_uid} already purged.")
+                return True
+            except Exception as e:
+                logger.error(f"[FIREBASE INCINERATOR ERROR] Failed deleting {target_uid}: {e}")
+                return False
+
+        return False
