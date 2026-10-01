@@ -53,7 +53,7 @@ async def process_revenuecat_event(
 
     try:
         user_uuid = UUID(user_id_str)
-    except ValueError:
+    except (ValueError, TypeError):
         return {"status": "ignored", "reason": "Invalid UUID format"}
 
     # 1. Idempotency Check
