@@ -249,7 +249,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 state.isGpsVerified
                                     ? state.location
                                     : (state.isAcquiringGps
-                                        ? 'Acquiring authentic hardware GPS...'
+                                        ? 'Locking authentic hardware GPS...'
                                         : (state.gpsError ?? 'GPS Verification Required')),
                                 style: AppTypography.bodySmall.copyWith(
                                   color: titleColor,
@@ -263,7 +263,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 state.isGpsVerified
                                     ? 'Authentic device GPS locked · Anti-Fraud Protected'
                                     : (state.isAcquiringGps
-                                        ? 'Connecting to hardware satellites...'
+                                        ? 'Fusing satellites & network for genuine accuracy...'
                                         : 'Manual entry disabled · Real GPS required to proceed'),
                                 style: TextStyle(
                                   fontSize: 11.0,
@@ -311,10 +311,31 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                             side: BorderSide(color: verifiedTeal.withOpacity(0.5)),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
                           ),
-                          onPressed: () => notifier.fetchRealGpsLocation(),
-                          icon: const Icon(Icons.gps_fixed, size: 16.0),
-                          label: const Text('Retry Hardware GPS Acquisition',
-                              style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            if (state.isGpsServiceDisabled) {
+                              notifier.openLocationSettings();
+                            } else if (state.isGpsPermissionDeniedForever) {
+                              notifier.openAppSettings();
+                            } else {
+                              notifier.fetchRealGpsLocation();
+                            }
+                          },
+                          icon: Icon(
+                            state.isGpsServiceDisabled
+                                ? Icons.location_on
+                                : (state.isGpsPermissionDeniedForever
+                                    ? Icons.settings
+                                    : Icons.gps_fixed),
+                            size: 16.0,
+                          ),
+                          label: Text(
+                            state.isGpsServiceDisabled
+                                ? 'Turn on Device GPS'
+                                : (state.isGpsPermissionDeniedForever
+                                    ? 'Open App Settings'
+                                    : 'Retry Hardware GPS Acquisition'),
+                            style: const TextStyle(fontSize: 12.0, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
                     ],

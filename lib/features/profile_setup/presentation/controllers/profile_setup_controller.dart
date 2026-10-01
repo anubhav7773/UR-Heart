@@ -36,6 +36,8 @@ class ProfileSetupState {
   final bool isGpsVerified;
   final bool isAcquiringGps;
   final String? gpsError;
+  final bool isGpsServiceDisabled;
+  final bool isGpsPermissionDeniedForever;
 
   const ProfileSetupState({
     this.photoSlots = const {},
@@ -62,6 +64,8 @@ class ProfileSetupState {
     this.isGpsVerified = false,
     this.isAcquiringGps = false,
     this.gpsError,
+    this.isGpsServiceDisabled = false,
+    this.isGpsPermissionDeniedForever = false,
   });
 
   bool get isBioPolishing => isPolishingBio;
@@ -94,6 +98,8 @@ class ProfileSetupState {
     bool? isGpsVerified,
     bool? isAcquiringGps,
     String? gpsError,
+    bool? isGpsServiceDisabled,
+    bool? isGpsPermissionDeniedForever,
   }) {
     return ProfileSetupState(
       photoSlots: photoSlots ?? this.photoSlots,
@@ -121,6 +127,9 @@ class ProfileSetupState {
       isGpsVerified: isGpsVerified ?? this.isGpsVerified,
       isAcquiringGps: isAcquiringGps ?? this.isAcquiringGps,
       gpsError: gpsError,
+      isGpsServiceDisabled: isGpsServiceDisabled ?? this.isGpsServiceDisabled,
+      isGpsPermissionDeniedForever:
+          isGpsPermissionDeniedForever ?? this.isGpsPermissionDeniedForever,
     );
   }
 }
@@ -200,7 +209,12 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
 
   /// Acquires real hardware GPS coordinates and reverse-geocodes locality
   Future<String> fetchRealGpsLocation() async {
-    state = state.copyWith(isAcquiringGps: true, gpsError: null);
+    state = state.copyWith(
+      isAcquiringGps: true,
+      gpsError: null,
+      isGpsServiceDisabled: false,
+      isGpsPermissionDeniedForever: false,
+    );
     final result = await RealGpsLocationService.acquireRealHardwareGps();
     if (result.isSuccess) {
       final prefs = await SharedPreferences.getInstance();
@@ -214,6 +228,8 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         isGpsVerified: true,
         isAcquiringGps: false,
         gpsError: null,
+        isGpsServiceDisabled: false,
+        isGpsPermissionDeniedForever: false,
       );
       return result.formattedLocation;
     } else {
@@ -221,9 +237,21 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         isGpsVerified: false,
         isAcquiringGps: false,
         gpsError: result.errorMessage ?? 'Unable to acquire genuine GPS',
+        isGpsServiceDisabled: result.isServiceDisabled,
+        isGpsPermissionDeniedForever: result.isPermissionDeniedForever,
       );
       return result.errorMessage ?? 'Unable to acquire genuine GPS';
     }
+  }
+
+  /// Direct link to device location settings if GPS is switched off
+  Future<void> openLocationSettings() async {
+    await RealGpsLocationService.openLocationSettings();
+  }
+
+  /// Direct link to app permission settings if location permission was permanently denied
+  Future<void> openAppSettings() async {
+    await RealGpsLocationService.openAppSettings();
   }
 
   Future<bool> processAndUploadPhoto({
