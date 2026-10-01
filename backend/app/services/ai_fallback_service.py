@@ -7,7 +7,7 @@ from app.core.config import get_settings
 logger = logging.getLogger("ai_fallback")
 settings = get_settings()
 
-OPENROUTER_TEXT_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+OPENROUTER_TEXT_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 OPENROUTER_VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
 
 

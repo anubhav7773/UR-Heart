@@ -9,12 +9,14 @@ class PersonaHeaderCard extends StatelessWidget {
   final UserProfile profile;
   final bool isDark;
   final VoidCallback onEditAvatar;
+  final VoidCallback? onVerifyKyc;
 
   const PersonaHeaderCard({
     super.key,
     required this.profile,
     required this.isDark,
     required this.onEditAvatar,
+    this.onVerifyKyc,
   });
 
   ImageProvider? _resolveAvatarProvider() {
@@ -149,6 +151,52 @@ class PersonaHeaderCard extends StatelessWidget {
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   color: crestColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: onVerifyKyc,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (isDark
+                                    ? DarkSanctuaryTokens.primaryCoral
+                                    : LightSanctuaryTokens.terracottaAccent)
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isDark
+                                  ? DarkSanctuaryTokens.primaryCoral
+                                  : LightSanctuaryTokens.terracottaAccent,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.shield_outlined,
+                                size: 12,
+                                color: isDark
+                                    ? DarkSanctuaryTokens.primaryCoral
+                                    : LightSanctuaryTokens.terracottaAccent,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'VERIFY ✨',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? DarkSanctuaryTokens.primaryCoral
+                                      : LightSanctuaryTokens.terracottaAccent,
                                 ),
                               ),
                             ],

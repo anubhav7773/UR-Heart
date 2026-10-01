@@ -7,12 +7,14 @@ class TextOnlyChatInputBar extends StatefulWidget {
   final bool isDark;
   final void Function(String message) onSendMessage;
   final void Function(String violation)? onViolation;
+  final TextEditingController? controller;
 
   const TextOnlyChatInputBar({
     super.key,
     required this.isDark,
     required this.onSendMessage,
     this.onViolation,
+    this.controller,
   });
 
   @override
@@ -20,7 +22,8 @@ class TextOnlyChatInputBar extends StatefulWidget {
 }
 
 class _TextOnlyChatInputBarState extends State<TextOnlyChatInputBar> {
-  final TextEditingController _textController = TextEditingController();
+  late final TextEditingController _textController;
+  bool _isInternalController = false;
   bool _canSend = false;
 
   static const Map<String, String> _hindiDigits = {
@@ -29,8 +32,31 @@ class _TextOnlyChatInputBarState extends State<TextOnlyChatInputBar> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.controller != null) {
+      _textController = widget.controller!;
+    } else {
+      _textController = TextEditingController();
+      _isInternalController = true;
+    }
+    _canSend = _textController.text.trim().isNotEmpty;
+    _textController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    final hasText = _textController.text.trim().isNotEmpty;
+    if (hasText != _canSend && mounted) {
+      setState(() => _canSend = hasText);
+    }
+  }
+
+  @override
   void dispose() {
-    _textController.dispose();
+    _textController.removeListener(_onTextChanged);
+    if (_isInternalController) {
+      _textController.dispose();
+    }
     super.dispose();
   }
 

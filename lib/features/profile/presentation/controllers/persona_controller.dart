@@ -99,6 +99,18 @@ class PersonaController extends StateNotifier<PersonaState> {
     }
   }
 
+  Future<void> refreshProfile() async {
+    await _loadInitialProfile();
+  }
+
+  Future<void> onKycVerified() async {
+    state = state.copyWith(
+      profile: state.profile.copyWith(hasVerifiedCrest: true),
+      successMessage: 'Verified Sanctuary Crest Awarded! 🛡️✨',
+    );
+    await refreshProfile();
+  }
+
   void updateBio(String newBio) {
     state = state.copyWith(profile: state.profile.copyWith(bio: newBio));
   }

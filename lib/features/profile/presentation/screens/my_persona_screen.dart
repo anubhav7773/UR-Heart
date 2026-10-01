@@ -13,6 +13,7 @@ import '../widgets/persona_header_card.dart';
 import '../widgets/persona_tabs_header.dart';
 import '../widgets/photo_adjuster_dialog.dart';
 import '../widgets/preferences_slider_card.dart';
+import '../../../profile_setup/presentation/widgets/live_kyc_recording_modal.dart';
 
 /// Screen 11: My Persona View & Editor
 class MyPersonaScreen extends ConsumerWidget {
@@ -93,7 +94,10 @@ class MyPersonaScreen extends ConsumerWidget {
                 isDark: isDark,
                 onEditAvatar: () =>
                     _showPhotoUploadModal(context, ref, isDark, 0, isAvatar: true),
+                onVerifyKyc: () => _openLiveVideoKycModal(context, ref),
               ),
+              if (!state.profile.hasVerifiedCrest)
+                _buildSanctuaryKycPromptCard(context, ref, isDark),
               MomentsMediaGrid(
                 photos: state.profile.momentPhotos,
                 isDark: isDark,
@@ -346,5 +350,126 @@ class MyPersonaScreen extends ConsumerWidget {
         );
       }
     }
+  }
+
+  void _openLiveVideoKycModal(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => LiveKycRecordingModal(
+        anchorPhotoBase64: '',
+        onKycCompleted: (bool isVerified, String message) {
+          if (isVerified) {
+            ref.read(personaControllerProvider.notifier).onKycVerified();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: Colors.orangeAccent,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildSanctuaryKycPromptCard(
+    BuildContext context,
+    WidgetRef ref,
+    bool isDark,
+  ) {
+    final cardBg = isDark
+        ? DarkSanctuaryTokens.surfaceCard
+        : LightSanctuaryTokens.surfaceCard;
+    final coral = isDark
+        ? DarkSanctuaryTokens.primaryCoral
+        : LightSanctuaryTokens.terracottaAccent;
+    final headlineColor = isDark
+        ? DarkSanctuaryTokens.textHeadline
+        : LightSanctuaryTokens.textHeadline;
+    final mutedColor = isDark
+        ? DarkSanctuaryTokens.textMuted
+        : LightSanctuaryTokens.textMuted;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: coral.withValues(alpha: 0.5),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: coral.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: coral.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.verified_user_outlined, color: coral, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Claim Verified Sanctuary Crest 🛡️',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: headlineColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Prove genuine human presence to unlock 2x discovery resonance.',
+                      style: AppTypography.caption.copyWith(color: mutedColor),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: coral,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.videocam_rounded, size: 18),
+              label: const Text(
+                'Begin 3-Second Live Reflection ✨',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => _openLiveVideoKycModal(context, ref),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

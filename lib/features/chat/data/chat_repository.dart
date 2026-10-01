@@ -260,6 +260,34 @@ class ChatRepository {
     return {};
   }
 
+  /// Fetches real-time in-chat Eva bonding suggestions based on recent conversation flow
+  Future<List<String>> fetchEvaBondingSparks({
+    required String partnerName,
+    String partnerBio = '',
+    required List<ChatMessage> messages,
+  }) async {
+    try {
+      final recent = messages.take(6).map((m) => <String, String>{
+        'sender': m.isMe ? 'me' : 'partner',
+        'text': m.text,
+      }).toList();
+
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/api/v1/ai/eva/chat-sparks',
+        data: {
+          'partner_name': partnerName,
+          'partner_bio': partnerBio,
+          'recent_messages': recent,
+        },
+      );
+      final sparks = res.data?['sparks'] as List<dynamic>?;
+      if (sparks != null && sparks.isNotEmpty) {
+        return sparks.map((s) => s.toString()).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
   void _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
       throw const NetworkUnavailableException();

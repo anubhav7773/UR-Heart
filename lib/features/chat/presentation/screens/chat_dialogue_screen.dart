@@ -13,6 +13,7 @@ import '../widgets/nlp_warning_dialog.dart';
 import '../widgets/sacred_bridge_app_bar_action.dart';
 import '../widgets/shared_context_prompt_card.dart';
 import '../widgets/text_only_chat_input_bar.dart';
+import '../widgets/eva_bonding_spark_bar.dart';
 import '../../../ai_sanctuary/presentation/widgets/ai_dialogue_coach_sheet.dart';
 import '../../../../core/media/sanctuary_image_resolver.dart';
 
@@ -56,6 +57,7 @@ class ChatDialogueScreen extends ConsumerStatefulWidget {
 
 class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _chatInputController = TextEditingController();
 
   String _resolveMatchId() {
     final explicitId = widget.matchId;
@@ -133,6 +135,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
       FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
     } catch (_) {}
     _scrollController.dispose();
+    _chatInputController.dispose();
     super.dispose();
   }
 
@@ -509,8 +512,21 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                       },
                     ),
             ),
+            if (dialogueState.bondingSparks.isNotEmpty && !dialogueState.sparksDismissed)
+              EvaBondingSparkBar(
+                isDark: isDark,
+                sparks: dialogueState.bondingSparks,
+                onSelectSpark: (spark) {
+                  _chatInputController.text = spark;
+                  _chatInputController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: spark.length),
+                  );
+                },
+                onDismiss: () => notifier.dismissBondingSparks(),
+              ),
             TextOnlyChatInputBar(
               isDark: isDark,
+              controller: _chatInputController,
               onSendMessage: (cleanText) => notifier.sendMessage(cleanText),
               onViolation: (violation) => notifier.setViolationAlert(violation),
             ),

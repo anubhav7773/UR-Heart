@@ -87,6 +87,9 @@ _OUT_OF_DOMAIN_PATTERNS = [
     r"\bwho\s+is\s+the\s+(president|prime\s+minister|king|queen)\s+of\b",
     r"\b(crypto|bitcoin|btc|eth|ethereum|stock\s+market|shares\s+to\s+buy)\b",
     r"\b(recipe\s+for|how\s+to\s+cook|baking)\b",
+    r"\b(capital\s+of|weather\s+in|who\s+won\s+the|ipl\s+score|cricket\s+score|football\s+match|world\s+war)\b",
+    r"\b(write\s+an?\s+essay|do\s+my\s+homework|school\s+assignment)\b",
+    r"\b(stock\s+tips|cryptocurrency|mutual\s+funds|investment\s+advice)\b",
 ]
 
 

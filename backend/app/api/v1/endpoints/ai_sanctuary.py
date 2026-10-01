@@ -29,6 +29,17 @@ class DialogueCoachRequest(BaseModel):
     user_draft_reply: Optional[str] = Field(None, max_length=300)
 
 
+class ChatSparksRequest(BaseModel):
+    partner_name: str = Field(..., max_length=100)
+    partner_bio: Optional[str] = Field(None, max_length=500)
+    recent_messages: Optional[List[Dict[str, str]]] = None
+
+
+class ChatSparksResponse(BaseModel):
+    sparks: List[str]
+    status: str = "success"
+
+
 class GrievanceAssistRequest(BaseModel):
     offender_name: str = Field(..., max_length=100)
     user_narrative: str = Field(..., max_length=500)
@@ -79,6 +90,28 @@ async def get_dialogue_coaching(
     return EvaChatResponse(
         reply=result["reply"],
         is_guarded=result.get("is_guarded", False),
+        status=result.get("status", "success")
+    )
+
+
+@router.post("/chat-sparks", response_model=ChatSparksResponse, status_code=status.HTTP_200_OK)
+@limiter.limit("60/hour")
+async def get_chat_bonding_sparks(
+    request: Request,
+    payload: ChatSparksRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Real-time in-chat mindful bonding sparks based on conversation dialogue analysis.
+    Accelerates connection between seekers without degrading UX.
+    """
+    result = await AiOrchestrator.generate_chat_sparks(
+        partner_name=payload.partner_name,
+        partner_bio=payload.partner_bio or "",
+        recent_messages=payload.recent_messages or []
+    )
+    return ChatSparksResponse(
+        sparks=result.get("sparks", []),
         status=result.get("status", "success")
     )
 

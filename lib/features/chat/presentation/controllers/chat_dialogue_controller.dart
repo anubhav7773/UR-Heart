@@ -19,6 +19,8 @@ class ChatDialogueState {
   final String sharedPrompt;
   final List<String> icebreakers;
   final String currentUserId;
+  final List<String> bondingSparks;
+  final bool sparksDismissed;
 
   const ChatDialogueState({
     required this.matchId,
@@ -49,6 +51,8 @@ class ChatDialogueState {
       'Which passage or memory has stayed close to you recently?',
     ],
     this.currentUserId = 'user-me',
+    this.bondingSparks = const [],
+    this.sparksDismissed = false,
   });
 
   ChatDialogueState copyWith({
@@ -65,6 +69,8 @@ class ChatDialogueState {
     String? sharedPrompt,
     List<String>? icebreakers,
     String? currentUserId,
+    List<String>? bondingSparks,
+    bool? sparksDismissed,
   }) {
     return ChatDialogueState(
       matchId: matchId ?? this.matchId,
@@ -79,6 +85,8 @@ class ChatDialogueState {
       sharedPrompt: sharedPrompt ?? this.sharedPrompt,
       icebreakers: icebreakers ?? this.icebreakers,
       currentUserId: currentUserId ?? this.currentUserId,
+      bondingSparks: bondingSparks ?? this.bondingSparks,
+      sparksDismissed: sparksDismissed ?? this.sparksDismissed,
     );
   }
 }
@@ -98,6 +106,7 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
   final ChatWebSocketService _wsService;
   final ChatRepository _chatRepository;
   final String _currentUserId;
+  int _sentMessageCount = 0;
 
   static String cleanMatchId(String rawId) {
     String clean = rawId.trim();
@@ -157,6 +166,11 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     try {
       await _chatRepository.markMessagesAsRead(state.matchId);
     } catch (_) {}
+
+    // Auto-fetch Eva bonding sparks after dialogue initializes with messages
+    if (state.messages.isNotEmpty) {
+      _fetchBondingSparksQuietly();
+    }
   }
 
   /// Spends 1 Sacred Bridge Reveal Token to unlock the peer's genuine social handle
@@ -324,6 +338,12 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     // Cryptographically encrypt and dispatch via WSS & persist exactly once
     await sendEncryptedMessage(trimmed);
 
+    // Refresh bonding sparks every 3 sent messages to stay contextual
+    _sentMessageCount++;
+    if (_sentMessageCount % 3 == 0 && !state.sparksDismissed) {
+      _fetchBondingSparksQuietly();
+    }
+
     return true;
   }
 
@@ -353,6 +373,33 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
   void dismissViolationAlert() {
     state = state.copyWith(clearViolation: true);
+  }
+
+  /// Fetches Eva bonding sparks from backend and updates state
+  Future<void> fetchBondingSparks() async {
+    await _fetchBondingSparksQuietly();
+  }
+
+  Future<void> _fetchBondingSparksQuietly() async {
+    try {
+      final peerName = state.peerProfile['full_name'] as String? ?? 'Seeker';
+      final peerBio = state.peerProfile['bio'] as String? ?? '';
+      final sparks = await _chatRepository.fetchEvaBondingSparks(
+        partnerName: peerName,
+        partnerBio: peerBio,
+        messages: state.messages,
+      );
+      if (sparks.isNotEmpty && mounted) {
+        state = state.copyWith(bondingSparks: sparks, sparksDismissed: false);
+      }
+    } catch (_) {
+      // Silently fail — bonding sparks are non-critical UX enhancement
+    }
+  }
+
+  /// Dismisses the bonding spark bar until next refresh cycle
+  void dismissBondingSparks() {
+    state = state.copyWith(bondingSparks: [], sparksDismissed: true);
   }
 
   Future<void> markAsRead() async {

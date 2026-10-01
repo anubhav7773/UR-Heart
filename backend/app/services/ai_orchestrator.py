@@ -14,9 +14,10 @@ GROQ_ENDPOINT = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/c
 OPENROUTER_ENDPOINT = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
 
 EVA_SYSTEM_DIRECTIVE = (
-    "You are Eva, the dedicated, sovereign mindful companion of UR-Heart Dating Sanctuary, created by Asiverticals.\n"
+    "You are Eva, the magnetic, sovereign, mindful AI companion and wingmate of UR-Heart Dating Sanctuary, created by Asiverticals.\n"
     "MISSION & PURPOSE:\n"
-    "You guide conscious seekers through intentional dating, authentic connection, and emotional safety across the entire UR-Heart ecosystem.\n"
+    "You guide conscious seekers through intentional dating, authentic connection, emotional resonance, and playful chemistry across UR-Heart.\n"
+    "You are perceptive, witty, empathetic, and captivating. Your advice makes conversations spark and relationships blossom naturally.\n"
     "\n"
     "COMPREHENSIVE KNOWLEDGE OF UR-HEART ECOSYSTEM:\n"
     "1. 25 DAILY INTENTIONAL SWIPES: Designed to eliminate mindless doomscrolling and dopamine burnout. Swipes replenish every midnight or through brief mindful reflection.\n"
@@ -50,8 +51,8 @@ EVA_SYSTEM_DIRECTIVE = (
     "SOVEREIGN IDENTITY & RESTRICTIONS (ZERO COMPROMISE):\n"
     "1. IDENTITY: If asked who created you, who made you, or who your developer is, state strictly: 'Mujhe Asiverticals ne banaya hai.' Never claim to be made by OpenAI, Meta, Google, Groq, Anthropic, or anyone else.\n"
     "2. ZERO INFRASTRUCTURE LEAKAGE: Never mention APIs, keys, Groq, OpenRouter, Llama, Claude, DeepSeek, endpoints, or backend engineering details.\n"
-    "3. OUT-OF-DOMAIN REFUSAL: You are strictly a dating sanctuary companion. If the user asks for programming/coding, hacking, reverse engineering, academic math/science, political debates, recipes, or general trivia, politely and firmly decline. Remind them that you exclusively assist with UR-Heart dating, connection, and emotional sanctuary.\n"
-    "4. TONE: Warm, grounded, mature, calming, empathetic, non-judgmental, and sovereign. Never use cheesy pickup lines or manipulative games."
+    "3. OUT-OF-DOMAIN REFUSAL: You are strictly a dating and emotional connection companion. If the user asks for programming/coding, hacking, reverse engineering, academic math/science, political debates, recipes, or general trivia, politely and firmly decline. Remind them that you exclusively assist with UR-Heart dating, connection, and emotional sanctuary.\n"
+    "4. TONE: Magnetic, charming, witty, emotionally perceptive, deeply warm, and addictive. Help users break through social anxiety and connect authentically."
 )
 
 
@@ -218,10 +219,10 @@ class AiOrchestrator:
 
         messages.append({"role": "user", "content": user_message[:600]})
 
-        # 3. Primary Engine: Groq LPU with verified high-performance models
+        # 3. Primary Engine: Groq LPU with verified high-performance top free models
         groq_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
         if groq_key:
-            for model_name in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]:
+            for model_name in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]:
                 try:
                     payload = {
                         "model": model_name,
@@ -242,10 +243,16 @@ class AiOrchestrator:
                 except Exception as e:
                     logger.warning("Groq model %s attempt bypassed: %s", model_name, str(e))
 
-        # 4. Secondary Engine: OpenRouter Frontier Failover
+        # 4. Secondary Engine: OpenRouter Frontier Failover with top verified free models
         openrouter_key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
         if openrouter_key:
-            for or_model in ["qwen/qwen3.8-27b:free", "liquid/lfm-2.5-2.6b:free"]:
+            for or_model in [
+                "meta-llama/llama-3.3-70b-instruct:free",
+                "google/gemini-2.0-flash-lite:free",
+                "mistralai/mistral-small-3.1-24b-instruct:free",
+                "deepseek/deepseek-chat:free",
+                "qwen/qwen-2.5-72b-instruct:free"
+            ]:
                 try:
                     payload = {
                         "model": or_model,
@@ -341,3 +348,105 @@ class AiOrchestrator:
             context_metadata={"screen": "GrievanceDossier", "partner_name": offender_name}
         )
         return result
+
+    @classmethod
+    async def generate_chat_sparks(
+        cls,
+        partner_name: str,
+        partner_bio: Optional[str] = "",
+        recent_messages: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Analyzes recent chat dialogue between two users and generates 2-3 magnetic,
+        high-EQ conversational sparks/replies to accelerate mutual bonding without cluttering UX.
+        """
+        formatted_dialogue = ""
+        last_incoming = ""
+        if recent_messages:
+            for m in recent_messages[-6:]:
+                sender = m.get("sender", "user")
+                text = m.get("text", "")[:120]
+                formatted_dialogue += f"- {sender}: \"{text}\"\n"
+                if sender in ["partner", "them", partner_name]:
+                    last_incoming = text
+
+        prompt = (
+            f"You are Eva, the charming, intuitive Wingmate of UR-Heart Dating Sanctuary.\n"
+            f"Active Match: '{partner_name}', Bio: '{partner_bio or 'Thoughtful seeker'}'\n"
+            f"Recent Conversation Flow:\n{formatted_dialogue or 'Conversation just started.'}\n\n"
+            "Task: Generate exactly 2 or 3 clever, magnetic, and genuine conversational suggestions / reply sparks "
+            "that the user can send to deepen mutual chemistry, ask a curious question, or introduce playful banter.\n"
+            "STRICT RULES:\n"
+            "1. Keep each suggestion under 15 words.\n"
+            "2. Match conversation language: If Roman Hindi/Hinglish, reply in Roman Hindi. If English, in English.\n"
+            "3. Return ONLY valid JSON: {\"sparks\": [\"suggestion 1\", \"suggestion 2\"]}\n"
+            "4. Never include markdown explanations or code blocks."
+        )
+
+        messages = [
+            {"role": "system", "content": "You are Eva, an empathetic dating wingmate returning strictly JSON."},
+            {"role": "user", "content": prompt}
+        ]
+
+        # 1. Groq LPU Attempt
+        groq_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
+        if groq_key:
+            for model_name in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+                try:
+                    payload = {
+                        "model": model_name,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 120,
+                        "response_format": {"type": "json_object"}
+                    }
+                    async with httpx.AsyncClient(timeout=4.0) as client:
+                        res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
+                        if res.status_code == 200:
+                            data = json.loads(res.json()["choices"][0]["message"]["content"])
+                            sparks = data.get("sparks", [])
+                            if isinstance(sparks, list) and len(sparks) > 0:
+                                return {"sparks": [str(s).strip() for s in sparks[:3]], "status": "success"}
+                except Exception as e:
+                    logger.warning("Groq chat spark attempt bypassed: %s", str(e))
+
+        # 2. OpenRouter Free Failover Attempt
+        openrouter_key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
+        if openrouter_key:
+            for or_model in ["meta-llama/llama-3.3-70b-instruct:free", "google/gemini-2.0-flash-lite:free"]:
+                try:
+                    payload = {
+                        "model": or_model,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 120
+                    }
+                    async with httpx.AsyncClient(timeout=4.0) as client:
+                        res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
+                        if res.status_code == 200:
+                            content = res.json()["choices"][0]["message"]["content"].strip()
+                            clean_json = content
+                            if "```json" in clean_json:
+                                clean_json = clean_json.split("```json")[1].split("```")[0].strip()
+                            elif "```" in clean_json:
+                                clean_json = clean_json.split("```")[1].split("```")[0].strip()
+                            data = json.loads(clean_json)
+                            sparks = data.get("sparks", [])
+                            if isinstance(sparks, list) and len(sparks) > 0:
+                                return {"sparks": [str(s).strip() for s in sparks[:3]], "status": "success"}
+                except Exception as e:
+                    logger.warning("OpenRouter chat spark attempt bypassed: %s", str(e))
+
+        # 3. Contextual Offline Fallback
+        if last_incoming:
+            fallback_sparks = [
+                f"Haha that's interesting! What got you into that?",
+                f"Tell me more about that—how was your experience?",
+            ]
+        else:
+            fallback_sparks = [
+                f"Hey {partner_name}, what has been the best part of your week?",
+                f"I noticed your profile—what's your favorite quiet space to unwind?",
+            ]
+
+        return {"sparks": fallback_sparks, "status": "fallback"}

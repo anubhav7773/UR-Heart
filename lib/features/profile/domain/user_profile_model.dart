@@ -114,7 +114,9 @@ class UserProfile {
       interestedIn: json['interested_in'] as String? ?? 'Everyone',
       maskedWhatsApp: json['contact_bridge_masked'] as String? ?? '+91 **** ****',
       memberSinceText: 'Member of Sanctuary',
-      hasVerifiedCrest: json['kyc_status'] as bool? ?? true,
+      hasVerifiedCrest: json['kyc_status'] as bool? ??
+          (json['is_kyc_verified'] as bool? ??
+              (json['is_kyc'] as bool? ?? false)),
       location: json['location_name'] as String? ?? json['location'] as String? ?? 'Ayodhya, UP',
       bio: json['bio'] as String? ?? '',
       profession: json['profession'] as String? ?? '',
