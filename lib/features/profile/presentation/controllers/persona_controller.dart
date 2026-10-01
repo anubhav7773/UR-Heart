@@ -52,10 +52,12 @@ class PersonaController extends StateNotifier<PersonaState> {
 
   Future<void> _loadInitialProfile() async {
     final cached = await _repo.loadProfileFromStorage();
+    if (!mounted) return;
     state = state.copyWith(profile: cached);
 
     try {
       final remote = await _repo.fetchMyProfile();
+      if (!mounted) return;
       final List<String> mergedMoments = List<String>.from(cached.momentPhotos);
       while (mergedMoments.length < 4) {
         mergedMoments.add('');

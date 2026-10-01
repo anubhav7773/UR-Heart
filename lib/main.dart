@@ -48,6 +48,7 @@ Future<void> main() async {
     } else {
       resolvedInitialRoute = '/consent';
     }
+
   } catch (_) {}
 
   // Stream app initialization event to Render Live Logs

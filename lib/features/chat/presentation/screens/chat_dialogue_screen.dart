@@ -14,6 +14,7 @@ import '../widgets/sacred_bridge_app_bar_action.dart';
 import '../widgets/shared_context_prompt_card.dart';
 import '../widgets/text_only_chat_input_bar.dart';
 import '../../../ai_sanctuary/presentation/widgets/ai_dialogue_coach_sheet.dart';
+import '../../../../core/media/sanctuary_image_resolver.dart';
 
 class ChatDialogueArguments {
   final String matchId, recipientId, recipientName, sharedContextQuote;
@@ -178,7 +179,8 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                 peer['avatar'] as String? ??
                 ''))
         .trim();
-    final hasValidAvatar = avatarUrl.isNotEmpty && avatarUrl.startsWith('http');
+    final imageProvider = resolveSanctuaryImageProvider(avatarUrl);
+    final hasValidAvatar = imageProvider != null;
 
     final isVerified = args?.isVerified ??
         (peer['is_verified'] as bool? ??
@@ -250,8 +252,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                     CircleAvatar(
                       radius: 19,
                       backgroundColor: pine.withValues(alpha: 0.15),
-                      backgroundImage:
-                          hasValidAvatar ? NetworkImage(avatarUrl) : null,
+                      backgroundImage: imageProvider,
                       child: !hasValidAvatar
                           ? Text(displayName.isNotEmpty ? displayName[0] : 'S',
                               style:
@@ -600,8 +601,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
                       CircleAvatar(
                         radius: 46,
                         backgroundColor: pine.withValues(alpha: 0.15),
-                        backgroundImage:
-                            hasValidAvatar ? NetworkImage(avatarUrl) : null,
+                        backgroundImage: resolveSanctuaryImageProvider(avatarUrl),
                         child: !hasValidAvatar
                             ? Text(
                                 displayName.isNotEmpty ? displayName[0] : 'S',

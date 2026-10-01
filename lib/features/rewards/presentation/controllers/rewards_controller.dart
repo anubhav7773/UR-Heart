@@ -20,6 +20,7 @@ class RewardsController extends StateNotifier<RewardHubState> {
 
   Future<void> loadSavedState() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     final swipes = prefs.getInt(keySwipes) ?? 25;
     final letters = prefs.getInt(keyLetters) ?? 1;
     final wa = prefs.getInt(keyWaProgress) ?? 2;

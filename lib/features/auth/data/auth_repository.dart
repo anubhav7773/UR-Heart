@@ -170,6 +170,81 @@ class AuthRepository {
     );
   }
 
+  /// Direct Email/Password Sign-In with backend session generation and persistent token storage
+  Future<AuthResult> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/v1/auth/login',
+        data: {
+          'email': cleanEmail,
+          'password': password,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data!;
+        final tokenStr = data['access_token'] ?? data['token'];
+        final userId = data['user_id']?.toString() ?? data['id']?.toString();
+        final isCompleted = data['is_profile_completed'] == true;
+        final fbToken = data['firebase_token'] ?? data['firebase_custom_token'];
+
+        // Synchronize with Firebase Auth if token provided
+        if (fbToken != null && fbToken.toString().isNotEmpty) {
+          try {
+            await FirebaseAuth.instance.signInWithCustomToken(fbToken.toString());
+            debugPrint('[AUTH] Firebase console signed in: $cleanEmail');
+          } catch (fbErr) {
+            debugPrint('[AUTH] Firebase signInWithCustomToken notice: $fbErr');
+          }
+        }
+
+        // Persist session tokens to SecureSessionStorage
+        if (tokenStr != null) {
+          await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
+        }
+
+        final isSuperadmin = (cleanEmail == 'kshtriyaanubhav9120@gmail.com');
+        await SecureSessionStorage.instance.saveUserSession(
+          userId: userId,
+          email: cleanEmail,
+          role: isSuperadmin ? 'superadmin' : 'user',
+          isProfileCompleted: isCompleted,
+        );
+
+        // Also persist to SharedPreferences for immediate app gateway resilience
+        final prefs = await SharedPreferences.getInstance();
+        if (tokenStr != null) {
+          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
+          await prefs.setString('auth_token', tokenStr.toString());
+        }
+        await prefs.setString('ur_heart_user_email', cleanEmail);
+        await prefs.setBool('ur_heart_consent_given', true);
+        await prefs.setBool('ur_heart_theme_locked', true);
+
+        if (isCompleted) {
+          await prefs.setBool('ur_heart_profile_setup_completed', true);
+          await prefs.setBool('ur_heart_has_entered_sanctuary', true);
+        }
+
+        return AuthResult.success(
+          userId: userId,
+          email: cleanEmail,
+          isProfileCompleted: isCompleted,
+        );
+      }
+      return AuthResult.failure('Authentication failed. Please check your credentials.');
+    } on DioException catch (dioErr) {
+      final msg = dioErr.response?.data?['detail'] ?? 'Sign In failed. Please try again.';
+      return AuthResult.failure(msg.toString());
+    } catch (e) {
+      return AuthResult.failure('Network error. Please try again.');
+    }
+  }
+
   /// Signs user out of Google and Firebase with atomic hardware session flush
   Future<void> signOut() async {
     await _googleAuthService.signOut();
@@ -228,12 +303,27 @@ class AuthRepository {
 
           final matchedEmail = data['email']?.toString() ?? cleanEmail;
           final isSuperadmin = (matchedEmail?.toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com');
+          final isCompleted = data['is_profile_completed'] == true;
           await SecureSessionStorage.instance.saveUserSession(
             userId: data['user_id']?.toString() ?? data['id']?.toString(),
             email: matchedEmail,
             role: isSuperadmin ? 'superadmin' : 'user',
-            isProfileCompleted: data['is_profile_completed'] == true,
+            isProfileCompleted: isCompleted,
           );
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
+          await prefs.setString('auth_token', tokenStr.toString());
+          if (matchedEmail != null) {
+            await prefs.setString('ur_heart_user_email', matchedEmail);
+          }
+          await prefs.setBool('ur_heart_consent_given', true);
+          await prefs.setBool('ur_heart_theme_locked', true);
+
+          if (isCompleted) {
+            await prefs.setBool('ur_heart_profile_setup_completed', true);
+            await prefs.setBool('ur_heart_has_entered_sanctuary', true);
+          }
         }
         return data;
       }
@@ -277,12 +367,25 @@ class AuthRepository {
             await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
             final isSuperadmin = (cleanEmail == 'kshtriyaanubhav9120@gmail.com');
+            final isCompleted = data['is_profile_completed'] == true;
             await SecureSessionStorage.instance.saveUserSession(
               userId: data['user_id']?.toString() ?? data['id']?.toString(),
               email: cleanEmail,
               role: isSuperadmin ? 'superadmin' : 'user',
-              isProfileCompleted: data['is_profile_completed'] == true,
+              isProfileCompleted: isCompleted,
             );
+
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('ur_heart_auth_token', tokenStr.toString());
+            await prefs.setString('auth_token', tokenStr.toString());
+            await prefs.setString('ur_heart_user_email', cleanEmail);
+            await prefs.setBool('ur_heart_consent_given', true);
+            await prefs.setBool('ur_heart_theme_locked', true);
+
+            if (isCompleted) {
+              await prefs.setBool('ur_heart_profile_setup_completed', true);
+              await prefs.setBool('ur_heart_has_entered_sanctuary', true);
+            }
           }
         }
         return data;
@@ -293,6 +396,7 @@ class AuthRepository {
       return null;
     }
   }
+
 }
 
 /// Provider for AuthRepository

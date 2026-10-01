@@ -1,7 +1,17 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/sanctuary_notification_service.dart';
 import '../../../../core/storage/secure_session_storage.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../auth/presentation/controllers/consent_controller.dart';
+import '../../../feed/presentation/controllers/feed_controller.dart';
+import '../../../growth/presentation/controllers/growth_hub_controller.dart';
+import '../../../profile/presentation/controllers/persona_controller.dart';
+import '../../../profile_setup/presentation/controllers/profile_setup_controller.dart';
+import '../../../rewards/presentation/controllers/rewards_controller.dart';
 import '../../data/settings_repository.dart';
 
 class SettingsState {
@@ -44,8 +54,9 @@ class SettingsState {
 
 class SettingsController extends StateNotifier<SettingsState> {
   final SettingsRepository _repo;
+  final Ref? _ref;
 
-  SettingsController(this._repo)
+  SettingsController(this._repo, [this._ref])
       : super(SettingsState(settings: _repo.getSettings())) {
     _loadUserRoleAndEmail();
   }
@@ -158,13 +169,31 @@ class SettingsController extends StateNotifier<SettingsState> {
   Future<void> toggleMasterPush(bool value) => toggleMasterResonance(value);
   Future<void> rotateEncryptionKeys([dynamic context]) => rotateKey();
   Future<bool> executePermanentAccountErasure([dynamic context]) => incinerateAccount();
+
+  /// Irrevocably logs out current account, purges all local state,
+  /// signs out of Google and Firebase, cancels notifications, and invalidates in-memory controllers.
   Future<void> logout([dynamic context]) async {
+    // 1. Sign out of Google Identity / One Tap
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
+
+    // 2. Sign out of Firebase Auth
     try {
       await FirebaseAuth.instance.signOut();
     } catch (_) {}
+
+    // 3. Clear hardware Keystore secure storage
     try {
       await SecureSessionStorage.instance.clearAllSessionData();
     } catch (_) {}
+
+    // 4. Dismiss all system tray notifications
+    try {
+      await SanctuaryNotificationService.instance.cancelAll();
+    } catch (_) {}
+
+    // 5. Irrevocably purge all user session and profile keys from SharedPreferences
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('ur_heart_profile_setup_completed');
@@ -179,6 +208,9 @@ class SettingsController extends StateNotifier<SettingsState> {
       await prefs.remove('ur_heart_selected_dob');
       await prefs.remove('profile_age');
       await prefs.remove('ur_heart_user_age');
+      await prefs.remove('ur_heart_dob_day');
+      await prefs.remove('ur_heart_dob_month');
+      await prefs.remove('ur_heart_dob_year');
       await prefs.remove('profile_gender');
       await prefs.remove('profile_location');
       await prefs.remove('profile_bio');
@@ -186,10 +218,51 @@ class SettingsController extends StateNotifier<SettingsState> {
       await prefs.remove('profile_education');
       await prefs.remove('profile_contact_bridge_platform');
       await prefs.remove('profile_contact_bridge_handle');
+      await prefs.remove('profile_gps_verified');
+      await prefs.remove('profile_gps_latitude');
+      await prefs.remove('profile_gps_longitude');
+      await prefs.remove('profile_is_kyc_verified');
+      await prefs.remove('profile_interested_in');
+      await prefs.remove('profile_min_age');
+      await prefs.remove('profile_max_age');
+      await prefs.remove('ur_heart_direct_letters');
+      await prefs.remove('ur_heart_user_photo');
+      await prefs.remove('ur_heart_consent_given');
+      await prefs.remove('urheart_theme_permanently_locked');
+      await prefs.remove('ur_heart_theme_locked');
+      await prefs.remove('sanctuary_seen_notification_ids');
       for (int i = 1; i <= 5; i++) {
         await prefs.remove('profile_photo_slot_$i');
       }
     } catch (_) {}
+
+    // 6. Invalidate and reset all in-memory Riverpod controllers
+    if (_ref != null) {
+      try {
+        _ref!.read(authControllerProvider.notifier).reset();
+        _ref!.invalidate(authControllerProvider);
+      } catch (_) {}
+      try {
+        _ref!.read(profileSetupControllerProvider.notifier).reset();
+        _ref!.invalidate(profileSetupControllerProvider);
+      } catch (_) {}
+      try {
+        _ref!.invalidate(feedControllerProvider);
+      } catch (_) {}
+      try {
+        _ref!.invalidate(rewardsControllerProvider);
+      } catch (_) {}
+      try {
+        _ref!.invalidate(growthHubControllerProvider);
+      } catch (_) {}
+      try {
+        _ref!.invalidate(personaControllerProvider);
+      } catch (_) {}
+      try {
+        _ref!.invalidate(consentProvider);
+      } catch (_) {}
+    }
+
     state = state.copyWith(successMessage: 'Logged out of Sanctuary');
   }
 
@@ -201,5 +274,6 @@ class SettingsController extends StateNotifier<SettingsState> {
 final settingsControllerProvider =
     StateNotifierProvider<SettingsController, SettingsState>((ref) {
   final repo = ref.watch(settingsRepositoryProvider);
-  return SettingsController(repo);
+  return SettingsController(repo, ref);
 });
+

@@ -3,6 +3,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../domain/chat_models.dart';
+import '../../../../core/media/sanctuary_image_resolver.dart';
 
 /// Horizontal carousel displaying recent resonance sparks with online state (< 150 lines)
 class RecentSparksCarousel extends StatelessWidget {
@@ -77,28 +78,33 @@ class RecentSparksCarousel extends StatelessWidget {
         children: [
           Stack(
             children: [
-              Container(
-                width: 58.0,
-                height: 58.0,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.chipBackground,
-                  border: Border.all(color: borderColor, width: 2.0),
-                  image: spark.avatarUrl.isNotEmpty && spark.avatarUrl.startsWith('http')
-                      ? DecorationImage(
-                          image: NetworkImage(spark.avatarUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: (spark.avatarUrl.isEmpty || !spark.avatarUrl.startsWith('http'))
-                    ? Center(
-                        child: Text(
-                          spark.name.isNotEmpty ? spark.name[0] : 'S',
-                          style: AppTypography.titleH2.copyWith(color: pine, fontSize: 20.0),
-                        ),
-                      )
-                    : null,
+              Builder(
+                builder: (context) {
+                  final imageProvider = resolveSanctuaryImageProvider(spark.avatarUrl);
+                  return Container(
+                    width: 58.0,
+                    height: 58.0,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.chipBackground,
+                      border: Border.all(color: borderColor, width: 2.0),
+                      image: imageProvider != null
+                          ? DecorationImage(
+                              image: imageProvider,
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: imageProvider == null
+                        ? Center(
+                            child: Text(
+                              spark.name.isNotEmpty ? spark.name[0] : 'S',
+                              style: AppTypography.titleH2.copyWith(color: pine, fontSize: 20.0),
+                            ),
+                          )
+                        : null,
+                  );
+                },
               ),
               if (spark.isOnline)
                 Positioned(

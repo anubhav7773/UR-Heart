@@ -19,6 +19,16 @@ from app.models.domain.message import Message
 router = APIRouter(prefix="/chat", tags=["1:1 Encrypted Dialogues"])
 
 
+def _clean_match_uuid(match_id: str) -> UUID:
+    """Strips 'match-', 'conn_', 'spark_' prefixes if present and parses valid UUID."""
+    clean = str(match_id).strip()
+    for prefix in ("match-", "match_", "conn-", "conn_", "spark-", "spark_"):
+        if clean.startswith(prefix):
+            clean = clean[len(prefix):]
+            break
+    return UUID(clean)
+
+
 def _calculate_age(dob: Optional[date]) -> int:
     if not dob:
         return 24
@@ -33,8 +43,12 @@ def encrypt_message_storage(plain_text: str, match_id: str) -> str:
     Zero plaintext is readable in database.
     """
     try:
+        try:
+            clean_id = str(_clean_match_uuid(match_id))
+        except Exception:
+            clean_id = str(match_id)
         secret = os.getenv("JWT_SECRET_KEY", "urheart_default_super_secret_sanctuary_2026")
-        key_material = hashlib.sha256(f"{secret}:{match_id}".encode()).digest()
+        key_material = hashlib.sha256(f"{secret}:{clean_id}".encode()).digest()
         aesgcm = AESGCM(key_material)
         nonce = os.urandom(12)
         ct = aesgcm.encrypt(nonce, plain_text.encode("utf-8"), None)
@@ -51,11 +65,15 @@ def decrypt_message_storage(stored_text: str, match_id: str) -> str:
     if not stored_text or not stored_text.startswith("enc_v1:"):
         return stored_text  # legacy or unencrypted fallback
     try:
+        try:
+            clean_id = str(_clean_match_uuid(match_id))
+        except Exception:
+            clean_id = str(match_id)
         raw = base64.b64decode(stored_text[7:])
         nonce = raw[:12]
         ct = raw[12:]
         secret = os.getenv("JWT_SECRET_KEY", "urheart_default_super_secret_sanctuary_2026")
-        key_material = hashlib.sha256(f"{secret}:{match_id}".encode()).digest()
+        key_material = hashlib.sha256(f"{secret}:{clean_id}".encode()).digest()
         aesgcm = AESGCM(key_material)
         decrypted_bytes = aesgcm.decrypt(nonce, ct, None)
         return decrypted_bytes.decode("utf-8")
@@ -106,7 +124,7 @@ async def get_dialogue_threads(
             msg_res = await db.execute(msg_stmt)
             last_msg = msg_res.scalar_one_or_none()
 
-            photo = partner.avatar_url or (partner.photos[0] if (partner.photos and any(partner.photos)) else "")
+            photo = partner.avatar_url or next((p for p in (partner.photos or []) if p and str(p).strip()), "")
             last_raw = last_msg.encrypted_text if last_msg else "Resonance established. Begin your sacred dialogue."
             last_text = decrypt_message_storage(last_raw, str(m.id))
             last_time = last_msg.created_at.strftime("%I:%M %p") if last_msg else (
@@ -114,6 +132,19 @@ async def get_dialogue_threads(
             )
             unread_count = 1 if (last_msg and last_msg.sender_id != current_user.id and last_msg.status != "read") else 0
             partner_age = _calculate_age(partner.dob)
+
+            # Determine if this dialogue was established via a direct letter
+            from app.models.domain.swipe import Swipe
+            ds_stmt = select(Swipe).where(
+                or_(
+                    and_(Swipe.actor_id == current_user.id, Swipe.target_id == partner.id),
+                    and_(Swipe.actor_id == partner.id, Swipe.target_id == current_user.id)
+                ),
+                Swipe.swipe_type == "direct"
+            ).limit(1)
+            ds_res = await db.execute(ds_stmt)
+            is_direct = ds_res.scalar_one_or_none() is not None
+            category_tag = "Direct Letter" if is_direct else "Mutual Spark"
 
             threads.append({
                 "match_id": str(m.id),
@@ -137,16 +168,19 @@ async def get_dialogue_threads(
                 "kyc_status": bool(partner.kyc_status),
                 "is_online": True,
                 "bio": partner.bio or "",
-                "city": partner.city or "Ayodhya, Uttar Pradesh",
-                "location": partner.city or "Ayodhya, Uttar Pradesh",
+                "city": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
+                "location": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
                 "gender": partner.gender or "",
-                "interests": partner.interests or [],
-                "intentions": partner.intentions or "Appreciating intentional conversations and authentic connection.",
+                "interests": getattr(partner, "interests", None) or [],
+                "intentions": getattr(partner, "intentions", None) or "Appreciating intentional conversations and authentic connection.",
                 "last_message": last_text,
                 "last_message_text": last_text,
                 "last_timestamp": last_time,
                 "unread_count": unread_count,
-                "delivery_status": last_msg.status if last_msg else "delivered"
+                "delivery_status": last_msg.status if last_msg else "delivered",
+                "category_tag": category_tag,
+                "is_direct_letter": is_direct,
+                "shared_context_quote": "Direct Sanctuary Letter" if is_direct else "Mutual Resonance Ignited",
             })
 
     print(f"[CHAT THREADS] Serving {len(threads)} live conversation threads from PostgreSQL", flush=True)
@@ -154,6 +188,7 @@ async def get_dialogue_threads(
 
 
 @router.get("/threads/{match_id}/peer", status_code=status.HTTP_200_OK, summary="Get Peer Seeker Profile")
+@router.get("/matches/{match_id}/peer", status_code=status.HTTP_200_OK, summary="Get Peer Seeker Profile Alias")
 async def get_dialogue_peer_profile(
     match_id: str,
     current_user: User = Depends(get_current_user),
@@ -161,7 +196,7 @@ async def get_dialogue_peer_profile(
 ):
     """Returns the peer's profile details for this match dialogue."""
     try:
-        match_uuid = UUID(match_id)
+        match_uuid = _clean_match_uuid(match_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid match_id UUID.")
 
@@ -180,7 +215,7 @@ async def get_dialogue_peer_profile(
     if not partner:
         raise HTTPException(status_code=404, detail="Peer not found.")
 
-    photo = partner.avatar_url or (partner.photos[0] if (partner.photos and any(partner.photos)) else "")
+    photo = partner.avatar_url or next((p for p in (partner.photos or []) if p and str(p).strip()), "")
     return {
         "id": str(partner.id),
         "recipient_id": str(partner.id),
@@ -192,11 +227,11 @@ async def get_dialogue_peer_profile(
         "is_verified": bool(partner.kyc_status),
         "is_kyc_verified": bool(partner.kyc_status),
         "bio": partner.bio or "",
-        "city": partner.city or "Ayodhya, Uttar Pradesh",
-        "location": partner.city or "Ayodhya, Uttar Pradesh",
+        "city": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
+        "location": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
         "gender": partner.gender or "",
-        "interests": partner.interests or [],
-        "intentions": partner.intentions or "Appreciating intentional conversations and authentic connection.",
+        "interests": getattr(partner, "interests", None) or [],
+        "intentions": getattr(partner, "intentions", None) or "Appreciating intentional conversations and authentic connection.",
         "photos": [p for p in (partner.photos or []) if p and str(p).strip()] or ([photo] if photo else []),
     }
 
@@ -228,7 +263,7 @@ async def get_active_sparks(
             if not partner:
                 continue
 
-            photo = partner.avatar_url or (partner.photos[0] if (partner.photos and any(partner.photos)) else "")
+            photo = partner.avatar_url or next((p for p in (partner.photos or []) if p and str(p).strip()), "")
             partner_age = _calculate_age(partner.dob)
             sparks.append({
                 "id": str(m.id),
@@ -243,11 +278,11 @@ async def get_active_sparks(
                 "kyc_status": bool(partner.kyc_status),
                 "is_online": True,
                 "bio": partner.bio or "",
-                "city": partner.city or "Ayodhya, Uttar Pradesh",
-                "location": partner.city or "Ayodhya, Uttar Pradesh",
+                "city": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
+                "location": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
                 "gender": partner.gender or "",
-                "interests": partner.interests or [],
-                "intentions": partner.intentions or "Appreciating intentional conversations and authentic connection.",
+                "interests": getattr(partner, "interests", None) or [],
+                "intentions": getattr(partner, "intentions", None) or "Appreciating intentional conversations and authentic connection.",
                 "match_type": "MUTUAL"
             })
 
@@ -264,7 +299,7 @@ async def get_dialogue_messages(
     """Returns chronologically ordered messages for match dialogue."""
     messages = []
     try:
-        match_uuid = UUID(match_id)
+        match_uuid = _clean_match_uuid(match_id)
     except ValueError:
         match_uuid = None
 
@@ -324,7 +359,7 @@ async def send_chat_message(
         raise HTTPException(status_code=400, detail="match_id and message text are required.")
 
     try:
-        match_uuid = UUID(resolved_match_id)
+        match_uuid = _clean_match_uuid(resolved_match_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid match_id UUID format.")
 
@@ -405,7 +440,7 @@ async def get_match_bridge_status(
     mutual confirmation or a redeemed Reveal Token.
     """
     try:
-        match_uuid = UUID(match_id)
+        match_uuid = _clean_match_uuid(match_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid match_id UUID.")
 
@@ -451,7 +486,7 @@ async def redeem_bridge_reveal_token(
     Requires reveal_tokens_count >= 1 (earned via 3 video reflections or sovereign pass).
     """
     try:
-        match_uuid = UUID(match_id)
+        match_uuid = _clean_match_uuid(match_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid match_id UUID.")
 
@@ -492,4 +527,5 @@ async def redeem_bridge_reveal_token(
         "platform": partner.contact_bridge_type or "whatsapp",
         "handle": partner.contact_bridge_encrypted or "",
         "remaining_reveal_tokens": current_user.reveal_tokens_count,
+        "reveal_tokens_count": current_user.reveal_tokens_count,
     }

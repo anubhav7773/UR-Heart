@@ -54,6 +54,8 @@ class _SanctuaryNavigationShellState
     SharedPreferences.getInstance().then((prefs) {
       prefs.setBool('ur_heart_profile_setup_completed', true);
       prefs.setBool('ur_heart_has_entered_sanctuary', true);
+      final storedSeen = prefs.getStringList('sanctuary_seen_notification_ids') ?? [];
+      _seenNotificationIds.addAll(storedSeen);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialIndex != 0) {
@@ -88,10 +90,18 @@ class _SanctuaryNavigationShellState
         if (unreadList.isNotEmpty && mounted) {
           final isDark =
               ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
-          // Mark all unread notifications as seen and dispatch to native Android system tray
+          // Mark all unread notifications as seen, dispatch to native tray, and acknowledge to backend
           for (final notif in unreadList) {
             final notifId = notif['id']?.toString();
-            if (notifId != null) _seenNotificationIds.add(notifId);
+            if (notifId != null) {
+              _seenNotificationIds.add(notifId);
+              // Acknowledge read to backend so it never delivers as unread on restart
+              apiClient.dio.post<dynamic>(
+                '/api/v1/notifications/mark-read',
+                data: {'notification_id': notifId},
+              ).ignore();
+            }
+
 
             final nType = notif['type']?.toString().toLowerCase() ?? 'system';
             final nTitle = notif['title']?.toString() ?? 'Sanctuary Resonance';
@@ -113,10 +123,14 @@ class _SanctuaryNavigationShellState
                   senderId: sId,
                 );
               } else if (nType.contains('spark') || nType.contains('match')) {
-                final pName = nData['peer_name']?.toString() ?? nTitle;
+                final pName = nData['peer_name']?.toString() ??
+                    nData['partner_name']?.toString() ??
+                    nTitle;
                 final mId = nData['match_id']?.toString() ??
                     'm_${DateTime.now().millisecondsSinceEpoch}';
-                final pId = nData['peer_id']?.toString() ?? 'peer_1';
+                final pId = nData['peer_id']?.toString() ??
+                    nData['partner_id']?.toString() ??
+                    'peer_1';
                 SanctuaryNotificationService.instance.showMutualSparkNotification(
                   peerName: pName,
                   matchId: mId,
@@ -153,6 +167,13 @@ class _SanctuaryNavigationShellState
           final latestNotif = unreadList.last;
           _showWhatsAppNotification(latestNotif, isDark);
 
+          // Persist seen IDs so on app kill and re-open, the same notification never pops again
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setStringList(
+                'sanctuary_seen_notification_ids', _seenNotificationIds.toList());
+          } catch (_) {}
+
           setState(() {
             _unreadResonanceCount = notifications
                 .where((n) => n['is_read'] != true && n['type'] != 'message')
@@ -187,6 +208,12 @@ class _SanctuaryNavigationShellState
       final senderName =
           rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
 
+      final avatarUrl = notifData['sender_avatar']?.toString() ??
+          notifData['avatar_url']?.toString() ??
+          notifData['partner_photo']?.toString() ??
+          '';
+      final age = notifData['sender_age'] as int? ?? notifData['partner_age'] as int? ?? 24;
+
       ref.read(navigationIndexProvider.notifier).state = 2;
 
       if (matchId != null && matchId.isNotEmpty) {
@@ -196,7 +223,8 @@ class _SanctuaryNavigationShellState
             matchId: matchId,
             recipientId: senderId,
             recipientName: senderName,
-            recipientAge: 25,
+            recipientAge: age,
+            recipientAvatarUrl: avatarUrl,
             isOnline: true,
             hasWaKey: true,
             sharedContextQuote: 'Deep Mindful Connection',
@@ -220,6 +248,11 @@ class _SanctuaryNavigationShellState
               .trim();
       final partnerName =
           rawPartnerName.isNotEmpty ? rawPartnerName : 'Soul Seeker';
+      final avatarUrl = notifData['partner_photo']?.toString() ??
+          notifData['sender_avatar']?.toString() ??
+          notifData['avatar_url']?.toString() ??
+          '';
+      final age = notifData['partner_age'] as int? ?? notifData['sender_age'] as int? ?? 24;
 
       ref.read(navigationIndexProvider.notifier).state = 2;
 
@@ -230,7 +263,8 @@ class _SanctuaryNavigationShellState
             matchId: matchId,
             recipientId: partnerId,
             recipientName: partnerName,
-            recipientAge: 25,
+            recipientAge: age,
+            recipientAvatarUrl: avatarUrl,
             isOnline: true,
             hasWaKey: true,
             sharedContextQuote: 'Mutual Resonance Ignited',
@@ -240,10 +274,43 @@ class _SanctuaryNavigationShellState
       return;
     }
 
-    // 3. New incoming like / direct resonate letter -> Jump to Resonances screen (tab 1)
-    if (notifType.contains('like') ||
-        notifType.contains('direct') ||
-        notifType.contains('resonate')) {
+    // 3. New incoming direct letter -> If matchId, jump directly to ChatDialogueScreen
+    if (notifType.contains('direct')) {
+      final matchId = notifData['match_id']?.toString() ?? notif['match_id']?.toString();
+      if (matchId != null && matchId.isNotEmpty) {
+        final senderName = notifData['sender_name']?.toString() ??
+            notifData['partner_name']?.toString() ??
+            'Seeker';
+        final senderId = notifData['sender_id']?.toString() ??
+            notifData['partner_id']?.toString() ??
+            'user_peer';
+        final avatarUrl = notifData['sender_avatar']?.toString() ??
+            notifData['partner_photo']?.toString() ??
+            notifData['avatar_url']?.toString() ??
+            '';
+        final age = notifData['sender_age'] as int? ?? notifData['partner_age'] as int? ?? 24;
+
+        ref.read(navigationIndexProvider.notifier).state = 2;
+        Navigator.of(context).pushNamed(
+          ChatDialogueScreen.routeName,
+          arguments: ChatDialogueArguments(
+            matchId: matchId,
+            recipientId: senderId,
+            recipientName: senderName,
+            recipientAge: age,
+            recipientAvatarUrl: avatarUrl,
+            isOnline: true,
+            hasWaKey: false,
+            sharedContextQuote: 'Direct Resonance Letter Received',
+          ),
+        );
+        return;
+      }
+      ref.read(navigationIndexProvider.notifier).state = 1;
+      return;
+    }
+
+    if (notifType.contains('like') || notifType.contains('resonate')) {
       ref.read(navigationIndexProvider.notifier).state = 1;
       return;
     }
@@ -361,6 +428,7 @@ class _SanctuaryNavigationShellState
   void dispose() {
     _dismissActiveNotification();
     _notificationPoller?.cancel();
+    _seenNotificationIds.clear();
     super.dispose();
   }
 

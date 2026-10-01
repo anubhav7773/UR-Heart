@@ -1,6 +1,6 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
@@ -134,9 +134,9 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
     try {
       final profile = await _profileRepo!.fetchMyProfile();
       final prefs = await SharedPreferences.getInstance();
-      final localTokens = prefs.getInt('ur_heart_reveal_tokens') ?? 0;
-      final effectiveTokens = math.max(localTokens, profile.revealTokensCount);
+      final effectiveTokens = profile.revealTokensCount;
       await prefs.setInt('ur_heart_reveal_tokens', effectiveTokens);
+      await prefs.setInt('ur_heart_direct_letters', profile.directLettersCount);
 
       state = state.copyWith(
         userId: profile.id,
@@ -334,6 +334,16 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       peerWhatsappProgress: nextPeer,
       isWhatsappUnlocked: isUnlocked,
     );
+  }
+
+  void updateRevealTokens(int count) {
+    state = state.copyWith(revealTokensCount: count);
+    SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_reveal_tokens', count));
+  }
+
+  void updateDirectLetters(int count) {
+    state = state.copyWith(directLetters: count);
+    SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', count));
   }
 
   Future<void> purchasePackage(String productId, [BuildContext? context]) async {

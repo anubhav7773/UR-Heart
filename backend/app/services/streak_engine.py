@@ -94,7 +94,7 @@ class StreakEngine:
                     "message": "Streak is currently secured. Next ritual unlocks shortly.",
                     "streak_count": user.streak_count or 1,
                     "boost_points": user.boost_points or 1,
-                    "reveal_tokens_count": user.reveal_tokens_count or 1,
+                    "reveal_tokens_count": user.reveal_tokens_count if user.reveal_tokens_count is not None else 0,
                     "seconds_remaining": int((user.streak_expires_at - now).total_seconds()),
                     "streak_expires_at": user.streak_expires_at.isoformat()
                 }
@@ -121,7 +121,7 @@ class StreakEngine:
             data={
                 "streak_count": user.streak_count,
                 "boost_points": user.boost_points,
-                "reveal_tokens_count": user.reveal_tokens_count or 1
+                "reveal_tokens_count": user.reveal_tokens_count if user.reveal_tokens_count is not None else 0
             }
         )
 
@@ -130,7 +130,7 @@ class StreakEngine:
             "message": f"Day {user.streak_count} streak locked! +1 Boost Point credited.",
             "streak_count": user.streak_count,
             "boost_points": user.boost_points,
-            "reveal_tokens_count": user.reveal_tokens_count or 1,
+            "reveal_tokens_count": user.reveal_tokens_count if user.reveal_tokens_count is not None else 0,
             "seconds_remaining": 86400,
             "streak_expires_at": user.streak_expires_at.isoformat() if user.streak_expires_at else None
         }
@@ -141,7 +141,7 @@ class StreakEngine:
         now = datetime.now(timezone.utc)
         streak_count = user.streak_count or 0
         boost_points = user.boost_points or 0
-        tokens_count = user.reveal_tokens_count if user.reveal_tokens_count is not None else 1
+        tokens_count = user.reveal_tokens_count if user.reveal_tokens_count is not None else 0
 
         is_active = bool(user.streak_expires_at and user.streak_expires_at > now and streak_count > 0)
         seconds_remaining = 0

@@ -47,7 +47,7 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
           Navigator.of(context).pushReplacementNamed('/main');
         } else if (hasAuth && !isSetupDone) {
           Navigator.of(context).pushReplacementNamed('/profile-setup');
-        } else if (isConsentGiven) {
+        } else if (hasAuth && isConsentGiven) {
           Navigator.of(context).pushReplacementNamed('/auth');
         }
       } catch (_) {}

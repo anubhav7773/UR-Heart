@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
+import 'package:ur_heart/features/chat/presentation/screens/chat_dialogue_screen.dart';
 import '../widgets/incoming_like_card.dart';
 import '../widgets/mutual_connection_tile.dart';
 import '../widgets/unlock_resonances_banner.dart';
 import '../controllers/resonances_controller.dart';
+import '../../domain/resonance_models.dart';
+
 
 class ResonancesScreen extends ConsumerStatefulWidget {
   const ResonancesScreen({super.key});
@@ -32,8 +35,41 @@ class _ResonancesScreenState extends ConsumerState<ResonancesScreen> with Single
     super.dispose();
   }
 
-  void _navigateToChat(BuildContext context, String matchId) {
-    Navigator.of(context).pushNamed('/chat-dialogue', arguments: {'match_id': matchId});
+  void _navigateToChat({
+    required BuildContext context,
+    required String matchId,
+    required String recipientId,
+    required String recipientName,
+    String recipientAvatarUrl = '',
+    bool isVerified = false,
+    String bio = '',
+    String location = '',
+    String sharedQuote = 'Resonance established',
+  }) {
+    // Strip prefixes so dialogue controller and API resolve clean UUID
+    String cleanId = matchId;
+    for (final prefix in ['conn_', 'match-', 'match_', 'spark_']) {
+      if (cleanId.startsWith(prefix)) {
+        cleanId = cleanId.substring(prefix.length);
+        break;
+      }
+    }
+
+    Navigator.of(context).pushNamed(
+      ChatDialogueScreen.routeName,
+      arguments: ChatDialogueArguments(
+        matchId: cleanId,
+        recipientId: recipientId,
+        recipientName: recipientName,
+        recipientAvatarUrl: recipientAvatarUrl,
+        isVerified: isVerified,
+        bio: bio,
+        location: location,
+        sharedContextQuote: sharedQuote,
+        isOnline: true,
+        hasWaKey: false,
+      ),
+    );
   }
 
   @override
@@ -93,9 +129,28 @@ class _ResonancesScreenState extends ConsumerState<ResonancesScreen> with Single
                           itemCount: resonancesState.incomingLikes.length,
                           itemBuilder: (context, index) {
                             final item = resonancesState.incomingLikes[index];
-                            final senderId = item is Map
-                                ? (item['user_id'] as String? ?? item['id'] as String? ?? '')
-                                : (item.senderId as String? ?? item.id as String? ?? '');
+                            String senderId = '';
+                            String sName = 'Seeker';
+                            String sPhoto = '';
+                            String sBio = '';
+                            String sLoc = '';
+                            bool sVer = false;
+
+                            if (item is IncomingLikeProfile) {
+                              senderId = item.senderId.isNotEmpty ? item.senderId : item.id;
+                              sName = item.fullName;
+                              sPhoto = item.photoUrl;
+                              sBio = item.bio;
+                              sLoc = item.location;
+                              sVer = item.isVerified;
+                            } else if (item is Map) {
+                              senderId = (item['user_id'] as String? ?? item['sender_id'] as String? ?? item['id'] as String? ?? '');
+                              sName = (item['full_name'] as String? ?? item['name'] as String? ?? 'Seeker');
+                              sPhoto = (item['photo_url'] as String? ?? item['avatar_url'] as String? ?? '');
+                              sBio = (item['bio'] as String? ?? '');
+                              sLoc = (item['location'] as String? ?? '');
+                              sVer = (item['is_verified'] as bool? ?? false);
+                            }
 
                             return IncomingLikeCard(
                               likeData: item,
@@ -104,7 +159,17 @@ class _ResonancesScreenState extends ConsumerState<ResonancesScreen> with Single
                               onChatTriggered: () async {
                                 final matchId = await ref.read(resonancesControllerProvider.notifier).createMutualMatch(senderId);
                                 if (matchId != null && context.mounted) {
-                                  _navigateToChat(context, matchId);
+                                  _navigateToChat(
+                                    context: context,
+                                    matchId: matchId,
+                                    recipientId: senderId,
+                                    recipientName: sName,
+                                    recipientAvatarUrl: sPhoto,
+                                    bio: sBio,
+                                    location: sLoc,
+                                    isVerified: sVer,
+                                    sharedQuote: 'Direct Sanctuary Resonance Ignited',
+                                  );
                                 }
                               },
                             );
@@ -122,14 +187,50 @@ class _ResonancesScreenState extends ConsumerState<ResonancesScreen> with Single
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       final match = resonancesState.mutualConnections[index];
-                      final matchId = match is Map
-                          ? (match['id'] as String? ?? '')
-                          : (match.matchId as String? ?? match.id as String? ?? '');
+                      String matchId = '';
+                      String pId = '';
+                      String pName = 'Sanctuary Match';
+                      String pPhoto = '';
+                      bool isVer = false;
+                      String bio = '';
+                      String loc = '';
+                      String tag = 'Mutual Resonance';
+
+                      if (match is MutualConnection) {
+                        matchId = match.matchId.isNotEmpty ? match.matchId : match.id;
+                        pId = match.partnerId;
+                        pName = match.fullName;
+                        pPhoto = match.photoUrl;
+                        isVer = match.isVerified;
+                        bio = match.bio;
+                        loc = match.location;
+                        tag = match.categoryTag;
+                      } else if (match is Map) {
+                        matchId = (match['match_id'] as String? ?? match['id'] as String? ?? '');
+                        pId = (match['partner_id'] as String? ?? match['recipient_id'] as String? ?? '');
+                        pName = (match['full_name'] as String? ?? match['name'] as String? ?? 'Sanctuary Match');
+                        pPhoto = (match['photo_url'] as String? ?? match['avatar_url'] as String? ?? '');
+                        isVer = (match['is_verified'] as bool? ?? false);
+                        bio = (match['bio'] as String? ?? '');
+                        loc = (match['location'] as String? ?? '');
+                        tag = (match['category_tag'] as String? ?? 'Mutual Resonance');
+                      }
+
 
                       return MutualConnectionTile(
                         match: match,
                         isDark: isDark,
-                        onTap: () => _navigateToChat(context, matchId),
+                        onTap: () => _navigateToChat(
+                          context: context,
+                          matchId: matchId,
+                          recipientId: pId,
+                          recipientName: pName,
+                          recipientAvatarUrl: pPhoto,
+                          isVerified: isVer,
+                          bio: bio,
+                          location: loc,
+                          sharedQuote: tag,
+                        ),
                       );
                     },
                   ),

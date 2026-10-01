@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../../../core/media/sanctuary_image_resolver.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
+import '../../domain/resonance_models.dart';
 
 class IncomingLikeCard extends StatelessWidget {
   final dynamic likeData;
@@ -36,11 +38,16 @@ class IncomingLikeCard extends StatelessWidget {
         ? (likeData['age'] as int? ?? 23)
         : (likeData.age as int? ?? 23);
     final String photoUrl = likeData is Map
-        ? (likeData['photo_url'] as String? ?? '')
+        ? (likeData['photo_url'] as String? ?? likeData['avatar_url'] as String? ?? '')
         : (likeData.photoUrl as String? ?? '');
     final int matchScore = likeData is Map
         ? (likeData['match_score'] as int? ?? 92)
         : (likeData.matchScore as int? ?? 92);
+    final bool isDirect = likeData is Map
+        ? (likeData['is_direct_letter'] as bool? ?? (likeData['swipe_type'] == 'direct'))
+        : (likeData is IncomingLikeProfile ? (likeData as IncomingLikeProfile).isDirectLetter : false);
+
+    final imageProvider = resolveSanctuaryImageProvider(photoUrl);
 
     return Container(
       decoration: BoxDecoration(
@@ -56,9 +63,9 @@ class IncomingLikeCard extends StatelessWidget {
           children: [
             // Background Image (Blurred if not Sovereign)
             Positioned.fill(
-              child: photoUrl.isNotEmpty
-                  ? Image.network(
-                      photoUrl,
+              child: imageProvider != null
+                  ? Image(
+                      image: imageProvider,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => _buildFallback(pine),
                     )
@@ -86,6 +93,24 @@ class IncomingLikeCard extends StatelessWidget {
                 ),
               ),
             ),
+            // Direct Letter Badge on top-left
+            if (isDirect)
+              Positioned(
+                top: 10,
+                left: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD36A42),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                  ),
+                  child: const Text(
+                    '💌 Direct Letter',
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
             // Sovereign Badge or Match Score Pill
             Positioned(
               top: 10,
@@ -125,7 +150,9 @@ class IncomingLikeCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isSovereignUser ? 'Liked you recently' : 'Unlock unmasked with Sovereign',
+                    isDirect
+                        ? 'Sent you a direct letter'
+                        : (isSovereignUser ? 'Liked you recently' : 'Unlock unmasked with Sovereign'),
                     maxLines: 1,
                     style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.8)),
                   ),
@@ -135,20 +162,20 @@ class IncomingLikeCard extends StatelessWidget {
                     height: 36,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: pine,
+                        backgroundColor: isDirect ? const Color(0xFFD36A42) : pine,
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         padding: EdgeInsets.zero,
                       ),
                       onPressed: onChatTriggered,
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('⚡', style: TextStyle(fontSize: 12)),
-                          SizedBox(width: 4),
+                          Text(isDirect ? '💌' : '⚡', style: const TextStyle(fontSize: 12)),
+                          const SizedBox(width: 4),
                           Text(
-                            'Spark Direct Connection',
-                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            isDirect ? 'Open Direct Dialogue' : 'Spark Direct Connection',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),

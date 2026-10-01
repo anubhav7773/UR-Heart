@@ -55,14 +55,9 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
       if (widget.initialToken != null && widget.initialToken!.isNotEmpty) {
         _verifyMagicLinkToken(widget.initialToken!);
       }
-
-      final state = ref.read(authControllerProvider);
-      final email = widget.email ?? state.email;
-      if (email.isNotEmpty && state.resendCooldownSeconds == 0 && widget.initialToken == null) {
-        ref.read(authControllerProvider.notifier).resendVerificationEmail(email);
-      }
     });
   }
+
 
   void _startLiveElapsedTimer() {
     _elapsedTimer?.cancel();
@@ -233,17 +228,20 @@ class _MagicLinkScreenState extends ConsumerState<MagicLinkScreen> {
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('ur_heart_consent_given', true);
+    await prefs.setBool('ur_heart_theme_locked', true);
     if (!mounted) return;
 
     final isCompleted = prefs.getBool('ur_heart_profile_setup_completed') ?? false;
 
     if (isCompleted) {
-      Navigator.of(context).pushReplacementNamed('/sanctuary');
+      Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
     } else {
       // Direct transition to Profile Sanctuary as requested
-      Navigator.of(context).pushReplacementNamed('/profile-setup');
+      Navigator.of(context).pushNamedAndRemoveUntil('/profile-setup', (route) => false);
     }
   }
+
 
   Future<void> _launchNativeEmailClient() async {
     final emailUri = Uri(scheme: 'mailto');

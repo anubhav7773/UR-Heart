@@ -315,16 +315,22 @@ async def toggle_night_slumber(
 class ProfileCreateRequest(BaseModel):
     full_name: Optional[str] = None
     date_of_birth: Optional[str] = None
+    dob: Optional[str] = None
+    birth_date: Optional[str] = None
     gender: Optional[str] = None
     looking_for: Optional[str] = None
+    interested_in: Optional[str] = None
     bridge_platform: Optional[str] = None
+    contact_bridge_type: Optional[str] = None
     bridge_value: Optional[str] = None
+    contact_bridge_handle: Optional[str] = None
     location: Optional[str] = None
     location_name: Optional[str] = None
     bio: Optional[str] = None
     profession: Optional[str] = None
     education: Optional[str] = None
-    is_kyc: Optional[bool] = False
+    is_kyc: Optional[bool] = None
+    is_kyc_verified: Optional[bool] = None
     photos: Optional[list] = None
     avatar_url: Optional[str] = None
     email: Optional[str] = None
@@ -371,8 +377,8 @@ async def create_or_update_profile(
         else:
             up_vals["gender"] = "Unspecified"
 
-    if payload.looking_for:
-        lf = str(payload.looking_for).strip().lower()
+    lf = str(payload.looking_for or payload.interested_in or "").strip().lower()
+    if lf:
         if lf in ("men", "man", "male"):
             up_vals["interested_in"] = "Men"
         elif lf in ("women", "woman", "female"):
@@ -387,22 +393,32 @@ async def create_or_update_profile(
         up_vals["education"] = payload.education
     if loc_name:
         up_vals["location_name"] = loc_name
-    if payload.is_kyc is not None:
-        up_vals["kyc_status"] = payload.is_kyc
-    if payload.bridge_platform:
-        up_vals["contact_bridge_type"] = payload.bridge_platform
-    if payload.bridge_value:
-        up_vals["contact_bridge_encrypted"] = payload.bridge_value
+    
+    kyc_val = payload.is_kyc if payload.is_kyc is not None else payload.is_kyc_verified
+    if kyc_val is not None:
+        up_vals["kyc_status"] = kyc_val
+
+    bridge_platform_val = payload.bridge_platform or payload.contact_bridge_type
+    if bridge_platform_val:
+        up_vals["contact_bridge_type"] = bridge_platform_val
+
+    bridge_value_val = payload.bridge_value or payload.contact_bridge_handle
+    if bridge_value_val:
+        up_vals["contact_bridge_encrypted"] = bridge_value_val
+
     if payload.photos:
-        up_vals["photos"] = payload.photos
-        if not payload.avatar_url and len(payload.photos) > 0:
-            up_vals["avatar_url"] = payload.photos[0]
-    if payload.avatar_url:
-        up_vals["avatar_url"] = payload.avatar_url
-    if payload.date_of_birth:
+        clean_photos = [p for p in payload.photos if p and str(p).strip()]
+        up_vals["photos"] = clean_photos
+        if not payload.avatar_url and clean_photos:
+            up_vals["avatar_url"] = clean_photos[0]
+    if payload.avatar_url and str(payload.avatar_url).strip():
+        up_vals["avatar_url"] = str(payload.avatar_url).strip()
+
+    dob_val = payload.date_of_birth or payload.dob or payload.birth_date
+    if dob_val:
         try:
             from datetime import date as _date
-            up_vals["dob"] = _date.fromisoformat(payload.date_of_birth)
+            up_vals["dob"] = _date.fromisoformat(str(dob_val).split("T")[0])
         except Exception:
             pass
     if payload.latitude is not None:

@@ -61,14 +61,13 @@ class FeedController extends StateNotifier<FeedState> {
       final deck = await _repository.fetchDiscoveryDeck();
       final prefs = await SharedPreferences.getInstance();
       final cachedLetters = prefs.getInt('ur_heart_direct_letters');
-      final resolvedLetters = (deck.directLettersCount != null && deck.directLettersCount! > 0)
-          ? deck.directLettersCount!
-          : (cachedLetters ?? state.directLettersCount);
+      final resolvedLetters = deck.directLettersCount ?? cachedLetters ?? state.directLettersCount;
 
-      if (deck.directLettersCount != null && deck.directLettersCount! > 0) {
+      if (deck.directLettersCount != null) {
         await prefs.setInt('ur_heart_direct_letters', deck.directLettersCount!);
       }
 
+      if (!mounted) return;
       state = state.copyWith(
         candidates: deck.candidates,
         swipesRemaining: deck.swipesRemaining ?? state.swipesRemaining,
@@ -76,6 +75,7 @@ class FeedController extends StateNotifier<FeedState> {
         isLoading: false,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }

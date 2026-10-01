@@ -261,4 +261,16 @@ class SanctuaryNotificationService {
       priority: Priority.high,
     );
   }
+
+  /// Cancels all active system tray notifications on user logout or session reset
+  Future<void> cancelAll() async {
+    if (!_isInitialized) return;
+    try {
+      await _notificationsPlugin.cancelAll();
+      debugPrint('[NOTIFICATIONS] All active system tray notifications dismissed.');
+    } catch (e) {
+      debugPrint('[NOTIFICATIONS] cancelAll warning: $e');
+    }
+  }
 }
+

@@ -164,11 +164,68 @@ class AgeGateAuthScreen extends ConsumerWidget {
                             return;
                           }
 
-                          final success = await authNotifier.submitRegistration();
-                          if (success && context.mounted) {
-                            Navigator.of(context).pushNamed('/verify-email');
+                          if (authState.isSignInTab) {
+                            // --- EXISTING USER SIGN IN ---
+                            final result = await authNotifier.signInWithPassword();
+                            if (result.isSuccess && context.mounted) {
+                              await ref
+                                  .read(profileSetupControllerProvider.notifier)
+                                  .loadSavedProfile();
+                              if (!context.mounted) return;
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Row(
+                                    children: [
+                                      Icon(Icons.check_circle, color: Colors.white, size: 20),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Welcome back to your Sanctuary ✨',
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: Color(0xFF1B4332),
+                                  duration: Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+
+                              if (result.isProfileCompleted) {
+                                Navigator.of(context).pushNamedAndRemoveUntil(
+                                  '/main',
+                                  (route) => false,
+                                );
+                              } else {
+                                Navigator.of(context).pushNamedAndRemoveUntil(
+                                  '/profile-setup',
+                                  (route) => false,
+                                );
+                              }
+                            } else if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result.errorMessage ?? 'Sign In failed. Please check your credentials.',
+                                    style: AppTypography.bodySmall.copyWith(color: Colors.white),
+                                  ),
+                                  backgroundColor: const Color(0xFFC94A29),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } else {
+                            // --- NEW ACCOUNT REGISTRATION ---
+                            final success = await authNotifier.submitRegistration();
+                            if (success && context.mounted) {
+                              Navigator.of(context).pushNamed(
+                                '/verify-email',
+                                arguments: {'email': authState.email},
+                              );
+                            }
                           }
                         },
+
                   child: authState.isLoading
                       ? const SizedBox(
                           width: 20,

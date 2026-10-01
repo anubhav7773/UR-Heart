@@ -314,5 +314,46 @@ def test_firebase_console_magic_link_verification():
     fb_admin_auth.delete_user(fb_uid)
 
 
+def test_direct_letter_notification_routing():
+    """Verify that when sending a direct letter, sender does NOT receive self-match notification, and recipient receives direct letter notification."""
+    from app.api.v1.endpoints.notifications import NOTIFICATION_STORE, push_notification
+    import uuid
+
+    sender_id = str(uuid.uuid4())
+    target_id = str(uuid.uuid4())
+
+    NOTIFICATION_STORE[sender_id] = []
+    NOTIFICATION_STORE[target_id] = []
+
+    # Inbound Direct Letter to target_id (sender does not get an instant self-match notification)
+    push_notification(
+        user_id=target_id,
+        notif_type="direct_letter",
+        title="Direct Sanctuary Letter 💌",
+        body="Sender sent you a Direct Sanctuary Letter: Hello!",
+        data={
+            "match_id": "m_test_123",
+            "partner_id": sender_id,
+            "partner_name": "Sender Seeker",
+            "peer_name": "Sender Seeker",
+            "sender_id": sender_id,
+            "sender_name": "Sender Seeker",
+            "target_route": "/chat-dialogue"
+        }
+    )
+
+    # 1. Verify sender's queue has no spurious self-match notifications
+    assert len(NOTIFICATION_STORE[sender_id]) == 0, "Sender must not receive match notification for their own outbound direct letter"
+
+    # 2. Verify target received the direct letter
+    assert len(NOTIFICATION_STORE[target_id]) == 1
+    target_notif = NOTIFICATION_STORE[target_id][0]
+    assert target_notif["type"] == "direct_letter"
+    assert target_notif["title"] == "Direct Sanctuary Letter 💌"
+    assert target_notif["data"]["peer_name"] == "Sender Seeker"
+    assert target_notif["data"]["partner_name"] == "Sender Seeker"
+
+
+
 
 

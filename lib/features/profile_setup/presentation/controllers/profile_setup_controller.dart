@@ -132,6 +132,11 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     loadSavedProfile();
   }
 
+  /// Completely resets ProfileSetupState to clean defaults
+  void reset() {
+    state = const ProfileSetupState();
+  }
+
   /// Automatically restores user's authentic name, DOB, and stored profile from disk
   Future<void> loadSavedProfile() async {
     try {
@@ -160,7 +165,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       final savedMinAge = prefs.getDouble('profile_min_age') ?? state.minAge;
       final savedMaxAge = prefs.getDouble('profile_max_age') ?? state.maxAge;
 
-      // Restore existing photos
+      // Restore existing photos strictly from valid local disk files
       final Map<int, String> restoredSlots = {};
       for (int i = 1; i <= 5; i++) {
         final path = prefs.getString('profile_photo_slot_$i');
@@ -183,7 +188,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         contactBridgeHandle: savedBridgeHandle,
         minAge: savedMinAge,
         maxAge: savedMaxAge,
-        photoSlots: restoredSlots.isNotEmpty ? restoredSlots : state.photoSlots,
+        photoSlots: restoredSlots,
       );
 
       // Auto-trigger GPS acquisition if not yet verified
@@ -463,8 +468,10 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'gender': state.gender,
       'dob': state.dobString,
       'birth_date': state.dobString,
+      'date_of_birth': state.dobString,
       if (savedAge != null && savedAge > 0) 'age': savedAge,
       'interested_in': interestedInStr,
+      'looking_for': interestedInStr,
       'bio': state.bio,
       'profession': state.profession,
       'education': state.education,
@@ -475,16 +482,20 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'preferred_age_min': state.minAge.toInt(),
       'preferred_age_max': state.maxAge.toInt(),
       'contact_bridge_type': state.contactBridgePlatform,
+      'bridge_platform': state.contactBridgePlatform,
       'contact_bridge_handle': state.contactBridgeHandle,
+      'bridge_value': state.contactBridgeHandle,
       'is_kyc_verified': state.isKycVerified,
+      'is_kyc': state.isKycVerified,
       'photo_slots_count': state.photoSlots.length,
       'photos': [
+        state.photoSlots[1] ?? '',
         state.photoSlots[2] ?? '',
         state.photoSlots[3] ?? '',
         state.photoSlots[4] ?? '',
         state.photoSlots[5] ?? '',
       ],
-      'avatar_url': state.photoSlots[1] ?? '',
+      'avatar_url': state.photoSlots[1] ?? (state.photoSlots.values.isNotEmpty ? state.photoSlots.values.first : ''),
       'email': email,
     });
 

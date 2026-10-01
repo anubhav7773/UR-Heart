@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../core/media/sanctuary_image_resolver.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
-import '../../data/resonances_repository.dart';
+import '../../domain/resonance_models.dart';
 
 class MutualConnectionTile extends StatelessWidget {
   final dynamic match;
@@ -36,6 +37,10 @@ class MutualConnectionTile extends StatelessWidget {
     final int age = _extractAge();
     final String timeStr = _extractTime();
     final String snippet = _extractSnippet();
+    final String photoUrl = _extractPhotoUrl();
+    final bool isDirect = _isDirectLetter();
+    final imageProvider = resolveSanctuaryImageProvider(photoUrl);
+
 
     return Container(
       decoration: BoxDecoration(
@@ -59,10 +64,13 @@ class MutualConnectionTile extends StatelessWidget {
                     CircleAvatar(
                       radius: 26.0,
                       backgroundColor: pine.withValues(alpha: 0.12),
-                      child: Text(
-                        fullName.isNotEmpty ? fullName[0] : 'S',
-                        style: TextStyle(color: pine, fontWeight: FontWeight.bold, fontSize: 18.0),
-                      ),
+                      backgroundImage: imageProvider,
+                      child: imageProvider == null
+                          ? Text(
+                              fullName.isNotEmpty ? fullName[0] : 'S',
+                              style: TextStyle(color: pine, fontWeight: FontWeight.bold, fontSize: 18.0),
+                            )
+                          : null,
                     ),
                     Positioned(
                       right: 0,
@@ -87,16 +95,45 @@ class MutualConnectionTile extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '$fullName, $age',
-                            style: TextStyle(
-                              fontFamily: 'Serif',
-                              color: primaryText,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15.0,
+                          Flexible(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '$fullName, $age',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontFamily: 'Serif',
+                                      color: primaryText,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15.0,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6.0),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDirect
+                                        ? const Color(0xFFD36A42).withValues(alpha: 0.15)
+                                        : pine.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    isDirect ? '💌 Letter' : '💫 Mutual',
+                                    style: TextStyle(
+                                      fontSize: 10.0,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDirect ? const Color(0xFFD36A42) : pine,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          Text(timeStr, style: TextStyle(color: subText, fontSize: 11.5)),
+                          Text(timeStr, style: TextStyle(color: subText, fontSize: 11.0)),
                         ],
                       ),
                       const SizedBox(height: 3.0),
@@ -120,26 +157,47 @@ class MutualConnectionTile extends StatelessWidget {
   }
 
   String _extractName() {
-    if (connection != null) return connection?.fullName ?? '';
-    if (match is Map) return (match['full_name'] as String? ?? 'Sanctuary Match');
+    if (connection != null) return connection!.fullName;
+    if (match is MutualConnection) return (match as MutualConnection).fullName;
+    if (match is Map) return (match['full_name'] as String? ?? match['name'] as String? ?? 'Sanctuary Match');
     return 'Sanctuary Match';
   }
 
   int _extractAge() {
-    if (connection != null) return connection?.age ?? 24;
+    if (connection != null) return connection!.age;
+    if (match is MutualConnection) return (match as MutualConnection).age;
     if (match is Map) return (match['age'] as int? ?? 24);
     return 24;
   }
 
+  String _extractPhotoUrl() {
+    if (connection != null) return connection!.photoUrl;
+    if (match is MutualConnection) return (match as MutualConnection).photoUrl;
+    if (match is Map) return (match['photo_url'] as String? ?? match['avatar_url'] as String? ?? '');
+    return '';
+  }
+
   String _extractTime() {
-    if (connection != null) return connection?.matchedTime ?? 'Just now';
+    if (connection != null) return connection!.matchedTime;
+    if (match is MutualConnection) return (match as MutualConnection).matchedTime;
     if (match is Map) return (match['matched_time'] as String? ?? 'Just now');
     return 'Just now';
   }
 
   String _extractSnippet() {
-    if (connection != null) return connection?.lastSnippet ?? 'Mutual resonance established.';
+    if (connection != null) return connection!.lastSnippet;
+    if (match is MutualConnection) return (match as MutualConnection).lastSnippet;
     if (match is Map) return (match['last_snippet'] as String? ?? 'Mutual resonance established.');
     return 'Mutual resonance established.';
+  }
+
+  bool _isDirectLetter() {
+    if (connection != null) return connection!.isDirectLetter;
+    if (match is MutualConnection) return (match as MutualConnection).isDirectLetter;
+    if (match is Map) {
+      return (match['is_direct_letter'] as bool? ??
+          (match['category_tag']?.toString().toLowerCase().contains('direct') ?? false));
+    }
+    return false;
   }
 }

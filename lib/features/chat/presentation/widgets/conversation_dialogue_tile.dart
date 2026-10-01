@@ -3,6 +3,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../domain/chat_models.dart';
+import '../../../../core/media/sanctuary_image_resolver.dart';
 import 'delivery_tick_icon.dart';
 
 /// Conversation dialogue tile for Screen 8 Chats Hub (< 160 lines)
@@ -122,15 +123,14 @@ class ConversationDialogueTile extends StatelessWidget {
   }
 
   Widget _buildAvatar(Color pine, Color onlineColor) {
+    final imageProvider = resolveSanctuaryImageProvider(conversation.recipientAvatarUrl);
     return Stack(
       children: [
         CircleAvatar(
           radius: 23.0,
           backgroundColor: pine.withValues(alpha: 0.15),
-          backgroundImage: conversation.recipientAvatarUrl.isNotEmpty
-              ? NetworkImage(conversation.recipientAvatarUrl)
-              : null,
-          child: conversation.recipientAvatarUrl.isEmpty
+          backgroundImage: imageProvider,
+          child: imageProvider == null
               ? Text(
                   conversation.recipientName.isNotEmpty ? conversation.recipientName[0] : 'S',
                   style: TextStyle(color: pine, fontWeight: FontWeight.bold, fontSize: 16.0),

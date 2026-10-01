@@ -28,8 +28,9 @@ def push_notification(
     if user_key not in NOTIFICATION_STORE:
         NOTIFICATION_STORE[user_key] = []
 
+    import uuid as _uuid
     entry = {
-        "id": f"notif_{int(datetime.utcnow().timestamp() * 1000)}",
+        "id": f"notif_{int(datetime.utcnow().timestamp() * 1000)}_{_uuid.uuid4().hex[:6]}",
         "type": notif_type,
         "title": title,
         "body": body,

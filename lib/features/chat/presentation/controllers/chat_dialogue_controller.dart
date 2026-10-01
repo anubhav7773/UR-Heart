@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/crypto/sanctuary_crypto_vault.dart';
 import '../../data/chat_repository.dart';
 import '../../data/chat_websocket_service.dart';
@@ -86,7 +87,8 @@ final chatDialogueControllerProvider = StateNotifierProvider.family<
     ChatDialogueController, ChatDialogueState, String>((ref, matchId) {
   final repo = ref.watch(chatRepositoryProvider);
   final ws = ref.watch(chatWebSocketServiceProvider);
-  return ChatDialogueController(ws, repo, 'user-me', matchId);
+  final cleanId = ChatDialogueController.cleanMatchId(matchId);
+  return ChatDialogueController(ws, repo, 'user-me', cleanId);
 });
 
 /// True E2EE Encrypted Chat Pipeline Controller (DIS-07 Fix)
@@ -97,12 +99,23 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
   final ChatRepository _chatRepository;
   final String _currentUserId;
 
+  static String cleanMatchId(String rawId) {
+    String clean = rawId.trim();
+    for (final prefix in ['conn_', 'match-', 'match_', 'spark_']) {
+      if (clean.startsWith(prefix)) {
+        clean = clean.substring(prefix.length);
+        break;
+      }
+    }
+    return clean;
+  }
+
   ChatDialogueController(
     this._wsService,
     this._chatRepository,
     this._currentUserId,
     String matchId,
-  ) : super(ChatDialogueState(matchId: matchId, isLoading: true)) {
+  ) : super(ChatDialogueState(matchId: cleanMatchId(matchId), isLoading: true)) {
     _initDialogue();
   }
 
@@ -113,18 +126,22 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
   Future<void> _initDialogue() async {
     state = state.copyWith(isLoading: true);
 
-    // 1. Fetch historical thread messages & live contact bridge status & peer profile
-    final history = await _chatRepository.fetchThreadMessages(state.matchId);
-    final bridge = await _chatRepository.fetchContactBridgeStatus(state.matchId);
-    final peerData = await _chatRepository.fetchPeerProfile(state.matchId);
+    try {
+      // 1. Fetch historical thread messages & live contact bridge status & peer profile
+      final history = await _chatRepository.fetchThreadMessages(state.matchId);
+      final bridge = await _chatRepository.fetchContactBridgeStatus(state.matchId);
+      final peerData = await _chatRepository.fetchPeerProfile(state.matchId);
 
-    state = state.copyWith(
-      messages: history,
-      isLoading: false,
-      isConnected: true,
-      bridgeData: bridge,
-      peerProfile: {...state.peerProfile, ...peerData},
-    );
+      state = state.copyWith(
+        messages: history,
+        isLoading: false,
+        isConnected: true,
+        bridgeData: bridge,
+        peerProfile: {...state.peerProfile, ...peerData},
+      );
+    } catch (_) {
+      state = state.copyWith(isLoading: false);
+    }
 
     // 2. Listen to incoming E2EE WebSocket events
     _wsService.messageStream.listen((event) async {
@@ -137,7 +154,9 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       }
     });
 
-    await _chatRepository.markMessagesAsRead(state.matchId);
+    try {
+      await _chatRepository.markMessagesAsRead(state.matchId);
+    } catch (_) {}
   }
 
   /// Spends 1 Sacred Bridge Reveal Token to unlock the peer's genuine social handle
@@ -145,6 +164,12 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     try {
       final updatedBridge = await _chatRepository.redeemBridgeRevealToken(state.matchId);
       state = state.copyWith(bridgeData: updatedBridge);
+
+      final dynamic rem = updatedBridge['remaining_reveal_tokens'] ?? updatedBridge['reveal_tokens_count'];
+      if (rem is int) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('ur_heart_reveal_tokens', rem);
+      }
       return true;
     } catch (_) {
       return false;

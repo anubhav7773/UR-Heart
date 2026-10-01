@@ -134,6 +134,12 @@ class AuthController extends StateNotifier<AuthState> {
 
   AuthController(this._repository) : super(const AuthState());
 
+  /// Completely resets AuthState to clean defaults (purges lingering DOB & identity)
+  void reset() {
+    _timer?.cancel();
+    state = const AuthState();
+  }
+
   void setAuthTab({required bool isSignIn}) {
     state = state.copyWith(isSignInTab: isSignIn, errorMessage: null);
   }
@@ -278,7 +284,40 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// Authenticates existing users directly using email and password
+  Future<AuthResult> signInWithPassword() async {
+    if (!state.canSubmit) {
+      return AuthResult.failure(
+        'Please select your Date of Birth above and confirm you are 18+ to proceed.',
+      );
+    }
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+
+    try {
+      final result = await _repository.signInWithPassword(
+        email: state.email,
+        password: state.password,
+      );
+
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: result.isSuccess ? null : (result.errorMessage ?? 'Sign In failed.'),
+        authenticatedUserId: result.userId,
+      );
+
+      return result;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'An unexpected error occurred during Sign In.',
+      );
+      return AuthResult.failure(e.toString());
+    }
+  }
+
   Future<bool> submitRegistration() async {
+
     if (!state.canSubmit) return false;
 
     state = state.copyWith(isLoading: true, errorMessage: null);

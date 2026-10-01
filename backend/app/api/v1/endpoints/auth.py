@@ -176,12 +176,15 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     clean_email = payload.email.strip().lower()
     res = await db.execute(select(User).where(User.email == clean_email))
     user_row = res.scalar_one_or_none()
+    user_uuid = None
     if user_row is not None:
         is_completed = bool(user_row.is_profile_completed)
+        user_uuid = str(user_row.id)
     else:
         # Auto-provision user shell in Supabase
+        new_uuid = _uuid.uuid4()
         new_user = User(
-            id=_uuid.uuid4(),
+            id=new_uuid,
             auth_id=_uuid.uuid4(),
             email=clean_email,
             full_name="Sanctuary Seeker",
@@ -197,19 +200,38 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
         db.add(new_user)
         try:
             await db.commit()
+            user_uuid = str(new_uuid)
         except Exception as e:
             await db.rollback()
-            print(f"[AUTH LOGIN] Auto-provision warning: {e}", flush=True)
+            user_uuid = str(new_uuid)
 
         is_completed = clean_email in COMPLETED_PROFILES
 
-    print(f"[AUTH LOGIN] User logged in: email={clean_email} is_profile_completed={is_completed}", flush=True)
+    from app.core.security import create_access_token
+    session_token = create_access_token({"sub": str(user_uuid), "email": clean_email})
+
+    from app.services.firebase_auth_service import FirebaseAuthService
+    custom_token = None
+    fb_uid = None
+    try:
+        fb_user, custom_token = FirebaseAuthService.verify_or_create_firebase_user(clean_email)
+        fb_uid = fb_user.uid if fb_user else None
+    except Exception as fb_err:
+        print(f"[AUTH LOGIN] Firebase sync notice: {fb_err}", flush=True)
+
+    print(f"[AUTH LOGIN] User logged in: email={clean_email} is_profile_completed={is_completed} user_id={user_uuid}", flush=True)
     return {
         "status": "authenticated",
-        "email": payload.email,
+        "email": clean_email,
+        "user_id": user_uuid,
+        "access_token": session_token,
+        "token": session_token,
+        "firebase_token": custom_token,
+        "firebase_uid": fb_uid,
         "is_profile_completed": is_completed,
         "message": "Authentication successful."
     }
+
 
 
 import asyncio
@@ -669,7 +691,8 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
         clean_key = key_to_check.strip()
         if clean_key in MAGIC_LINK_VAULT:
             record = MAGIC_LINK_VAULT[clean_key]
-            if not record.get("used", False) and record["expires_at"] > datetime.now(timezone.utc):
+            # Accept token if within expiry, even if browser tap already set used=True for deep link handoff
+            if record["expires_at"] > datetime.now(timezone.utc):
                 matched_email = record["email"]
                 record["used"] = True
 
@@ -681,6 +704,7 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
 
     if not matched_email:
         raise HTTPException(status_code=400, detail="Invalid, expired, or already used magic link.")
+
 
     res = await db.execute(select(User).where(User.email == matched_email))
     user_row = res.scalar_one_or_none()

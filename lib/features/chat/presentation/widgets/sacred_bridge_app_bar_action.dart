@@ -6,6 +6,7 @@ import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../navigation/presentation/screens/sanctuary_navigation_shell.dart';
 import '../../data/chat_websocket_service.dart';
 import '../controllers/chat_dialogue_controller.dart';
+import '../../../growth/presentation/controllers/growth_hub_controller.dart';
 
 /// Progress badge & multi-platform deep-linker for Sacred Contact Bridge
 /// Enforces DPDP Act Section 11 & IT Rules 2021: Contact handle is NEVER revealed
@@ -154,6 +155,11 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
                 final ok = await ref
                     .read(chatDialogueControllerProvider(matchId).notifier)
                     .redeemBridgeRevealToken();
+                if (ok) {
+                  try {
+                    ref.read(growthHubControllerProvider.notifier).syncUserData();
+                  } catch (_) {}
+                }
                 if (context.mounted) {
                   if (ok) {
                     ScaffoldMessenger.of(context).showSnackBar(

@@ -112,7 +112,7 @@ async def get_discovery_feed(
         "candidates": cards,
         "data": cards,
         "swipes_remaining": current_user.swipes_remaining if current_user else 10,
-        "direct_letters_count": (current_user.direct_letters_count if (current_user and current_user.direct_letters_count is not None and current_user.direct_letters_count > 0) else (1 if current_user else 0)),
+        "direct_letters_count": (current_user.direct_letters_count if (current_user and current_user.direct_letters_count is not None) else 0),
         "streak_count": current_user.streak_count if current_user else 0,
         "boost_points": current_user.boost_points if current_user else 0,
     }
@@ -151,22 +151,35 @@ async def record_swipe(
         if current_user.swipes_remaining > 0:
             current_user.swipes_remaining = max(0, current_user.swipes_remaining - 1)
 
-        # Check for mutual like or direct resonate
+        # Decrement direct_letters_count on direct letters in PostgreSQL
         swipe_type_clean = payload.swipe_type.lower()
+        if swipe_type_clean == "direct":
+            if (current_user.direct_letters_count or 0) > 0:
+                current_user.direct_letters_count = max(0, current_user.direct_letters_count - 1)
+
+        # Check for mutual like or direct resonate
         if swipe_type_clean in ("like", "direct", "superlike"):
             from app.api.v1.endpoints.notifications import push_notification
-            push_notification(
-                user_id=str(target_uuid),
-                notif_type="direct_letter" if swipe_type_clean in ("direct", "superlike") else "like",
-                title="Direct Resonate Spark ✨" if swipe_type_clean in ("direct", "superlike") else "New Resonance ✨",
-                body=f"{current_user.full_name} sent you a Direct Sanctuary Letter." if swipe_type_clean in ("direct", "superlike") else f"{current_user.full_name} resonated with your profile.",
-                data={
-                    "actor_id": str(current_user.id),
-                    "actor_name": current_user.full_name,
-                    "swipe_type": swipe_type_clean,
-                    "target_route": "/resonances"
-                }
-            )
+
+            # For regular likes, notify target of new resonance
+            if swipe_type_clean == "like":
+                sender_photo = current_user.avatar_url or next((p for p in (current_user.photos or []) if p and str(p).strip()), "")
+                push_notification(
+                    user_id=str(target_uuid),
+                    notif_type="like",
+                    title="New Resonance ✨",
+                    body=f"{current_user.full_name} resonated with your profile.",
+                    data={
+                        "actor_id": str(current_user.id),
+                        "actor_name": current_user.full_name,
+                        "sender_id": str(current_user.id),
+                        "sender_name": current_user.full_name,
+                        "sender_avatar": sender_photo,
+                        "avatar_url": sender_photo,
+                        "swipe_type": swipe_type_clean,
+                        "target_route": "/resonances"
+                    }
+                )
 
             reciprocal_stmt = select(Swipe).where(
                 Swipe.actor_id == target_uuid,
@@ -176,7 +189,7 @@ async def record_swipe(
             reciprocal_res = await db.execute(reciprocal_stmt)
             reciprocal_swipe = reciprocal_res.scalar_one_or_none()
 
-            # If mutual like OR direct resonate, form a match
+            # If mutual like OR direct resonate, form a match/dialogue bridge
             if reciprocal_swipe or swipe_type_clean in ("direct", "superlike"):
                 is_match = True
                 existing_match_stmt = select(Match).where(
@@ -195,51 +208,89 @@ async def record_swipe(
                     await db.flush()
                 match_id = str(match.id)
 
-                # If a direct letter was attached, persist it as a real Message
+                # If a direct letter was attached, persist it as a real Message with storage encryption
                 if payload.letter_text and payload.letter_text.strip():
                     from app.models.domain.message import Message
+                    from app.api.v1.endpoints.chat_api import encrypt_message_storage
+                    storage_text = encrypt_message_storage(payload.letter_text.strip(), str(match.id))
                     direct_msg = Message(
                         match_id=match.id,
                         sender_id=current_user.id,
-                        encrypted_text=payload.letter_text.strip(),
+                        encrypted_text=storage_text,
                         status="delivered"
                     )
                     db.add(direct_msg)
 
-                # Push match notification to both users
                 target_user_res = await db.execute(select(User).where(User.id == target_uuid))
                 target_user = target_user_res.scalar_one_or_none()
                 target_name = target_user.full_name if target_user else "Seeker"
+                target_photo = target_user.avatar_url or next((p for p in (target_user.photos or []) if p and str(p).strip()), "") if target_user else ""
+                sender_photo = current_user.avatar_url or next((p for p in (current_user.photos or []) if p and str(p).strip()), "")
 
-                push_notification(
-                    user_id=str(current_user.id),
-                    notif_type="match",
-                    title="Sacred Match Ignited 💫",
-                    body=f"You and {target_name} have mutually resonated! Begin your mindful dialogue.",
-                    data={
-                        "match_id": match_id,
-                        "partner_id": str(target_uuid),
-                        "partner_name": target_name,
-                        "target_route": "/chat-dialogue"
-                    }
-                )
-                body_to_target = (
-                    f"{current_user.full_name} sent you a Direct Sanctuary Letter: \"{payload.letter_text.strip()[:60]}...\""
-                    if payload.letter_text and payload.letter_text.strip()
-                    else f"You and {current_user.full_name} have mutually resonated! Begin your mindful dialogue."
-                )
-                push_notification(
-                    user_id=str(target_uuid),
-                    notif_type="match",
-                    title="Sacred Match Ignited 💫" if not payload.letter_text else "Direct Letter & Match 💌",
-                    body=body_to_target,
-                    data={
-                        "match_id": match_id,
-                        "partner_id": str(current_user.id),
-                        "partner_name": current_user.full_name,
-                        "target_route": "/chat-dialogue"
-                    }
-                )
+                if reciprocal_swipe:
+                    # Genuine mutual resonance: Notify both users
+                    push_notification(
+                        user_id=str(current_user.id),
+                        notif_type="match",
+                        title="Sacred Match Ignited 💫",
+                        body=f"You and {target_name} have mutually resonated! Begin your mindful dialogue.",
+                        data={
+                            "match_id": match_id,
+                            "partner_id": str(target_uuid),
+                            "partner_name": target_name,
+                            "peer_name": target_name,
+                            "sender_id": str(target_uuid),
+                            "sender_name": target_name,
+                            "partner_photo": target_photo,
+                            "sender_avatar": target_photo,
+                            "avatar_url": target_photo,
+                            "target_route": "/chat-dialogue"
+                        }
+                    )
+                    push_notification(
+                        user_id=str(target_uuid),
+                        notif_type="match",
+                        title="Sacred Match Ignited 💫",
+                        body=f"You and {current_user.full_name} have mutually resonated! Begin your mindful dialogue.",
+                        data={
+                            "match_id": match_id,
+                            "partner_id": str(current_user.id),
+                            "partner_name": current_user.full_name,
+                            "peer_name": current_user.full_name,
+                            "sender_id": str(current_user.id),
+                            "sender_name": current_user.full_name,
+                            "partner_photo": sender_photo,
+                            "sender_avatar": sender_photo,
+                            "avatar_url": sender_photo,
+                            "target_route": "/chat-dialogue"
+                        }
+                    )
+                else:
+                    # Inbound Direct Letter from current_user (sender) to target_uuid (recipient)
+                    # Strictly notify only the recipient without generating false self-match alerts on the sender
+                    body_to_target = (
+                        f"{current_user.full_name} sent you a Direct Sanctuary Letter: \"{payload.letter_text.strip()[:60]}...\""
+                        if payload.letter_text and payload.letter_text.strip()
+                        else f"{current_user.full_name} sent you a Direct Sanctuary Letter."
+                    )
+                    push_notification(
+                        user_id=str(target_uuid),
+                        notif_type="direct_letter",
+                        title="Direct Sanctuary Letter 💌",
+                        body=body_to_target,
+                        data={
+                            "match_id": match_id,
+                            "partner_id": str(current_user.id),
+                            "partner_name": current_user.full_name,
+                            "peer_name": current_user.full_name,
+                            "sender_id": str(current_user.id),
+                            "sender_name": current_user.full_name,
+                            "partner_photo": sender_photo,
+                            "sender_avatar": sender_photo,
+                            "avatar_url": sender_photo,
+                            "target_route": "/chat-dialogue"
+                        }
+                    )
 
         await db.commit()
     else:
