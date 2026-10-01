@@ -82,7 +82,7 @@ def verify_admob_ecdsa(query_string: str) -> bool:
     padded_b64 = signature_b64 + "=" * (-len(signature_b64) % 4)
     try:
         signature_der = base64.urlsafe_b64decode(padded_b64)
-    except Exception:
+    except (ValueError, TypeError):
         return False
 
     # Fetch cached public keys
@@ -192,7 +192,7 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
     # 5. Atomic Balance Credit & Audit Commit
     try:
         user_uuid = UUID(user_id_str)
-    except ValueError:
+    except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="Invalid user UUID in custom_data.")
 
     await db.execute(

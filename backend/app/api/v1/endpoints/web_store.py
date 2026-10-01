@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import get_settings
 from app.core.database import get_db
@@ -121,7 +122,7 @@ async def verify_store_user(payload: VerifyUserRequest, db: AsyncSession = Depen
         parsed_uuid = uuid.UUID(q)
         res = await db.execute(select(User).where(User.id == parsed_uuid))
         user = res.scalar_one_or_none()
-    except Exception:
+    except (ValueError, TypeError):
         pass
 
     if not user:
@@ -191,7 +192,7 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         parsed_uuid = uuid.UUID(user_query)
         res = await db.execute(select(User).where(User.id == parsed_uuid))
         user = res.scalar_one_or_none()
-    except Exception:
+    except (ValueError, TypeError):
         pass
 
     if not user:
@@ -219,9 +220,9 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         )
         db.add(ledger)
         await db.commit()
-    except Exception as e:
+    except SQLAlchemyError as e:
         await db.rollback()
-        print(f"[STORE ORDER PERSISTENCE WARNING] {e}", flush=True)
+        raise HTTPException(status_code=500, detail="Failed to persist order to database.")
 
     return {
         "status": "order_created",
@@ -303,8 +304,9 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
             .values(status="pending_verification")
         )
         await db.commit()
-    except Exception as e:
+    except SQLAlchemyError as e:
         await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update order status.")
 
     tx_hash = f"0x{uuid.uuid4().hex[:16]}"
     deep_link = f"urheart://store/receipt?order_id={payload.order_id}&status=pending_verification"
@@ -360,7 +362,7 @@ async def approve_store_order(
             parsed_uuid = uuid.UUID(user_query)
             res = await db.execute(select(User).where(User.id == parsed_uuid))
             user = res.scalar_one_or_none()
-        except Exception:
+        except (ValueError, TypeError):
             pass
 
         if not user and "@" in user_query:
