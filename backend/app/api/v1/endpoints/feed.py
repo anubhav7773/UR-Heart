@@ -57,11 +57,24 @@ async def get_discovery_feed(
         swiped_subq = select(Swipe.target_id).where(Swipe.actor_id == current_user.id)
         stmt = stmt.where(not_(User.id.in_(swiped_subq)))
 
-        # Orientation matching if specified
-        if current_user.interested_in in ("Women", "Woman"):
-            stmt = stmt.where(User.gender.in_(["Woman", "Women"]))
-        elif current_user.interested_in in ("Men", "Man"):
-            stmt = stmt.where(User.gender.in_(["Man", "Men"]))
+        # Orientation matching — bidirectional algorithm
+        # Direction 1: User's preference → filter candidate's gender
+        if current_user.interested_in and current_user.interested_in not in ("Everyone",):
+            if current_user.interested_in in ("Women", "Woman"):
+                stmt = stmt.where(User.gender.in_(["Woman", "Women"]))
+            elif current_user.interested_in in ("Men", "Man"):
+                stmt = stmt.where(User.gender.in_(["Man", "Men"]))
+
+        # Direction 2: Candidate must also be interested in user's gender (reverse check)
+        if current_user.gender:
+            user_g = current_user.gender.strip()
+            if user_g in ("Man", "Men"):
+                stmt = stmt.where(User.interested_in.in_(["Men", "Man", "Everyone"]))
+            elif user_g in ("Woman", "Women"):
+                stmt = stmt.where(User.interested_in.in_(["Women", "Woman", "Everyone"]))
+            else:
+                # Non-binary / Other: only show candidates interested in Everyone
+                stmt = stmt.where(User.interested_in == "Everyone")
 
     # Priority Ranking: Boosted candidates with higher streak & boost points appear first!
     stmt = stmt.order_by(

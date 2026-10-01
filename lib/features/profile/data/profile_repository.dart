@@ -182,6 +182,8 @@ class ProfileRepository {
           'profession': updated.profession,
           'education': updated.education,
           'location_name': updated.location,
+          'gender': updated.gender,
+          'interested_in': updated.interestedIn,
           'preferred_age_min': updated.minAgePref.toInt(),
           'preferred_age_max': updated.maxAgePref.toInt(),
           'photos': updated.momentPhotos,

@@ -87,7 +87,7 @@ class OrientationSelectorPills extends ConsumerWidget {
               padding: const EdgeInsets.only(right: 8.0),
               child: InkWell(
                 borderRadius: BorderRadius.circular(20.0),
-                onTap: () => notifier.toggleInterestedIn(opt),
+                onTap: () => notifier.setInterestedIn(opt),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   decoration: BoxDecoration(

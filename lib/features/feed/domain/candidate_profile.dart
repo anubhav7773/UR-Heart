@@ -140,10 +140,34 @@ class CandidateProfile {
     bool targetIsIncognito = false,
   }) {
     if (targetIsIncognito) return false;
-    final matchUserWantsTarget = userInterestedIn == 'Everyone' ||
-        targetGender.toLowerCase() == userInterestedIn.toLowerCase();
-    final matchTargetWantsUser = targetInterestedIn == 'Everyone' ||
-        targetInterestedIn.toLowerCase() == userGender.toLowerCase();
-    return matchUserWantsTarget && matchTargetWantsUser;
+
+    final normTargetGender = _normalizeGender(targetGender);
+    final normUserGender = _normalizeGender(userGender);
+    final normUserInterest = _normalizeInterest(userInterestedIn);
+    final normTargetInterest = _normalizeInterest(targetInterestedIn);
+
+    // Does user want to see this candidate's gender?
+    final userWantsTarget = normUserInterest == 'everyone' ||
+        normTargetGender == normUserInterest;
+    // Does candidate want to see user's gender?
+    final targetWantsUser = normTargetInterest == 'everyone' ||
+        normUserGender == normTargetInterest;
+
+    return userWantsTarget && targetWantsUser;
+  }
+
+  static String _normalizeGender(String g) {
+    final lower = g.trim().toLowerCase();
+    if (['man', 'men', 'male'].contains(lower)) return 'men';
+    if (['woman', 'women', 'female'].contains(lower)) return 'women';
+    return lower; // non-binary, other, etc.
+  }
+
+  static String _normalizeInterest(String i) {
+    final lower = i.trim().toLowerCase();
+    if (['man', 'men', 'male'].contains(lower)) return 'men';
+    if (['woman', 'women', 'female'].contains(lower)) return 'women';
+    if (lower.contains(',') || lower == 'everyone' || lower.isEmpty) return 'everyone';
+    return lower;
   }
 }

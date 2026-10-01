@@ -410,6 +410,14 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     state = state.copyWith(interestedIn: updated);
   }
 
+  /// Sets a single interested_in preference (radio-style single-select)
+  void setInterestedIn(String option) {
+    state = state.copyWith(interestedIn: {option});
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('profile_interested_in', option);
+    });
+  }
+
   void updateContactBridge({required String platform, required String handle}) {
     state = state.copyWith(
       contactBridgePlatform: platform,
@@ -461,7 +469,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
 
     final prefs = await SharedPreferences.getInstance();
     final interestedInStr = state.interestedIn.isNotEmpty
-        ? state.interestedIn.join(', ')
+        ? state.interestedIn.first
         : 'Everyone';
     await prefs.setString('profile_interested_in', interestedInStr);
     await prefs.setString('profile_full_name', state.fullName);

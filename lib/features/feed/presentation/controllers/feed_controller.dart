@@ -67,9 +67,21 @@ class FeedController extends StateNotifier<FeedState> {
         await prefs.setInt('ur_heart_direct_letters', deck.directLettersCount!);
       }
 
+      // Client-side defense-in-depth orientation filter
+      final userGender = prefs.getString('profile_gender') ?? '';
+      final userInterestedIn = prefs.getString('profile_interested_in') ?? 'Everyone';
+      final filtered = deck.candidates.where((c) {
+        return CandidateProfile.checkOrientationShield(
+          userGender: userGender,
+          userInterestedIn: userInterestedIn,
+          targetGender: c.gender,
+          targetInterestedIn: c.lookingFor,
+        );
+      }).toList();
+
       if (!mounted) return;
       state = state.copyWith(
-        candidates: deck.candidates,
+        candidates: filtered,
         swipesRemaining: deck.swipesRemaining ?? state.swipesRemaining,
         directLettersCount: resolvedLetters,
         isLoading: false,
