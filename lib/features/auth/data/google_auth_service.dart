@@ -92,22 +92,75 @@ class GoogleAuthService {
 
     _initCompleter = Completer<void>();
     try {
-      await GoogleSignIn.instance.initialize(
-        serverClientId: serverClientId,
-      );
+      if (!kIsWeb) {
+        await GoogleSignIn.instance.initialize(
+          serverClientId: serverClientId,
+        );
+      }
       _isInitialized = true;
-      _initCompleter!.complete();
+      _initCompleter?.complete();
     } catch (e) {
-      _initCompleter!.completeError(e);
+      _initCompleter?.completeError(e);
       _initCompleter = null;
-      debugPrint('[GoogleAuthService] Initialization error: $e');
-      rethrow;
+      debugPrint('[GoogleAuthService] Initialization notice: $e');
+      if (!kIsWeb) rethrow;
     }
   }
 
   /// Triggers the Google One Tap / Interactive Credential Flow
   Future<GoogleAuthResult> signIn() async {
     try {
+      // 1. WEB PLATFORM: Use native Firebase signInWithPopup
+      if (kIsWeb) {
+        final auth = _auth;
+        if (auth == null) {
+          return GoogleAuthResult.failure(
+            'Firebase Auth service is unavailable on Web. Please refresh the page.',
+          );
+        }
+
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({
+          'prompt': 'select_account',
+        });
+
+        final UserCredential userCredential =
+            await auth.signInWithPopup(googleProvider);
+        final User? user = userCredential.user;
+        if (user == null) {
+          return GoogleAuthResult.failure(
+            'Unable to retrieve user details from Google sign-in.',
+          );
+        }
+
+        final String? idToken = await user.getIdToken();
+        final String email = user.email ?? '';
+        final String? displayName = user.displayName;
+        final String? photoUrl = user.photoURL;
+        final String userId = user.uid;
+
+        if (idToken != null) {
+          await SecureSessionStorage.instance.saveAuthToken(idToken);
+        }
+        await SecureSessionStorage.instance.saveUserSession(
+          userId: userId,
+          email: email,
+          displayName: displayName,
+          photoUrl: photoUrl,
+        );
+
+        return GoogleAuthResult.success(
+          userId: userId,
+          email: email,
+          displayName: displayName,
+          photoUrl: photoUrl,
+          idToken: idToken,
+        );
+      }
+
+      // 2. MOBILE PLATFORM: Native GoogleSignIn Authenticate flow
       await initialize();
 
       // Trigger modern Credential Manager One Tap / Account Chooser
@@ -170,17 +223,29 @@ class GoogleAuthService {
     } on FirebaseAuthException catch (e) {
       debugPrint(
           '[GoogleAuthService] FirebaseAuthException: ${e.code} - ${e.message}');
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request' ||
+          e.code == 'web-context-cancelled') {
+        return GoogleAuthResult.cancelled();
+      }
+      if (e.code == 'unauthorized-domain') {
+        return GoogleAuthResult.failure(
+          'Domain is not authorized in Firebase Console. Please add urheart.asiverticals.me to Authorized Domains.',
+        );
+      }
       return GoogleAuthResult.failure(
         e.message ?? 'Authentication service error. Please try again.',
       );
     } catch (e) {
       debugPrint('[GoogleAuthService] Unexpected error: $e');
       final errorStr = e.toString();
-      if (errorStr.toLowerCase().contains('cancel')) {
+      if (errorStr.toLowerCase().contains('cancel') ||
+          errorStr.toLowerCase().contains('popup_closed') ||
+          errorStr.toLowerCase().contains('closed')) {
         return GoogleAuthResult.cancelled();
       }
       return GoogleAuthResult.failure(
-        'Unable to sign in with Google. Please check your internet connection.',
+        'Google Sign-In error: $e',
       );
     }
   }
