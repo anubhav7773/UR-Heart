@@ -14,6 +14,7 @@ import '../../features/chat/presentation/screens/chat_dialogue_screen.dart';
 import '../../features/profile/presentation/screens/my_persona_screen.dart';
 import '../../features/legal_vault/presentation/screens/vault_legal_screen.dart';
 import '../../features/settings/presentation/screens/sanctuary_settings_screen.dart';
+import '../../features/settings/presentation/screens/sanctuary_app_info_screen.dart';
 import '../../features/settings/presentation/screens/superadmin_kyc_desk_screen.dart';
 import '../../features/rewards/presentation/screens/growth_hub_screen.dart';
 import '../../features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
@@ -72,6 +73,8 @@ class URHeartApp extends ConsumerWidget {
         SanctuarySettingsScreen.routeName: (context) => const SanctuarySettingsScreen(),
         SuperadminKycDeskScreen.routeName: (context) => const SuperadminKycDeskScreen(),
         EvaSanctuaryScreen.routeName: (context) => const EvaSanctuaryScreen(),
+        SanctuaryAppInfoScreen.routeName: (context) => const SanctuaryAppInfoScreen(),
+        '/appinfo': (context) => const SanctuaryAppInfoScreen(),
       },
       onGenerateRoute: (settings) {
         final routeName = settings.name ?? '';

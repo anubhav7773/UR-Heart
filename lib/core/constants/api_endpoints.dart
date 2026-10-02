@@ -6,7 +6,7 @@ class ApiEndpoints {
   // Official Production Domain (Asiverticals.me parent network)
   static const String officialDomain = 'urheart.asiverticals.me';
   static const String fallbackDomain = 'ur-heart.onrender.com';
-  static const String webSanctuaryUrl = 'https://urheart.asiverticals.me';
+  static const String webSanctuaryUrl = 'https://urheart.asiverticals.me/appinfo';
   static const String privacyPolicyUrl = 'https://urheart.asiverticals.me/privacy';
   static const String termsOfServiceUrl = 'https://urheart.asiverticals.me/terms';
   static const String deleteAccountUrl = 'https://urheart.asiverticals.me/delete-account';

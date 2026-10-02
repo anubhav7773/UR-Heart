@@ -3,6 +3,18 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://ur-heart.onrender.com/api/$1"
+    },
+    {
+      "source": "/store/(.*)",
+      "destination": "https://ur-heart.onrender.com/store/$1"
+    },
+    {
+      "source": "/store",
+      "destination": "https://ur-heart.onrender.com/store"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
