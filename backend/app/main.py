@@ -197,18 +197,9 @@ app.include_router(statutory_direct_router, prefix=f"{settings.API_V1_PREFIX}/st
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
 
-@app.api_route("/", methods=["GET", "HEAD"], tags=["Render Health"])
-@app.api_route("/health", methods=["GET", "HEAD"], tags=["Render Health"])
-@limiter.limit("120/minute")
-async def root_health_probe(request: Request):
-    """
-    Root endpoint:
-    - If accessed by a web browser (accept: text/html) on '/', renders the responsive dark-sanctuary web landing page.
-    - If accessed via API / probe / HEAD / '/health', returns high-speed JSON health status.
-    """
-    accept_header = request.headers.get("accept", "")
-    if request.method == "GET" and request.url.path == "/" and "text/html" in accept_header:
-        html = f"""<!DOCTYPE html>
+def get_sanctuary_overview_html() -> str:
+    """Generates the responsive dark-sanctuary platform overview & 9 subsystems HTML."""
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -1144,7 +1135,31 @@ async def root_health_probe(request: Request):
   </script>
 </body>
 </html>"""
-        return HTMLResponse(content=html, status_code=200)
+
+
+@app.get("/appinfo", response_class=HTMLResponse, tags=["Sanctuary Overview"])
+@app.get("/overview", response_class=HTMLResponse, tags=["Sanctuary Overview"])
+@app.get("/info", response_class=HTMLResponse, tags=["Sanctuary Overview"])
+async def sanctuary_appinfo_overview(request: Request):
+    """
+    Official Web Sanctuary Platform Overview & 9 Subsystems (/appinfo).
+    Primary destination for in-app statutory portal links and browser seekers.
+    """
+    return HTMLResponse(content=get_sanctuary_overview_html(), status_code=200)
+
+
+@app.api_route("/", methods=["GET", "HEAD"], tags=["Render Health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Render Health"])
+@limiter.limit("120/minute")
+async def root_health_probe(request: Request):
+    """
+    Root endpoint:
+    - If accessed on '/' with browser accept header, renders responsive dark-sanctuary web landing page.
+    - If accessed on '/health' or via API / probe / HEAD, returns high-speed JSON health status.
+    """
+    accept_header = request.headers.get("accept", "")
+    if request.method == "GET" and request.url.path == "/" and ("text/html" in accept_header or accept_header == "*/*" or not accept_header):
+        return HTMLResponse(content=get_sanctuary_overview_html(), status_code=200)
 
     # High-speed API / Probe response
     return JSONResponse(

@@ -174,3 +174,68 @@ async def test_night_slumber_preference_update_and_persistence(mock_user, mock_d
         assert get_data["preferences"]["night_slumber"] is True
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_appinfo_and_overview_rendering():
+    """
+    Verify that /appinfo and /overview return HTTP 200 and render the complete
+    Sanctuary Platform Overview HTML and 9 subsystems without 404 Not Found.
+    """
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. /appinfo
+        resp_appinfo = await client.get("/appinfo")
+        assert resp_appinfo.status_code == 200
+        assert "UR-Heart" in resp_appinfo.text
+        assert "The 9 Core Sanctuary Subsystems" in resp_appinfo.text
+        assert "Discovery Deck & Resonance Engine" in resp_appinfo.text
+        assert "Sanctuary Web Store" in resp_appinfo.text
+
+        # 2. /overview
+        resp_overview = await client.get("/overview")
+        assert resp_overview.status_code == 200
+        assert "The 9 Core Sanctuary Subsystems" in resp_overview.text
+
+
+@pytest.mark.asyncio
+async def test_web_store_html_pricing_and_validity_alignment():
+    """
+    Verify that /store HTML product cards exactly reflect 100% in-app pricing,
+    validity (365 days for 1-Year pass, 24h for Global passport), and conditions.
+    """
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp_store = await client.get("/store")
+        assert resp_store.status_code == 200
+        text = resp_store.text
+
+        # 1. 1-Year Sovereign Pass alignment (365 Days, ₹799)
+        assert "1-Year Sovereign Pass" in text
+        assert "365 Days Access" in text
+        assert "365-Day Sovereign Crest" in text
+        assert "₹799" in text
+
+        # 2. 24h Global Passport alignment (24h, ₹99)
+        assert "24h Global Passport" in text
+        assert "24 Hours Unrestricted Access" in text
+        assert "₹99" in text
+        assert "selectProduct('urheart_pack_global_passport', 99" in text
+
+        # 3. Instant Contact Key mutual consent condition
+        assert "Instant Contact Key" in text
+        assert "Requires Mutual Partner Consent" in text
+        assert "₹29" in text
+
+        # 4. Weekly and Monthly alignment
+        assert "1-Week Sovereign Sprint" in text
+        assert "Popular" in text
+        assert "₹49" in text
+        assert "1-Month Sovereign Pass" in text
+        assert "Most Mindful" in text
+        assert "₹149" in text
+
+        # 5. Statutory billing terms box
+        assert "Sovereign Billing Terms & Conditions" in text
+        assert "Mutual Consent Guarantee" in text
+

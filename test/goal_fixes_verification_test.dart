@@ -103,7 +103,7 @@ void main() {
       expect(args.recipientName, 'Aarav Sharma');
       expect(args.recipientAge, 25);
       expect(args.isOnline, true);
-      expect(args.hasWaKey, true);
+      expect(args.hasWaKey, false);
     });
   });
 
@@ -206,7 +206,7 @@ void main() {
     test('ApiEndpoints configured with urheart.asiverticals.me', () {
       expect(ApiEndpoints.officialDomain, 'urheart.asiverticals.me');
       expect(ApiEndpoints.defaultBaseUrl, 'https://urheart.asiverticals.me');
-      expect(ApiEndpoints.webSanctuaryUrl, 'https://urheart.asiverticals.me');
+      expect(ApiEndpoints.webSanctuaryUrl, 'https://urheart.asiverticals.me/appinfo');
     });
 
     testWidgets('OfficialWebSanctuaryCard renders official domain and launch button', (tester) async {

@@ -388,6 +388,14 @@ CONTACT_SCRIPT = """
 """
 
 
+@router.get("/appinfo", response_class=HTMLResponse)
+@router.get("/overview", response_class=HTMLResponse)
+async def serve_statutory_appinfo():
+    """Serves the complete UR-Heart platform overview on statutory routes."""
+    from app.main import get_sanctuary_overview_html
+    return HTMLResponse(content=get_sanctuary_overview_html(), status_code=200)
+
+
 @router.get("/privacy-policy", response_class=HTMLResponse)
 @router.get("/privacy", response_class=HTMLResponse)
 async def serve_privacy_policy(request: Request):

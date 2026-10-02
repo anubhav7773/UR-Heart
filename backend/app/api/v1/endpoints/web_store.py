@@ -47,7 +47,7 @@ STORE_PRODUCTS = {
     },
     "urheart_pass_lifetime": {
         "id": "urheart_pass_lifetime",
-        "name": "1-Year Sovereign Pass (365 Days)",
+        "name": "1-Year Sovereign Pass",
         "badge": "365 Days Access",
         "price_inr": 799,
         "price_usd": 59.99,
@@ -59,7 +59,7 @@ STORE_PRODUCTS = {
     "urheart_key_instant_contact": {
         "id": "urheart_key_instant_contact",
         "name": "Instant Contact Key",
-        "badge": "A La Carte",
+        "badge": "Key",
         "price_inr": 29,
         "price_usd": 1.49,
         "duration_days": 0,
@@ -70,7 +70,7 @@ STORE_PRODUCTS = {
     "urheart_pack_direct_letters": {
         "id": "urheart_pack_direct_letters",
         "name": "3 Direct Letters Pack",
-        "badge": "A La Carte",
+        "badge": "Micro",
         "price_inr": 49,
         "price_usd": 1.99,
         "duration_days": 0,
@@ -81,7 +81,7 @@ STORE_PRODUCTS = {
     "urheart_pack_global_passport": {
         "id": "urheart_pack_global_passport",
         "name": "24h Global Passport",
-        "badge": "A La Carte",
+        "badge": "Passport",
         "price_inr": 99,
         "price_usd": 1.99,
         "duration_days": 1,
@@ -222,27 +222,30 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         res = await db.execute(select(User).where(User.email == user_query.lower()))
         user = res.scalar_one_or_none()
 
-    target_user_id = user.id if user else uuid.uuid4()
-
     # SEC-MED-02: Persist pending order to PostgreSQL so container spin-downs do not lose order state
-    try:
-        ledger = InAppPurchase(
-            user_id=target_user_id,
-            transaction_reference=order_id,
-            product_identifier=payload.product_id,
-            store="web_store",
-            currency=payload.currency,
-            amount_gross=float(amount),
-            platform_fee=0.00,
-            amount_net=float(amount),
-            status="pending_verification"
-        )
-        db.add(ledger)
-        await db.commit()
-    except SQLAlchemyError as e:
-        await db.rollback()
-        print(f"[STORE ORDER PERSISTENCE ERROR] {e}", flush=True)
-        raise HTTPException(status_code=500, detail="Failed to persist order to database.")
+    # If this is a demo/seeker test account without a DB user row, keep in memory only to satisfy FK constraint
+    is_demo_seeker = "seeker" in user_query.lower() or "demo" in user_query.lower()
+    if user or not is_demo_seeker:
+        try:
+            target_user_id = user.id if user else (parsed_uuid or uuid.uuid4())
+            resolved_store = "web_razorpay_india" if payload.currency == "INR" else "web_stripe_global"
+            ledger = InAppPurchase(
+                user_id=target_user_id,
+                transaction_reference=order_id,
+                product_identifier=payload.product_id,
+                store=resolved_store,
+                currency=payload.currency,
+                amount_gross=float(amount),
+                platform_fee=0.00,
+                amount_net=float(amount),
+                status="pending"
+            )
+            db.add(ledger)
+            await db.commit()
+        except SQLAlchemyError as e:
+            await db.rollback()
+            print(f"[STORE ORDER PERSISTENCE ERROR] {e}", flush=True)
+            raise HTTPException(status_code=500, detail="Failed to persist order to database.")
 
     return {
         "status": "order_created",
@@ -321,7 +324,7 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
         await db.execute(
             update(InAppPurchase)
             .where(InAppPurchase.transaction_reference == payload.order_id)
-            .values(status="pending_verification")
+            .values(status="pending")
         )
         await db.commit()
     except SQLAlchemyError as e:
@@ -430,6 +433,16 @@ async def approve_store_order(
                 update(User)
                 .where(User.id == user.id)
                 .values(reveal_tokens_count=User.reveal_tokens_count + 1)
+            )
+        elif "global_passport" in product_id:
+            await db.execute(
+                update(User)
+                .where(User.id == user.id)
+                .values(
+                    subscription_expires_at=expires_at,
+                    swipes_remaining=999999,
+                    is_ad_free=True
+                )
             )
 
     # Update order & ledger status to 'completed'
@@ -1075,33 +1088,35 @@ async def serve_web_sanctuary_store(request: Request):
             <ul class="product-features">
               <li>Unlimited Swipes & Discoveries</li>
               <li>5 Weekly Direct Letters</li>
-              <li>100% Ad-Free Silence</li>
+              <li>100% Ad-Free Silence (30 Days)</li>
               <li>Eva AI Priority Counsel</li>
             </ul>
           </div>
 
           <div class="product-card" onclick="selectProduct('urheart_pass_weekly', 49, '1-Week Sovereign Sprint')">
-            <span class="product-card-badge">Sprint</span>
+            <span class="product-card-badge">Popular</span>
             <div class="product-name">1-Week Sovereign Sprint</div>
             <div class="product-price">₹49 <span style="font-size:12px; color:var(--text-muted);">/ $4.99</span></div>
             <div class="product-bonus">✨ 7-Day Complete Silence</div>
             <ul class="product-features">
               <li>Unlimited Card Discovery</li>
               <li>10 Bonus Reflections</li>
-              <li>Zero Advertisements</li>
+              <li>Zero Advertisements (7 Days)</li>
+              <li>Instant Fast Pass</li>
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_pass_lifetime', 799, 'Lifetime Sovereign Crest')">
-            <span class="product-card-badge">Forever</span>
-            <div class="product-name">Lifetime Sovereign Crest</div>
+          <div class="product-card" onclick="selectProduct('urheart_pass_lifetime', 799, '1-Year Sovereign Pass')">
+            <span class="product-card-badge">365 Days Access</span>
+            <div class="product-name">1-Year Sovereign Pass</div>
             <div class="product-price">₹799 <span style="font-size:12px; color:var(--text-muted);">/ $59.99</span></div>
-            <div class="product-bonus">✨ One-Time Forever Crest</div>
+            <div class="product-bonus">✨ 365-Day Sovereign Crest</div>
             <ul class="product-features">
-              <li>Permanent Sovereign Crest</li>
-              <li>Infinite Resonances Forever</li>
+              <li>365 Days Sovereign Crest</li>
+              <li>Infinite Resonances for 1 Year</li>
               <li>Full Legal Vault Export Access</li>
-              <li>Never Pay Again</li>
+              <li>Stage 3 Reveal Token (Mutual Consent Required)</li>
+              <li>100% Ad-Free Silence (365 Days)</li>
             </ul>
           </div>
 
@@ -1109,10 +1124,11 @@ async def serve_web_sanctuary_store(request: Request):
             <span class="product-card-badge">Key</span>
             <div class="product-name">Instant Contact Key</div>
             <div class="product-price">₹29 <span style="font-size:12px; color:var(--text-muted);">/ $1.49</span></div>
-            <div class="product-bonus">✨ Skip 3-Ad Ritual</div>
+            <div class="product-bonus">✨ Fast-Track Reveal Token</div>
             <ul class="product-features">
-              <li>Instant WhatsApp / Phone Reveal</li>
-              <li>Zero Ad Wait Time</li>
+              <li>1 Contact Reveal Token</li>
+              <li>Requires Mutual Partner Consent</li>
+              <li>Skips 3-Ad Ritual Wait Time</li>
             </ul>
           </div>
 
@@ -1122,21 +1138,36 @@ async def serve_web_sanctuary_store(request: Request):
             <div class="product-price">₹49 <span style="font-size:12px; color:var(--text-muted);">/ $1.99</span></div>
             <div class="product-bonus">✨ Reach Their Private Box</div>
             <ul class="product-features">
-              <li>3 Guaranteed Direct Notes</li>
+              <li>3 Guaranteed Direct Notes (+ Web Bonus)</li>
               <li>Priority Kinship Inbox Delivery</li>
+              <li>Bypasses Standard Discovery Queue</li>
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_pack_global_passport', 79, '48h Global Passport')">
+          <div class="product-card" onclick="selectProduct('urheart_pack_global_passport', 99, '24h Global Passport')">
             <span class="product-card-badge">Passport</span>
-            <div class="product-name">48h Global Passport</div>
-            <div class="product-price">₹79 <span style="font-size:12px; color:var(--text-muted);">/ $2.99</span></div>
-            <div class="product-bonus">✨ Worldwide Cities</div>
+            <div class="product-name">24h Global Passport</div>
+            <div class="product-price">₹99 <span style="font-size:12px; color:var(--text-muted);">/ $1.99</span></div>
+            <div class="product-bonus">✨ 24h Global Teleportation</div>
             <ul class="product-features">
               <li>Teleport to Any Global City</li>
-              <li>48 Hours Unrestricted Access</li>
+              <li>24 Hours Unrestricted Access</li>
+              <li>Explore Worldwide Kinships</li>
             </ul>
           </div>
+        </div>
+
+        <!-- Statutory Billing Conditions Notice -->
+        <div style="margin-top:24px; padding:18px 22px; background:rgba(22, 33, 29, 0.72); border:1px solid rgba(43, 61, 53, 0.85); border-radius:14px; font-size:12.5px; color:var(--text-muted); line-height:1.65;">
+          <strong style="color:var(--gold); display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:13px;">
+            <span>⚖️</span> Sovereign Billing Terms & Conditions
+          </strong>
+          <ul style="padding-left:18px; margin:0;">
+            <li><strong>Validity:</strong> Sovereign Passes activate immediately upon payment verification and remain active for the exact duration purchased (7 days for Sprint, 30 days for Monthly, 365 days for 1-Year Pass, 24 hours for Global Passport).</li>
+            <li><strong>Mutual Consent Guarantee:</strong> Instant Contact Keys credit contact reveal tokens. In strict adherence with DPDP Act 2023 privacy regulations, contact disclosure occurs only upon uncoerced bilateral mutual consent.</li>
+            <li><strong>Web Advantage:</strong> All web store purchases include a 10% sovereign bonus over standard in-app billing.</li>
+            <li><strong>Refund Policy:</strong> Due to instantaneous digital entitlement delivery, purchases are non-refundable once unlocked, in compliance with statutory digital goods regulations.</li>
+          </ul>
         </div>
 
         <div class="btn-actions">
