@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Secure WSS Transport with Single-Use Ephemeral Handshake Tickets (DIS-06 Fix)
@@ -16,11 +15,14 @@ class ChatWebSocketService {
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
   bool _isDisposed = false;
+  bool _isConnected = false;
+  int _reconnectAttempts = 0;
   final StreamController<Map<String, dynamic>> _messageStreamController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get messageStream => _messageStreamController.stream;
   Stream<Map<String, dynamic>> get eventStream => _messageStreamController.stream;
+  bool get isConnected => _isConnected && _channel != null;
 
   ChatWebSocketService([Dio? dio, String? baseWsHost])
       : _dio = dio ?? Dio(),
@@ -50,19 +52,18 @@ class ChatWebSocketService {
         return;
       }
 
-      // 2. Open strictly encrypted WSS channel using ephemeral ticket
+      // 2. Open strictly encrypted WSS channel cross-platform (Web, Android, iOS)
       final wsUri = Uri.parse('wss://$_baseWsHost/ws/chat?ticket=$ticket');
-      _channel = IOWebSocketChannel.connect(
-        wsUri,
-        pingInterval: const Duration(seconds: 25),
-      );
+      _channel = WebSocketChannel.connect(wsUri);
+      _isConnected = true;
+      _reconnectAttempts = 0;
 
       _channel?.stream.listen(
         (data) {
-            final decoded = jsonDecode(data as String);
-            if (decoded is Map<String, dynamic>) {
-              _messageStreamController.add(decoded);
-            }
+          final decoded = jsonDecode(data as String);
+          if (decoded is Map<String, dynamic>) {
+            _messageStreamController.add(decoded);
+          }
         },
         onError: (_) => _handleDisconnect(),
         onDone: () => _handleDisconnect(),
@@ -105,14 +106,16 @@ class ChatWebSocketService {
   }
 
   void _handleDisconnect() {
+    _isConnected = false;
     if (_isDisposed) return;
     _heartbeatTimer?.cancel();
     _channel?.sink.close();
     _channel = null;
 
-    // Auto-reconnect after 4-second backoff
+    _reconnectAttempts++;
+    final delayMs = _reconnectAttempts <= 1 ? 800 : (_reconnectAttempts <= 3 ? 1500 : 3000);
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 4), () {
+    _reconnectTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!_isDisposed) {
         connectSecureChannel();
       }
@@ -121,6 +124,7 @@ class ChatWebSocketService {
 
   void disconnect() {
     _isDisposed = true;
+    _isConnected = false;
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
     _channel?.sink.close();

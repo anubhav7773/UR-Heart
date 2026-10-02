@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/flutter_windowmanager.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../data/chat_repository.dart';
 import '../controllers/chat_dialogue_controller.dart';
+import '../services/window_security_service.dart';
 import '../widgets/ai_icebreaker_chips_row.dart';
 import '../widgets/chat_safety_dialog.dart';
 import '../widgets/dialogue_message_bubble.dart';
@@ -77,7 +77,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
   void initState() {
     super.initState();
     try {
-      FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+      WindowSecurityService.enableSecureMode();
     } catch (_) {}
 
     Future.microtask(() {
@@ -132,7 +132,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
   @override
   void dispose() {
     try {
-      FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
+      WindowSecurityService.disableSecureMode();
     } catch (_) {}
     _scrollController.dispose();
     _chatInputController.dispose();

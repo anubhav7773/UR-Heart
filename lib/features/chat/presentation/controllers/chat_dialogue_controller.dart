@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/crypto/sanctuary_crypto_vault.dart';
 import '../../data/chat_repository.dart';
 import '../../data/chat_websocket_service.dart';
@@ -104,6 +105,7 @@ final chatDialogueControllerProvider = StateNotifierProvider.family<
 /// Manages X25519 Diffie-Hellman key exchange, ChaCha20-Poly1305 AEAD encryption,
 /// single-use WSS channel stream listening, and Sacred Bridge Stage progression.
 class ChatDialogueController extends StateNotifier<ChatDialogueState> {
+  static const _uuid = Uuid();
   final ChatWebSocketService _wsService;
   final ChatRepository _chatRepository;
   final String _currentUserId;
@@ -184,21 +186,52 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       _fetchBondingSparksQuietly();
     }
 
-    // 3. Start resilient 4-second active dialogue sync poller
+    // 3. Start resilient dialogue sync poller with intelligent reconciliation
     _startActiveDialoguePoller();
   }
 
   void _startActiveDialoguePoller() {
     _activeDialoguePoller?.cancel();
-    _activeDialoguePoller = Timer.periodic(const Duration(seconds: 4), (_) async {
+    // Adaptive frequency: 2s when socket disconnected/recovering, 6s when WS connected
+    final interval = _wsService.isConnected ? const Duration(seconds: 6) : const Duration(seconds: 2);
+    _activeDialoguePoller = Timer.periodic(interval, (_) async {
       if (!mounted) return;
       try {
         final freshMessages = await _chatRepository.fetchThreadMessages(state.matchId);
         if (freshMessages.isNotEmpty && mounted) {
-          final existingIds = state.messages.map((m) => m.id).toSet();
-          final newArrivals = freshMessages.where((m) => !existingIds.contains(m.id)).toList();
-          if (newArrivals.isNotEmpty) {
-            state = state.copyWith(messages: [...state.messages, ...newArrivals]);
+          final updatedMessages = List<ChatMessage>.from(state.messages);
+          bool hasChanges = false;
+
+          for (final fresh in freshMessages) {
+            // Check for exact ID match or fuzzy match on sent messages (reconciling optimistic UI)
+            final existingIdx = updatedMessages.indexWhere((m) {
+              if (m.id == fresh.id) return true;
+              if (m.isMe && fresh.isMe && m.text.trim() == fresh.text.trim()) {
+                final diffSeconds = fresh.createdAt.difference(m.createdAt).abs().inSeconds;
+                if (diffSeconds < 30) return true;
+              }
+              return false;
+            });
+
+            if (existingIdx != -1) {
+              final current = updatedMessages[existingIdx];
+              // Upgrade optimistic message with confirmed server id and status
+              if (current.id != fresh.id || current.status != fresh.status) {
+                updatedMessages[existingIdx] = current.copyWith(
+                  id: fresh.id,
+                  status: fresh.status,
+                );
+                hasChanges = true;
+              }
+            } else {
+              // Genuinely new message from peer
+              updatedMessages.add(fresh);
+              hasChanges = true;
+            }
+          }
+
+          if (hasChanges && mounted) {
+            state = state.copyWith(messages: updatedMessages);
           }
         }
       } catch (_) {}
@@ -240,22 +273,29 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
   /// Encrypts plaintext via X25519 + ChaCha20-Poly1305 before dispatching.
   Future<void> sendEncryptedMessage(String plainText) async {
+    final messageId = _uuid.v4();
+    final recipientId = state.peerProfile['recipient_id'] as String? ?? 'peer';
     final peerBytes = state.peerPublicKeyBytes;
+
     if (peerBytes == null || peerBytes.isEmpty) {
       // Fallback: Dispatches with standard envelope if peer key is pending exchange
       _wsService.sendJsonPayload({
         'type': 'dialogue_message',
         'match_id': state.matchId,
         'sender_id': _currentUserId,
+        'recipient_id': recipientId,
         'payload_type': 'unencrypted_fallback',
         'text': plainText,
+        'id': messageId,
+        'client_id': messageId,
+        'timestamp': DateTime.now().toIso8601String(),
       });
 
       final localMsg = ChatMessage(
-        id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
+        id: messageId,
         matchId: state.matchId,
         senderId: _currentUserId,
-        recipientId: state.peerProfile['recipient_id'] as String? ?? 'peer',
+        recipientId: recipientId,
         text: plainText,
         createdAt: DateTime.now(),
         status: MessageDeliveryStatus.sent,
@@ -263,12 +303,14 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       );
       state = state.copyWith(messages: [...state.messages, localMsg]);
 
-      // Persist to backend database
+      // Persist to backend database (skip duplicate WS dispatch since already sent)
       try {
         await _chatRepository.sendMessage(
           matchId: state.matchId,
           text: plainText,
-          recipientId: state.peerProfile['recipient_id'] as String? ?? 'peer',
+          recipientId: recipientId,
+          messageId: messageId,
+          skipWs: true,
         );
       } catch (_) {}
       return;
@@ -284,17 +326,21 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       'type': 'dialogue_message',
       'match_id': state.matchId,
       'sender_id': _currentUserId,
+      'recipient_id': recipientId,
       'payload_type': 'chacha20_poly1305',
       'ciphertext': packet.ciphertextBase64,
       'nonce': packet.nonceBase64,
       'mac': packet.macBase64,
+      'id': messageId,
+      'client_id': messageId,
+      'timestamp': DateTime.now().toIso8601String(),
     });
 
     final localMsg = ChatMessage(
-      id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
+      id: messageId,
       matchId: state.matchId,
       senderId: _currentUserId,
-      recipientId: state.peerProfile['recipient_id'] as String? ?? 'peer',
+      recipientId: recipientId,
       text: plainText,
       createdAt: DateTime.now(),
       status: MessageDeliveryStatus.sent,
@@ -302,12 +348,14 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     );
     state = state.copyWith(messages: [...state.messages, localMsg]);
 
-    // Persist to backend database
+    // Persist to backend database (skip duplicate WS dispatch since already sent)
     try {
       await _chatRepository.sendMessage(
         matchId: state.matchId,
         text: plainText,
-        recipientId: state.peerProfile['recipient_id'] as String? ?? 'peer',
+        recipientId: recipientId,
+        messageId: messageId,
+        skipWs: true,
       );
     } catch (_) {}
   }
@@ -337,13 +385,34 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       displayText = rawEvent['text'] as String? ?? rawEvent['content'] as String? ?? '';
     }
 
-    final msgId = rawEvent['id'] as String? ?? rawEvent['message_id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
-    if (state.messages.any((m) => m.id == msgId)) {
+    final msgId = rawEvent['id'] as String? ??
+        rawEvent['client_id'] as String? ??
+        rawEvent['message_id'] as String? ??
+        '';
+
+    // Layer 1 Dedup: Match by ID if present
+    if (msgId.isNotEmpty && state.messages.any((m) => m.id == msgId)) {
       return;
     }
 
+    // Layer 2 Dedup: Fuzzy content match within recent window to prevent double print
+    final trimmedText = displayText.trim();
+    final now = DateTime.now();
+    final isDuplicate = state.messages.any((m) {
+      if (!m.isMe && m.text.trim() == trimmedText) {
+        final diff = now.difference(m.createdAt).abs().inSeconds;
+        if (diff < 15) return true;
+      }
+      return false;
+    });
+
+    if (isDuplicate) {
+      return;
+    }
+
+    final finalId = msgId.isNotEmpty ? msgId : _uuid.v4();
     final newMsg = ChatMessage(
-      id: msgId,
+      id: finalId,
       matchId: state.matchId,
       senderId: senderId,
       recipientId: _currentUserId,

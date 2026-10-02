@@ -1,10 +1,11 @@
 import os
+import asyncio
 import base64
 import hashlib
 from datetime import date, datetime
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_
@@ -89,6 +90,8 @@ class SendMessageRequest(BaseModel):
     recipient_id: Optional[str] = None
     text: Optional[str] = None
     content: Optional[str] = None
+    id: Optional[str] = None
+    client_id: Optional[str] = None
 
 
 @router.get("/threads", status_code=status.HTTP_200_OK, summary="Get Active Dialogue Threads")
@@ -426,56 +429,87 @@ async def send_chat_message(
         )
     text_content = sanitized_or_reason
 
+    # Parse client message UUID for single-source-of-truth deduplication
+    target_msg_id = None
+    raw_client_id = payload.client_id or payload.id
+    if raw_client_id:
+        try:
+            target_msg_id = UUID(str(raw_client_id).strip())
+        except Exception:
+            target_msg_id = None
+
+    if target_msg_id:
+        existing_res = await db.execute(select(Message).where(Message.id == target_msg_id))
+        existing_m = existing_res.scalar_one_or_none()
+        if existing_m:
+            return {
+                "status": "delivered",
+                "id": str(existing_m.id),
+                "client_id": str(existing_m.id),
+                "match_id": str(existing_m.match_id),
+                "sender_id": str(existing_m.sender_id),
+                "text": text_content.strip(),
+                "created_at": existing_m.created_at.isoformat() if existing_m.created_at else "",
+            }
+
     # Encrypt before persisting in PostgreSQL messages table (E2EE at rest)
     storage_encrypted = encrypt_message_storage(text_content.strip(), str(match_uuid))
 
-    msg = Message(
-        match_id=match_uuid,
-        sender_id=current_user.id,
-        encrypted_text=storage_encrypted,
-        status="delivered"
-    )
+    msg_kwargs = {
+        "match_id": match_uuid,
+        "sender_id": current_user.id,
+        "encrypted_text": storage_encrypted,
+        "status": "delivered",
+    }
+    if target_msg_id:
+        msg_kwargs["id"] = target_msg_id
+
+    msg = Message(**msg_kwargs)
     db.add(msg)
     await db.commit()
     await db.refresh(msg)
 
-    # Find recipient from match and push notification + real-time WebSocket delivery
+    # Instant WebSocket Direct Message Delivery & Background Push Notification
     try:
-        match_res = await db.execute(select(Match).where(Match.id == match_uuid))
-        m = match_res.scalar_one_or_none()
-        if m:
-            recipient_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
-            
-            # 1. Instant WebSocket Direct Message Delivery
-            from app.services.chat_manager import manager
-            ws_msg = {
-                "type": "dialogue_message",
-                "match_id": str(match_uuid),
-                "sender_id": str(current_user.id),
-                "recipient_id": str(recipient_id),
-                "payload_type": "unencrypted_fallback",
-                "text": text_content.strip(),
-                "created_at": msg.created_at.isoformat() if msg.created_at else datetime.utcnow().isoformat(),
-                "id": str(msg.id),
-            }
-            await manager.send_direct_message(str(recipient_id), ws_msg)
+        from app.services.chat_manager import manager
+        ws_msg = {
+            "type": "dialogue_message",
+            "match_id": str(match_uuid),
+            "sender_id": str(current_user.id),
+            "recipient_id": str(recipient_id),
+            "payload_type": "unencrypted_fallback",
+            "text": text_content.strip(),
+            "created_at": msg.created_at.isoformat() if msg.created_at else datetime.utcnow().isoformat(),
+            "id": str(msg.id),
+            "client_id": str(msg.id),
+        }
+        await manager.send_direct_message(str(recipient_id), ws_msg)
 
-            # 2. Push Notification & FCM Engine
-            from app.api.v1.endpoints.notifications import push_notification
-            push_notification(
-                user_id=str(recipient_id),
-                notif_type="message",
-                title=f"Message from {current_user.full_name} 💬",
-                body=text_content[:80],
-                data={
-                    "match_id": str(match_uuid),
-                    "sender_id": str(current_user.id),
-                    "sender_name": current_user.full_name,
-                    "target_route": "/chat-dialogue",
-                }
-            )
+        def _dispatch_fcm():
+            try:
+                from app.api.v1.endpoints.notifications import push_notification
+                push_notification(
+                    user_id=str(recipient_id),
+                    notif_type="message",
+                    title=f"Message from {current_user.full_name} 💬",
+                    body=text_content[:80],
+                    data={
+                        "match_id": str(match_uuid),
+                        "sender_id": str(current_user.id),
+                        "sender_name": current_user.full_name,
+                        "target_route": "/chat-dialogue",
+                    }
+                )
+            except Exception as e:
+                print(f"[CHAT MESSAGE NOTIF] Notice: {e}", flush=True)
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.run_in_executor(None, _dispatch_fcm)
+        except Exception:
+            _dispatch_fcm()
     except Exception as e:
-        print(f"[CHAT MESSAGE NOTIF] Notice: {e}", flush=True)
+        print(f"[CHAT MESSAGE RELAY] Notice: {e}", flush=True)
 
     return {
         "status": "sent",

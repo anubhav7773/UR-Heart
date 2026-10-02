@@ -151,9 +151,11 @@ class ChatRepository {
     required String matchId,
     required String text,
     required String recipientId,
+    String? messageId,
+    bool skipWs = false,
   }) async {
     final message = ChatMessage(
-      id: _uuid.v4(),
+      id: messageId ?? _uuid.v4(),
       matchId: matchId,
       senderId: 'me',
       recipientId: recipientId,
@@ -164,7 +166,13 @@ class ChatRepository {
     );
 
     final currentList = _messagesByMatch.putIfAbsent(matchId, () => []);
-    currentList.add(message);
+    // Reconcile if already in list
+    final existingIdx = currentList.indexWhere((m) => m.id == message.id);
+    if (existingIdx != -1) {
+      currentList[existingIdx] = message;
+    } else {
+      currentList.add(message);
+    }
 
     final convIdx = _conversations.indexWhere((c) => c.matchId == matchId);
     if (convIdx != -1) {
@@ -175,16 +183,19 @@ class ChatRepository {
       );
     }
 
-    _wsService?.sendJson({
-      'action': 'send_message',
-      'match_id': matchId,
-      'recipient_id': recipientId,
-      'text': text,
-      'message_id': message.id,
-      'timestamp': message.createdAt.toIso8601String(),
-    });
+    if (!skipWs) {
+      _wsService?.sendJson({
+        'type': 'dialogue_message',
+        'match_id': matchId,
+        'recipient_id': recipientId,
+        'text': text,
+        'message_id': message.id,
+        'id': message.id,
+        'timestamp': message.createdAt.toIso8601String(),
+      });
+    }
 
-    // Persist message to PostgreSQL backend database
+    // Persist message to PostgreSQL backend database with deterministic client_id
     try {
       await _dio.post<dynamic>(
         '/api/v1/chat/messages',
@@ -192,6 +203,8 @@ class ChatRepository {
           'match_id': matchId,
           'text': text,
           'recipient_id': recipientId,
+          'client_id': message.id,
+          'id': message.id,
         },
       );
     } catch (e) {

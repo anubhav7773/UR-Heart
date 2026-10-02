@@ -23,6 +23,8 @@ import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
 import '../theme/theme_controller.dart';
 import 'responsive_desktop_frame.dart';
+import '../../features/chat/presentation/services/web_security_stub.dart'
+    if (dart.library.js_interop) '../../features/chat/presentation/services/web_security_web.dart';
 
 /// Global navigator key for cross-screen and deep link navigation
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -47,6 +49,9 @@ class URHeartApp extends ConsumerWidget {
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       builder: (context, child) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          dismissWebSplash();
+        });
         return ResponsiveDesktopFrame(
           isDark: isDark,
           child: child ?? const SizedBox.shrink(),
