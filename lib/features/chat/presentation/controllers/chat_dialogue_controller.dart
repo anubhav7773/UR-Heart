@@ -108,7 +108,7 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
   static const _uuid = Uuid();
   final ChatWebSocketService _wsService;
   final ChatRepository _chatRepository;
-  final String _currentUserId;
+  String _currentUserId;
   int _sentMessageCount = 0;
 
   static String cleanMatchId(String rawId) {
@@ -139,6 +139,14 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
   Future<void> _initDialogue() async {
     state = state.copyWith(isLoading: true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedUid = prefs.getString('ur_heart_user_id') ?? prefs.getString('user_id');
+      if (storedUid != null && storedUid.isNotEmpty) {
+        _currentUserId = storedUid;
+      }
+    } catch (_) {}
 
     try {
       // 1. Fetch historical thread messages & live contact bridge status & peer profile
@@ -362,8 +370,20 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
   Future<void> _handleIncomingEncryptedMessage(Map<String, dynamic> rawEvent) async {
     final senderId = rawEvent['sender_id'] as String? ?? '';
-    // Prevent duplicate bubbles by ignoring echoes of messages we sent ourselves
-    if (senderId.isNotEmpty && senderId == _currentUserId) {
+    final msgId = rawEvent['id'] as String? ??
+        rawEvent['client_id'] as String? ??
+        rawEvent['message_id'] as String? ??
+        '';
+
+    // Prevent duplicate bubbles: ignore echo if message already exists locally as sent by me
+    if (msgId.isNotEmpty && state.messages.any((m) => m.id == msgId && m.isMe)) {
+      return;
+    }
+    // Only drop on sender_id match if _currentUserId is an authentic user UUID (not fallback string)
+    if (_currentUserId.isNotEmpty &&
+        _currentUserId != 'user-me' &&
+        _currentUserId != 'me' &&
+        senderId == _currentUserId) {
       return;
     }
 
@@ -384,11 +404,6 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     } else {
       displayText = rawEvent['text'] as String? ?? rawEvent['content'] as String? ?? '';
     }
-
-    final msgId = rawEvent['id'] as String? ??
-        rawEvent['client_id'] as String? ??
-        rawEvent['message_id'] as String? ??
-        '';
 
     // Layer 1 Dedup: Match by ID if present
     if (msgId.isNotEmpty && state.messages.any((m) => m.id == msgId)) {

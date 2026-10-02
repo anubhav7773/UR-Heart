@@ -93,6 +93,36 @@
         return false;
       }
     });
+
+    // 3. Native Browser Notification Handlers (0 DOM Overlays)
+    window.showWebNotification = function(title, body) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(title, {
+            body: body,
+            icon: '/icons/Icon-192.png',
+            badge: '/favicon.png'
+          });
+        } catch (e) {
+          if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(function(reg) {
+              reg.showNotification(title, {
+                body: body,
+                icon: '/icons/Icon-192.png',
+                badge: '/favicon.png'
+              });
+            });
+          }
+        }
+      }
+    };
+
+    window.requestWebNotificationPermission = function() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        return Notification.requestPermission();
+      }
+      return Promise.resolve(Notification.permission || 'denied');
+    };
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

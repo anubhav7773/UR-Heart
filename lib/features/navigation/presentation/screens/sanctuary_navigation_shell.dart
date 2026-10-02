@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,6 +67,10 @@ class _SanctuaryNavigationShellState
       final authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
       if (authToken != null && authToken.isNotEmpty) {
         SanctuaryNotificationService.syncStoredFcmToken(authToken);
+      }
+
+      if (kIsWeb) {
+        SanctuaryNotificationService.instance.requestWebNotificationPermission().ignore();
       }
     } catch (_) {}
 

@@ -39,6 +39,8 @@ def _dispatch_fcm_push(fcm_token: str, title: str, body: str, data: Optional[Dic
             for k, v in data.items():
                 clean_data[str(k)] = str(v)
 
+        click_link = clean_data.get("target_route") or "/"
+
         msg = messaging.Message(
             token=fcm_token,
             notification=messaging.Notification(
@@ -55,6 +57,30 @@ def _dispatch_fcm_push(fcm_token: str, title: str, body: str, data: Optional[Dic
                     icon="@mipmap/ic_launcher",
                     color="#1B4332",
                 ),
+            ),
+            webpush=messaging.WebpushConfig(
+                headers={"Urgency": "high"},
+                notification=messaging.WebpushNotification(
+                    title=title,
+                    body=body,
+                    icon="/icons/Icon-192.png",
+                    badge="/favicon.png",
+                ),
+                fcm_options=messaging.WebpushFCMOptions(
+                    link=click_link,
+                ),
+            ),
+            apns=messaging.APNSConfig(
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        alert=messaging.ApsAlert(
+                            title=title,
+                            body=body,
+                        ),
+                        sound="default",
+                        badge=1,
+                    )
+                )
             ),
         )
         messaging.send(msg, app=app)

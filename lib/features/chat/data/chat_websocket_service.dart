@@ -31,8 +31,12 @@ class ChatWebSocketService {
   static String _resolveWsHost(Dio? dio) {
     if (dio != null && dio.options.baseUrl.isNotEmpty) {
       try {
-        final host = Uri.parse(dio.options.baseUrl).host;
-        if (host.isNotEmpty) return host;
+        final host = Uri.parse(dio.options.baseUrl).host.trim();
+        // Never connect WSS to Vercel domains (e.g. app.urheart.asiverticals.me or *.vercel.app)
+        // Vercel does not support persistent WebSocket connections.
+        if (host.isNotEmpty && !host.contains('vercel') && !host.startsWith('app.')) {
+          return host;
+        }
       } catch (_) {}
     }
     return 'urheart.asiverticals.me';

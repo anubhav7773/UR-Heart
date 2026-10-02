@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_session_storage.dart';
+import '../../../core/services/sanctuary_notification_service.dart';
 import 'google_auth_service.dart';
 
 /// Result wrapper for authentication operations
@@ -220,6 +221,7 @@ class AuthRepository {
         if (tokenStr != null) {
           await prefs.setString('ur_heart_auth_token', tokenStr.toString());
           await prefs.setString('auth_token', tokenStr.toString());
+          SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
         }
         await prefs.setString('ur_heart_user_email', cleanEmail);
         await prefs.setBool('ur_heart_consent_given', true);
@@ -314,6 +316,7 @@ class AuthRepository {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('ur_heart_auth_token', tokenStr.toString());
           await prefs.setString('auth_token', tokenStr.toString());
+          SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
           if (matchedEmail != null) {
             await prefs.setString('ur_heart_user_email', matchedEmail);
           }
@@ -378,6 +381,7 @@ class AuthRepository {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('ur_heart_auth_token', tokenStr.toString());
             await prefs.setString('auth_token', tokenStr.toString());
+            SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
             await prefs.setString('ur_heart_user_email', cleanEmail);
             await prefs.setBool('ur_heart_consent_given', true);
             await prefs.setBool('ur_heart_theme_locked', true);

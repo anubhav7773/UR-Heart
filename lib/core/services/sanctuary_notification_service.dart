@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../app/ur_heart_app.dart';
+import '../../features/chat/presentation/services/web_security_stub.dart'
+    if (dart.library.js_interop) '../../features/chat/presentation/services/web_security_web.dart';
 
 /// Ultra-Premium Outside-the-App Notification Service
 /// Delivers WhatsApp-like heads-up notifications to Android system tray and lock screen
@@ -153,6 +155,10 @@ class SanctuaryNotificationService {
   /// Safely requests notification permissions on Web upon explicit user interaction
   Future<bool> requestWebNotificationPermission() async {
     try {
+      if (kIsWeb) {
+        await requestBrowserNotificationPermission();
+      }
+
       final fcm = FirebaseMessaging.instance;
       final settings = await fcm.requestPermission(
         alert: true,
@@ -161,10 +167,12 @@ class SanctuaryNotificationService {
       );
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        final token = await fcm.getToken();
-        if (token != null && token.isNotEmpty) {
-          _registerFcmTokenWithBackend(token);
-        }
+        try {
+          final token = await fcm.getToken();
+          if (token != null && token.isNotEmpty) {
+            await _registerFcmTokenWithBackend(token);
+          }
+        } catch (_) {}
         return true;
       }
     } catch (e) {
@@ -244,7 +252,10 @@ class SanctuaryNotificationService {
     Importance importance = Importance.max,
     Priority priority = Priority.high,
   }) async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      showBrowserNotification(title, body);
+      return;
+    }
     if (!_isInitialized) {
       await initialize();
     }
