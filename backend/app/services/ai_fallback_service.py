@@ -8,7 +8,7 @@ logger = logging.getLogger("ai_fallback")
 settings = get_settings()
 
 OPENROUTER_TEXT_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
-OPENROUTER_VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
+OPENROUTER_VISION_MODEL = "dots-studio/dots-3-note-preview:free"
 
 
 class AiFallbackService:

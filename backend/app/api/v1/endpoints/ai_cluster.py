@@ -103,8 +103,8 @@ async def verify_liveness_kyc(
     )
 
     return LivenessCheckResponse(
-        is_live_human=result.get("is_live_human", True),
-        face_match_score=result.get("face_match_score", 90),
+        is_live_human=result.get("is_live_human", False),
+        face_match_score=result.get("face_match_score", 0),
         estimated_age_bracket=result.get("estimated_age_bracket", "22-28"),
         is_underage=result.get("is_underage", False),
         rejection_reason=result.get("rejection_reason") or None

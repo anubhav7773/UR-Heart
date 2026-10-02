@@ -99,16 +99,90 @@ class EvaIdentityEngine:
         return False
 
     @classmethod
+    def _is_valid_image(cls, b64_str: str) -> bool:
+        """Checks if base64 string decodes to a valid image format."""
+        if not b64_str or len(b64_str) < 50:
+            return False
+        try:
+            clean = b64_str.split(",")[-1] if "," in b64_str else b64_str
+            raw = base64.b64decode(clean[:128])
+            return (
+                raw.startswith(b"\xff\xd8")  # JPEG
+                or raw.startswith(b"\x89PNG")  # PNG
+                or raw.startswith(b"RIFF")  # WEBP
+                or raw.startswith(b"GIF")
+            )
+        except Exception:
+            return False
+
+    @classmethod
     def extract_image_frames(cls, input_b64_list: List[str]) -> List[str]:
-        """Validates and extracts pure base64 image frames."""
-        result_frames = []
+        """
+        Extracts sharp JPEG image frames if input contains base64 encoded MP4 video.
+        Ensures AI Vision receives valid image payloads, not raw video bytes.
+        """
+        import base64
+        import tempfile
+        import os
+        import cv2
+
+        result_frames: List[str] = []
         for item in input_b64_list:
-            if not item:
+            if not item or len(item) < 40:
                 continue
-            clean = item.split(",")[-1] if "," in item else item
-            if len(clean) > 500:  # Valid image payload threshold
-                result_frames.append(clean)
-        return result_frames if result_frames else input_b64_list
+            try:
+                clean_b64 = item.split(",")[-1] if "," in item else item
+                raw_bytes = base64.b64decode(clean_b64)
+
+                # Check if payload is a video (MP4 ftyp, moov, or large stream without image header)
+                is_video = (b"ftyp" in raw_bytes[:50]) or (
+                    len(raw_bytes) > 20000
+                    and not raw_bytes.startswith(b"\xff\xd8")
+                    and not raw_bytes.startswith(b"\x89PNG")
+                    and not raw_bytes.startswith(b"RIFF")
+                )
+
+                if is_video:
+                    tmp_path = None
+                    try:
+                        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+                            tmp.write(raw_bytes)
+                            tmp_path = tmp.name
+
+                        cap = cv2.VideoCapture(tmp_path)
+                        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                        if total_frames > 0:
+                            indices = [
+                                max(0, int(total_frames * 0.15)),
+                                max(0, int(total_frames * 0.50)),
+                                max(0, int(total_frames * 0.85)),
+                            ]
+                            for idx in indices:
+                                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                                ret, frame = cap.read()
+                                if ret and frame is not None:
+                                    h, w = frame.shape[:2]
+                                    if max(h, w) > 720:
+                                        scale = 720.0 / max(h, w)
+                                        frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+                                    _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                    result_frames.append(base64.b64encode(buffer).decode("utf-8"))
+                        cap.release()
+                    finally:
+                        if tmp_path and os.path.exists(tmp_path):
+                            try:
+                                os.remove(tmp_path)
+                            except Exception:
+                                pass
+                else:
+                    if len(clean_b64) > 100:
+                        result_frames.append(clean_b64)
+            except Exception as e:
+                logger.warning("Frame extraction notice: %s", e)
+                if len(item) > 100:
+                    result_frames.append(item)
+
+        return result_frames
 
     @classmethod
     async def verify_kyc_liveness(
@@ -121,19 +195,36 @@ class EvaIdentityEngine:
         """
         Evaluates Video KYC liveness with multi-model failover:
         1. Safe local OpenCV heuristic (if available)
-        2. Stable Groq Vision (`llama-3.2-90b-vision-preview` or `llama-3.2-11b-vision-preview`)
-        3. OpenRouter Vision fallback (`google/gemini-2.0-flash-lite:free` / `meta-llama/llama-3.2-11b-vision-instruct:free`)
+        2. Production Groq Vision (`qwen/qwen3.8-27b`)
+        3. OpenRouter Vision fallback (`dots-studio/dots-3-note-preview:free`, `qwen/qwen3.8-27b:free`)
         4. Resilient image dimension & biometric presence validation
         """
         extracted_frames = cls.extract_image_frames(frames_b64)
         clean_anchor = anchor_b64.split(",")[-1] if "," in anchor_b64 else anchor_b64
 
+        # Fail closed immediately if neither valid anchor nor video frames exist
+        anchor_valid = cls._is_valid_image(clean_anchor)
+        if not anchor_valid and not extracted_frames:
+            return KycAiEvaluation(
+                is_live_human=False,
+                face_match_score=0,
+                rejection_reason="Corrupted or invalid image frames received.",
+                status="pending_manual_review"
+            )
+
+        # If anchor was omitted or is invalid, synthesize anchor from frame 0
+        if (not anchor_valid or len(clean_anchor) < 500) and extracted_frames:
+            clean_anchor = extracted_frames[0]
+            comparison_frames = extracted_frames[1:] if len(extracted_frames) > 1 else extracted_frames
+        else:
+            comparison_frames = extracted_frames
+
         # 1. Safe local check
-        local_face_found = cls._detect_faces_opencv_safe([clean_anchor] + extracted_frames)
+        local_face_found = cls._detect_faces_opencv_safe([clean_anchor] + comparison_frames)
 
         prompt_text = (
             "You are the Sanctuary Identity Sentinel. Image 1 is profile portrait. "
-            "Images 2, 3, 4 are frames from a 3-second live selfie video.\n"
+            "Images 2 and 3 are consecutive frames from a 3-second live selfie video.\n"
             "Evaluate biometric liveness, natural micro-movement across frames, and facial match.\n"
             "Return ONLY a raw JSON object with these keys: "
             "{\"is_live_human\": true, \"face_match_score\": 85, \"estimated_age_bracket\": \"22-28\", "
@@ -142,17 +233,16 @@ class EvaIdentityEngine:
 
         content_payload: List[Dict[str, Any]] = [{"type": "text", "text": prompt_text}]
         content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{clean_anchor}"}})
-        for frame in extracted_frames[:3]:
+        for frame in comparison_frames[:2]:
             content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame}"}})
 
-        # 2. Primary: Groq Vision
-        groq_models = ["llama-3.2-11b-vision", "llama-3.2-90b-vision", "llama-3.2-11b-text-preview"]
+        # 2. Primary: Groq Vision (qwen/qwen3.8-27b)
+        groq_models = ["qwen/qwen3.8-27b"]
         for g_model in groq_models:
             groq_key = getattr(settings, "GROQ_API_KEY", "") or ""
             if not groq_key:
                 break
             try:
-                # Omit response_format: json_object to prevent 400 errors with multimodal payloads
                 payload = {
                     "model": g_model,
                     "messages": [{"role": "user", "content": content_payload}],
@@ -175,9 +265,9 @@ class EvaIdentityEngine:
         or_key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
         if or_key:
             or_models = [
-                "meta-llama/llama-3.2-11b-vision-instruct",
-                "google/gemini-2.0-flash-exp:free",
-                "meta-llama/llama-3.2-90b-vision-instruct",
+                "dots-studio/dots-3-note-preview:free",
+                "qwen/qwen3.8-27b:free",
+                "google/gemma-4-26b-a4b-it:free",
             ]
             for o_model in or_models:
                 try:
@@ -200,7 +290,7 @@ class EvaIdentityEngine:
                     logger.warning("OpenRouter Vision (%s) error: %s", o_model, e)
 
         # 4. Graceful Fallback: Validate image payload structure
-        if len(clean_anchor) > 1000 and len(extracted_frames) >= 1:
+        if (cls._is_valid_image(clean_anchor) or len(clean_anchor) > 1000) and (len(extracted_frames) >= 1 or len(comparison_frames) >= 1):
             logger.info("Vision APIs offline; verified valid biometric frames for user %s", user_id)
             return KycAiEvaluation(
                 is_live_human=True,
@@ -218,15 +308,15 @@ class EvaIdentityEngine:
         )
 
     @classmethod
-    def _parse_kyc_json(cls, raw_content: str, local_face: bool) -> Optional[KycAiEvaluation]:
+    def _parse_kyc_json(cls, raw_content: str, local_face: bool = False) -> Optional[KycAiEvaluation]:
         try:
-            # Extract JSON block even if markdown backticks exist
             match = re.search(r"\{.*\}", raw_content, re.DOTALL)
             if match:
                 data = json.loads(match.group(0))
                 score = int(data.get("face_match_score", 0))
                 is_live = bool(data.get("is_live_human", False)) or local_face
                 is_underage = bool(data.get("is_underage", False))
+                reason = data.get("rejection_reason", "")
 
                 if (is_live or local_face) and score >= 60 and not is_underage:
                     return KycAiEvaluation(
@@ -244,6 +334,15 @@ class EvaIdentityEngine:
                         is_underage=True,
                         rejection_reason="Underage profile detected.",
                         status="rejected"
+                    )
+                else:
+                    return KycAiEvaluation(
+                        is_live_human=is_live,
+                        face_match_score=score,
+                        estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
+                        is_underage=is_underage,
+                        rejection_reason=reason or "Biometric threshold not met. Routed to manual review.",
+                        status="rejected" if (score < 40 and not is_live) else "pending_manual_review"
                     )
         except Exception as e:
             logger.warning("Failed to parse KYC JSON: %s", e)

@@ -174,7 +174,7 @@ class ProfileRepository {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
         ApiEndpoints.aiKycLiveness,
         data: {
-          'anchor_photo_b64': anchorPhotoB64 ?? b64Video.substring(0, 100),
+          'anchor_photo_b64': anchorPhotoB64 ?? '',
           'video_bytes_b64': b64Video,
         },
       );

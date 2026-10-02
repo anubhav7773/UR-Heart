@@ -214,7 +214,7 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
           final slotBytes = await File(slot1Path).readAsBytes();
           anchor = base64Encode(slotBytes);
         } else {
-          anchor = videoB64.substring(0, videoB64.length > 200 ? 200 : videoB64.length);
+          anchor = '';
         }
       }
 

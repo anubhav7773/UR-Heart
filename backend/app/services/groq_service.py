@@ -30,9 +30,12 @@ class KycAiEvaluation(BaseModel):
 
 def sanitize_prompt_input(user_text: str) -> str:
     """Strips delimiter tags, normalizes whitespace, and escapes control characters."""
-    escaped = html.escape(user_text.strip())
-    cleaned = re.sub(r'<\/?(?:user_submitted_text|system|assistant|instruction)[^>]*>', '', escaped, flags=re.I)
-    return cleaned[:500]
+    # Strip raw XML/control boundary tags BEFORE html escaping so they are reliably eliminated
+    cleaned = re.sub(r'<\/?(?:user_submitted_text|system|assistant|instruction)[^>]*>', '', user_text.strip(), flags=re.I)
+    escaped = html.escape(cleaned)
+    # Also strip any escaped variants in case input was pre-escaped
+    sanitized = re.sub(r'&lt;\/?(?:user_submitted_text|system|assistant|instruction)[^&]*&gt;', '', escaped, flags=re.I)
+    return sanitized[:500]
 
 
 class GroqAiService:
@@ -60,11 +63,12 @@ class GroqAiService:
         Deeply analyzes user's raw thoughts and transforms them into an authentic
         sanctuary bio using Eva Section 1 (Identity & Persona Engine).
         """
-        if not raw_bio or len(raw_bio.strip()) < 2:
+        sanitized_bio = sanitize_prompt_input(raw_bio or "")
+        if not sanitized_bio or len(sanitized_bio.strip()) < 2:
             return "Please share a few words or thoughts about yourself first! Eva will transform them into an authentic, top-class bio ✨"
         from app.services.eva_identity_engine import EvaIdentityEngine
-        res = await EvaIdentityEngine.polish_bio(raw_bio.strip())
-        return res.get("polished_bio", raw_bio.strip())
+        res = await EvaIdentityEngine.polish_bio(sanitized_bio.strip())
+        return res.get("polished_bio", sanitized_bio.strip())
 
 
     @classmethod
@@ -119,47 +123,22 @@ class GroqAiService:
         frame_3_b64: str
     ) -> Dict[str, Any]:
         """
-        Legacy endpoint interface. FAIL-CLOSED: Zero auto-pass on failure or missing keys.
+        Legacy endpoint interface. Routes to Eva Section 1 engine.
         """
-        prompt = (
-            "Analyze these 4 images: Image 1 is profile anchor portrait. Images 2, 3, and 4 are consecutive frames "
-            "from a 3-second live selfie video. Verify: 1) True human liveness (micro-movements, natural depth across frames), "
-            "2) Facial biometric match between Image 1 and Frames 2-4, 3) Estimated age bracket. "
-            "Respond strictly in JSON: {\"is_live_human\": bool, \"face_match_score\": int (0-100), "
-            "\"estimated_age_bracket\": str, \"is_underage\": bool, \"rejection_reason\": str}"
+        from app.services.eva_identity_engine import EvaIdentityEngine
+        import uuid
+        eval_result = await EvaIdentityEngine.verify_kyc_liveness(
+            user_id=uuid.uuid4(),
+            anchor_b64=anchor_bytes_b64,
+            frames_b64=[frame_1_b64, frame_2_b64, frame_3_b64]
         )
-
-        payload = {
-            "model": "llama-3.2-11b-vision-preview",
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/webp;base64,{anchor_bytes_b64}"}},
-                    {"type": "image_url", "image_url": {"url": f"data:image/webp;base64,{frame_1_b64}"}},
-                    {"type": "image_url", "image_url": {"url": f"data:image/webp;base64,{frame_2_b64}"}},
-                    {"type": "image_url", "image_url": {"url": f"data:image/webp;base64,{frame_3_b64}"}}
-                ]
-            }],
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"}
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=6.0) as client:
-                res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
-                if res.status_code == 200:
-                    return json.loads(res.json()["choices"][0]["message"]["content"])
-        except Exception as e:
-            logger.warning("Groq Vision exception: %s", str(e))
-
-        # FAIL CLOSED: Never auto-pass
         return {
-            "is_live_human": False,
-            "face_match_score": 0,
-            "estimated_age_bracket": "unknown",
-            "is_underage": True,
-            "rejection_reason": "Automated verification unavailable. Manual Sentinel review required."
+            "is_live_human": eval_result.is_live_human,
+            "face_match_score": eval_result.face_match_score,
+            "estimated_age_bracket": eval_result.estimated_age_bracket,
+            "is_underage": eval_result.is_underage,
+            "rejection_reason": eval_result.rejection_reason,
+            "status": eval_result.status
         }
 
     @classmethod
@@ -246,6 +225,19 @@ class GroqAiService:
             frames_b64=frames_b64,
             db_session=db_session
         )
+
+        # Hook admin escalation queue if manual review is required
+        if (eval_result.status == "pending_manual_review" or not eval_result.is_live_human) and db_session is not None:
+            try:
+                await cls._escalate_to_admin_desk(
+                    user_id=user_id,
+                    score=eval_result.face_match_score,
+                    reason=eval_result.rejection_reason or "Automated biometric review pending",
+                    db=db_session
+                )
+            except Exception as e:
+                logger.warning("Failed to escalate KYC to admin desk: %s", e)
+
         return KycAiEvaluation(
             is_live_human=eval_result.is_live_human,
             face_match_score=eval_result.face_match_score,

@@ -152,7 +152,7 @@ class ImageModerationService {
 
       final groqUrl = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       final payload = {
-        'model': 'llama-3.2-11b-vision-preview',
+        'model': 'qwen/qwen3.8-27b',
         'messages': [
           {
             'role': 'user',
