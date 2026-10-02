@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:uuid/uuid.dart';
 import 'ad_reward_models.dart';
+import 'web_mindful_sponsor_dialog.dart';
 
 class RewardedAdManager {
   static final RewardedAdManager instance = RewardedAdManager._internal();
@@ -125,11 +127,12 @@ class RewardedAdManager {
     }
   }
 
-  /// DIS-02 & DUM-13 FIX: Shows real AdMob rewarded ad with cryptographic SSV.
+  /// DIS-02, DUM-13 & WEB FIX: Shows real AdMob rewarded ad on Mobile and Mindful Sponsor Reflection on Web.
   Future<bool> showRewardedAd({
     required String userId,
     required String adType,
     String targetId = 'none',
+    BuildContext? context,
     VoidCallback? onRewardGranted,
     void Function(String error)? onPlaybackFailed,
     OnClientRewardVerified? onClientRewardVerified,
@@ -137,47 +140,66 @@ class RewardedAdManager {
     final customData = '$userId:$adType:$targetId';
     lastCustomDataTransmitted = customData;
 
-    final realAdToPlay = _primaryRealAd ?? _secondaryRealAd;
+    if (kIsWeb && context != null && context.mounted) {
+      final bool completed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => WebMindfulSponsorDialog(adType: adType),
+      ) ?? false;
 
-    if (realAdToPlay != null) {
-      // 1. Inject Server-Side Verification custom data
-      final ssvOptions = ServerSideVerificationOptions(
-        customData: customData,
-      );
-      realAdToPlay.setServerSideOptions(ssvOptions);
+      if (!completed) {
+        if (onPlaybackFailed != null) {
+          onPlaybackFailed('Sanctuary reflection was dismissed before completion.');
+        }
+        return false;
+      }
 
-      // 2. Bind presentation callbacks
-      realAdToPlay.fullScreenContentCallback = FullScreenContentCallback(
-        onAdDismissedFullScreenContent: (ad) {
-          ad.dispose();
-          if (realAdToPlay == _primaryRealAd) {
-            _primaryRealAd = _secondaryRealAd;
-            _secondaryRealAd = null;
-          } else {
-            _secondaryRealAd = null;
-          }
-          _loadNextBufferSlot(); // Replenish double buffer
-        },
-        onAdFailedToShowFullScreenContent: (ad, error) {
-          ad.dispose();
-          _primaryRealAd = null;
-          _loadNextBufferSlot();
-          if (onPlaybackFailed != null) {
-            onPlaybackFailed(error.message);
-          }
-        },
-      );
-
-      // 3. Play live rewarded reflection
-      realAdToPlay.show(
-        onUserEarnedReward: (ad, reward) {
-          if (onRewardGranted != null) onRewardGranted();
-        },
-      );
-    } else {
-      // Buffer fallback for environments without live Google Play Services
       if (onRewardGranted != null) {
         onRewardGranted();
+      }
+    } else {
+      final realAdToPlay = _primaryRealAd ?? _secondaryRealAd;
+
+      if (realAdToPlay != null) {
+        // 1. Inject Server-Side Verification custom data
+        final ssvOptions = ServerSideVerificationOptions(
+          customData: customData,
+        );
+        realAdToPlay.setServerSideOptions(ssvOptions);
+
+        // 2. Bind presentation callbacks
+        realAdToPlay.fullScreenContentCallback = FullScreenContentCallback(
+          onAdDismissedFullScreenContent: (ad) {
+            ad.dispose();
+            if (realAdToPlay == _primaryRealAd) {
+              _primaryRealAd = _secondaryRealAd;
+              _secondaryRealAd = null;
+            } else {
+              _secondaryRealAd = null;
+            }
+            _loadNextBufferSlot(); // Replenish double buffer
+          },
+          onAdFailedToShowFullScreenContent: (ad, error) {
+            ad.dispose();
+            _primaryRealAd = null;
+            _loadNextBufferSlot();
+            if (onPlaybackFailed != null) {
+              onPlaybackFailed(error.message);
+            }
+          },
+        );
+
+        // 3. Play live rewarded reflection
+        realAdToPlay.show(
+          onUserEarnedReward: (ad, reward) {
+            if (onRewardGranted != null) onRewardGranted();
+          },
+        );
+      } else {
+        // Buffer fallback for environments without live Google Play Services
+        if (onRewardGranted != null) {
+          onRewardGranted();
+        }
       }
     }
 

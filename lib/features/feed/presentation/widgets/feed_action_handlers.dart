@@ -18,6 +18,7 @@ class FeedActionHandlers {
       userId: userId,
       adType: 'quick_reflection',
       targetId: 'none',
+      context: context,
       onRewardGranted: () async {
         // Refresh live feed state to read server-credited swipes
         await ref.read(feedControllerProvider.notifier).loadFeed();

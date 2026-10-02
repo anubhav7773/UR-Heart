@@ -264,6 +264,7 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       userId: effectiveUserId,
       adType: adType,
       targetId: targetId,
+      context: context,
       onRewardGranted: () async {
         applyReward(
           adType,

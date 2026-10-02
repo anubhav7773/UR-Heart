@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../controllers/profile_setup_controller.dart';
 
-/// Production-Grade Genuine Hardware Video KYC Capture Modal (DUM-16 & ACT-21 Fix)
-/// Connects physical front camera, records 3-second biometric glance,
-/// purges dummy blank byte arrays, and dispatches true MP4/video bytes to backend.
+/// Production-Grade Genuine Hardware Video KYC Capture Modal (DUM-16, ACT-21 & WEB Parity)
+/// Connects physical front camera / webcam, records 3-second biometric glance,
+/// supports Web/Desktop fallback video upload, and dispatches true MP4/video bytes to backend.
 class LiveKycRecordingModal extends ConsumerStatefulWidget {
   final String anchorPhotoBase64;
   final void Function(bool isVerified, String message)? onKycCompleted;
@@ -31,6 +32,7 @@ class LiveKycRecordingModal extends ConsumerStatefulWidget {
 class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
   CameraController? _cameraController;
   bool _isCameraReady = false;
+  bool _cameraUnavailable = false;
   bool _isRecording = false;
   bool _isUploading = false;
   int _recordingSeconds = 3;
@@ -46,7 +48,12 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        if (mounted) setState(() => _isCameraReady = false);
+        if (mounted) {
+          setState(() {
+            _isCameraReady = false;
+            _cameraUnavailable = true;
+          });
+        }
         return;
       }
 
@@ -63,9 +70,19 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
 
       await controller.initialize();
       _cameraController = controller;
-      if (mounted) setState(() => _isCameraReady = true);
+      if (mounted) {
+        setState(() {
+          _isCameraReady = true;
+          _cameraUnavailable = false;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _isCameraReady = false);
+      if (mounted) {
+        setState(() {
+          _isCameraReady = false;
+          _cameraUnavailable = true;
+        });
+      }
     }
   }
 
@@ -109,21 +126,27 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Record a 3-second quiet glance to verify genuine human presence. Audio is never recorded.',
+            _cameraUnavailable
+                ? 'Webcam / camera not detected. You can upload a short 3-second selfie clip.'
+                : 'Glance gently into the camera for 3 seconds to verify authenticity.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: sub, height: 1.35),
+            style: TextStyle(fontSize: 13, color: sub),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           ClipRRect(
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: BorderRadius.circular(90),
             child: SizedBox(
               width: 180,
               height: 180,
               child: _isCameraReady && _cameraController != null
                   ? CameraPreview(_cameraController!)
                   : Container(
-                      color: Colors.black12,
-                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      color: isDark ? Colors.white10 : Colors.black12,
+                      child: Center(
+                        child: _cameraUnavailable
+                            ? Icon(Icons.videocam_off_outlined, size: 48, color: sub)
+                            : const CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
             ),
           ),
@@ -134,27 +157,63 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
               style: TextStyle(color: pine, fontWeight: FontWeight.bold, fontSize: 13),
             ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: pine,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          if (!_cameraUnavailable)
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: pine,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: (_isCameraReady && !_isRecording && !_isUploading)
+                    ? _startLivenessCapture
+                    : null,
+                child: _isUploading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text(_isRecording ? 'Capturing Biometric Glance...' : 'Begin 3-Second Glance ➔',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
-              onPressed: (_isCameraReady && !_isRecording && !_isUploading)
-                  ? _startLivenessCapture
-                  : null,
-              child: _isUploading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(_isRecording ? 'Capturing Biometric Glance...' : 'Begin 3-Second Glance ➔',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: pine, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: _isUploading ? null : _pickVideoFallback,
+                icon: _isUploading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(Icons.upload_file_rounded, color: pine),
+                label: Text(
+                  _isUploading ? 'Verifying...' : 'Upload 3-Second Clip',
+                  style: TextStyle(color: pine, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
+  }
+
+  Future<void> _pickVideoFallback() async {
+    try {
+      final picker = ImagePicker();
+      final video = await picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 10),
+      );
+      if (video != null) {
+        setState(() => _isUploading = true);
+        await _dispatchRealVideoToBackend(video);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isUploading = false);
+    }
   }
 
   Future<void> _startLivenessCapture() async {
@@ -180,7 +239,7 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
               _isUploading = true;
             });
           }
-          await _dispatchRealVideoToBackend(File(videoFile.path));
+          await _dispatchRealVideoToBackend(videoFile);
         }
       });
     } catch (_) {
@@ -193,7 +252,7 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
     }
   }
 
-  Future<void> _dispatchRealVideoToBackend(File videoFile) async {
+  Future<void> _dispatchRealVideoToBackend(XFile videoFile) async {
     try {
       final Uint8List videoBytes = await videoFile.readAsBytes();
       final String videoB64 = base64Encode(videoBytes);
@@ -205,16 +264,25 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
             .executeVideoKyc(videoBytes: videoBytes);
       } catch (_) {}
 
-      // Resolve anchor photo
+      // Resolve anchor photo in a cross-platform manner
       String anchor = widget.anchorPhotoBase64;
       if (anchor.isEmpty) {
         final profileState = ref.read(profileSetupControllerProvider);
-        final slot1Path = profileState.photoSlots[1];
-        if (slot1Path != null && await File(slot1Path).exists()) {
-          final slotBytes = await File(slot1Path).readAsBytes();
-          anchor = base64Encode(slotBytes);
-        } else {
-          anchor = '';
+        final slot1 = profileState.photoSlots[1];
+        if (slot1 != null && slot1.isNotEmpty) {
+          if (slot1.startsWith('data:') && slot1.contains(',')) {
+            anchor = slot1.split(',').last;
+          } else if (slot1.length > 200 && !slot1.startsWith('http') && !slot1.startsWith('/') && !slot1.startsWith('blob:')) {
+            anchor = slot1;
+          } else {
+            try {
+              final xFile = XFile(slot1);
+              final bytes = await xFile.readAsBytes();
+              anchor = base64Encode(bytes);
+            } catch (_) {
+              anchor = '';
+            }
+          }
         }
       }
 
@@ -241,10 +309,6 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
       if (mounted) {
         Navigator.of(context).pop();
         widget.onKycCompleted?.call(false, 'Verification service timed out. Routed for manual review.');
-      }
-    } finally {
-      if (await videoFile.exists()) {
-        await videoFile.delete(); // Ephemeral hygiene: purge temporary video capture
       }
     }
   }

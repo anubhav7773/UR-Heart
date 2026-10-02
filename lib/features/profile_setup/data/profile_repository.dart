@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -71,14 +70,14 @@ class ProfileRepository {
     }
   }
 
-  /// Uploads compressed file directly to Cloudflare R2 presigned URL
+  /// Uploads compressed file bytes directly to Cloudflare R2 presigned URL
   Future<bool> uploadPhotoToR2({
     required String presignedPutUrl,
-    required File file,
+    required List<int> bytes,
   }) async {
-    return R2Uploader.uploadBinaryToR2(
+    return R2Uploader.uploadBytesToR2(
       presignedPutUrl: presignedPutUrl,
-      fileToUpload: file,
+      bytes: bytes,
       contentType: 'image/webp',
     );
   }

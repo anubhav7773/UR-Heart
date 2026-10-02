@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/media/sanctuary_image_resolver.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../controllers/profile_setup_controller.dart';
 
@@ -355,9 +355,8 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
     required Color accentColor,
     required Color mutedColor,
   }) {
-    final isNetwork = filePath != null && (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:'));
-    final isLocal = !kIsWeb && filePath != null && !isNetwork && filePath.isNotEmpty && File(filePath).existsSync();
-    final hasValidImage = isNetwork || isLocal;
+    final imageProvider = resolveSanctuaryImageProvider(filePath);
+    final hasValidImage = imageProvider != null;
 
     return Container(
       height: height,
@@ -379,19 +378,11 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
                 ? Stack(
                     fit: StackFit.expand,
                     children: [
-                      isNetwork
-                          ? Image.network(
-                              filePath,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
-                            )
-                          : (!kIsWeb
-                              ? Image.file(
-                                  File(filePath),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
-                                )
-                              : _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor)),
+                      Image(
+                        image: imageProvider,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
+                      ),
                       Positioned(
                         right: 6,
                         bottom: 6,

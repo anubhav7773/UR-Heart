@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/media/media_compressor.dart';
@@ -175,11 +175,11 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       final savedMinAge = prefs.getDouble('profile_min_age') ?? state.minAge;
       final savedMaxAge = prefs.getDouble('profile_max_age') ?? state.maxAge;
 
-      // Restore existing photos strictly from valid local disk files
+      // Restore existing photos from valid storage strings or URLs
       final Map<int, String> restoredSlots = {};
       for (int i = 1; i <= 5; i++) {
         final path = prefs.getString('profile_photo_slot_$i');
-        if (path != null && File(path).existsSync()) {
+        if (path != null && path.trim().isNotEmpty) {
           restoredSlots[i] = path;
         }
       }
@@ -332,7 +332,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
 
   Future<bool> processAndUploadPhoto({
     required int slotNumber,
-    required File rawFile,
+    required XFile rawFile,
     String userId = 'demo_user_1',
   }) async {
     try {

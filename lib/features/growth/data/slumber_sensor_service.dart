@@ -4,9 +4,10 @@ import 'package:sensors_plus/sensors_plus.dart';
 
 enum SlumberDeviceState { active, restingFaceDown, morningHarvestReady }
 
-/// Policy-safe Hardware Accelerometer Slumber & Morning Pickup Sensor Service (DIS-08 & ACT-06 Fix)
-/// Utilizes genuine physical accelerometer events from sensors_plus.
-/// Detects face-down stillness posture (Z < -8.5 m/s^2) and morning pickup wake events (delta acceleration).
+/// Policy-safe Accelerometer Slumber & Morning Pickup Sensor Service (DIS-08, ACT-06 & WEB Parity)
+/// Utilizes genuine physical accelerometer events on Mobile (sensors_plus).
+/// Detects face-down stillness posture (Z < -8.5 m/s^2) on phones.
+/// Provides graceful Nocturnal Sanctuary Stillness on Web/Desktop browsers.
 class SlumberSensorService {
   static final SlumberSensorService instance = SlumberSensorService._internal();
   SlumberSensorService._internal();
@@ -27,6 +28,10 @@ class SlumberSensorService {
   static const double _gravityThreshold = 8.5; // Z-axis threshold for face-down
   static const double _stillnessTolerance = 1.2;
 
+  Duration _lastRestDuration = Duration.zero;
+  Duration get lastRestDuration => _lastRestDuration;
+  double get lastRestHours => _lastRestDuration.inMinutes / 60.0;
+
   /// Starts physical hardware accelerometer monitoring with callback compatibility
   void startMonitoring({required void Function() onMorningPickup}) {
     _onMorningPickup = onMorningPickup;
@@ -37,6 +42,14 @@ class SlumberSensorService {
   void startHardwareMonitoring() {
     _isMonitoring = true;
     _sensorSubscription?.cancel();
+
+    if (kIsWeb) {
+      // Web / Desktop platform: hardware accelerometer not present or cannot be placed face-down.
+      // Slumber is managed via Nocturnal Sanctuary Stillness or manual rest trigger.
+      debugPrint('[SlumberSensorService] Web environment active: Nocturnal Sanctuary Stillness enabled.');
+      return;
+    }
+
     runZonedGuarded(() {
       _sensorSubscription = accelerometerEventStream(
         samplingPeriod: SensorInterval.normalInterval,
@@ -82,10 +95,31 @@ class SlumberSensorService {
     }
   }
 
-  Duration _lastRestDuration = Duration.zero;
-  Duration get lastRestDuration => _lastRestDuration;
-  double get lastRestHours => _lastRestDuration.inMinutes / 60.0;
+  /// Initiates a Web Stillness rest session
+  void startWebStillnessSession() {
+    _isFaceDown = true;
+    _slumberStartTime = DateTime.now();
+    _stateController.add(SlumberDeviceState.restingFaceDown);
+  }
 
+  /// Concludes a Web Stillness session and unlocks morning harvest if qualified
+  void completeWebStillnessSession() {
+    _isFaceDown = false;
+    final startTime = _slumberStartTime;
+    if (startTime != null) {
+      final duration = DateTime.now().difference(startTime);
+      _lastRestDuration = duration;
+      if (duration.inSeconds >= 10) {
+        _stateController.add(SlumberDeviceState.morningHarvestReady);
+        _onMorningPickup?.call();
+      } else {
+        _stateController.add(SlumberDeviceState.active);
+      }
+    } else {
+      triggerMorningPickupWakeEvent();
+    }
+    _slumberStartTime = null;
+  }
 
   /// Stops physical hardware sensor monitoring
   void stopMonitoring() {
@@ -101,8 +135,9 @@ class SlumberSensorService {
     _isMonitoring = false;
   }
 
-  /// Simulates / triggers morning pickup wake event (e.g. for testing / demo)
+  /// Simulates / triggers morning pickup wake event (e.g. for testing / web / demo)
   void triggerMorningPickupWakeEvent() {
+    _lastRestDuration = const Duration(hours: 7);
     _stateController.add(SlumberDeviceState.morningHarvestReady);
     _onMorningPickup?.call();
   }
