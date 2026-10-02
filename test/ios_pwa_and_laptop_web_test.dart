@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ur_heart/core/ads/rewarded_ad_manager.dart';
 import 'package:ur_heart/core/app/ur_heart_app.dart';
+import 'package:ur_heart/core/app/responsive_desktop_frame.dart';
 import 'package:ur_heart/core/services/sanctuary_notification_service.dart';
 import 'package:ur_heart/features/navigation/presentation/widgets/ios_pwa_install_banner.dart';
 
@@ -59,7 +60,7 @@ void main() {
   });
 
   group('Desktop & Laptop Responsive Sanctuary Frame UI Verification', () {
-    testWidgets('URHeartApp embeds desktop max-width 500 constraint', (tester) async {
+    testWidgets('URHeartApp embeds ResponsiveDesktopFrame', (tester) async {
       await tester.pumpWidget(
         const ProviderScope(
           child: URHeartApp(initialRoute: '/consent'),
@@ -67,11 +68,26 @@ void main() {
       );
       await tester.pump();
 
-      // Verify ConstrainedBox with maxWidth: 500 is present
-      final constrainedBoxFinder = find.byWidgetPredicate(
-        (widget) => widget is ConstrainedBox && widget.constraints.maxWidth == 500.0,
+      expect(find.byType(ResponsiveDesktopFrame), findsOneWidget);
+    });
+
+    testWidgets('ResponsiveDesktopFrame renders smartphone frame on desktop widths', (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ResponsiveDesktopFrame(
+            isDark: false,
+            child: Scaffold(body: Text('Sanctuary Content')),
+          ),
+        ),
       );
-      expect(constrainedBoxFinder, findsOneWidget);
+      await tester.pump();
+
+      expect(find.text('UR-HEART'), findsOneWidget);
+      expect(find.text('Sanctuary Content'), findsOneWidget);
     });
 
     testWidgets('IosPwaInstallBanner renders cleanly and gracefully handles dismissal', (tester) async {

@@ -21,6 +21,7 @@ import '../../features/ai_sanctuary/presentation/screens/eva_sanctuary_screen.da
 import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
 import '../theme/theme_controller.dart';
+import 'responsive_desktop_frame.dart';
 
 /// Global navigator key for cross-screen and deep link navigation
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -45,14 +46,9 @@ class URHeartApp extends ConsumerWidget {
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       builder: (context, child) {
-        return Container(
-          color: const Color(0xFF07080D),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
-              child: child ?? const SizedBox.shrink(),
-            ),
-          ),
+        return ResponsiveDesktopFrame(
+          isDark: isDark,
+          child: child ?? const SizedBox.shrink(),
         );
       },
       initialRoute: initialRoute,
