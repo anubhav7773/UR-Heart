@@ -69,6 +69,7 @@ class SlumberSensorService {
       final startTime = _slumberStartTime;
       if (startTime != null) {
         final durationResting = DateTime.now().difference(startTime);
+        _lastRestDuration = durationResting;
         // Minimum 10 seconds of resting required for harvest unlock
         if (durationResting.inSeconds >= 10) {
           _stateController.add(SlumberDeviceState.morningHarvestReady);
@@ -80,6 +81,11 @@ class SlumberSensorService {
       _slumberStartTime = null;
     }
   }
+
+  Duration _lastRestDuration = Duration.zero;
+  Duration get lastRestDuration => _lastRestDuration;
+  double get lastRestHours => _lastRestDuration.inMinutes / 60.0;
+
 
   /// Stops physical hardware sensor monitoring
   void stopMonitoring() {

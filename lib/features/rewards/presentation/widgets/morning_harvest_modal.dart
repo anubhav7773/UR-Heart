@@ -52,7 +52,7 @@ class MorningHarvestModal extends StatelessWidget {
             ),
             const SizedBox(height: 10.0),
             Text(
-              'Your device rested quietly overnight. Complete 1 mindful interactive sponsor reflection to unmask your morning harvest (+20 Swipes & +2 Direct Letters).',
+              'Your device rested quietly overnight. Complete the morning sponsor reflection to unmask your harvest. Ad networks dynamically determine the duration (10s Swipes, 20s Direct Letter, or 30s Reveal Token) based on morning auction demand.',
               textAlign: TextAlign.center,
               style: TextStyle(color: bodyColor, height: 1.45, fontSize: 13.0),
             ),

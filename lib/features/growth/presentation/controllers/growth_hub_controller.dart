@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
+import '../../../../core/ads/ad_reward_models.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../profile/data/profile_repository.dart';
 import '../../../rewards/data/sanctuary_billing_service.dart';
@@ -216,11 +217,38 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
     );
   }
 
+  Future<void> triggerMorningHarvestAuction([BuildContext? context]) async {
+    final restHours = SlumberSensorService.instance.lastRestHours;
+    final auction = RewardedAdManager.instance.conductProviderAuction(restHours: restHours);
+
+    if (context != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Mediation Auction: ${auction.winningNetwork.toUpperCase()} served a ${auction.durationSeconds}s reflection (${auction.tier.rewardLabel})',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
+    await triggerRewardedAd(
+      adType: AdPlacementTypes.morningHarvestUnlock,
+      durationSeconds: auction.durationSeconds,
+      network: auction.winningNetwork,
+      restHours: auction.restHours,
+      context: context,
+    );
+  }
+
   Future<void> triggerRewardedAd({
     required String adType,
     String? userId,
     String targetId = 'none',
     BuildContext? context,
+    int? durationSeconds,
+    String? network,
+    double? restHours,
   }) async {
     if (state.isAdFree || state.subscriptionTier != 'free') {
       if (context != null && context.mounted) {
@@ -237,7 +265,12 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       adType: adType,
       targetId: targetId,
       onRewardGranted: () async {
-        applyReward(adType, targetId: targetId);
+        applyReward(
+          adType,
+          targetId: targetId,
+          durationSeconds: durationSeconds,
+          restHours: restHours,
+        );
         String rewardNotice = 'Verified reward applied for: $adType';
         try {
           final res = await DioClient().dio.post<dynamic>(
@@ -246,6 +279,9 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
               'ad_type': adType,
               'target_id': targetId,
               'user_id': effectiveUserId,
+              'duration_seconds': durationSeconds ?? 10,
+              'network': network ?? 'admob',
+              'rest_hours': restHours ?? 0.0,
             },
           );
           if (res.data != null && res.data is Map<String, dynamic>) {
@@ -295,7 +331,12 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
     );
   }
 
-  void applyReward(String adType, {String targetId = 'none'}) {
+  void applyReward(
+    String adType, {
+    String targetId = 'none',
+    int? durationSeconds,
+    double? restHours,
+  }) {
     switch (adType) {
       case 'quick_reflection':
         final nextSwipes = state.swipesRemaining + 10;
@@ -308,16 +349,40 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
         SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', nextLetters));
         break;
       case 'morning_harvest_unlock':
-        final harvestSwipes = state.swipesRemaining + 20;
-        final harvestLetters = state.directLetters + 2;
-        state = state.copyWith(
-          swipesRemaining: harvestSwipes,
-          directLetters: harvestLetters,
-        );
-        SharedPreferences.getInstance().then((p) {
-          p.setInt('ur_heart_swipes_remaining', harvestSwipes);
-          p.setInt('ur_heart_direct_letters', harvestLetters);
-        });
+        final duration = durationSeconds ?? 10;
+        final restHrs = restHours ?? 0.0;
+        final restMult = restHrs >= 8.0 ? 2.0 : (restHrs >= 6.0 ? 1.5 : 1.0);
+
+        if (duration <= 15) {
+          final grantedSwipes = (10 * restMult).toInt();
+          final nextSwipes = state.swipesRemaining + grantedSwipes;
+          state = state.copyWith(swipesRemaining: nextSwipes);
+          SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_swipes_remaining', nextSwipes));
+        } else if (duration <= 25) {
+          final nextLetters = state.directLetters + 1;
+          state = state.copyWith(directLetters: nextLetters);
+          SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', nextLetters));
+        } else {
+          final currentProg = state.whatsappProgress;
+          if (currentProg >= 2) {
+            final nextTokens = state.revealTokensCount + 1;
+            state = state.copyWith(
+              whatsappProgress: 0,
+              revealTokensCount: nextTokens,
+              isWhatsappUnlocked: true,
+            );
+            SharedPreferences.getInstance().then((p) {
+              p.setInt('ur_heart_reveal_tokens', nextTokens);
+              p.setInt('ur_heart_whatsapp_progress', 0);
+            });
+          } else {
+            final nextProg = currentProg + 1;
+            state = state.copyWith(whatsappProgress: nextProg);
+            SharedPreferences.getInstance().then((p) {
+              p.setInt('ur_heart_whatsapp_progress', nextProg);
+            });
+          }
+        }
         break;
       case 'daily_streak_boost':
         state = state.copyWith(

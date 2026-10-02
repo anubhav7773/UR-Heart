@@ -1,4 +1,5 @@
 import os
+import secrets
 import hmac
 import hashlib
 import base64
@@ -260,8 +261,6 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
                     token_rec.user2_ads_count += 1
 
                 if token_rec.user1_ads_count >= 3 and token_rec.user2_ads_count >= 3 and not token_rec.is_unlocked:
-                    import secrets
-                    from datetime import timedelta, timezone
                     token_rec.is_unlocked = True
                     token_rec.ephemeral_token = secrets.token_urlsafe(32)
                     token_rec.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
@@ -273,10 +272,16 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
     return {"status": "success", "user_id": str(user_uuid), "granted_points": points_to_credit}
 
 
+_recent_user_claims: Dict[UUID, datetime] = {}
+
+
 class ClaimAdRewardRequest(BaseModel):
     ad_type: str
     target_id: Optional[str] = "none"
     user_id: Optional[str] = None
+    duration_seconds: Optional[int] = 10
+    network: Optional[str] = "admob"
+    rest_hours: Optional[float] = 0.0
 
 
 @router.post("/claim-reward", status_code=status.HTTP_200_OK, summary="Claim Verified Ad Reward")
@@ -287,8 +292,19 @@ async def claim_ad_reward(
 ):
     """
     Credits ad reward points and swipes directly to authenticated public.users record in PostgreSQL.
+    Supports dynamic ad duration tiers decided by provider RTB auction and anti-bot throttling.
     """
     target_user = current_user
+
+    # Anti-bot throttle: reject automated rapid-fire repeat scripts (< 2 seconds cooldown)
+    now = datetime.now(timezone.utc)
+    last_claim = _recent_user_claims.get(target_user.id)
+    if last_claim and (now - last_claim).total_seconds() < 2.0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Mindful pacing required. Please allow a few seconds between claims."
+        )
+    _recent_user_claims[target_user.id] = now
 
     swipes_to_grant = 0
     letters_to_grant = 0
@@ -305,9 +321,60 @@ async def claim_ad_reward(
         letters_to_grant = 1
         points_to_credit = 25
     elif payload.ad_type == "morning_harvest_unlock":
-        swipes_to_grant = 20
-        letters_to_grant = 2
-        points_to_credit = 50
+        # Dynamic duration auction: ad provider determines duration
+        # 10s -> 10 Swipes
+        # 20s -> 1 Direct Letter
+        # 30s -> Social Handle Reveal Progress / Token
+        duration = payload.duration_seconds or 10
+        rest_hrs = payload.rest_hours or 0.0
+        rest_mult = 1.0
+        if rest_hrs >= 8.0:
+            rest_mult = 2.0
+        elif rest_hrs >= 6.0:
+            rest_mult = 1.5
+
+        if duration <= 15:
+            # Short reflection (10s): 10 Swipes
+            swipes_to_grant = int(10 * rest_mult)
+            points_to_credit = int(10 * rest_mult)
+            reward_msg = f"Morning Harvest ({payload.network or 'AdMob'} {duration}s ad): +{swipes_to_grant} Swipes credited!"
+        elif duration <= 25:
+            # Medium resonance (20s): 1 Direct Letter
+            letters_to_grant = 1
+            swipes_to_grant = int(5 * (rest_mult - 1.0))
+            points_to_credit = int(25 * rest_mult)
+            reward_msg = f"Morning Harvest ({payload.network or 'AdMob'} {duration}s ad): +{letters_to_grant} Direct Letter credited!"
+        else:
+            # Premium ritual (30s): Reveal token progression
+            points_to_credit = int(50 * rest_mult)
+            ledger_entry = AdRewardLedger(
+                user_id=target_user.id,
+                ssv_transaction_id=f"slumber-harvest-{uuid.uuid4().hex[:12]}",
+                network=payload.network or "admob",
+                ad_type="sacred_bridge_reveal",
+                reward_points=points_to_credit
+            )
+            db.add(ledger_entry)
+            await db.flush()
+
+            ad_count_res = await db.execute(
+                select(func.count(AdRewardLedger.id))
+                .where(
+                    AdRewardLedger.user_id == target_user.id,
+                    AdRewardLedger.ad_type.in_(["whatsapp_reveal", "sacred_bridge_reveal"])
+                )
+            )
+            total_reveal_ads = ad_count_res.scalar() or 0
+            cycle_count = total_reveal_ads % 3
+            if cycle_count == 0:
+                target_user.reveal_tokens_count = (target_user.reveal_tokens_count or 0) + 1
+                token_granted = True
+                whatsapp_progress = 0
+                reward_msg = f"Morning Harvest ({payload.network or 'AdMob'} 30s ritual): +1 Reveal Token credited! Total: {target_user.reveal_tokens_count}"
+            else:
+                token_granted = False
+                whatsapp_progress = cycle_count
+                reward_msg = f"Morning Harvest ({payload.network or 'AdMob'} 30s ritual): {cycle_count}/3 towards Reveal Token!"
     elif payload.ad_type in ("whatsapp_reveal", "sacred_bridge_reveal"):
         points_to_credit = 30
         
@@ -365,8 +432,6 @@ async def claim_ad_reward(
                         elif match_rec.user2_id == target_user.id and token_rec.user2_ads_count < 3:
                             token_rec.user2_ads_count += 1
                         if token_rec.user1_ads_count >= 3 and token_rec.user2_ads_count >= 3 and not token_rec.is_unlocked:
-                            import secrets
-                            from datetime import timedelta, timezone
                             token_rec.is_unlocked = True
                             token_rec.ephemeral_token = secrets.token_urlsafe(32)
                             token_rec.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)

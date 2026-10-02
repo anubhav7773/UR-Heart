@@ -93,3 +93,47 @@ class RewardedAdInstance {
     isDisposed = true;
   }
 }
+
+/// Dynamic ad duration tiers decided by provider mediation auction (DIS-08 & PROV-AUC Fix)
+enum DynamicRewardTier {
+  quickSwipes(10, '10 Swipes', 10, 'swipes'),
+  deepLetter(20, '1 Direct Letter', 25, 'letters'),
+  sacredReveal(30, 'Social Handle Reveal Progress', 50, 'reveal_token');
+
+  final int durationSeconds;
+  final String rewardLabel;
+  final int points;
+  final String rewardType;
+
+  const DynamicRewardTier(this.durationSeconds, this.rewardLabel, this.points, this.rewardType);
+
+  static DynamicRewardTier fromDuration(int seconds) {
+    if (seconds <= 15) {
+      return DynamicRewardTier.quickSwipes;
+    } else if (seconds <= 25) {
+      return DynamicRewardTier.deepLetter;
+    } else {
+      return DynamicRewardTier.sacredReveal;
+    }
+  }
+}
+
+/// Real-Time Bidding (RTB) Auction Result where ad providers determine ad duration
+class AdAuctionResult {
+  final String winningNetwork;
+  final int durationSeconds;
+  final DynamicRewardTier tier;
+  final double restHours;
+  final double restMultiplier;
+  final double eCpmBid;
+
+  const AdAuctionResult({
+    required this.winningNetwork,
+    required this.durationSeconds,
+    required this.tier,
+    this.restHours = 0.0,
+    this.restMultiplier = 1.0,
+    this.eCpmBid = 14.50,
+  });
+}
+
