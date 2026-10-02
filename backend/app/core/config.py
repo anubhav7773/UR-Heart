@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = "ur-heart-media"
 
     # Ad Network SSV Secrets (5 Supported Networks: AdMob, Meta, Unity, Chartboost, Liftoff)
+    ADMOB_PUBLISHER_ID: str = "pub-XXXXXXXXXXXXXXXX"
     ADMOB_VERIFIER_KEYS_URL: str = "https://www.gstatic.com/admob/reward/verifier-keys.json"
     META_AUDIENCE_SSV_SECRET: str = "meta_ssv_secret_sanctuary_2026"
     UNITY_ADS_SSV_SECRET: str = "unity_ssv_secret_sanctuary_2026"

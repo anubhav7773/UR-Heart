@@ -1,0 +1,19 @@
+# UR-Heart Sanctuary - Authorized Digital Sellers (app-ads.txt)
+# Official IAB Tech Lab Specification: https://iabtechlab.com/ads-txt/
+# Developer Domain: https://urheart.asiverticals.me
+
+# 1. Google AdMob (Google LLC)
+# TAG ID: f08c47fec0942fa0
+google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
+
+# 2. Meta Audience Network (Facebook, Inc.)
+facebook.com, 0000000000000000, DIRECT
+
+# 3. Unity Ads (Unity Technologies)
+unityads.com, 0000000, DIRECT
+
+# 4. Chartboost (Chartboost, Inc.)
+chartboost.com, 000000000000000000000000, DIRECT
+
+# 5. Liftoff / Vungle (Liftoff Mobile, Inc.)
+vungle.com, 000000000000000000000000, DIRECT

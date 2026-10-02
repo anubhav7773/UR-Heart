@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, Request, Response, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -195,6 +195,37 @@ app.include_router(statutory_direct_router, prefix=f"{settings.API_V1_PREFIX}/st
 
 # Mount Main API v1 Router
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
+
+
+@app.get("/app-ads.txt", response_class=PlainTextResponse, tags=["IAB Authorized Sellers"])
+async def get_app_ads_txt():
+    """
+    IAB Tech Lab app-ads.txt Specification:
+    Authorized Digital Sellers for Google AdMob, Meta, Unity, Chartboost, Liftoff.
+    Direct crawler verification endpoint for Google Play Store & AdMob verification.
+    """
+    pub_id = getattr(settings, "ADMOB_PUBLISHER_ID", "pub-XXXXXXXXXXXXXXXX") or "pub-XXXXXXXXXXXXXXXX"
+    content = f"""# UR-Heart Sanctuary - Authorized Digital Sellers (app-ads.txt)
+# Official IAB Tech Lab Specification: https://iabtechlab.com/ads-txt/
+# Developer Domain: https://urheart.asiverticals.me
+
+# 1. Google AdMob (Google LLC)
+google.com, {pub_id}, DIRECT, f08c47fec0942fa0
+
+# 2. Meta Audience Network (Facebook, Inc.)
+facebook.com, 0000000000000000, DIRECT
+
+# 3. Unity Ads (Unity Technologies)
+unityads.com, 0000000, DIRECT
+
+# 4. Chartboost (Chartboost, Inc.)
+chartboost.com, 000000000000000000000000, DIRECT
+
+# 5. Liftoff / Vungle (Liftoff Mobile, Inc.)
+vungle.com, 000000000000000000000000, DIRECT
+"""
+    return PlainTextResponse(content=content, media_type="text/plain; charset=utf-8")
+
 
 
 def get_sanctuary_overview_html() -> str:
