@@ -27,8 +27,10 @@ services:
         value: ur-heart-44b46.firebasestorage.app
       - key: SUPERADMIN_EMAIL
         value: kshtriyaanubhav9120@gmail.com
-      - key: APPLOVIN_SDK_KEY
-        value: demo_applovin_sdk_key_ur_heart
+      - key: CHARTBOOST_SSV_SECRET
+        value: chartboost_ssv_secret_sanctuary_2026
+      - key: LIFTOFF_SSV_SECRET
+        value: liftoff_ssv_secret_sanctuary_2026
       - key: ADMOB_VERIFIER_KEYS_URL
         value: https://www.gstatic.com/admob/reward/verifier-keys.json
       - key: SUPABASE_PGBOUNCER_URL

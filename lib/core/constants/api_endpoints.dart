@@ -22,7 +22,8 @@ class ApiEndpoints {
   static const String authSessionHandshake = '/api/v1/auth/session';
   static const String mediaPresignedUrl = '/api/v1/media/presigned-url';
   static const String adMobRewardCallback = '/api/v1/ads/admob/callback';
-  static const String appLovinRewardCallback = '/api/v1/ads/applovin/callback';
+  static const String chartboostRewardCallback = '/api/v1/ads/chartboost/callback';
+  static const String liftoffRewardCallback = '/api/v1/ads/liftoff/callback';
   static const String adminKycPending = '/api/v1/admin/kyc/pending';
   static const String adminKycAction = '/api/v1/admin/kyc/action';
 

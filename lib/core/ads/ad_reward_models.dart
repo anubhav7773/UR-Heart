@@ -3,10 +3,10 @@ import 'package:uuid/uuid.dart';
 /// Supported mediated ad networks in the 5-network waterfall
 enum AdMediatedNetwork {
   admob,
-  inmobi,
   meta,
   unity,
-  applovin,
+  chartboost,
+  liftoff,
 }
 
 /// Standardized ad placement codes conforming to SSV backend contract

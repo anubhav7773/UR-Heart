@@ -65,7 +65,7 @@ class RewardedAdManager {
   /// Conducts multi-network RTB mediation auction where ad providers decide the ad duration.
   /// User has zero permission to choose duration during Night Slumber morning harvest.
   AdAuctionResult conductProviderAuction({double restHours = 0.0}) {
-    final networks = ['admob', 'unity', 'applovin', 'inmobi', 'meta'];
+    final networks = ['admob', 'meta', 'unity', 'chartboost', 'liftoff'];
     final winningNetwork = networks[DateTime.now().millisecond % networks.length];
 
     // Providers bid based on advertiser demand: 10s (short), 20s (medium), 30s (premium)

@@ -130,7 +130,7 @@ async def test_morning_harvest_30s_ad_advances_reveal_token(mock_auction_user, m
             json={
                 "ad_type": "morning_harvest_unlock",
                 "duration_seconds": 30,
-                "network": "applovin",
+                "network": "liftoff",
                 "rest_hours": 0.0,
             },
         )

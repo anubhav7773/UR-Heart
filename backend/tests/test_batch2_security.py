@@ -19,30 +19,30 @@ async def test_sec04_fake_ad_reward_callback_rejection():
     """
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # Spoofed InMobi callback without signature
+        # Spoofed Chartboost callback without signature
         res_no_sig = await client.get(
             "/api/v1/ads/verify-reward",
             params={
-                "network": "inmobi",
+                "network": "chartboost",
                 "transaction_id": f"fake_tx_{uuid.uuid4().hex[:8]}",
                 "custom_data": f"{uuid.uuid4()}:morning_harvest_unlock"
             }
         )
         assert res_no_sig.status_code == 403
-        assert "Invalid INMOBI HMAC signature" in res_no_sig.json().get("detail", "")
+        assert "Invalid CHARTBOOST HMAC signature" in res_no_sig.json().get("detail", "")
 
-        # Spoofed InMobi callback with fake signature
+        # Spoofed Chartboost callback with fake signature
         res_bad_sig = await client.get(
             "/api/v1/ads/verify-reward",
             params={
-                "network": "inmobi",
+                "network": "chartboost",
                 "transaction_id": f"fake_tx_{uuid.uuid4().hex[:8]}",
                 "custom_data": f"{uuid.uuid4()}:morning_harvest_unlock",
                 "signature": "bad_hex_signature_12345"
             }
         )
         assert res_bad_sig.status_code == 403
-        assert "Invalid INMOBI HMAC signature" in res_bad_sig.json().get("detail", "")
+        assert "Invalid CHARTBOOST HMAC signature" in res_bad_sig.json().get("detail", "")
 
 
 @pytest.mark.asyncio

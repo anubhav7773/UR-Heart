@@ -412,17 +412,17 @@ def test_ads_ssv_malformed_custom_data_and_signature():
     mock_db.execute.return_value = mock_res
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        secret = NETWORK_SECRETS.get("inmobi", "inmobi_ssv_secret_sanctuary_2026")
+        secret = NETWORK_SECRETS.get("chartboost", "chartboost_ssv_secret_sanctuary_2026")
 
         # 2. Valid signature, but custom_data lacks colons (malformed)
         bad_custom_data = "single_string_no_colons"
-        canonical_query = f"network=inmobi&transaction_id=tx_malformed_1&custom_data={bad_custom_data}"
+        canonical_query = f"network=chartboost&transaction_id=tx_malformed_1&custom_data={bad_custom_data}"
         sig = hmac.new(secret.encode("utf-8"), canonical_query.encode("utf-8"), hashlib.sha256).hexdigest()
 
         res = client.get(
             "/api/v1/ads/verify-reward",
             params={
-                "network": "inmobi",
+                "network": "chartboost",
                 "transaction_id": "tx_malformed_1",
                 "custom_data": bad_custom_data,
                 "signature": sig
@@ -433,13 +433,13 @@ def test_ads_ssv_malformed_custom_data_and_signature():
 
         # 3. Valid signature, but user_id is not a valid UUID
         bad_uuid_custom_data = "not-a-valid-uuid:quick_reflection:none"
-        canonical_query2 = f"network=inmobi&transaction_id=tx_malformed_2&custom_data={bad_uuid_custom_data}"
+        canonical_query2 = f"network=chartboost&transaction_id=tx_malformed_2&custom_data={bad_uuid_custom_data}"
         sig2 = hmac.new(secret.encode("utf-8"), canonical_query2.encode("utf-8"), hashlib.sha256).hexdigest()
 
         res2 = client.get(
             "/api/v1/ads/verify-reward",
             params={
-                "network": "inmobi",
+                "network": "chartboost",
                 "transaction_id": "tx_malformed_2",
                 "custom_data": bad_uuid_custom_data,
                 "signature": sig2

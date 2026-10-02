@@ -48,13 +48,12 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET_NAME: str = "ur-heart-media"
 
-    # Ad Network SSV Secrets
-    APPLOVIN_SDK_KEY: str = "demo_applovin_sdk_key_ur_heart"
+    # Ad Network SSV Secrets (5 Supported Networks: AdMob, Meta, Unity, Chartboost, Liftoff)
     ADMOB_VERIFIER_KEYS_URL: str = "https://www.gstatic.com/admob/reward/verifier-keys.json"
-    INMOBI_SSV_SECRET: str = "inmobi_ssv_secret_sanctuary_2026"
     META_AUDIENCE_SSV_SECRET: str = "meta_ssv_secret_sanctuary_2026"
     UNITY_ADS_SSV_SECRET: str = "unity_ssv_secret_sanctuary_2026"
-    APPLOVIN_SSV_SECRET: str = "applovin_ssv_secret_sanctuary_2026"
+    CHARTBOOST_SSV_SECRET: str = "chartboost_ssv_secret_sanctuary_2026"
+    LIFTOFF_SSV_SECRET: str = "liftoff_ssv_secret_sanctuary_2026"
 
     # Billing & Store Webhook Secrets
     REVENUECAT_WEBHOOK_SECRET: str = "rc_webhook_secret_sanctuary_2026"

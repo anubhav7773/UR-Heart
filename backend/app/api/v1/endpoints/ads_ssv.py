@@ -33,12 +33,12 @@ ADMOB_KEYS_URL = "https://gstatic.com/admob/reward/verifier-keys.json"
 _admob_keys_cache: Dict[str, Any] = {}
 _admob_cache_expiry: float = 0.0
 
-# Network Pre-Shared Secrets (Loaded from environment variables)
+# Network Pre-Shared Secrets (5 Networks: AdMob, Meta, Unity, Chartboost, Liftoff)
 NETWORK_SECRETS = {
-    "inmobi": os.getenv("INMOBI_SSV_SECRET", "inmobi_ssv_secret_sanctuary_2026"),
     "meta": os.getenv("META_AUDIENCE_SSV_SECRET", "meta_ssv_secret_sanctuary_2026"),
     "unity": os.getenv("UNITY_ADS_SSV_SECRET", "unity_ssv_secret_sanctuary_2026"),
-    "applovin": os.getenv("APPLOVIN_SSV_SECRET", "applovin_ssv_secret_sanctuary_2026"),
+    "chartboost": os.getenv("CHARTBOOST_SSV_SECRET", "chartboost_ssv_secret_sanctuary_2026"),
+    "liftoff": os.getenv("LIFTOFF_SSV_SECRET", "liftoff_ssv_secret_sanctuary_2026"),
 }
 
 
@@ -110,7 +110,7 @@ def verify_admob_ecdsa(query_string: str) -> bool:
 
 
 def verify_hmac_network(network: str, query_string: str, received_signature: str) -> bool:
-    """Verifies HMAC-SHA256 signature for non-Google networks (InMobi/Meta/Unity/AppLovin)."""
+    """Verifies HMAC-SHA256 signature for non-Google networks (Meta/Unity/Chartboost/Liftoff)."""
     secret = NETWORK_SECRETS.get(network)
     if not secret:
         return False  # Reject if secret is not configured
@@ -209,7 +209,7 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
     )
 
     db_ad_type = "sacred_bridge_reveal" if ad_type in ("whatsapp_reveal", "sacred_bridge_reveal") else ad_type
-    valid_network = network if network in ('admob', 'inmobi', 'meta', 'unity', 'applovin') else 'admob'
+    valid_network = network if network in ('admob', 'meta', 'unity', 'chartboost', 'liftoff') else 'admob'
 
     ledger_entry = AdRewardLedger(
         user_id=user_uuid,

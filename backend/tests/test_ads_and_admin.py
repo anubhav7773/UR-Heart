@@ -111,13 +111,13 @@ async def test_ad_ssv_idempotency_workflow():
         import hmac
         import hashlib
         from app.api.v1.endpoints.ads_ssv import NETWORK_SECRETS
-        secret = NETWORK_SECRETS.get("inmobi", "inmobi_ssv_secret_sanctuary_2026")
-        canonical_query = f"network=inmobi&transaction_id={tx_id}&custom_data={test_user_id}:quick_reflection:none"
+        secret = NETWORK_SECRETS.get("chartboost", "chartboost_ssv_secret_sanctuary_2026")
+        canonical_query = f"network=chartboost&transaction_id={tx_id}&custom_data={test_user_id}:quick_reflection:none"
         sig = hmac.new(secret.encode("utf-8"), canonical_query.encode("utf-8"), hashlib.sha256).hexdigest()
 
         # First request (should succeed)
         params_first = {
-            "network": "inmobi",
+            "network": "chartboost",
             "transaction_id": tx_id,
             "custom_data": f"{test_user_id}:quick_reflection:none",
             "signature": sig
@@ -187,6 +187,9 @@ async def test_ad_claim_reward_whatsapp_reveal_cycle():
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
+        from app.api.v1.endpoints.ads_ssv import _recent_user_claims
+        _recent_user_claims.clear()
+
         # Ad 1
         res1 = await client.post("/api/v1/ads/claim-reward", json={"ad_type": "whatsapp_reveal"})
         assert res1.status_code == 200, f"Error: {res1.text}"
@@ -196,6 +199,7 @@ async def test_ad_claim_reward_whatsapp_reveal_cycle():
         assert data1["reveal_tokens_count"] == 0
 
         # Ad 2
+        _recent_user_claims.clear()
         res2 = await client.post("/api/v1/ads/claim-reward", json={"ad_type": "whatsapp_reveal"})
         assert res2.status_code == 200
         data2 = res2.json()
@@ -203,6 +207,7 @@ async def test_ad_claim_reward_whatsapp_reveal_cycle():
         assert data2["reveal_tokens_count"] == 0
 
         # Ad 3 (completes cycle -> grants 1 token)
+        _recent_user_claims.clear()
         res3 = await client.post("/api/v1/ads/claim-reward", json={"ad_type": "whatsapp_reveal"})
         assert res3.status_code == 200
         data3 = res3.json()

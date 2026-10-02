@@ -19,7 +19,7 @@ void main() {
       final manager = RewardedAdManager.instance;
       final auction = manager.conductProviderAuction(restHours: 7.5);
 
-      expect(['admob', 'unity', 'applovin', 'inmobi', 'meta'], contains(auction.winningNetwork));
+      expect(['admob', 'meta', 'unity', 'chartboost', 'liftoff'], contains(auction.winningNetwork));
       expect([10, 20, 30], contains(auction.durationSeconds));
       expect(auction.restMultiplier, equals(1.5)); // 6+ hours earns 1.5x
       expect(auction.tier, isNotNull);
