@@ -1,3 +1,2 @@
-/// Non-web stub for web screenshot privacy mode & splash dismissal
+/// Non-web stub for web screenshot privacy mode
 void setWebPrivacyMode(bool enabled) {}
-void dismissWebSplash() {}

@@ -32,7 +32,7 @@
   <link rel="manifest" href="manifest.json">
 
   <style>
-    body {
+    html, body {
       margin: 0;
       padding: 0;
       background-color: #090A10;
@@ -42,103 +42,9 @@
       height: 100vh;
       width: 100vw;
     }
-    #splash-loading {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: #090A10;
-      z-index: 99999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-      pointer-events: none;
-    }
-    .pulsing-heart {
-      width: 72px;
-      height: 72px;
-      border-radius: 20px;
-      background: radial-gradient(circle at center, #FF2E7E 0%, #7952F5 100%);
-      box-shadow: 0 0 35px rgba(255, 46, 126, 0.45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: sanctuaryPulse 2s infinite ease-in-out;
-    }
-    .pulsing-heart svg {
-      width: 36px;
-      height: 36px;
-      fill: #FFFFFF;
-    }
-    .sanctuary-title {
-      margin-top: 20px;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      background: linear-gradient(135deg, #FFFFFF 0%, #FF8CB3 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .sanctuary-sub {
-      margin-top: 8px;
-      font-size: 13px;
-      color: #8C93A8;
-      letter-spacing: 0.05em;
-    }
-    @keyframes sanctuaryPulse {
-      0% { transform: scale(0.96); box-shadow: 0 0 25px rgba(255, 46, 126, 0.3); }
-      50% { transform: scale(1.04); box-shadow: 0 0 45px rgba(121, 82, 245, 0.6); }
-      100% { transform: scale(0.96); box-shadow: 0 0 25px rgba(255, 46, 126, 0.3); }
-    }
-
-    /* Sovereign Privacy Veil for 1:1 Encrypted Dialogues */
-    #sanctuary-privacy-veil {
-      display: none;
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(9, 10, 16, 0.96);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      z-index: 99998;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      color: #F3F5F4;
-      text-align: center;
-      padding: 24px;
-      box-sizing: border-box;
-      pointer-events: auto;
-    }
   </style>
 </head>
 <body>
-  <!-- Seamless Luxury Startup Splash -->
-  <div id="splash-loading">
-    <div class="pulsing-heart">
-      <svg viewBox="0 0 24 24">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-      </svg>
-    </div>
-    <div class="sanctuary-title">UR-Heart</div>
-    <div class="sanctuary-sub">Entering Mindful Sanctuary...</div>
-  </div>
-
-  <!-- Screen Capture / Snipping Privacy Veil for Web 1:1 Encrypted Dialogues -->
-  <div id="sanctuary-privacy-veil">
-    <div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(255, 46, 126, 0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-      <svg viewBox="0 0 24 24" style="width: 32px; height: 32px; fill: #FF2E7E;">
-        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-      </svg>
-    </div>
-    <div style="font-size: 18px; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">SOVEREIGN PRIVACY SHIELD ACTIVE</div>
-    <div style="font-size: 13px; color: #8C93A8; max-width: 320px; line-height: 1.5;">Screen capture, background view & external inspection are strictly restricted in 1:1 Encrypted Dialogues. Return to tab to resume.</div>
-  </div>
-
   <script>
     // 1. Service Worker Registration
     if ('serviceWorker' in navigator) {
@@ -153,88 +59,34 @@
       });
     }
 
-    // 2. Instant Smooth Splash Dismissal Logic
-    window.dismissSanctuarySplash = function() {
-      var splash = document.getElementById('splash-loading');
-      if (splash && splash.style.opacity !== '0') {
-        splash.style.opacity = '0';
-        setTimeout(function() {
-          if (splash && splash.parentNode) {
-            splash.parentNode.removeChild(splash);
-          }
-        }, 380);
-      }
-    };
-
-    // Auto-detect Flutter first frame render
-    var splashObserver = new MutationObserver(function(mutations, obs) {
-      var flt = document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas');
-      if (flt) {
-        setTimeout(window.dismissSanctuarySplash, 100);
-        obs.disconnect();
-      }
-    });
-    splashObserver.observe(document.body, { childList: true, subtree: true });
-
-    // Failsafe auto-dismissal after 2.8s
-    setTimeout(function() {
-      if (window.dismissSanctuarySplash) window.dismissSanctuarySplash();
-    }, 2800);
-
-    // 3. Web Screenshot Shield & Privacy Veil Controls
+    // 2. Web Screenshot Security Interceptors (Zero DOM Overlays to prevent tapjacking errors)
     window._urHeartPrivacyMode = false;
     window.setUrHeartPrivacyMode = function(enabled) {
       window._urHeartPrivacyMode = !!enabled;
-      var veil = document.getElementById('sanctuary-privacy-veil');
-      if (!window._urHeartPrivacyMode && veil) {
-        veil.style.display = 'none';
-      }
     };
-
-    function showPrivacyVeilIfActive() {
-      if (window._urHeartPrivacyMode) {
-        var veil = document.getElementById('sanctuary-privacy-veil');
-        if (veil) veil.style.display = 'flex';
-      }
-    }
-    function hidePrivacyVeilIfActive() {
-      var veil = document.getElementById('sanctuary-privacy-veil');
-      if (veil) veil.style.display = 'none';
-    }
-
-    window.addEventListener('blur', showPrivacyVeilIfActive);
-    document.addEventListener('visibilitychange', function() {
-      if (document.hidden) {
-        showPrivacyVeilIfActive();
-      } else {
-        hidePrivacyVeilIfActive();
-      }
-    });
-    window.addEventListener('focus', hidePrivacyVeilIfActive);
 
     // Intercept PrintScreen key, Ctrl+P, Ctrl+Shift+S
     window.addEventListener('keyup', function(e) {
       if (window._urHeartPrivacyMode) {
         if (e.key === 'PrintScreen' || e.keyCode === 44) {
-          showPrivacyVeilIfActive();
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText('').catch(function() {});
           }
-          setTimeout(hidePrivacyVeilIfActive, 1400);
         }
       }
     });
+
     window.addEventListener('keydown', function(e) {
       if (window._urHeartPrivacyMode) {
         if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S')) {
           e.preventDefault();
           e.stopPropagation();
-          showPrivacyVeilIfActive();
-          setTimeout(hidePrivacyVeilIfActive, 1400);
           return false;
         }
       }
     });
+
+    // Disable context menu while in confidential dialogue
     window.addEventListener('contextmenu', function(e) {
       if (window._urHeartPrivacyMode) {
         e.preventDefault();

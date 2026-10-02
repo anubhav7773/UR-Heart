@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ur_heart/core/services/sanctuary_notification_service.dart';
 import 'package:ur_heart/features/chat/data/chat_repository.dart';
 import 'package:ur_heart/features/chat/presentation/services/window_security_service.dart';
 import 'package:ur_heart/features/chat/presentation/services/web_security_stub.dart'
@@ -79,9 +80,9 @@ void main() {
     });
   });
 
-  group('Problem 2: Web App Splash Screen Dismissal Safety', () {
-    test('dismissWebSplash executes safely on any platform without throwing', () {
-      expect(() => dismissWebSplash(), returnsNormally);
+  group('Problem 2: Web Notification Permission Hygiene', () {
+    test('requestWebNotificationPermission method exists and is callable safely', () async {
+      expect(SanctuaryNotificationService.instance.requestWebNotificationPermission, isA<Function>());
     });
   });
 

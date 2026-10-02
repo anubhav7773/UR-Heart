@@ -80,25 +80,27 @@ class SanctuaryNotificationService {
     }
   }
 
-  // Initialize Firebase Cloud Messaging for outside-the-app push notifications (Web + Native)
-  try {
-    final fcm = FirebaseMessaging.instance;
-    await fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    // Initialize Firebase Cloud Messaging for outside-the-app push notifications (Web + Native)
+    try {
+      final fcm = FirebaseMessaging.instance;
+      if (!kIsWeb) {
+        await fcm.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          provisional: false,
+        );
 
-    final token = await fcm.getToken();
-    if (token != null && token.isNotEmpty) {
-      debugPrint('[FCM] Device Token: ...${token.substring(token.length - 8)}');
-      _registerFcmTokenWithBackend(token);
-    }
+        final token = await fcm.getToken();
+        if (token != null && token.isNotEmpty) {
+          debugPrint('[FCM] Device Token: ...${token.substring(token.length - 8)}');
+          _registerFcmTokenWithBackend(token);
+        }
+      }
 
-    fcm.onTokenRefresh.listen((newToken) {
-      _registerFcmTokenWithBackend(newToken);
-    });
+      fcm.onTokenRefresh.listen((newToken) {
+        _registerFcmTokenWithBackend(newToken);
+      });
 
     // Foreground push message listener: Show system notification immediately
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -146,6 +148,29 @@ class SanctuaryNotificationService {
         _dispatchTokenToBackend(token, authToken).ignore();
       }
     });
+  }
+
+  /// Safely requests notification permissions on Web upon explicit user interaction
+  Future<bool> requestWebNotificationPermission() async {
+    try {
+      final fcm = FirebaseMessaging.instance;
+      final settings = await fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        final token = await fcm.getToken();
+        if (token != null && token.isNotEmpty) {
+          _registerFcmTokenWithBackend(token);
+        }
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[NOTIFICATIONS] Web permission request note: $e');
+    }
+    return false;
   }
 
   static Future<void> _dispatchTokenToBackend(String token, String authToken) async {

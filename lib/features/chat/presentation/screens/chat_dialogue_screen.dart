@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
@@ -55,9 +56,10 @@ class ChatDialogueScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatDialogueScreen> createState() => _ChatDialogueScreenState();
 }
 
-class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
+class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _chatInputController = TextEditingController();
+  bool _isObscuredDueToFocusLoss = false;
 
   String _resolveMatchId() {
     final explicitId = widget.matchId;
@@ -76,6 +78,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     try {
       WindowSecurityService.enableSecureMode();
     } catch (_) {}
@@ -131,12 +134,27 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     try {
       WindowSecurityService.disableSecureMode();
     } catch (_) {}
     _scrollController.dispose();
     _chatInputController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (kIsWeb) {
+      final isInactive = state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden;
+      if (_isObscuredDueToFocusLoss != isInactive && mounted) {
+        setState(() {
+          _isObscuredDueToFocusLoss = isInactive;
+        });
+      }
+    }
   }
 
   @override
@@ -474,64 +492,109 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (promptText.isNotEmpty)
-              SharedContextPromptCard(isDark: isDark, promptText: promptText),
-            if (dialogueState.messages.isEmpty &&
-                dialogueState.icebreakers.isNotEmpty)
-              AiIcebreakerChipsRow(
-                isDark: isDark,
-                icebreakers: dialogueState.icebreakers,
-                onSelectIcebreaker: (prompt) => notifier.sendMessage(prompt),
-              ),
-            Expanded(
-              child: dialogueState.messages.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Begin with intention. Conversations here flow unhurried.',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: subText,
-                            fontStyle: FontStyle.italic),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      itemCount: dialogueState.messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = dialogueState.messages[index];
-                        return DialogueMessageBubble(
-                          message: msg,
-                          isMe: msg.isMe,
-                          isDark: isDark,
-                        );
-                      },
-                    ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                if (promptText.isNotEmpty)
+                  SharedContextPromptCard(isDark: isDark, promptText: promptText),
+                if (dialogueState.messages.isEmpty &&
+                    dialogueState.icebreakers.isNotEmpty)
+                  AiIcebreakerChipsRow(
+                    isDark: isDark,
+                    icebreakers: dialogueState.icebreakers,
+                    onSelectIcebreaker: (prompt) => notifier.sendMessage(prompt),
+                  ),
+                Expanded(
+                  child: dialogueState.messages.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Begin with intention. Conversations here flow unhurried.',
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: subText,
+                                fontStyle: FontStyle.italic),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          itemCount: dialogueState.messages.length,
+                          itemBuilder: (context, index) {
+                            final msg = dialogueState.messages[index];
+                            return DialogueMessageBubble(
+                              message: msg,
+                              isMe: msg.isMe,
+                              isDark: isDark,
+                            );
+                          },
+                        ),
+                ),
+                if (dialogueState.bondingSparks.isNotEmpty && !dialogueState.sparksDismissed)
+                  EvaBondingSparkBar(
+                    isDark: isDark,
+                    sparks: dialogueState.bondingSparks,
+                    onSelectSpark: (spark) {
+                      _chatInputController.text = spark;
+                      _chatInputController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: spark.length),
+                      );
+                    },
+                    onDismiss: () => notifier.dismissBondingSparks(),
+                  ),
+                TextOnlyChatInputBar(
+                  isDark: isDark,
+                  controller: _chatInputController,
+                  onSendMessage: (cleanText) => notifier.sendMessage(cleanText),
+                  onViolation: (violation) => notifier.setViolationAlert(violation),
+                ),
+              ],
             ),
-            if (dialogueState.bondingSparks.isNotEmpty && !dialogueState.sparksDismissed)
-              EvaBondingSparkBar(
-                isDark: isDark,
-                sparks: dialogueState.bondingSparks,
-                onSelectSpark: (spark) {
-                  _chatInputController.text = spark;
-                  _chatInputController.selection = TextSelection.fromPosition(
-                    TextPosition(offset: spark.length),
-                  );
+          ),
+          if (_isObscuredDueToFocusLoss && kIsWeb)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() {
+                    _isObscuredDueToFocusLoss = false;
+                  });
                 },
-                onDismiss: () => notifier.dismissBondingSparks(),
+                child: Container(
+                  color: const Color(0xF5090A10),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: const Color(0x26FF2E7E),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.lock_rounded, color: Color(0xFFFF2E7E), size: 30),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'SOVEREIGN PRIVACY SHIELD ACTIVE',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Dialogue masked while unfocused to prevent unauthorized screen capture. Tap anywhere to resume.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: Color(0xFF8C93A8)),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            TextOnlyChatInputBar(
-              isDark: isDark,
-              controller: _chatInputController,
-              onSendMessage: (cleanText) => notifier.sendMessage(cleanText),
-              onViolation: (violation) => notifier.setViolationAlert(violation),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
