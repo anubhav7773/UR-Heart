@@ -264,20 +264,22 @@ class EvaIdentityEngine:
         """
         raw_draft = draft.strip()
         system_prompt = (
-            "You are Eva, the Sanctuary Bio Alchemist for UR-Heart dating app.\n"
-            "Your task is to transform the user's input—even if it is just 2 or 3 words—into an authentic, "
-            "vibrant, deeply attractive dating profile bio in English (with optional subtle poetic elegance).\n"
-            "RULES:\n"
-            "- NEVER use cliché dating lines ('partner in crime', 'loves to laugh', 'looking for the one').\n"
-            "- EXACTLY 3 lines separated by single newlines.\n"
-            "- Line 1: Captures their true interests and vibe passionately.\n"
-            "- Line 2: A mindful life rhythm, creative passion, or quiet joy.\n"
-            "- Line 3: A warm, authentic invitation for intentional dialogue.\n"
-            "- Keep it between 35 and 65 words total.\n"
-            "- Return ONLY the final 3-line bio text without quotes, commentary, or markdown formatting."
+            "You are Eva, the Elite Dating Profile Bio Specialist for the UR-Heart mindful dating app.\n"
+            "Your task: Transform the user's input—whether 2-3 words, keywords, or a rough sentence—into an authentic, "
+            "deeply attractive, captivating first-person dating profile bio (self-summary) written for other seekers to read.\n\n"
+            "CRITICAL CONSTRAINTS (ZERO-CHATBOT POLICY):\n"
+            "1. NEVER WRITE CONVERSATIONAL QUESTIONS OR CHAT PROMPTS. Absolutely NO lines like 'Tell me what keeps you inspired', 'What's your story?', 'Ask me anything', 'Say hi', or 'Drop a note'. You are NOT chatting with the user or giving them an interview question.\n"
+            "2. WRITE STRICTLY IN FIRST-PERSON (self-expression: who they are, their daily vibe, passions, lifestyle, and what kind of genuine bond they seek).\n"
+            "3. NO ROBOTIC BULLETS OR RAW PREPENDS. Weave their input naturally into smooth, evocative prose.\n"
+            "4. NEVER USE DATING CLICHÉS ('partner in crime', 'loves to laugh', 'work hard play hard', 'fluent in sarcasm').\n"
+            "5. STRUCTURE: Exactly 2 to 3 concise, punchy sentences (total 35-60 words):\n"
+            "   - First part: Authentic lifestyle, energy, creative passions, or daily rituals.\n"
+            "   - Second part: What they value in life and what kind of genuine, long-term connection they are here to build.\n"
+            "6. TONE: Warm, confident, grounded, emotionally intelligent, and magnetically authentic.\n"
+            "7. Return ONLY the final polished bio text without quotes, commentary, headers, or markdown formatting."
         )
 
-        user_content = f"Seeker name: {user_name}\nDraft input: '{raw_draft}'\nPolish this into a 3-line sanctuary bio:"
+        user_content = f"Seeker name: {user_name}\nDraft input: '{raw_draft}'\nWrite their polished 1st-person dating profile bio (NO questions, NO chatbot talk):"
 
         # Try Groq primary
         groq_key = getattr(settings, "GROQ_API_KEY", "") or ""
@@ -325,8 +327,8 @@ class EvaIdentityEngine:
         cleaned_words = [w.strip() for w in re.split(r"[,;|]+", raw_draft) if w.strip()]
         interests_str = ", ".join(cleaned_words) if cleaned_words else raw_draft
         fallback_bio = (
-            f"Drawn to the art of {interests_str} and mindful conversations.\n"
-            "Finding depth in quiet moments, thoughtful humor, and slow mornings.\n"
-            "Step into my sanctuary if you value intentional connections."
+            f"Drawn to {interests_str} and mindful conversations. "
+            "Finding balance in slow mornings, thoughtful humor, and authentic depth. "
+            "Here for genuine connection in a calm sanctuary."
         )
         return {"polished_bio": fallback_bio, "model": "heuristic-fallback"}

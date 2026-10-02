@@ -137,8 +137,8 @@ void main() {
 
       // Verify Screen 10 editorial elements
       expect(find.text('Growth PRO · REWARDS HUB'), findsOneWidget);
-      expect(find.text('100% FREE SANCTUARY · ZERO PAYWALLS'), findsOneWidget);
-      expect(find.text('Swipes Remaining'), findsOneWidget);
+      expect(find.text('SACRED BALANCE · FREE OR SOVEREIGN'), findsOneWidget);
+      expect(find.text('Profile Skips'), findsOneWidget);
       expect(find.text('Night Sanctuary Slumber'), findsOneWidget);
 
       // Toggle Slumber Mode

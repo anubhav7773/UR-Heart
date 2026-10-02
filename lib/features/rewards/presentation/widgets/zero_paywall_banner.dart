@@ -46,7 +46,7 @@ class ZeroPaywallBanner extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '100% FREE SANCTUARY · ZERO PAYWALLS',
+                  'SACRED BALANCE · FREE OR SOVEREIGN',
                   style: AppTypography.accordionCategory.copyWith(
                     color: accentColor,
                     letterSpacing: 1.3,
@@ -57,7 +57,7 @@ class ZeroPaywallBanner extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Mindful Moments in Balance',
+            'Earn Free Access or Ascend Sovereign',
             style: AppTypography.titleH2.copyWith(
               color: headlineColor,
               fontSize: 20.0,
@@ -65,7 +65,7 @@ class ZeroPaywallBanner extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'No recurring subscriptions or micro-transactions. Mindful sponsor moments replenish your sacred resources in balance.',
+            'Enjoy full sanctuary privileges for free through mindful sponsor reflections, or unlock Sovereign Passes for complete ad-free silence, infinite discoveries, and instant reveals.',
             style: AppTypography.bodyStandard.copyWith(
               color: bodyColor,
               height: 1.45,

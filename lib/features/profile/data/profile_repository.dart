@@ -258,15 +258,15 @@ class ProfileRepository {
               {
                 'role': 'system',
                 'content':
-                    'You are EVA AI, the poetic and empathetic Wordsmith for UR-Heart dating sanctuary. '
-                    'The user has shared raw, broken, or informal thoughts about themselves. '
-                    'Deeply analyze their specific words, extract their true passions and personality, '
-                    'and craft a top-class, soulful, authentic dating bio (35-50 words). '
-                    'Base the bio strictly on the user expressed thoughts. Return ONLY the polished bio text, no explanations.'
+                    'You are EVA AI for UR-Heart mindful dating. '
+                    'Transform the seeker\'s raw thoughts into an authentic, attractive first-person dating bio (35-50 words). '
+                    'CRITICAL ZERO-CHATBOT POLICY: NEVER ask questions or write conversational chat prompts (no "Tell me...", no "What inspires you?", no "Ask me anything"). '
+                    'Write strictly as their personal dating profile bio. Return ONLY the polished bio text, no explanations.'
               },
               {
                 'role': 'user',
-                'content': 'Please polish my raw thoughts into an authentic dating bio: "$rawText"'
+                'content':
+                    'Write my 1st-person dating profile bio from these raw thoughts (NO questions, NO chatbot talk): "$rawText"'
               }
             ],
             'temperature': 0.75,

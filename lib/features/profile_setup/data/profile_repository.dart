@@ -121,9 +121,13 @@ class ProfileRepository {
             {
               'role': 'system',
               'content':
-                  'You are EVA AI for UR-Heart mindful dating. Elegantly polish this bio while preserving authentic interests. Return ONLY the polished text.'
+                  'You are EVA AI for UR-Heart mindful dating. Transform the user\'s input into an authentic, charismatic first-person dating bio (self-summary). CRITICAL ZERO-CHATBOT POLICY: NEVER ask questions or write conversational chat prompts (no "Tell me...", no "What inspires you?", no "Ask me anything"). Return ONLY the polished bio text.'
             },
-            {'role': 'user', 'content': cleaned}
+            {
+              'role': 'user',
+              'content':
+                  'Draft input: "$cleaned". Write my polished 1st-person dating bio (NO questions, NO chatbot talk):'
+            }
           ],
           'temperature': 0.7,
           'max_tokens': 120,
@@ -153,10 +157,10 @@ class ProfileRepository {
     }
 
     if (cleaned.length < 30) {
-      return '$cleaned · Cherishing intentional presence, unhurried moments, and meaningful connection in a noisy world.';
+      return 'Passionate about $cleaned, slow living, and deep conversations. Grounded, intentional, and looking to build a genuine, lasting connection.';
     }
 
-    return '$cleaned\n\n✨ Mindful reflection: Valuing intellectual curiosity, deep presence, and shared moments of resonance.';
+    return '$cleaned. Grounded in intentional living, quiet depth, and thoughtful humor. Seeking a genuine, lasting connection.';
   }
 
   /// Submits real front-camera video bytes to EVA AI Vision KYC on Render
