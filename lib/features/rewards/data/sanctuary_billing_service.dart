@@ -45,7 +45,7 @@ class SanctuaryBillingService {
   };
 
   SanctuaryBillingService(this._dio, [InAppPurchase? iap])
-      : _iap = _isTestEnvironment ? null : (iap ?? InAppPurchase.instance) {
+      : _iap = (_isTestEnvironment || kIsWeb) ? null : (iap ?? InAppPurchase.instance) {
     _singletonInstance = this;
     _initializeBillingStream();
   }

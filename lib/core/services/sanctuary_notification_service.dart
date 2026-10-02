@@ -225,8 +225,8 @@ class SanctuaryNotificationService {
       ledColor: const Color(0xFFD4AF37), // Sacred Gold
       ledOnMs: 500,
       ledOffMs: 500,
-      enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 250, 200, 250]),
+      enableVibration: !kIsWeb,
+      vibrationPattern: kIsWeb ? null : Int64List.fromList([0, 250, 200, 250]),
       category: AndroidNotificationCategory.message,
     );
 
