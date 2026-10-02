@@ -51,7 +51,7 @@ void main() {
 
     testWidgets('4. WebMindfulSponsorDialog renders mindful reflection and countdown timer', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: WebMindfulSponsorDialog(adType: 'quick_reflection'),
           ),

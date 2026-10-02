@@ -332,15 +332,26 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
 
   Future<bool> processAndUploadPhoto({
     required int slotNumber,
-    required XFile rawFile,
+    required dynamic rawFile,
     String userId = 'demo_user_1',
   }) async {
     try {
-      final bytes = await rawFile.readAsBytes();
+      final Uint8List bytes;
+      final String localPath;
+      if (rawFile is XFile) {
+        bytes = await rawFile.readAsBytes();
+        localPath = rawFile.path;
+      } else if (rawFile is Uint8List) {
+        bytes = rawFile;
+        localPath = 'memory_slot_$slotNumber.jpg';
+      } else {
+        bytes = await (rawFile as dynamic).readAsBytes() as Uint8List;
+        localPath = (rawFile as dynamic).path as String? ?? 'slot_$slotNumber.jpg';
+      }
       return await processAndUploadBytes(
         slotNumber: slotNumber,
         rawBytes: bytes,
-        localFallbackPath: rawFile.path,
+        localFallbackPath: localPath,
         userId: userId,
       );
     } catch (_) {
