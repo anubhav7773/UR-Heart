@@ -30,18 +30,24 @@ class RewardedAdManager {
   bool get isAdReady => (_primaryRealAd != null || _primaryBufferAd != null) && !(_primaryBufferAd?.isDisposed ?? true);
 
   Future<void> initialize() async {
-    try {
-      await MobileAds.instance.initialize();
-      await _loadNextBufferSlot();
-      await _loadNextBufferSlot();
-    } catch (e) {
-      debugPrint('[RewardedAdManager] Init error: $e');
-    }
+    if (kIsWeb) return;
+    await runZonedGuarded(() async {
+      try {
+        await MobileAds.instance.initialize();
+        await _loadNextBufferSlot();
+        await _loadNextBufferSlot();
+      } catch (e) {
+        debugPrint('[RewardedAdManager] Init error: $e');
+      }
+    }, (error, stack) {
+      debugPrint('[RewardedAdManager] Platform channel notice: $error');
+    });
   }
 
   void initializePreloader() {
     _primaryBufferAd ??= RewardedAdInstance(network: 'admob');
     _secondaryBufferAd ??= RewardedAdInstance(network: 'admob');
+    if (kIsWeb) return;
     // Lazy buffer loading protected against premature SDK calls
     try {
       _loadNextBufferSlot();
@@ -87,6 +93,7 @@ class RewardedAdManager {
   }
 
   Future<void> _loadNextBufferSlot() async {
+    if (kIsWeb) return;
     if (_isLoading) return;
     if (_primaryRealAd != null && _secondaryRealAd != null) return;
 

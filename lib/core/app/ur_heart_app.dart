@@ -44,6 +44,17 @@ class URHeartApp extends ConsumerWidget {
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
+      builder: (context, child) {
+        return Container(
+          color: const Color(0xFF07080D),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
       initialRoute: initialRoute,
       home: initialRoute == null ? const SanctuaryAppGateway() : null,
       routes: {

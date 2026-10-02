@@ -32,6 +32,10 @@ class SanctuaryNotificationService {
   /// Initialize local notification engine, register Android 13+ channels, and initialize FCM
   Future<void> initialize() async {
     if (_isInitialized) return;
+    if (kIsWeb) {
+      _isInitialized = true;
+      return;
+    }
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidSettings);
@@ -199,6 +203,7 @@ class SanctuaryNotificationService {
     Importance importance = Importance.max,
     Priority priority = Priority.high,
   }) async {
+    if (kIsWeb) return;
     if (!_isInitialized) {
       await initialize();
     }

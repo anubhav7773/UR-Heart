@@ -15,6 +15,7 @@ import '../../../rewards/presentation/screens/growth_hub_screen.dart';
 import '../../../ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
 import '../../../../core/services/sanctuary_notification_service.dart';
 import '../widgets/whatsapp_notification_banner.dart';
+import '../widgets/ios_pwa_install_banner.dart';
 
 /// Global Navigation Index State Provider for Tab Switching
 final navigationIndexProvider = StateProvider<int>((ref) => 0);
@@ -501,14 +502,21 @@ class _SanctuaryNavigationShellState
         backgroundColor: isDark
             ? DarkSanctuaryTokens.background
             : LightSanctuaryTokens.background,
-        body: IndexedStack(
-          index: currentIndex,
-          children: const [
-            FeedScreen(),
-            ResonancesScreen(),
-            ChatsListScreen(),
-            GrowthHubScreen(),
-            MyPersonaScreen(),
+        body: Column(
+          children: [
+            IosPwaInstallBanner(isDark: isDark),
+            Expanded(
+              child: IndexedStack(
+                index: currentIndex,
+                children: const [
+                  FeedScreen(),
+                  ResonancesScreen(),
+                  ChatsListScreen(),
+                  GrowthHubScreen(),
+                  MyPersonaScreen(),
+                ],
+              ),
+            ),
           ],
         ),
         floatingActionButton: Container(

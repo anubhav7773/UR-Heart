@@ -67,13 +67,16 @@ class UnbundledCheckboxGroup extends ConsumerWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Read Terms of Service in browser',
-                    style: TextStyle(
-                      color: pine,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
-                      decoration: TextDecoration.underline,
+                  Flexible(
+                    child: Text(
+                      'Read Terms of Service in browser',
+                      style: TextStyle(
+                        color: pine,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 4),
