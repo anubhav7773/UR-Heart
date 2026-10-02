@@ -124,8 +124,11 @@ def push_notification(
 
     # 1. Real-time WebSocket delivery to connected client
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+        if loop and loop.is_running():
             loop.create_task(manager.send_direct_message(user_key, {
                 "type": "sanctuary_notification",
                 "notification": entry

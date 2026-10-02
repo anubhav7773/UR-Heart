@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../chat/presentation/screens/chats_list_screen.dart';
 import '../../../chat/presentation/screens/chat_dialogue_screen.dart';
+import '../../../chat/data/chat_repository.dart';
 import '../../../feed/presentation/screens/feed_screen.dart';
 import '../../../profile/presentation/screens/my_persona_screen.dart';
 import '../../../resonances/presentation/screens/resonances_screen.dart';
@@ -45,6 +45,7 @@ class _SanctuaryNavigationShellState
     extends ConsumerState<SanctuaryNavigationShell> {
   DateTime? _lastBackPressTime;
   Timer? _notificationPoller;
+  StreamSubscription<Map<String, dynamic>>? _wsSubscription;
   int _unreadResonanceCount = 0;
   int _unreadChatCount = 0;
   final Set<String> _seenNotificationIds = {};
@@ -54,6 +55,7 @@ class _SanctuaryNavigationShellState
   void initState() {
     super.initState();
     _initializeSeenAndStartPoller();
+    _listenToRealtimeWebSocket();
   }
 
   Future<void> _initializeSeenAndStartPoller() async {
@@ -68,10 +70,6 @@ class _SanctuaryNavigationShellState
       if (authToken != null && authToken.isNotEmpty) {
         SanctuaryNotificationService.syncStoredFcmToken(authToken);
       }
-
-      if (kIsWeb) {
-        SanctuaryNotificationService.instance.requestWebNotificationPermission().ignore();
-      }
     } catch (_) {}
 
     if (mounted) {
@@ -82,9 +80,48 @@ class _SanctuaryNavigationShellState
     }
   }
 
+  void _listenToRealtimeWebSocket() {
+    try {
+      final wsService = ref.read(chatWebSocketServiceProvider);
+      _wsSubscription = wsService.eventStream.listen((event) {
+        if (!mounted) return;
+        final type = event['type']?.toString();
+        final action = event['action']?.toString();
+
+        if (type == 'sanctuary_notification') {
+          final notif = event['notification'];
+          if (notif is Map<String, dynamic>) {
+            _dispatchSingleNotification(notif, showBanner: true);
+          }
+        } else if (action == 'new_message' || type == 'dialogue_message') {
+          final senderName = event['sender_name']?.toString() ?? 'Sanctuary Seeker';
+          final content = event['content']?.toString() ?? event['text']?.toString() ?? 'New message';
+          final matchId = event['match_id']?.toString() ?? '';
+          final senderId = event['sender_id']?.toString() ?? '';
+          final notifMap = {
+            'id': 'ws_${DateTime.now().millisecondsSinceEpoch}',
+            'type': 'message',
+            'title': 'Message from $senderName 💬',
+            'body': content,
+            'match_id': matchId,
+            'is_read': false,
+            'created_at': DateTime.now().toIso8601String(),
+            'data': {
+              'match_id': matchId,
+              'sender_id': senderId,
+              'sender_name': senderName,
+              'message': content,
+            }
+          };
+          _dispatchSingleNotification(notifMap, showBanner: true);
+        }
+      });
+    } catch (_) {}
+  }
+
   void _startNotificationPoller() {
     _pollNotifications();
-    _notificationPoller = Timer.periodic(const Duration(seconds: 10), (_) {
+    _notificationPoller = Timer.periodic(const Duration(seconds: 15), (_) {
       _pollNotifications();
     });
   }
@@ -105,112 +142,117 @@ class _SanctuaryNavigationShellState
             .toList();
 
         if (unreadList.isNotEmpty && mounted) {
-          final isDark =
-              ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
-          // Mark all unread notifications as seen, dispatch to native tray, and acknowledge to backend
           for (final notif in unreadList) {
-            final notifId = notif['id']?.toString();
-            if (notifId != null) {
-              _seenNotificationIds.add(notifId);
-              // Acknowledge read to backend so it never delivers as unread on restart
-              apiClient.dio.post<dynamic>(
-                '/api/v1/notifications/mark-read',
-                data: {'notification_id': notifId},
-              ).ignore();
-            }
-
-
-            final nType = notif['type']?.toString().toLowerCase() ?? 'system';
-            final nTitle = notif['title']?.toString() ?? 'Sanctuary Resonance';
-            final nBody = notif['body']?.toString() ?? '';
-            final nData = notif['data'] as Map<String, dynamic>? ?? {};
-
-            try {
-              if (nType.contains('message') || nType.contains('chat')) {
-                final sName = nData['sender_name']?.toString() ??
-                    nTitle.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
-                final mId = nData['match_id']?.toString() ??
-                    notif['match_id']?.toString() ??
-                    'm_${DateTime.now().millisecondsSinceEpoch}';
-                final sId = nData['sender_id']?.toString() ?? 'user_peer';
-                SanctuaryNotificationService.instance.showDialogueMessageNotification(
-                  senderName: sName,
-                  messageText: nBody,
-                  matchId: mId,
-                  senderId: sId,
-                );
-              } else if (nType.contains('spark') || nType.contains('match')) {
-                final pName = nData['peer_name']?.toString() ??
-                    nData['partner_name']?.toString() ??
-                    nTitle;
-                final mId = nData['match_id']?.toString() ??
-                    'm_${DateTime.now().millisecondsSinceEpoch}';
-                final pId = nData['peer_id']?.toString() ??
-                    nData['partner_id']?.toString() ??
-                    'peer_1';
-                SanctuaryNotificationService.instance.showMutualSparkNotification(
-                  peerName: pName,
-                  matchId: mId,
-                  peerId: pId,
-                );
-              } else if (nType.contains('direct')) {
-                final sName = nData['sender_name']?.toString() ?? 'Seeker';
-                final mId = nData['match_id']?.toString() ??
-                    'm_${DateTime.now().millisecondsSinceEpoch}';
-                final sId = nData['sender_id']?.toString() ?? 'user_peer';
-                SanctuaryNotificationService.instance.showDirectLetterNotification(
-                  senderName: sName,
-                  messageSnippet: nBody,
-                  matchId: mId,
-                  senderId: sId,
-                );
-              } else if (nType.contains('streak')) {
-                final streakVal = nData['streak_count'] as int? ?? 1;
-                SanctuaryNotificationService.instance.showStreakAlertNotification(
-                  streakCount: streakVal,
-                  hoursRemaining: 6,
-                );
-              } else if (nType.contains('pass')) {
-                final aName = nData['sender_name']?.toString() ??
-                    nData['actor_name']?.toString() ??
-                    'A seeker';
-                SanctuaryNotificationService.instance.showSystemNotification(
-                  id: (notifId ?? 'notif').hashCode,
-                  title: 'Profile Passed 🍃',
-                  body: '$aName passed your resonance card.',
-                );
-              } else {
-                SanctuaryNotificationService.instance.showSystemNotification(
-                  id: (notifId ?? 'notif').hashCode,
-                  title: nTitle,
-                  body: nBody,
-                );
-              }
-            } catch (_) {}
+            _dispatchSingleNotification(notif, showBanner: notif == unreadList.last);
           }
-
-          // Show strictly only the single latest notification as an in-app banner
-          final latestNotif = unreadList.last;
-          _showWhatsAppNotification(latestNotif, isDark);
-
-          // Persist seen IDs so on app kill and re-open, the same notification never pops again
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setStringList(
-                'sanctuary_seen_notification_ids', _seenNotificationIds.toList());
-          } catch (_) {}
-
-          setState(() {
-            _unreadResonanceCount = notifications
-                .where((n) => n['is_read'] != true && n['type'] != 'message')
-                .length;
-            _unreadChatCount = notifications
-                .where((n) => n['is_read'] != true && n['type'] == 'message')
-                .length;
-          });
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> _dispatchSingleNotification(Map<String, dynamic> notif, {bool showBanner = true}) async {
+    final notifId = notif['id']?.toString();
+    if (notifId != null && _seenNotificationIds.contains(notifId)) {
+      return;
+    }
+    if (notifId != null) {
+      _seenNotificationIds.add(notifId);
+      if (!notifId.startsWith('ws_')) {
+        ref.read(apiClientProvider).dio.post<dynamic>(
+          '/api/v1/notifications/mark-read',
+          data: {'notification_id': notifId},
+        ).ignore();
+      }
+    }
+
+    final nType = notif['type']?.toString().toLowerCase() ?? 'system';
+    final nTitle = notif['title']?.toString() ?? 'Sanctuary Resonance';
+    final nBody = notif['body']?.toString() ?? '';
+    final nData = notif['data'] as Map<String, dynamic>? ?? {};
+
+    try {
+      if (nType.contains('message') || nType.contains('chat')) {
+        final sName = nData['sender_name']?.toString() ??
+            nTitle.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
+        final mId = nData['match_id']?.toString() ??
+            notif['match_id']?.toString() ??
+            'm_${DateTime.now().millisecondsSinceEpoch}';
+        final sId = nData['sender_id']?.toString() ?? 'user_peer';
+        SanctuaryNotificationService.instance.showDialogueMessageNotification(
+          senderName: sName,
+          messageText: nBody,
+          matchId: mId,
+          senderId: sId,
+        );
+      } else if (nType.contains('spark') || nType.contains('match')) {
+        final pName = nData['peer_name']?.toString() ??
+            nData['partner_name']?.toString() ??
+            nTitle;
+        final mId = nData['match_id']?.toString() ??
+            'm_${DateTime.now().millisecondsSinceEpoch}';
+        final pId = nData['peer_id']?.toString() ??
+            nData['partner_id']?.toString() ??
+            'peer_1';
+        SanctuaryNotificationService.instance.showMutualSparkNotification(
+          peerName: pName,
+          matchId: mId,
+          peerId: pId,
+        );
+      } else if (nType.contains('direct')) {
+        final sName = nData['sender_name']?.toString() ?? 'Seeker';
+        final mId = nData['match_id']?.toString() ??
+            'm_${DateTime.now().millisecondsSinceEpoch}';
+        final sId = nData['sender_id']?.toString() ?? 'user_peer';
+        SanctuaryNotificationService.instance.showDirectLetterNotification(
+          senderName: sName,
+          messageSnippet: nBody,
+          matchId: mId,
+          senderId: sId,
+        );
+      } else if (nType.contains('streak')) {
+        final streakVal = nData['streak_count'] as int? ?? 1;
+        SanctuaryNotificationService.instance.showStreakAlertNotification(
+          streakCount: streakVal,
+          hoursRemaining: 6,
+        );
+      } else if (nType.contains('pass')) {
+        final aName = nData['sender_name']?.toString() ??
+            nData['actor_name']?.toString() ??
+            'A seeker';
+        SanctuaryNotificationService.instance.showSystemNotification(
+          id: (notifId ?? 'notif').hashCode,
+          title: 'Profile Passed 🍃',
+          body: '$aName passed your resonance card.',
+        );
+      } else {
+        SanctuaryNotificationService.instance.showSystemNotification(
+          id: (notifId ?? 'notif').hashCode,
+          title: nTitle,
+          body: nBody,
+        );
+      }
+    } catch (_) {}
+
+    if (showBanner && mounted) {
+      final isDark = ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
+      _showWhatsAppNotification(notif, isDark);
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+          'sanctuary_seen_notification_ids', _seenNotificationIds.toList());
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        if (nType.contains('message') || nType.contains('chat')) {
+          _unreadChatCount++;
+        } else {
+          _unreadResonanceCount++;
+        }
+      });
+    }
   }
 
   void _handleNotificationNavigation(Map<String, dynamic> notif) {
@@ -454,6 +496,7 @@ class _SanctuaryNavigationShellState
   void dispose() {
     _dismissActiveNotification();
     _notificationPoller?.cancel();
+    _wsSubscription?.cancel();
     _seenNotificationIds.clear();
     super.dispose();
   }

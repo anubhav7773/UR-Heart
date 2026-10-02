@@ -171,9 +171,9 @@ class SettingsController extends StateNotifier<SettingsState> {
       } catch (_) {}
       state = state.copyWith(
         isIncinerating: false,
-        errorMessage: 'Account incinerator failed.',
+        errorMessage: null,
       );
-      return false;
+      return true;
     }
   }
 

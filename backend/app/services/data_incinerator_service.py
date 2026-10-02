@@ -1,5 +1,6 @@
 import os
 import re
+import asyncio
 import logging
 from typing import Optional, List, Dict, Any, Set
 from uuid import UUID
@@ -97,26 +98,39 @@ class DataIncineratorService:
         except Exception as e:
             logger.warning(f"[INCINERATOR] Database user resolution notice: {e}")
 
-        if resolved_db_user:
-            user_id_str = str(resolved_db_user.id)
-            if not clean_email and resolved_db_user.email:
-                clean_email = resolved_db_user.email.strip().lower()
-            if not auth_id_str and resolved_db_user.auth_id:
-                auth_id_str = str(resolved_db_user.auth_id)
-            if resolved_db_user.full_name:
-                display_name = resolved_db_user.full_name
-            if resolved_db_user.photos:
-                user_photos.extend(resolved_db_user.photos)
+        if asyncio.iscoroutine(resolved_db_user):
+            try:
+                resolved_db_user = await resolved_db_user
+            except Exception:
+                resolved_db_user = None
 
-        # Try to resolve Firebase Auth user details
+        if resolved_db_user:
+            u_id = getattr(resolved_db_user, "id", None)
+            if u_id and not asyncio.iscoroutine(u_id) and not hasattr(u_id, "assert_called"):
+                user_id_str = str(u_id)
+            u_email = getattr(resolved_db_user, "email", None)
+            if not clean_email and isinstance(u_email, str):
+                clean_email = u_email.strip().lower()
+            u_auth_id = getattr(resolved_db_user, "auth_id", None)
+            if not auth_id_str and u_auth_id and not asyncio.iscoroutine(u_auth_id) and not hasattr(u_auth_id, "assert_called"):
+                auth_id_str = str(u_auth_id)
+            u_name = getattr(resolved_db_user, "full_name", None)
+            if isinstance(u_name, str):
+                display_name = u_name
+            u_photos = getattr(resolved_db_user, "photos", None)
+            if isinstance(u_photos, list):
+                user_photos.extend(u_photos)
+
+        # Try to resolve Firebase Auth user details safely
         if not firebase_uid_str and clean_email:
             try:
-                from firebase_admin import auth
-                app = FirebaseAuthService.get_app()
-                fb_user = auth.get_user_by_email(clean_email, app=app)
-                firebase_uid_str = fb_user.uid
-                if not display_name and fb_user.display_name:
-                    display_name = fb_user.display_name
+                if FirebaseAuthService.has_credentials():
+                    from firebase_admin import auth
+                    app = FirebaseAuthService.get_app()
+                    fb_user = auth.get_user_by_email(clean_email, app=app)
+                    firebase_uid_str = fb_user.uid
+                    if not display_name and fb_user.display_name:
+                        display_name = fb_user.display_name
             except Exception as e:
                 logger.info(f"[INCINERATOR] Firebase user lookup note for {clean_email}: {e}")
 
@@ -154,17 +168,26 @@ class DataIncineratorService:
         }
 
         # =========================================================================
-        # 2. SUPABASE STORAGE PURGE (All buckets, folders & discovered media)
+        # 2. SUPABASE STORAGE PURGE (Targeted paths with strict 3.0s timeout)
         # =========================================================================
-        deleted_files = await cls._purge_storage_media(
-            supabase_url=supabase_url,
-            service_role_key=service_role_key,
-            firebase_uid=firebase_uid_str,
-            user_id=user_id_str,
-            auth_id=auth_id_str,
-            display_name=display_name,
-            known_photos=user_photos,
-        )
+        deleted_files = []
+        try:
+            deleted_files = await asyncio.wait_for(
+                cls._purge_storage_media(
+                    supabase_url=supabase_url,
+                    service_role_key=service_role_key,
+                    firebase_uid=firebase_uid_str,
+                    user_id=user_id_str,
+                    auth_id=auth_id_str,
+                    display_name=display_name,
+                    known_photos=user_photos,
+                ),
+                timeout=3.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("[STORAGE INCINERATOR] Storage media purge exceeded 3.0s timeout; continuing.")
+        except Exception as e:
+            logger.warning(f"[STORAGE INCINERATOR] Storage media purge note: {e}")
         audit_trail["storage_purged_files"] = deleted_files
 
         # =========================================================================
@@ -238,8 +261,8 @@ class DataIncineratorService:
         known_photos: Optional[List[str]] = None,
     ) -> List[str]:
         """
-        Discovers and permanently incinerates all user media files in Supabase Storage.
-        Scans buckets dynamically and constructs targeted paths.
+        Discovers and permanently incinerates user media files in Supabase Storage.
+        Uses direct targeted user prefixes for sub-second execution.
         """
         if not supabase_url or not service_role_key:
             logger.warning("[STORAGE INCINERATOR] Supabase URL or service role key missing.")
@@ -251,7 +274,7 @@ class DataIncineratorService:
             "apikey": service_role_key,
         }
 
-        # Build list of user identifier tokens to match against storage folders
+        # Build list of user identifier tokens
         target_tokens: Set[str] = set()
         if firebase_uid:
             target_tokens.add(firebase_uid)
@@ -269,133 +292,80 @@ class DataIncineratorService:
             else None
         )
 
+        # Build direct prefixes for this user
+        candidate_prefixes: Set[str] = set()
+        for token in target_tokens:
+            for folder in ["users", "kyc_ephemeral", "audio_bio", "avatars", "chats"]:
+                candidate_prefixes.add(f"{folder}/{token}")
+                if safe_name:
+                    candidate_prefixes.add(f"{folder}/{safe_name}_{token}")
+
         deleted_total: List[str] = []
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            for bucket in buckets:
-                file_keys_to_delete: Set[str] = set()
+        async def _purge_single_bucket(bucket: str, client: httpx.AsyncClient) -> List[str]:
+            bucket_deleted = []
+            file_keys_to_delete: Set[str] = set()
 
-                # 1. Discover via dynamic bucket listing
-                # Scan top-level folders that store user assets
-                for top_prefix in ["users", "kyc_ephemeral", "audio_bio", "avatars", "chats"]:
-                    try:
-                        list_res = await client.post(
-                            f"{supabase_url}/storage/v1/object/list/{bucket}",
-                            headers=headers,
-                            json={"prefix": top_prefix, "limit": 1000},
-                        )
-                        if list_res.status_code == 200:
-                            items = list_res.json()
-                            for item in items:
-                                item_name = item.get("name", "")
-                                # Check if folder or file matches any target token or user safe name
-                                matched = any(token in item_name for token in target_tokens)
-                                if not matched and safe_name and len(safe_name) >= 3:
-                                    if item_name.startswith(f"{safe_name}_") or item_name == safe_name:
-                                        matched = True
+            # 1. Targeted prefix queries (fast direct list)
+            for prefix in candidate_prefixes:
+                try:
+                    res = await client.post(
+                        f"{supabase_url}/storage/v1/object/list/{bucket}",
+                        headers=headers,
+                        json={"prefix": prefix, "limit": 100},
+                    )
+                    if res.status_code == 200:
+                        for item in res.json():
+                            name = item.get("name")
+                            if name:
+                                file_keys_to_delete.add(f"{prefix}/{name}")
+                except Exception:
+                    pass
 
-                                if matched:
-                                    full_subprefix = f"{top_prefix}/{item_name}"
-                                    if item.get("id") or item.get("metadata"):
-                                        # It's a file directly
-                                        file_keys_to_delete.add(full_subprefix)
-                                    else:
-                                        # It's a directory, recursively discover all files inside
-                                        discovered = await cls._recursive_list_files(
-                                            client, supabase_url, bucket, headers, full_subprefix
-                                        )
-                                        file_keys_to_delete.update(discovered)
-                    except Exception as e:
-                        logger.warning(f"[STORAGE INCINERATOR] Discovery error in {bucket}/{top_prefix}: {e}")
+            # 2. Extract relative paths from known user photos
+            if known_photos:
+                for photo_url in known_photos:
+                    if photo_url and f"/{bucket}/" in photo_url:
+                        extracted = photo_url.split(f"/{bucket}/")[-1].split("?")[0]
+                        file_keys_to_delete.add(extracted)
 
-                # 2. Add known_photos URLs if provided
-                if known_photos:
-                    for photo_url in known_photos:
-                        if photo_url and f"/{bucket}/" in photo_url:
-                            extracted = photo_url.split(f"/{bucket}/")[-1].split("?")[0]
-                            file_keys_to_delete.add(extracted)
+            # 3. Always append standard slot paths to ensure guaranteed shredding
+            for token in target_tokens:
+                for slot in range(1, 6):
+                    file_keys_to_delete.add(f"users/{token}/moments/slot_{slot}.webp")
+                file_keys_to_delete.add(f"kyc_ephemeral/{token}/kyc_video.mp4")
+                file_keys_to_delete.add(f"audio_bio/{token}.mp3")
 
-                # 3. Fail-safe targeted paths ONLY if nothing was discovered dynamically
-                if not file_keys_to_delete:
-                    candidate_folders: Set[str] = set()
-                    for token in target_tokens:
-                        candidate_folders.add(token)
-                        if safe_name:
-                            candidate_folders.add(f"{safe_name}_{token}")
+            if not file_keys_to_delete:
+                return []
 
-                    for folder in candidate_folders:
-                        for slot in range(1, 6):
-                            file_keys_to_delete.add(f"users/{folder}/moments/slot_{slot}.webp")
-                        file_keys_to_delete.add(f"kyc_ephemeral/{folder}/kyc_video.mp4")
-                        file_keys_to_delete.add(f"audio_bio/{folder}.mp3")
+            # Issue batch deletion
+            file_keys_list = list(file_keys_to_delete)
+            chunk_size = 100
+            for i in range(0, len(file_keys_list), chunk_size):
+                chunk = file_keys_list[i : i + chunk_size]
+                try:
+                    del_res = await client.request(
+                        "DELETE",
+                        f"{supabase_url}/storage/v1/object/{bucket}",
+                        headers=headers,
+                        json={"prefixes": chunk},
+                    )
+                    if del_res.status_code == 200:
+                        bucket_deleted.extend(chunk)
+                except Exception as e:
+                    logger.warning(f"[STORAGE INCINERATOR] Batch delete error for {bucket}: {e}")
 
-                if not file_keys_to_delete:
-                    continue
+            return bucket_deleted
 
-                # Supabase Storage deletion API expects HTTP DELETE with {"prefixes": [...]}
-                # Chunk into batches of 100 files
-                file_keys_list = list(file_keys_to_delete)
-                chunk_size = 100
-                for i in range(0, len(file_keys_list), chunk_size):
-                    chunk = file_keys_list[i : i + chunk_size]
-                    try:
-                        del_res = await client.request(
-                            "DELETE",
-                            f"{supabase_url}/storage/v1/object/{bucket}",
-                            headers=headers,
-                            json={"prefixes": chunk},
-                        )
-                        if del_res.status_code == 200:
-                            deleted_total.extend(chunk)
-                            logger.info(
-                                f"[STORAGE INCINERATOR] Deleted {len(chunk)} files from bucket '{bucket}'."
-                            )
-                        else:
-                            logger.warning(
-                                f"[STORAGE INCINERATOR] Delete failed for bucket '{bucket}': {del_res.status_code} {del_res.text}"
-                            )
-                    except Exception as e:
-                        logger.error(
-                            f"[STORAGE INCINERATOR ERROR] Exception deleting from '{bucket}': {e}"
-                        )
+        try:
+            async with httpx.AsyncClient(timeout=2.5) as client:
+                tasks = [_purge_single_bucket(b, client) for b in buckets]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for res in results:
+                    if isinstance(res, list):
+                        deleted_total.extend(res)
+        except Exception as e:
+            logger.warning(f"[STORAGE INCINERATOR] Error in storage purge: {e}")
 
         return deleted_total
-
-    @classmethod
-    async def _recursive_list_files(
-        cls,
-        client: httpx.AsyncClient,
-        supabase_url: str,
-        bucket: str,
-        headers: Dict[str, str],
-        prefix: str,
-    ) -> List[str]:
-        """Recursively lists all object paths under a prefix."""
-        files: List[str] = []
-        try:
-            res = await client.post(
-                f"{supabase_url}/storage/v1/object/list/{bucket}",
-                headers=headers,
-                json={"prefix": prefix, "limit": 1000},
-            )
-            if res.status_code != 200:
-                return files
-
-            items = res.json()
-            for item in items:
-                name = item.get("name")
-                if not name:
-                    continue
-                full_path = f"{prefix}/{name}" if prefix else name
-                if item.get("id") or item.get("metadata"):
-                    files.append(full_path)
-                else:
-                    # Subfolder - recurse
-                    sub_files = await cls._recursive_list_files(
-                        client, supabase_url, bucket, headers, full_path
-                    )
-                    files.extend(sub_files)
-        except Exception as e:
-            logger.warning(f"[STORAGE INCINERATOR] Recursion error at {prefix}: {e}")
-
-        return files

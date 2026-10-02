@@ -59,3 +59,5 @@ serviceAccountKey.json
 # Graphify local cache & scratch (persisted in .planning/graphs/)
 graphify-out/
 
+.vercel
+.env*

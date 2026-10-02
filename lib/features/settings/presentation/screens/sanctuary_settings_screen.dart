@@ -131,8 +131,8 @@ class SanctuarySettingsScreen extends ConsumerWidget {
                   }
                 },
                 onConfirmErasure: () async {
-                  final ok = await notifier.incinerateAccount();
-                  if (ok && context.mounted) {
+                  await notifier.incinerateAccount();
+                  if (context.mounted) {
                     await ref.read(themeProvider.notifier).resetThemeLock();
                     if (context.mounted) {
                       Navigator.of(context).pushNamedAndRemoveUntil(

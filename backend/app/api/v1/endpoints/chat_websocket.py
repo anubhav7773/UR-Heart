@@ -81,12 +81,10 @@ async def secure_chat_websocket_endpoint(websocket: WebSocket):
                         clean_mid = None
 
                 # Look up partner and match dialogue if clean_mid is available
-                if clean_mid:
+                if not recipient_uuid and clean_mid:
                     try:
                         from app.core.database import async_session_factory
                         from app.models.domain.match import Match
-                        from app.models.domain.chat import Message
-                        from app.api.v1.endpoints.chat_api import encrypt_message_storage
                         from sqlalchemy import select
 
                         async with async_session_factory() as session:
@@ -97,67 +95,79 @@ async def secure_chat_websocket_endpoint(websocket: WebSocket):
                             if m:
                                 partner_uuid = m.user2_id if str(m.user1_id) == str(authenticated_user_id) else m.user1_id
                                 recipient_uuid = partner_uuid
-
-                            # Persist message to PostgreSQL database if not already stored
-                            msg_id_raw = data.get("id") or data.get("client_id")
-                            target_msg_uuid = None
-                            if msg_id_raw:
-                                try:
-                                    target_msg_uuid = UUID(str(msg_id_raw).strip())
-                                except Exception:
-                                    target_msg_uuid = None
-
-                            already_saved = False
-                            if target_msg_uuid:
-                                existing_res = await session.execute(select(Message.id).where(Message.id == target_msg_uuid))
-                                if existing_res.scalar_one_or_none():
-                                    already_saved = True
-
-                            text_body = data.get("text") or data.get("content") or data.get("ciphertext") or ""
-                            if not already_saved and text_body and clean_mid:
-                                storage_encrypted = encrypt_message_storage(str(text_body).strip(), str(clean_mid))
-                                msg_entry = Message(
-                                    id=target_msg_uuid or uuid4(),
-                                    match_id=clean_mid,
-                                    sender_id=authenticated_user_id,
-                                    encrypted_text=storage_encrypted,
-                                    status="delivered",
-                                )
-                                session.add(msg_entry)
-                                await session.commit()
                     except Exception as err:
-                        logger.warning("WebSocket match/message resolution error: %s", err)
+                        logger.warning("WebSocket match partner lookup error: %s", err)
 
+                # 1. IMMEDIATE IN-MEMORY SOCKET DELIVERY (< 5ms)
                 if recipient_uuid:
                     recipient_str = str(recipient_uuid)
                     data["recipient_id"] = recipient_str
-                    # Direct delivery to recipient's live socket
                     await manager.send_direct_message(recipient_str, data)
 
-                    # Trigger outside-the-app notification if recipient is backgrounded
-                    try:
-                        from app.api.v1.endpoints.notifications import push_notification
-                        push_notification(
-                            user_id=recipient_str,
-                            notif_type="message",
-                            title="New Mindful Dialogue 💬",
-                            body=str(data.get("text") or "New encrypted dialogue message")[:80],
-                            data={
-                                "match_id": str(clean_mid) if clean_mid else match_id,
-                                "sender_id": str(authenticated_user_id),
-                                "target_route": "/chat-dialogue",
-                            }
-                        )
-                    except Exception as notif_err:
-                        logger.warning("WS push notification dispatch notice: %s", notif_err)
-
-                # Send transmission ack to sender
+                # Send transmission ack to sender immediately
                 await websocket.send_json({
                     "type": "delivery_ack",
                     "match_id": match_id,
                     "id": data.get("id"),
                     "status": "delivered_to_relay" if recipient_uuid else "queued"
                 })
+
+                # 2. ASYNC BACKGROUND DB PERSISTENCE & PUSH DISPATCH (Non-blocking)
+                async def _persist_and_notify_bg(mid_val, auth_uid_val, rec_uuid_val, payload_data):
+                    try:
+                        from app.core.database import async_session_factory
+                        from app.models.domain.chat import Message
+                        from app.api.v1.endpoints.chat_api import encrypt_message_storage
+                        from sqlalchemy import select
+
+                        msg_id_raw = payload_data.get("id") or payload_data.get("client_id")
+                        target_msg_uuid = None
+                        if msg_id_raw:
+                            try:
+                                target_msg_uuid = UUID(str(msg_id_raw).strip())
+                            except Exception:
+                                target_msg_uuid = None
+
+                        text_body = payload_data.get("text") or payload_data.get("content") or payload_data.get("ciphertext") or ""
+
+                        if mid_val and text_body:
+                            async with async_session_factory() as session:
+                                already_saved = False
+                                if target_msg_uuid:
+                                    existing_res = await session.execute(select(Message.id).where(Message.id == target_msg_uuid))
+                                    if existing_res.scalar_one_or_none():
+                                        already_saved = True
+
+                                if not already_saved:
+                                    storage_encrypted = encrypt_message_storage(str(text_body).strip(), str(mid_val))
+                                    msg_entry = Message(
+                                        id=target_msg_uuid or uuid4(),
+                                        match_id=mid_val,
+                                        sender_id=auth_uid_val,
+                                        encrypted_text=storage_encrypted,
+                                        status="delivered",
+                                    )
+                                    session.add(msg_entry)
+                                    await session.commit()
+
+                        if rec_uuid_val:
+                            from app.api.v1.endpoints.notifications import push_notification
+                            push_notification(
+                                user_id=str(rec_uuid_val),
+                                notif_type="message",
+                                title="New Mindful Dialogue 💬",
+                                body=str(payload_data.get("text") or "New encrypted dialogue message")[:80],
+                                data={
+                                    "match_id": str(mid_val) if mid_val else "",
+                                    "sender_id": str(auth_uid_val),
+                                    "target_route": "/chat-dialogue",
+                                }
+                            )
+                    except Exception as bg_err:
+                        logger.warning("Background message persistence/notify error: %s", bg_err)
+
+                import asyncio
+                asyncio.create_task(_persist_and_notify_bg(clean_mid, authenticated_user_id, recipient_uuid, data))
 
             # 3. Stage advance & Bridge events
             elif event_type in ("STAGE_ADVANCE_REQUEST", "stage_advanced", "bridge_reveal_request", "bridge_consent"):

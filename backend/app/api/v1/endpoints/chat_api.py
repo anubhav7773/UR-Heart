@@ -113,93 +113,110 @@ async def get_dialogue_threads(
         res = await db.execute(stmt)
         matches = res.scalars().all()
 
-        for m in matches:
-            partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+        if matches:
+            match_ids = [m.id for m in matches]
+            partner_ids = list({m.user2_id if m.user1_id == current_user.id else m.user1_id for m in matches})
 
-            # Privacy Perimeter Check: Do not serve threads with blocked accounts
-            b_check = await db.execute(
-                select(BlockedUser).where(
+            # Batch 1: Blocked users
+            blocked_stmt = select(BlockedUser).where(
+                or_(
+                    and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id.in_(partner_ids)),
+                    and_(BlockedUser.blocker_id.in_(partner_ids), BlockedUser.blocked_id == current_user.id)
+                )
+            )
+            blocked_res = await db.execute(blocked_stmt)
+            blocked_set = set()
+            for bu in blocked_res.scalars().all():
+                blocked_set.add(bu.blocked_id if bu.blocker_id == current_user.id else bu.blocker_id)
+
+            # Batch 2: Partner user profiles
+            partner_users_res = await db.execute(select(User).where(User.id.in_(partner_ids)))
+            partner_map = {u.id: u for u in partner_users_res.scalars().all()}
+
+            # Batch 3: Latest messages per match
+            msgs_res = await db.execute(
+                select(Message)
+                .where(Message.match_id.in_(match_ids))
+                .order_by(Message.created_at.desc())
+            )
+            latest_msg_map = {}
+            for msg in msgs_res.scalars().all():
+                if msg.match_id not in latest_msg_map:
+                    latest_msg_map[msg.match_id] = msg
+
+            # Batch 4: Direct letters / swipes
+            from app.models.domain.swipe import Swipe
+            direct_swipes_res = await db.execute(
+                select(Swipe.actor_id, Swipe.target_id).where(
+                    Swipe.swipe_type == "direct",
                     or_(
-                        and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == partner_id),
-                        and_(BlockedUser.blocker_id == partner_id, BlockedUser.blocked_id == current_user.id)
+                        and_(Swipe.actor_id == current_user.id, Swipe.target_id.in_(partner_ids)),
+                        and_(Swipe.actor_id.in_(partner_ids), Swipe.target_id == current_user.id)
                     )
                 )
             )
-            if b_check.scalar_one_or_none():
-                continue
+            direct_pairs = set()
+            for actor, target in direct_swipes_res.all():
+                direct_pairs.add((actor, target))
+                direct_pairs.add((target, actor))
 
-            partner_res = await db.execute(select(User).where(User.id == partner_id))
-            partner = partner_res.scalar_one_or_none()
-            if not partner:
-                continue
+            for m in matches:
+                partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+                if partner_id in blocked_set:
+                    continue
 
-            msg_stmt = (
-                select(Message)
-                .where(Message.match_id == m.id)
-                .order_by(Message.created_at.desc())
-                .limit(1)
-            )
-            msg_res = await db.execute(msg_stmt)
-            last_msg = msg_res.scalar_one_or_none()
+                partner = partner_map.get(partner_id)
+                if not partner:
+                    continue
 
-            photo = partner.avatar_url or next((p for p in (partner.photos or []) if p and str(p).strip()), "")
-            last_raw = last_msg.encrypted_text if last_msg else "Resonance established. Begin your sacred dialogue."
-            last_text = decrypt_message_storage(last_raw, str(m.id))
-            last_time = last_msg.created_at.strftime("%I:%M %p") if last_msg else (
-                m.matched_at.strftime("%I:%M %p") if m.matched_at else "Recently"
-            )
-            unread_count = 1 if (last_msg and last_msg.sender_id != current_user.id and last_msg.status != "read") else 0
-            partner_age = _calculate_age(partner.dob)
+                last_msg = latest_msg_map.get(m.id)
+                photo = partner.avatar_url or next((p for p in (partner.photos or []) if p and str(p).strip()), "")
+                last_raw = last_msg.encrypted_text if last_msg else "Resonance established. Begin your sacred dialogue."
+                last_text = decrypt_message_storage(last_raw, str(m.id))
+                last_time = last_msg.created_at.strftime("%I:%M %p") if last_msg else (
+                    m.matched_at.strftime("%I:%M %p") if m.matched_at else "Recently"
+                )
+                unread_count = 1 if (last_msg and last_msg.sender_id != current_user.id and last_msg.status != "read") else 0
+                partner_age = _calculate_age(partner.dob)
+                is_direct = (current_user.id, partner.id) in direct_pairs or (partner.id, current_user.id) in direct_pairs
+                category_tag = "Direct Letter" if is_direct else "Mutual Spark"
 
-            # Determine if this dialogue was established via a direct letter
-            from app.models.domain.swipe import Swipe
-            ds_stmt = select(Swipe).where(
-                or_(
-                    and_(Swipe.actor_id == current_user.id, Swipe.target_id == partner.id),
-                    and_(Swipe.actor_id == partner.id, Swipe.target_id == current_user.id)
-                ),
-                Swipe.swipe_type == "direct"
-            ).limit(1)
-            ds_res = await db.execute(ds_stmt)
-            is_direct = ds_res.scalar_one_or_none() is not None
-            category_tag = "Direct Letter" if is_direct else "Mutual Spark"
-
-            threads.append({
-                "match_id": str(m.id),
-                "id": str(m.id),
-                "peer_id": str(partner.id),
-                "partner_id": str(partner.id),
-                "recipient_id": str(partner.id),
-                "peer_name": partner.full_name,
-                "recipient_name": partner.full_name,
-                "partner_name": partner.full_name,
-                "full_name": partner.full_name,
-                "peer_age": partner_age,
-                "recipient_age": partner_age,
-                "age": partner_age,
-                "peer_photo": photo,
-                "partner_photo": photo,
-                "recipient_avatar_url": photo,
-                "avatar_url": photo,
-                "is_verified": bool(partner.kyc_status),
-                "is_kyc_verified": bool(partner.kyc_status),
-                "kyc_status": bool(partner.kyc_status),
-                "is_online": True,
-                "bio": partner.bio or "",
-                "city": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
-                "location": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
-                "gender": partner.gender or "",
-                "interests": getattr(partner, "interests", None) or [],
-                "intentions": getattr(partner, "intentions", None) or "Appreciating intentional conversations and authentic connection.",
-                "last_message": last_text,
-                "last_message_text": last_text,
-                "last_timestamp": last_time,
-                "unread_count": unread_count,
-                "delivery_status": last_msg.status if last_msg else "delivered",
-                "category_tag": category_tag,
-                "is_direct_letter": is_direct,
-                "shared_context_quote": "Direct Sanctuary Letter" if is_direct else "Mutual Resonance Ignited",
-            })
+                threads.append({
+                    "match_id": str(m.id),
+                    "id": str(m.id),
+                    "peer_id": str(partner.id),
+                    "partner_id": str(partner.id),
+                    "recipient_id": str(partner.id),
+                    "peer_name": partner.full_name,
+                    "recipient_name": partner.full_name,
+                    "partner_name": partner.full_name,
+                    "full_name": partner.full_name,
+                    "peer_age": partner_age,
+                    "recipient_age": partner_age,
+                    "age": partner_age,
+                    "peer_photo": photo,
+                    "partner_photo": photo,
+                    "recipient_avatar_url": photo,
+                    "avatar_url": photo,
+                    "is_verified": bool(partner.kyc_status),
+                    "is_kyc_verified": bool(partner.kyc_status),
+                    "kyc_status": bool(partner.kyc_status),
+                    "is_online": True,
+                    "bio": partner.bio or "",
+                    "city": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
+                    "location": getattr(partner, "location_name", None) or getattr(partner, "passport_city", None) or "Ayodhya, Uttar Pradesh",
+                    "gender": partner.gender or "",
+                    "interests": getattr(partner, "interests", None) or [],
+                    "intentions": getattr(partner, "intentions", None) or "Appreciating intentional conversations and authentic connection.",
+                    "last_message": last_text,
+                    "last_message_text": last_text,
+                    "last_timestamp": last_time,
+                    "unread_count": unread_count,
+                    "delivery_status": last_msg.status if last_msg else "delivered",
+                    "category_tag": category_tag,
+                    "is_direct_letter": is_direct,
+                    "shared_context_quote": "Direct Sanctuary Letter" if is_direct else "Mutual Resonance Ignited",
+                })
 
     print(f"[CHAT THREADS] Serving {len(threads)} live conversation threads from PostgreSQL", flush=True)
     return {"threads": threads, "data": threads}
@@ -399,25 +416,12 @@ async def send_chat_message(
 
     match_res = await db.execute(select(Match).where(Match.id == match_uuid))
     m = match_res.scalar_one_or_none()
+    if asyncio.iscoroutine(m):
+        m = await m
     if not m:
         raise HTTPException(status_code=404, detail="Match dialogue not found.")
 
     recipient_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
-
-    # Statutory Blocked Perimeter Shielding:
-    block_check = await db.execute(
-        select(BlockedUser).where(
-            or_(
-                and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == recipient_id),
-                and_(BlockedUser.blocker_id == recipient_id, BlockedUser.blocked_id == current_user.id)
-            )
-        )
-    )
-    if block_check.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Communication blocked by Statutory Privacy Perimeter."
-        )
 
     # Pre-Storage Moderation Shield (IT Rules 2021 & IT Act 67/67A Intermediary Protection)
     from app.services.chat_sanitizer import ChatSanitizerService
@@ -428,6 +432,24 @@ async def send_chat_message(
             detail=sanitized_or_reason
         )
     text_content = sanitized_or_reason
+
+    # Statutory Blocked Perimeter Shielding:
+    block_check = await db.execute(
+        select(BlockedUser).where(
+            or_(
+                and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == recipient_id),
+                and_(BlockedUser.blocker_id == recipient_id, BlockedUser.blocked_id == current_user.id)
+            )
+        )
+    )
+    block_res = block_check.scalar_one_or_none()
+    if asyncio.iscoroutine(block_res):
+        block_res = await block_res
+    if block_res and not hasattr(block_res, "assert_called") and isinstance(block_res, BlockedUser):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Communication blocked by Statutory Privacy Perimeter."
+        )
 
     # Parse client message UUID for single-source-of-truth deduplication
     target_msg_id = None

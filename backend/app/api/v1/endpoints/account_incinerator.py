@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Any
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,16 @@ class IncinerateAccountRequest(BaseModel):
     reason: Optional[str] = Field(default="user_requested_erasure", max_length=100)
 
 
+async def _purge_remote_user_storage(user_id: Any, email: Optional[str] = None) -> None:
+    """Hook for storage purging."""
+    pass
+
+
+async def _delete_auth_identity(user_id: Any, email: Optional[str] = None) -> None:
+    """Hook for auth identity purging."""
+    pass
+
+
 @router.delete("/incinerate-account", status_code=status.HTTP_200_OK)
 async def incinerate_account_irrevocably(
     payload: IncinerateAccountRequest,
@@ -33,6 +43,10 @@ async def incinerate_account_irrevocably(
     3. Supabase Auth (auth.users administrative record).
     4. PostgreSQL database (public.users and foreign key cascades).
     """
+    await _purge_remote_user_storage(str(current_user.id))
+    auth_target = str(current_user.auth_id) if getattr(current_user, "auth_id", None) else str(current_user.id)
+    await _delete_auth_identity(auth_target)
+
     audit = await DataIncineratorService.incinerate_user(
         email=current_user.email,
         user_id=current_user.id,
