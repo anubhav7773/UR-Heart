@@ -89,12 +89,6 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="urheart" android:host="open" />
             </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="urheart.asiverticals.me" android:pathPrefix="/store" />
-            </intent-filter>
             <!-- Render Fallback Domain Deep Linking -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

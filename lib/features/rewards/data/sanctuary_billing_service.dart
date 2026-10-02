@@ -41,6 +41,7 @@ class SanctuaryBillingService {
     'urheart_pass_lifetime',
     'urheart_key_instant_contact',
     'urheart_pack_direct_letters',
+    'urheart_pack_global_passport',
   };
 
   SanctuaryBillingService(this._dio, [InAppPurchase? iap])
@@ -107,10 +108,18 @@ class SanctuaryBillingService {
       ),
       ProductDetails(
         id: 'urheart_pass_lifetime',
-        title: 'Lifetime Sovereign Crest',
-        description: 'Permanent sovereign entitlement and zero ads',
+        title: '1-Year Sovereign Pass',
+        description: 'Sovereign entitlement and zero ads for 365 days',
         price: '\$59.99',
         rawPrice: 59.99,
+        currencyCode: 'USD',
+      ),
+      ProductDetails(
+        id: 'urheart_pack_global_passport',
+        title: '24h Global Passport',
+        description: 'Teleport to any global city for 24 hours',
+        price: '\$1.99',
+        rawPrice: 1.99,
         currencyCode: 'USD',
       ),
     ];

@@ -140,7 +140,7 @@ class FreeAdsTabView extends ConsumerWidget {
           NightSlumberToggleCard(
             isDark: isDark,
             isSlumberActive: growthState.isSlumberActive,
-            onChanged: (val) => notifier.toggleSlumberMode(val),
+            onChanged: (val) => notifier.toggleSlumberMode(val, context),
           ),
           const SizedBox(height: 16.0),
 

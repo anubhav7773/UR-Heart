@@ -346,6 +346,20 @@ class ProfileRepository {
     }
   }
 
+  Future<void> updateNightSlumber(bool val) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('ur_heart_night_slumber', val);
+      _currentProfile = _currentProfile.copyWith(nightSlumber: val);
+      await _dio?.put<dynamic>(
+        '/api/v1/user/preferences',
+        data: {'night_slumber': val},
+      );
+    } catch (e) {
+      debugPrint('[ProfileRepository] updateNightSlumber notice: $e');
+    }
+  }
+
   void _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
       throw const NetworkUnavailableException();

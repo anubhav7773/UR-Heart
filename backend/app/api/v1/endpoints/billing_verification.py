@@ -92,11 +92,14 @@ async def verify_client_store_purchase(
         elif "lifetime" in payload.product_id:
             tier = "lifetime"
             amount_gross = 59.99
-            duration_days = 3650
+            duration_days = 365
         elif "direct_letters" in payload.product_id:
             amount_gross = 1.99
         elif "instant_contact" in payload.product_id:
             amount_gross = 1.49
+        elif "global_passport" in payload.product_id:
+            amount_gross = 1.99
+            duration_days = 1
 
         platform_fee = round(amount_gross * 0.15, 2)  # Store 15% tier
     else:
@@ -127,6 +130,13 @@ async def verify_client_store_purchase(
             .where(User.id == current_user.id)
             .values(direct_letters_count=User.direct_letters_count + 3)
         )
+    elif "instant_contact" in payload.product_id:
+        current_user.reveal_tokens_count = (current_user.reveal_tokens_count or 0) + 1
+        await db.execute(
+            update(User)
+            .where(User.id == current_user.id)
+            .values(reveal_tokens_count=User.reveal_tokens_count + 1)
+        )
 
     # 4. Insert Financial Audit Ledger (Checklist Point 5 & 6)
     ledger_entry = InAppPurchase(
@@ -147,5 +157,7 @@ async def verify_client_store_purchase(
         "status": "verified",
         "product_id": payload.product_id,
         "subscription_tier": tier,
-        "expires_at": expires_at.isoformat() if expires_at else None
+        "expires_at": expires_at.isoformat() if expires_at else None,
+        "reveal_tokens_count": current_user.reveal_tokens_count,
+        "message": "Instant Contact Reveal Token credited. Mutual consent required to unmask handles." if "instant_contact" in payload.product_id else "Purchase successfully verified."
     }

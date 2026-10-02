@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 enum SlumberDeviceState { active, restingFaceDown, morningHarvestReady }
@@ -36,11 +37,19 @@ class SlumberSensorService {
   void startHardwareMonitoring() {
     _isMonitoring = true;
     _sensorSubscription?.cancel();
-    try {
+    runZonedGuarded(() {
       _sensorSubscription = accelerometerEventStream(
         samplingPeriod: SensorInterval.normalInterval,
-      ).listen(_processAccelerometerData, onError: (_) {});
-    } catch (_) {}
+      ).listen(
+        _processAccelerometerData,
+        onError: (dynamic e) {
+          debugPrint('[SlumberSensorService] Sensor error: $e');
+        },
+        cancelOnError: false,
+      );
+    }, (error, stack) {
+      debugPrint('[SlumberSensorService] Sensor hardware channel notice: $error');
+    });
   }
 
   void _processAccelerometerData(AccelerometerEvent event) {

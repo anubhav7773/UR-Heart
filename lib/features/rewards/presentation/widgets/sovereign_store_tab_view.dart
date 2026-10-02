@@ -102,17 +102,17 @@ class SovereignStoreTabView extends ConsumerWidget {
           const SizedBox(height: 10.0),
           _buildSubscriptionTile(context, ref, title: '1-Month Sovereign Pass', priceText: '\$14.99 / ₹149', badgeText: 'Most Mindful', productId: 'urheart_pass_monthly', isHighlighted: true),
           const SizedBox(height: 10.0),
-          _buildSubscriptionTile(context, ref, title: 'Lifetime Sovereign Crest', priceText: '\$59.99 / ₹799', badgeText: 'One-Time Forever', productId: 'urheart_pass_lifetime'),
+          _buildSubscriptionTile(context, ref, title: '1-Year Sovereign Pass', priceText: '\$59.99 / ₹799', badgeText: '365 Days Access', productId: 'urheart_pass_lifetime'),
           const SizedBox(height: 22.0),
 
           // A La Carte Micro-Store
           Text('A LA CARTE MICRO-PACKS', style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: subText, letterSpacing: 0.8)),
           const SizedBox(height: 10.0),
-          _buildMicroPackRow(context, ref, 'Instant Contact Key', 'Skip 3-ad ritual instantly', '\$1.49 / ₹29', 'urheart_key_instant_contact', surface, primaryText, subText, pine),
+          _buildMicroPackRow(context, ref, 'Instant Contact Key', 'Fast-track reveal with mutual consent', '\$1.49 / ₹29', 'urheart_key_instant_contact', surface, primaryText, subText, pine),
           const SizedBox(height: 8.0),
           _buildMicroPackRow(context, ref, '3 Direct Letters Pack', 'Reach their private inbox', '\$1.99 / ₹49', 'urheart_pack_direct_letters', surface, primaryText, subText, pine),
           const SizedBox(height: 8.0),
-          _buildMicroPackRow(context, ref, '48h Global Passport', 'Teleport to any global city', '\$2.99 / ₹79', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
+          _buildMicroPackRow(context, ref, '24h Global Passport', 'Teleport to any global city for 24h', '\$1.99 / ₹99', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
           const SizedBox(height: 18.0),
 
           // Google Play Policy Restore Purchases Link

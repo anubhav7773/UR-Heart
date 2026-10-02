@@ -245,9 +245,7 @@ class VaultRepository {
     }
   }
 
-  void unblockProfile(String id) {
-    unblockUser(id);
-  }
+  Future<bool> unblockProfile(String id) => unblockUser(id);
 
   void _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {

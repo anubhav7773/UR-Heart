@@ -49,7 +49,16 @@ class VaultController extends StateNotifier<VaultState> {
           activeExport: _repo.getActiveExport(),
           nominee: _repo.getNominee(),
           blockedList: _repo.getBlockedList(),
-        ));
+        )) {
+    loadVaultData();
+  }
+
+  Future<void> loadVaultData() async {
+    try {
+      final list = await _repo.fetchBlockedUsers();
+      state = state.copyWith(blockedList: list);
+    } catch (_) {}
+  }
 
   Future<void> requestDataExport() async {
     state = state.copyWith(isExporting: true, errorMessage: null);
@@ -137,12 +146,30 @@ class VaultController extends StateNotifier<VaultState> {
     }
   }
 
-  void unblockUser(String id) {
-    _repo.unblockProfile(id);
-    state = state.copyWith(
-      blockedList: _repo.getBlockedList(),
-      successMessage: 'User removed from blocked perimeter.',
-    );
+  Future<void> unblockUser(String id) async {
+    try {
+      final success = await _repo.unblockProfile(id);
+      if (success) {
+        final list = await _repo.fetchBlockedUsers();
+        state = state.copyWith(
+          blockedList: list,
+          successMessage: 'User removed from blocked perimeter.',
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> blockUser(String userId, {String reason = 'Blocked from Statutory Vault'}) async {
+    try {
+      final ok = await _repo.blockUser(userId, reason: reason);
+      if (ok) {
+        final list = await _repo.fetchBlockedUsers();
+        state = state.copyWith(
+          blockedList: list,
+          successMessage: 'User added to blocked perimeter.',
+        );
+      }
+    } catch (_) {}
   }
 
   void clearBanner() {

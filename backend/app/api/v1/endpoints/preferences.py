@@ -15,6 +15,7 @@ class PreferencesUpdateRequest(BaseModel):
     is_incognito: Optional[bool] = None
     discreet_mode: Optional[bool] = None
     push_notifications_enabled: Optional[bool] = None
+    night_slumber: Optional[bool] = None
 
 
 def _format_key_fingerprint(pub_key: Optional[str]) -> str:
@@ -41,6 +42,7 @@ async def get_user_preferences(
             "is_incognito": bool(current_user.is_incognito),
             "discreet_mode": bool(current_user.discreet_mode),
             "push_notifications_enabled": bool(current_user.push_notifications_enabled if current_user.push_notifications_enabled is not None else True),
+            "night_slumber": bool(current_user.night_slumber),
             "public_encryption_key": current_user.public_encryption_key,
             "key_fingerprint": _format_key_fingerprint(current_user.public_encryption_key),
         }
@@ -76,6 +78,7 @@ async def update_user_preferences(
         "status": "success",
         "updated_preferences": update_data,
         "is_incognito": bool(current_user.is_incognito),
+        "night_slumber": bool(current_user.night_slumber),
         "key_fingerprint": _format_key_fingerprint(current_user.public_encryption_key),
     }
 

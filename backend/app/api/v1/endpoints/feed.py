@@ -11,6 +11,7 @@ from app.core.security import get_current_user_optional
 from app.models.domain.user import User
 from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
+from app.models.domain.legal import BlockedUser
 from app.services.streak_engine import StreakEngine
 
 router = APIRouter(tags=["Discovery Feed & Swipes"])
@@ -71,6 +72,12 @@ async def get_discovery_feed(
         matched_u2_subq = select(Match.user2_id).where(Match.user1_id == current_user.id, Match.is_active == True)
         stmt = stmt.where(not_(User.id.in_(matched_u1_subq)))
         stmt = stmt.where(not_(User.id.in_(matched_u2_subq)))
+
+        # Exclude blocked perimeter candidates bidirectionally (Statutory Privacy Vault)
+        blocked_subq = select(BlockedUser.blocked_id).where(BlockedUser.blocker_id == current_user.id)
+        blocked_by_subq = select(BlockedUser.blocker_id).where(BlockedUser.blocked_id == current_user.id)
+        stmt = stmt.where(not_(User.id.in_(blocked_subq)))
+        stmt = stmt.where(not_(User.id.in_(blocked_by_subq)))
 
         # Orientation matching — bidirectional algorithm
         # Direction 1: User's preference → filter candidate's gender

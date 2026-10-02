@@ -16,6 +16,7 @@ from app.models.domain.user import User
 from app.models.domain.match import Match
 from app.models.domain.message import Message
 from app.models.domain.whatsapp_token import WhatsAppRevealToken
+from app.models.domain.legal import BlockedUser
 
 router = APIRouter(prefix="/chat", tags=["1:1 Encrypted Dialogues"])
 
@@ -111,6 +112,19 @@ async def get_dialogue_threads(
 
         for m in matches:
             partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+
+            # Privacy Perimeter Check: Do not serve threads with blocked accounts
+            b_check = await db.execute(
+                select(BlockedUser).where(
+                    or_(
+                        and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == partner_id),
+                        and_(BlockedUser.blocker_id == partner_id, BlockedUser.blocked_id == current_user.id)
+                    )
+                )
+            )
+            if b_check.scalar_one_or_none():
+                continue
+
             partner_res = await db.execute(select(User).where(User.id == partner_id))
             partner = partner_res.scalar_one_or_none()
             if not partner:
@@ -259,6 +273,19 @@ async def get_active_sparks(
 
         for m in matches:
             partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+
+            # Privacy Perimeter Check: Do not serve sparks with blocked accounts
+            b_check = await db.execute(
+                select(BlockedUser).where(
+                    or_(
+                        and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == partner_id),
+                        and_(BlockedUser.blocker_id == partner_id, BlockedUser.blocked_id == current_user.id)
+                    )
+                )
+            )
+            if b_check.scalar_one_or_none():
+                continue
+
             partner_res = await db.execute(select(User).where(User.id == partner_id))
             partner = partner_res.scalar_one_or_none()
             if not partner:
@@ -366,6 +393,28 @@ async def send_chat_message(
 
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required to send messages.")
+
+    match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+    m = match_res.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Match dialogue not found.")
+
+    recipient_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+
+    # Statutory Blocked Perimeter Shielding:
+    block_check = await db.execute(
+        select(BlockedUser).where(
+            or_(
+                and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == recipient_id),
+                and_(BlockedUser.blocker_id == recipient_id, BlockedUser.blocked_id == current_user.id)
+            )
+        )
+    )
+    if block_check.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Communication blocked by Statutory Privacy Perimeter."
+        )
 
     # Pre-Storage Moderation Shield (IT Rules 2021 & IT Act 67/67A Intermediary Protection)
     from app.services.chat_sanitizer import ChatSanitizerService

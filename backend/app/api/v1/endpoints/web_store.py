@@ -47,14 +47,14 @@ STORE_PRODUCTS = {
     },
     "urheart_pass_lifetime": {
         "id": "urheart_pass_lifetime",
-        "name": "Lifetime Sovereign Crest",
-        "badge": "One-Time Forever",
+        "name": "1-Year Sovereign Pass (365 Days)",
+        "badge": "365 Days Access",
         "price_inr": 799,
         "price_usd": 59.99,
-        "duration_days": 3650,
+        "duration_days": 365,
         "tier": "lifetime",
-        "bonus": "Permanent Sovereign Crest + Infinite Passes",
-        "features": ["Permanent Sovereign Crest", "Infinite Resonances Forever", "Full Legal Vault Export Access", "Instant Stage 3 Contact Key", "Never Pay Again"]
+        "bonus": "365 Days Sovereign Crest + Infinite Passes",
+        "features": ["365 Days Sovereign Crest", "Infinite Resonances for 1 Year", "Full Legal Vault Export Access", "Stage 3 Reveal Token with Mutual Consent", "100% Ad-Free Silence"]
     },
     "urheart_key_instant_contact": {
         "id": "urheart_key_instant_contact",
@@ -64,8 +64,8 @@ STORE_PRODUCTS = {
         "price_usd": 1.49,
         "duration_days": 0,
         "tier": "micro",
-        "bonus": "Bypasses 3-Ad Ritual Instantly",
-        "features": ["Instant WhatsApp / Phone Unmask", "Zero Wait Time", "Valid for Any Mutual Match"]
+        "bonus": "Credits 1 Reveal Token (Mutual Consent Required)",
+        "features": ["Credits 1 Contact Reveal Token", "Requires Mutual Consent from Partner", "Valid for Any Mutual Match Dialogue"]
     },
     "urheart_pack_direct_letters": {
         "id": "urheart_pack_direct_letters",
@@ -80,14 +80,14 @@ STORE_PRODUCTS = {
     },
     "urheart_pack_global_passport": {
         "id": "urheart_pack_global_passport",
-        "name": "48h Global Passport",
+        "name": "24h Global Passport",
         "badge": "A La Carte",
-        "price_inr": 79,
-        "price_usd": 2.99,
-        "duration_days": 2,
+        "price_inr": 99,
+        "price_usd": 1.99,
+        "duration_days": 1,
         "tier": "micro",
-        "bonus": "Explore Any World City for 48 Hours",
-        "features": ["Teleport to Mumbai, Delhi, London, NYC", "Explore Global Kinships", "Full 48 Hours Access"]
+        "bonus": "Explore Any World City for 24 Hours",
+        "features": ["Teleport to Mumbai, Delhi, London, NYC", "Explore Global Kinships", "Full 24 Hours Access"]
     }
 }
 
@@ -106,6 +106,19 @@ class CreateOrderRequest(BaseModel):
 class CompleteOrderRequest(BaseModel):
     order_id: str
     payment_reference: Optional[str] = None
+
+
+@router.get("/api/v1/store/catalogue")
+@router.get("/store/catalogue")
+async def get_store_catalogue():
+    """
+    Returns the official web store pass catalogue, prices, and durations.
+    """
+    return {
+        "status": "success",
+        "currency": "INR",
+        "products": list(STORE_PRODUCTS.values()),
+    }
 
 
 @router.post("/api/v1/store/verify-user")
@@ -416,7 +429,7 @@ async def approve_store_order(
             await db.execute(
                 update(User)
                 .where(User.id == user.id)
-                .values(reward_balance=User.reward_balance + 50)
+                .values(reveal_tokens_count=User.reveal_tokens_count + 1)
             )
 
     # Update order & ledger status to 'completed'

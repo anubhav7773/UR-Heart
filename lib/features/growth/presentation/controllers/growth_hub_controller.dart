@@ -7,6 +7,7 @@ import '../../../../core/ads/rewarded_ad_manager.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../profile/data/profile_repository.dart';
 import '../../../rewards/data/sanctuary_billing_service.dart';
+import '../../data/slumber_sensor_service.dart';
 
 class GrowthHubState {
   final String userId;
@@ -124,9 +125,14 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
       }
       final localTokens = prefs.getInt('ur_heart_reveal_tokens') ?? state.revealTokensCount;
       final localProg = prefs.getInt('ur_heart_whatsapp_progress') ?? state.whatsappProgress;
+      final localSlumber = prefs.getBool('ur_heart_night_slumber') ?? state.isSlumberActive;
+      if (localSlumber) {
+        SlumberSensorService.instance.startHardwareMonitoring();
+      }
       state = state.copyWith(
         revealTokensCount: localTokens,
         whatsappProgress: localProg,
+        isSlumberActive: localSlumber,
       );
     } catch (_) {}
 
@@ -396,9 +402,13 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
         await SanctuaryBillingService.instance.purchaseMicroPack(productId);
       }
       if (productId == 'urheart_pack_direct_letters') {
-        state = state.copyWith(directLetters: state.directLetters + 3);
+        final nextLetters = state.directLetters + 3;
+        state = state.copyWith(directLetters: nextLetters);
+        SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', nextLetters));
       } else if (productId == 'urheart_key_instant_contact') {
-        state = state.copyWith(isWhatsappUnlocked: true);
+        final nextTokens = state.revealTokensCount + 1;
+        state = state.copyWith(revealTokensCount: nextTokens);
+        SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_reveal_tokens', nextTokens));
       }
     } catch (_) {}
   }
@@ -455,7 +465,31 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
     }
   }
 
-  void toggleSlumberMode(bool val) {
+  Future<void> toggleSlumberMode(bool val, [BuildContext? context]) async {
     state = state.copyWith(isSlumberActive: val);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('ur_heart_night_slumber', val);
+
+      if (val) {
+        SlumberSensorService.instance.startHardwareMonitoring();
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Night Sanctuary Slumber Active · Face down for mindful rest and morning harvest.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        SlumberSensorService.instance.stopHardwareMonitoring();
+      }
+
+      if (_profileRepo != null) {
+        await _profileRepo!.updateNightSlumber(val);
+      }
+    } catch (e) {
+      debugPrint('[GrowthHubController] toggleSlumberMode notice: $e');
+    }
   }
 }

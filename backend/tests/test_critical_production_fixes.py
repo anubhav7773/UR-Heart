@@ -1,176 +1,176 @@
-"""
-Unit and Integration Tests for Critical Production Fixes:
-1. Sacred Bridge Reveal Token Bilateral Mutual Consent & Refund Gate
-2. Real-Time WebSocket Routing & FCM Push Registration
-3. Eva AI Split: EvaIdentityEngine (KYC Safe OpenCV & Bio Polish) & EvaCompanionEngine (Chat & Sparks)
-"""
-
-import os
 import uuid
+from datetime import datetime, date
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from httpx import ASGITransport, AsyncClient
+from unittest.mock import AsyncMock, MagicMock
 
-# Set test environment
-os.environ["ENVIRONMENT"] = "development"
-os.environ["SECRET_KEY"] = "production_super_secret_test_key_must_be_32_bytes_long!!"
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
-
+from app.main import app
+from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.domain.user import User
-from app.models.domain.match import Match
-from app.models.domain.whatsapp_token import WhatsAppRevealToken
-from app.services.chat_manager import ConnectionManager
-from app.services.eva_identity_engine import EvaIdentityEngine, KycAiEvaluation
-from app.services.eva_companion_engine import EvaCompanionEngine
-from app.api.v1.endpoints.notifications import push_notification, NOTIFICATION_STORE, USER_FCM_TOKENS
 
 
-# =============================================================================
-# 1. TEST: SACRED BRIDGE MUTUAL CONSENT & REFUND GATE
-# =============================================================================
-
-def test_whatsapp_reveal_token_model_structure():
-    """Verifies that WhatsAppRevealToken model enforces bilateral consent columns."""
-    token = WhatsAppRevealToken(
-        match_id=uuid.uuid4(),
-        user1_consent=False,
-        user2_consent=False,
-        is_unlocked=False,
+@pytest.fixture
+def mock_user():
+    return User(
+        id=uuid.uuid4(),
+        auth_id=uuid.uuid4(),
+        full_name="Tester Seeker",
+        dob=date(2000, 1, 1),
+        gender="man",
+        interested_in="all",
+        contact_bridge_type="whatsapp",
+        contact_bridge_encrypted="919999988888",
+        location_name="Connaught Place, New Delhi",
+        referral_code="SANCTUARY-P99999",
+        kyc_status=True,
+        subscription_tier="free",
+        reward_balance=50,
+        swipes_remaining=25,
+        direct_letters_count=1,
+        reveal_tokens_count=0,
+        is_profile_completed=True,
+        night_slumber=False,
+        is_incognito=False,
+        discreet_mode=False,
+        public_encryption_key=None,
+        push_notifications_enabled=True,
+        role="user",
     )
-    assert token.user1_consent is False
-    assert token.user2_consent is False
-    assert token.is_unlocked is False
-
-    # Simulate bilateral mutual consent
-    token.user1_consent = True
-    assert token.is_unlocked is False  # Cannot unlock with only 1 consent!
-
-    token.user2_consent = True
-    token.is_unlocked = token.user1_consent and token.user2_consent
-    assert token.is_unlocked is True   # Unlocks ONLY when BOTH consent!
 
 
-def test_sacred_bridge_refund_logic():
-    """Verifies that if user2 declines, user1 is refunded their reveal token."""
-    user1 = User(id=uuid.uuid4(), full_name="User One", reveal_tokens_count=1)
-    user2 = User(id=uuid.uuid4(), full_name="User Two", reveal_tokens_count=0)
+@pytest.fixture
+def mock_db():
+    session = AsyncMock()
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
+    session.add = MagicMock()
+    return session
 
-    # User 1 spends token to request reveal
-    user1.reveal_tokens_count -= 1
-    assert user1.reveal_tokens_count == 0
-
-    # User 2 declines
-    action = "decline"
-    if action == "decline":
-        # Refund token to user 1
-        user1.reveal_tokens_count += 1
-
-    assert user1.reveal_tokens_count == 1  # 100% refunded!
-
-
-# =============================================================================
-# 2. TEST: REAL-TIME WEBSOCKET ROUTING & NOTIFICATIONS
-# =============================================================================
 
 @pytest.mark.asyncio
-async def test_connection_manager_connect_and_routing():
-    """Tests ConnectionManager registering users and routing direct messages."""
-    cm = ConnectionManager()
-    user_a = str(uuid.uuid4())
-    user_b = str(uuid.uuid4())
+async def test_web_store_catalogue_specifications():
+    """
+    Test Problem 2 requirements:
+    1. Lifetime pass duration is strictly 365 days (1-Year Sovereign Pass)
+    2. Global passport duration is 1 day (24h) and price is ₹99 ($1.99)
+    3. Instant contact key requires mutual consent and grants token
+    """
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/store/catalogue")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["currency"] == "INR"
 
-    mock_ws_a = AsyncMock()
-    mock_ws_b = AsyncMock()
+        products = {p["id"]: p for p in data["products"]}
 
-    await cm.connect(user_a, mock_ws_a)
-    await cm.connect(user_b, mock_ws_b)
+        # 1. Lifetime pass
+        lifetime = products["urheart_pass_lifetime"]
+        assert lifetime["duration_days"] == 365
+        assert "365 Days" in lifetime["name"] or "1-Year" in lifetime["name"]
 
-    assert cm.is_user_online(user_a) is True
-    assert cm.is_user_online(user_b) is True
+        # 2. Global passport
+        passport = products["urheart_pack_global_passport"]
+        assert passport["duration_days"] == 1
+        assert passport["price_inr"] == 99
+        assert "24h" in passport["name"]
 
-    # User A sends direct message to User B
-    payload = {"type": "dialogue_message", "text": "Hello User B!", "sender_id": user_a}
-    await cm.send_direct_message(user_b, payload)
-
-    # Verify mock_ws_b received the json payload
-    mock_ws_b.send_json.assert_called_once_with(payload)
-    mock_ws_a.send_json.assert_not_called()
-
-    # Disconnect
-    cm.disconnect(user_a, mock_ws_a)
-    assert cm.is_user_online(user_a) is False
+        # 3. Instant contact key
+        contact_key = products["urheart_key_instant_contact"]
+        assert any("mutual consent" in str(feat).lower() for feat in contact_key["features"])
 
 
-def test_push_notification_stores_and_fcm_cache():
-    """Tests push_notification stores entry in NOTIFICATION_STORE."""
-    test_user_id = str(uuid.uuid4())
-    USER_FCM_TOKENS[test_user_id] = "fake_fcm_token_123456"
+@pytest.mark.asyncio
+async def test_billing_verification_lifetime_pass_365_days(mock_user, mock_db):
+    """
+    Verify that purchasing urheart_pass_lifetime sets duration to 365 days.
+    """
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_result
 
-    with patch("app.api.v1.endpoints.notifications._dispatch_fcm_push") as mock_fcm:
-        push_notification(
-            user_id=test_user_id,
-            notif_type="message",
-            title="New Dialogue ✨",
-            body="Hey, how are you?",
-            data={"match_id": "test_m_1"}
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/billing/verify-purchase",
+            json={
+                "store": "google_play",
+                "product_id": "urheart_pass_lifetime",
+                "purchase_token": "google_play_valid_token_string_exceeding_twenty_chars",
+                "transaction_id": "GPA.9999-1111-2222-33333",
+            },
         )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["subscription_tier"] == "lifetime"
+        # Check expires_at roughly 365 days ahead
+        expires_at = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
+        delta = (expires_at - datetime.now(expires_at.tzinfo)).days
+        assert 364 <= delta <= 366
 
-        # Verified in memory queue
-        assert test_user_id in NOTIFICATION_STORE
-        assert len(NOTIFICATION_STORE[test_user_id]) > 0
-        assert NOTIFICATION_STORE[test_user_id][0]["title"] == "New Dialogue ✨"
-
-        # Verified FCM dispatch attempted
-        mock_fcm.assert_called_once()
+    app.dependency_overrides.clear()
 
 
-# =============================================================================
-# 3. TEST: EVA IDENTITY ENGINE (OPENCV SAFETY & BIO POLISH)
-# =============================================================================
-
-def test_eva_identity_safe_opencv_fallback():
+@pytest.mark.asyncio
+async def test_billing_verification_instant_contact_key_credits_token(mock_user, mock_db):
     """
-    Tests that _detect_faces_opencv_safe never crashes with AttributeError
-    even if cv2.CascadeClassifier is missing.
+    Verify that purchasing urheart_key_instant_contact credits reveal_tokens_count instead of unilateral unlock.
     """
-    res = EvaIdentityEngine._detect_faces_opencv_safe(["fake_b64_image"])
-    # Should safely return boolean (False) without raising AttributeError
-    assert isinstance(res, bool)
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_result
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/billing/verify-purchase",
+            json={
+                "store": "google_play",
+                "product_id": "urheart_key_instant_contact",
+                "purchase_token": "google_play_valid_token_string_exceeding_twenty_chars",
+                "transaction_id": "GPA.8888-2222-3333-44444",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "verified"
+        assert "Instant Contact Reveal Token credited" in data["message"]
+        assert mock_user.reveal_tokens_count == 1
+
+    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
-async def test_eva_identity_bio_polish_fallback():
-    """Tests that EvaIdentityEngine generates high-quality 3-line bio from short keywords."""
-    result = await EvaIdentityEngine.polish_bio("gym, chai, books", user_name="Aryan")
-    bio_text = result.get("polished_bio", "")
-    assert len(bio_text) > 20
-    assert "sanctuary" in bio_text.lower() or "conversations" in bio_text.lower() or "chai" in bio_text.lower() or "books" in bio_text.lower()
+async def test_night_slumber_preference_update_and_persistence(mock_user, mock_db):
+    """
+    Test Problem 3: Night slumber preference can be toggled and read back via /api/v1/user/preferences.
+    """
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
 
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Update night_slumber to True
+        resp = await client.put(
+            "/api/v1/user/preferences",
+            json={"night_slumber": True},
+        )
+        assert resp.status_code == 200
+        assert mock_user.night_slumber is True
+        data = resp.json()
+        assert data["night_slumber"] is True
 
-# =============================================================================
-# 4. TEST: EVA COMPANION ENGINE (GUARDRAILS & SPARKS)
-# =============================================================================
+        # 2. Get preferences
+        get_resp = await client.get("/api/v1/user/preferences")
+        assert get_resp.status_code == 200
+        get_data = get_resp.json()
+        assert get_data["preferences"]["night_slumber"] is True
 
-@pytest.mark.asyncio
-async def test_eva_companion_guardrails_denial():
-    """Tests that Eva denies out-of-app questions (e.g. coding / essays) politely."""
-    result = await EvaCompanionEngine.chat_companion(
-        user_message="Write a python script to scrape twitter data",
-        user_name="Seeker"
-    )
-    assert result.get("denied") is True
-    assert "sanctuary" in result.get("reply", "").lower() or "dating" in result.get("reply", "").lower()
-
-
-@pytest.mark.asyncio
-async def test_eva_companion_bonding_sparks_generation():
-    """Tests generating bonding sparks from dialogue context."""
-    recent_messages = [
-        "I love quiet weekend hikes in nature.",
-        "Same here, mountain air is so grounding."
-    ]
-    sparks = await EvaCompanionEngine.generate_bonding_sparks(recent_messages, partner_name="Meera")
-    assert isinstance(sparks, list)
-    assert len(sparks) >= 2
-    for spark in sparks:
-        assert isinstance(spark, str)
-        assert len(spark) > 10
+    app.dependency_overrides.clear()

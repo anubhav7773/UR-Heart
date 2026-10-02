@@ -1,23 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../domain/vault_models.dart';
+import '../controllers/vault_controller.dart';
 
 /// Modal bottom sheet displaying blocked perimeter profiles with unblock actions
-class BlockedPerimeterList extends StatelessWidget {
-  final List<BlockedProfile> blockedList;
+class BlockedPerimeterList extends ConsumerWidget {
+  final List<BlockedProfile>? blockedList;
   final bool isDark;
-  final void Function(String id) onUnblock;
+  final void Function(String id)? onUnblock;
 
   const BlockedPerimeterList({
     super.key,
-    required this.blockedList,
+    this.blockedList,
     required this.isDark,
-    required this.onUnblock,
+    this.onUnblock,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vaultState = ref.watch(vaultControllerProvider);
+    final currentList = vaultState.blockedList.isNotEmpty 
+        ? vaultState.blockedList 
+        : (blockedList ?? []);
+    final notifier = ref.read(vaultControllerProvider.notifier);
+
     final bgColor = isDark
         ? DarkSanctuaryTokens.surfaceCard
         : LightSanctuaryTokens.surfaceCard;
@@ -58,7 +66,7 @@ class BlockedPerimeterList extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Blocked Perimeter (${blockedList.length})',
+                'Blocked Perimeter (${currentList.length})',
                 style: AppTypography.titleH2.copyWith(fontSize: 18, color: headlineColor),
               ),
               IconButton(
@@ -69,23 +77,30 @@ class BlockedPerimeterList extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Blocked accounts cannot view your sanctuary moments or discover you.',
+            'Blocked accounts cannot view your sanctuary moments, dialogue, or discover you.',
             style: AppTypography.bodySmall.copyWith(color: mutedColor),
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: blockedList.isEmpty
+            child: currentList.isEmpty
                 ? Center(
-                    child: Text(
-                      'No accounts in blocked perimeter.',
-                      style: TextStyle(color: mutedColor),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.shield_outlined, size: 40, color: mutedColor.withValues(alpha: 0.5)),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No accounts in blocked perimeter.',
+                          style: TextStyle(color: mutedColor),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.separated(
-                    itemCount: blockedList.length,
+                    itemCount: currentList.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
-                      final item = blockedList[index];
+                      final item = currentList[index];
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
@@ -111,7 +126,7 @@ class BlockedPerimeterList extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${item.name}, ${item.age}',
+                                    '${item.name}${item.age > 0 ? ', ${item.age}' : ''}',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                       color: headlineColor,
@@ -125,7 +140,22 @@ class BlockedPerimeterList extends StatelessWidget {
                               ),
                             ),
                             TextButton(
-                              onPressed: () => onUnblock(item.id),
+                              onPressed: () async {
+                                if (onUnblock != null) {
+                                  onUnblock!(item.id);
+                                } else {
+                                  await notifier.unblockUser(item.id);
+                                }
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Unblocked ${item.name}'),
+                                      duration: const Duration(seconds: 2),
+                                      backgroundColor: DarkSanctuaryTokens.primaryCoral,
+                                    ),
+                                  );
+                                }
+                              },
                               child: const Text(
                                 'Unblock',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -142,3 +172,4 @@ class BlockedPerimeterList extends StatelessWidget {
     );
   }
 }
+
