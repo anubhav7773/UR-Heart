@@ -146,7 +146,7 @@ class EvaIdentityEngine:
             content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame}"}})
 
         # 2. Primary: Groq Vision
-        groq_models = ["llama-3.2-90b-vision-preview", "llama-3.2-11b-vision-preview"]
+        groq_models = ["llama-3.2-11b-vision", "llama-3.2-90b-vision", "llama-3.2-11b-text-preview"]
         for g_model in groq_models:
             groq_key = getattr(settings, "GROQ_API_KEY", "") or ""
             if not groq_key:
@@ -175,9 +175,9 @@ class EvaIdentityEngine:
         or_key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
         if or_key:
             or_models = [
-                "google/gemini-2.0-flash-lite:free",
-                "meta-llama/llama-3.2-11b-vision-instruct:free",
-                "google/gemini-2.0-flash-exp:free"
+                "meta-llama/llama-3.2-11b-vision-instruct",
+                "google/gemini-2.0-flash-exp:free",
+                "meta-llama/llama-3.2-90b-vision-instruct",
             ]
             for o_model in or_models:
                 try:

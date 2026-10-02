@@ -62,6 +62,12 @@ def _sanitize_credential_dict(cred_dict: Dict[str, Any]) -> Dict[str, Any]:
             pad_needed = (4 - (len(pure_b64) % 4)) % 4
             if pad_needed:
                 pure_b64 += "=" * pad_needed
+            try:
+                # Canonicalize padding bits: zero out any corrupt non-zero bits that trigger cryptography RFC 4648 errors
+                raw_bytes = base64.b64decode(pure_b64)
+                pure_b64 = base64.b64encode(raw_bytes).decode("ascii")
+            except Exception:
+                pass
             # Reformat into standard 64-char lines
             body_lines = [pure_b64[i:i+64] for i in range(0, len(pure_b64), 64)]
             cred["private_key"] = f"{header}\n" + "\n".join(body_lines) + f"\n{footer}\n"
@@ -70,6 +76,11 @@ def _sanitize_credential_dict(cred_dict: Dict[str, Any]) -> Dict[str, Any]:
             pad_needed = (4 - (len(pure_b64) % 4)) % 4
             if pad_needed:
                 pure_b64 += "=" * pad_needed
+            try:
+                raw_bytes = base64.b64decode(pure_b64)
+                pure_b64 = base64.b64encode(raw_bytes).decode("ascii")
+            except Exception:
+                pass
             body_lines = [pure_b64[i:i+64] for i in range(0, len(pure_b64), 64)]
             cred["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(body_lines) + "\n-----END PRIVATE KEY-----\n"
         else:
@@ -174,6 +185,24 @@ class FirebaseAuthService:
                     return app
                 except Exception as e:
                     logger.warning("FIREBASE_SERVICE_ACCOUNT_B64 parse error: %s", e)
+
+            # 4. Self-healing fallback: Initialize with authentic verified project credentials
+            try:
+                backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                local_key_path = os.path.join(backend_dir, "serviceAccountKey.json")
+                if os.path.exists(local_key_path):
+                    with open(local_key_path, "r", encoding="utf-8") as f:
+                        key_dict = _sanitize_credential_dict(json.loads(f.read()))
+                        cred = credentials.Certificate(key_dict)
+                        app = firebase_admin.initialize_app(cred, {
+                            "projectId": project_id,
+                            "storageBucket": storage_bucket
+                        })
+                        cls._has_credentials = True
+                        logger.info("Firebase Admin initialized via fallback service account key.")
+                        return app
+            except Exception as e:
+                logger.warning("Fallback service account init notice: %s", e)
 
             # 5. Last-resort fallback: Initialize with explicit Project ID options
             try:

@@ -159,12 +159,16 @@ class SettingsController extends StateNotifier<SettingsState> {
     state = state.copyWith(isIncinerating: true, errorMessage: null);
     try {
       final success = await _repo.incinerateAccountIrrevocably();
+      await logout();
       state = state.copyWith(
         isIncinerating: false,
         successMessage: 'Account & data irrevocably purged.',
       );
       return success;
     } catch (_) {
+      try {
+        await logout();
+      } catch (_) {}
       state = state.copyWith(
         isIncinerating: false,
         errorMessage: 'Account incinerator failed.',

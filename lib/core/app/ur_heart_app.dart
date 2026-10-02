@@ -74,7 +74,6 @@ class URHeartApp extends ConsumerWidget {
         SuperadminKycDeskScreen.routeName: (context) => const SuperadminKycDeskScreen(),
         EvaSanctuaryScreen.routeName: (context) => const EvaSanctuaryScreen(),
         SanctuaryAppInfoScreen.routeName: (context) => const SanctuaryAppInfoScreen(),
-        '/appinfo': (context) => const SanctuaryAppInfoScreen(),
       },
       onGenerateRoute: (settings) {
         final routeName = settings.name ?? '';

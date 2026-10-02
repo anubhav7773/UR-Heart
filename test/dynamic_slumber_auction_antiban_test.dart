@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ur_heart/core/ads/ad_reward_models.dart';
 import 'package:ur_heart/core/ads/rewarded_ad_manager.dart';
 import 'package:ur_heart/features/growth/presentation/controllers/growth_hub_controller.dart';
 import 'package:ur_heart/features/rewards/presentation/widgets/free_ads_tab_view.dart';

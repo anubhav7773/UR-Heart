@@ -46,25 +46,34 @@ Future<void> main() async {
   try {
     final prefs = await SharedPreferences.getInstance();
     final secureToken = await SecureSessionStorage.instance.getAuthToken();
+    final storedAuthToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+    final hasBackendToken = (secureToken != null && secureToken.isNotEmpty) ||
+                            (storedAuthToken != null && storedAuthToken.isNotEmpty);
+
     final fbUser = FirebaseAuth.instance.currentUser;
-    final hasAuth = fbUser != null ||
-                    (secureToken != null && secureToken.isNotEmpty) ||
-                    (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
-                    (prefs.getString('auth_token')?.isNotEmpty ?? false);
-    final isProfileSetupDone = (prefs.getBool('ur_heart_profile_setup_completed') ?? false) ||
-                               (prefs.getBool('ur_heart_has_entered_sanctuary') ?? false);
+
+    // Self-healing: If Firebase has an orphaned user from an incinerated/purged session
+    if (fbUser != null && !hasBackendToken) {
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+    }
+
+    final hasAuth = hasBackendToken && fbUser != null;
     final isConsentGiven = (prefs.getBool('urheart_theme_permanently_locked') ?? false) ||
                            (prefs.getBool('ur_heart_theme_locked') ?? false) ||
                            (prefs.getBool('ur_heart_consent_given') ?? false);
+    final isProfileSetupDone = (prefs.getBool('ur_heart_profile_setup_completed') ?? false) ||
+                               (prefs.getBool('ur_heart_has_entered_sanctuary') ?? false);
 
-    if (hasAuth && isProfileSetupDone) {
-      resolvedInitialRoute = '/main';
-    } else if (hasAuth && !isProfileSetupDone) {
-      resolvedInitialRoute = '/profile-setup';
-    } else if (isConsentGiven) {
-      resolvedInitialRoute = '/auth';
-    } else {
+    if (!isConsentGiven) {
       resolvedInitialRoute = '/consent';
+    } else if (!hasAuth) {
+      resolvedInitialRoute = '/auth';
+    } else if (!isProfileSetupDone) {
+      resolvedInitialRoute = '/profile-setup';
+    } else {
+      resolvedInitialRoute = '/main';
     }
 
   } catch (_) {}

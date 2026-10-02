@@ -102,6 +102,19 @@
     <div class="sanctuary-sub">Entering Mindful Sanctuary...</div>
   </div>
 
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: '/' })
+          .then(function(reg) {
+            console.log('[Sanctuary SW] Background push worker registered:', reg.scope);
+          })
+          .catch(function(err) {
+            console.log('[Sanctuary SW] Worker registration note:', err);
+          });
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

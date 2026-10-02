@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ur_heart/features/growth/data/slumber_sensor_service.dart';
 import 'package:ur_heart/features/growth/presentation/controllers/growth_hub_controller.dart';
 import 'package:ur_heart/features/legal_vault/data/vault_repository.dart';
-import 'package:ur_heart/features/legal_vault/domain/vault_models.dart';
 import 'package:ur_heart/features/legal_vault/presentation/widgets/blocked_perimeter_list.dart';
 import 'package:ur_heart/features/rewards/data/sanctuary_billing_service.dart';
 import 'package:ur_heart/features/rewards/presentation/widgets/sovereign_store_tab_view.dart';
