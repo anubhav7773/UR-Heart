@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,18 +15,20 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
 
   const FiveSlotPhotoGrid({super.key, this.onSelectImage});
 
-  Future<void> _handlePhotoSelected(
+  Future<void> _handleXFileSelected(
     BuildContext context,
     WidgetRef ref,
     int slotNumber,
-    File file,
+    XFile file,
     bool isDark,
   ) async {
+    final bytes = await file.readAsBytes();
     final success = await ref
         .read(profileSetupControllerProvider.notifier)
-        .processAndUploadPhoto(
+        .processAndUploadBytes(
           slotNumber: slotNumber,
-          rawFile: file,
+          rawBytes: bytes,
+          localFallbackPath: file.path,
         );
 
     if (!success && context.mounted) {
@@ -147,7 +150,7 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
                         imageQuality: 85,
                       );
                       if (photo != null && context.mounted) {
-                        await _handlePhotoSelected(context, ref, slotNumber, File(photo.path), isDark);
+                        await _handleXFileSelected(context, ref, slotNumber, photo, isDark);
                       }
                     } catch (e) {
                       debugPrint('[FiveSlotPhotoGrid] Camera error: $e');
@@ -167,7 +170,7 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
                         imageQuality: 85,
                       );
                       if (image != null && context.mounted) {
-                        await _handlePhotoSelected(context, ref, slotNumber, File(image.path), isDark);
+                        await _handleXFileSelected(context, ref, slotNumber, image, isDark);
                       }
                     } catch (e) {
                       debugPrint('[FiveSlotPhotoGrid] Gallery error: $e');
@@ -352,8 +355,8 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
     required Color accentColor,
     required Color mutedColor,
   }) {
-    final isNetwork = filePath != null && (filePath.startsWith('http://') || filePath.startsWith('https://'));
-    final isLocal = filePath != null && !isNetwork && filePath.isNotEmpty && File(filePath).existsSync();
+    final isNetwork = filePath != null && (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:'));
+    final isLocal = !kIsWeb && filePath != null && !isNetwork && filePath.isNotEmpty && File(filePath).existsSync();
     final hasValidImage = isNetwork || isLocal;
 
     return Container(
@@ -382,11 +385,13 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
                             )
-                          : Image.file(
-                              File(filePath),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
-                            ),
+                          : (!kIsWeb
+                              ? Image.file(
+                                  File(filePath),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor),
+                                )
+                              : _buildPlaceholder(isAnchor, slotNumber, accentColor, mutedColor)),
                       Positioned(
                         right: 6,
                         bottom: 6,

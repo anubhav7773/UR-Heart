@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -254,16 +255,17 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     await RealGpsLocationService.openAppSettings();
   }
 
-  Future<bool> processAndUploadPhoto({
+  Future<bool> processAndUploadBytes({
     required int slotNumber,
-    required File rawFile,
+    required Uint8List rawBytes,
+    String? localFallbackPath,
     String userId = 'demo_user_1',
   }) async {
     state = state.copyWith(isUploadingPhoto: true, lastModerationError: null);
 
     // 1. Strict Multi-Layer Content Moderation Gatekeeper
-    final moderation = await ImageModerationService.inspectImage(
-      rawFile,
+    final moderation = await ImageModerationService.inspectBytes(
+      rawBytes,
       slotNumber: slotNumber,
     );
 
@@ -277,7 +279,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     }
 
     try {
-      final processed = await MediaCompressor.processPortraitPhoto(rawFile);
+      final processed = await MediaCompressor.processPortraitBytes(rawBytes);
       final prefs = await SharedPreferences.getInstance();
       final authUid = FirebaseAuth.instance.currentUser?.uid;
       final secureEmail = await SecureSessionStorage.instance.getUserEmail();
@@ -286,7 +288,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
           ? authUid
           : userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
 
-      String finalUrl = rawFile.path;
+      String finalUrl = localFallbackPath ?? '';
       if (processed != null) {
         try {
           final cloudUrl = await SupabaseMediaUploader.uploadProfileSlot(
@@ -301,23 +303,47 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         } catch (_) {}
       }
 
-      await prefs.setString('profile_photo_slot_$slotNumber', finalUrl);
+      if (finalUrl.isNotEmpty) {
+        await prefs.setString('profile_photo_slot_$slotNumber', finalUrl);
 
-      final updatedSlots = Map<int, String>.from(state.photoSlots);
-      updatedSlots[slotNumber] = finalUrl;
+        final updatedSlots = Map<int, String>.from(state.photoSlots);
+        updatedSlots[slotNumber] = finalUrl;
 
-      final updatedBlurHashes = Map<int, String>.from(state.blurHashes);
-      if (processed != null) {
-        updatedBlurHashes[slotNumber] = processed.blurHash;
+        final updatedBlurHashes = Map<int, String>.from(state.blurHashes);
+        if (processed != null) {
+          updatedBlurHashes[slotNumber] = processed.blurHash;
+        }
+
+        state = state.copyWith(
+          photoSlots: updatedSlots,
+          blurHashes: updatedBlurHashes,
+          isUploadingPhoto: false,
+        );
+        return true;
       }
 
-      state = state.copyWith(
-        photoSlots: updatedSlots,
-        blurHashes: updatedBlurHashes,
-        isUploadingPhoto: false,
-      );
-      return true;
+      state = state.copyWith(isUploadingPhoto: false);
+      return false;
     } catch (e) {
+      state = state.copyWith(isUploadingPhoto: false);
+      return false;
+    }
+  }
+
+  Future<bool> processAndUploadPhoto({
+    required int slotNumber,
+    required File rawFile,
+    String userId = 'demo_user_1',
+  }) async {
+    try {
+      final bytes = await rawFile.readAsBytes();
+      return await processAndUploadBytes(
+        slotNumber: slotNumber,
+        rawBytes: bytes,
+        localFallbackPath: rawFile.path,
+        userId: userId,
+      );
+    } catch (_) {
       state = state.copyWith(isUploadingPhoto: false);
       return false;
     }

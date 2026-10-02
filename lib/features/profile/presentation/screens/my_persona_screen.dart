@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -324,6 +325,17 @@ class MyPersonaScreen extends ConsumerWidget {
       if (file == null) return;
 
       if (!context.mounted) return;
+      if (kIsWeb) {
+        // On Web, directly upload without modal disk temp operations
+        final notifier = ref.read(personaControllerProvider.notifier);
+        if (isAvatar) {
+          await notifier.updateAvatarFile(File(file.path));
+        } else {
+          await notifier.updateMomentSlotFile(slotIndex, File(file.path));
+        }
+        return;
+      }
+
       // Allow user to interactively pan, zoom, rotate, and frame the photo
       final adjustedFile = await SanctuaryPhotoAdjusterDialog.show(
         context,

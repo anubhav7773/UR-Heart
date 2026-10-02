@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image/image.dart' as img;
 import 'blurhash_generator.dart';
@@ -38,9 +39,43 @@ class ProcessedMediaResult {
 class MediaCompressor {
   const MediaCompressor._();
 
+  /// Web & Mobile in-memory pure-Dart processing. Zero disk I/O.
+  static Future<ProcessedMediaOutput?> processPortraitBytes(Uint8List rawBytes) async {
+    if (rawBytes.isEmpty) return null;
+    try {
+      Uint8List? compressed;
+      final decoded = img.decodeImage(rawBytes);
+      if (decoded != null) {
+        final resized = img.copyResize(decoded, width: 800, height: 1066);
+        compressed = Uint8List.fromList(img.encodeJpg(resized, quality: 78));
+      } else {
+        compressed = rawBytes;
+      }
+
+      final hash = BlurhashGenerator.generateBlurHash(compressed);
+
+      return ProcessedMediaOutput(
+        webpBytes: compressed,
+        blurHash: hash,
+        byteSize: compressed.lengthInBytes,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Strips EXIF metadata, resizes to 800x1066 portrait, encodes to WebP (<35KB),
   /// and calculates 32x32 BlurHash placeholder in RAM.
   static Future<ProcessedMediaOutput?> processPortraitPhoto(File sourceFile) async {
+    if (kIsWeb) {
+      try {
+        final raw = await sourceFile.readAsBytes();
+        return await processPortraitBytes(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+
     if (!sourceFile.existsSync()) return null;
 
     try {

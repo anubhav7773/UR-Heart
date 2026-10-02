@@ -33,6 +33,9 @@ def get_allowed_cors_origins() -> List[str]:
         "https://urheart.app",
         "https://vault.urheart.app",
         "https://urheart.asiverticals.me",
+        "https://app.urheart.asiverticals.me",
+        "https://ur-heart-dist-bpsc.vercel.app",
+        "https://ur-heart.vercel.app",
         "https://urheart.in",
         "https://www.urheart.in",
     ]
@@ -41,8 +44,10 @@ def get_allowed_cors_origins() -> List[str]:
         canonical_origins.extend([
             "http://localhost:3000",
             "http://localhost:8000",
+            "http://localhost:7357",
             "http://127.0.0.1:3000",
             "http://127.0.0.1:8000",
+            "http://127.0.0.1:7357",
         ])
     return canonical_origins
 
@@ -103,16 +108,10 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_cors_origins(),
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|(.*\.?)asiverticals\.me|(.*\.?)vercel\.app|(.*\.?)urheart\.(app|in))(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=[
-        "Authorization",
-        "Content-Type",
-        "X-Installation-UUID",
-        "Accept",
-        "Origin",
-        "X-Requested-With",
-    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

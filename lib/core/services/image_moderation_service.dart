@@ -43,14 +43,12 @@ class ImageModerationService {
   static const String _groqApiKey =
       String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
 
-  /// Evaluates an image file against explicit content, abuse, violence, and policy rules.
-  /// Returns [ModerationResult.approved] for any normal, clothed photo.
-  static Future<ModerationResult> inspectImage(File imageFile, {int? slotNumber}) async {
+  /// Evaluates in-memory bytes against explicit content, abuse, violence, and policy rules.
+  /// Works 100% on both Web and Mobile.
+  static Future<ModerationResult> inspectBytes(Uint8List bytes, {int? slotNumber}) async {
     try {
-      final bytes = await imageFile.readAsBytes();
-
       // Gate 1: Server-side AI Moderation on Render (OpenCV QR/OCR + Groq Vision)
-      final serverCheck = await _checkWithRenderBackend(imageFile);
+      final serverCheck = await _checkBytesWithRenderBackend(bytes);
       if (!serverCheck.isSafe) {
         await ActivityLogger.log(
           category: 'MODERATION_VIOLATION',
@@ -89,18 +87,28 @@ class ImageModerationService {
       return ModerationResult.approved();
     } catch (e) {
       debugPrint('[ImageModerationService] Inspection error: $e');
-      // On error, allow the photo through (fail-open) so users aren't blocked
       return ModerationResult.approved();
     }
   }
 
-  /// Sends image to Render backend POST /api/v1/moderation/photo
-  /// The backend runs OpenCV QR detection, Tesseract OCR, and Groq Vision.
-  static Future<ModerationResult> _checkWithRenderBackend(File imageFile) async {
+  /// Evaluates an image file against explicit content, abuse, violence, and policy rules.
+  /// Returns [ModerationResult.approved] for any normal, clothed photo.
+  static Future<ModerationResult> inspectImage(File imageFile, {int? slotNumber}) async {
+    try {
+      final bytes = await imageFile.readAsBytes();
+      return await inspectBytes(bytes, slotNumber: slotNumber);
+    } catch (e) {
+      debugPrint('[ImageModerationService] Inspection error: $e');
+      return ModerationResult.approved();
+    }
+  }
+
+  /// Sends in-memory image bytes to Render backend POST /api/v1/moderation/photo
+  static Future<ModerationResult> _checkBytesWithRenderBackend(Uint8List bytes) async {
     try {
       final uri = Uri.parse('${ApiEndpoints.defaultBaseUrl}${ApiEndpoints.photoModeration}');
       final request = http.MultipartRequest('POST', uri);
-      request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+      request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'photo.jpg'));
 
       final streamedResponse = await request.send().timeout(const Duration(seconds: 10));
       final response = await http.Response.fromStream(streamedResponse);
@@ -116,7 +124,6 @@ class ImageModerationService {
     } catch (e) {
       debugPrint('[ImageModerationService] Server check warning: $e');
     }
-    // Server unreachable or returned safe — proceed
     return ModerationResult.approved();
   }
 

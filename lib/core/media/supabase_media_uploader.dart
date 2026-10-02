@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
 /// Direct Client-to-Supabase Cloud Storage Media Uploader
@@ -66,8 +67,10 @@ class SupabaseMediaUploader {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return '$supabaseUrl/storage/v1/object/public/$bucketName/$objectPath';
       }
+      debugPrint('[SupabaseMediaUploader] Upload notice: status=${response.statusCode} body=${response.body}');
       return null;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[SupabaseMediaUploader] Upload exception: $e');
       return null;
     } finally {
       if (_customClient == null) {
