@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, update
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from app.core.database import get_db
@@ -365,6 +365,7 @@ async def get_dialogue_messages(
             decrypted = decrypt_message_storage(msg.encrypted_text, match_id)
             messages.append({
                 "id": str(msg.id),
+                "client_id": str(getattr(msg, "client_id", None) or msg.id),
                 "match_id": match_id,
                 "sender_id": str(msg.sender_id),
                 "text": decrypted,
@@ -389,6 +390,57 @@ async def get_thread_messages(
     """Returns chronologically ordered messages for match dialogue thread."""
     msgs = await get_dialogue_messages(match_id, current_user, db)
     return {"messages": msgs, "data": msgs}
+
+
+@router.post("/threads/{match_id}/read", status_code=status.HTTP_200_OK, summary="Mark Thread Messages as Read")
+@router.post("/messages/{match_id}/read", status_code=status.HTTP_200_OK, summary="Mark Messages as Read (Alias)")
+async def mark_thread_messages_as_read(
+    match_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Marks all incoming messages in this match as read and notifies the sender."""
+    try:
+        match_uuid = _clean_match_uuid(match_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid match_id UUID format.")
+
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    stmt = (
+        update(Message)
+        .where(
+            Message.match_id == match_uuid,
+            Message.sender_id != current_user.id,
+            Message.status != "read"
+        )
+        .values(status="read")
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+
+    # Inform partner in real-time via WebSocket so checkmarks turn blue (read)
+    try:
+        match_res = await db.execute(select(Match).where(Match.id == match_uuid))
+        m = match_res.scalar_one_or_none()
+        if m:
+            partner_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
+            from app.services.chat_manager import manager
+            await manager.send_direct_message(
+                str(partner_id),
+                {
+                    "type": "read_receipt",
+                    "action": "status_update",
+                    "match_id": str(match_uuid),
+                    "reader_id": str(current_user.id),
+                    "status": "read"
+                }
+            )
+    except Exception as e:
+        print(f"[READ RECEIPT RELAY NOTICE] {e}", flush=True)
+
+    return {"status": "success", "updated_count": result.rowcount if hasattr(result, "rowcount") else 0}
 
 
 @router.post("/threads/{match_id}/messages", status_code=status.HTTP_201_CREATED, summary="Send Thread Message")
@@ -451,23 +503,21 @@ async def send_chat_message(
             detail="Communication blocked by Statutory Privacy Perimeter."
         )
 
-    # Parse client message UUID for single-source-of-truth deduplication
-    target_msg_id = None
-    raw_client_id = payload.client_id or payload.id
+    # Deduplicate via client_id if present
+    raw_client_id = str(payload.client_id or payload.id or "").strip()
     if raw_client_id:
-        try:
-            target_msg_id = UUID(str(raw_client_id).strip())
-        except Exception:
-            target_msg_id = None
-
-    if target_msg_id:
-        existing_res = await db.execute(select(Message).where(Message.id == target_msg_id))
+        existing_res = await db.execute(
+            select(Message).where(
+                Message.match_id == match_uuid,
+                Message.client_id == raw_client_id
+            )
+        )
         existing_m = existing_res.scalar_one_or_none()
         if existing_m:
             return {
-                "status": "delivered",
+                "status": existing_m.status or "delivered",
                 "id": str(existing_m.id),
-                "client_id": str(existing_m.id),
+                "client_id": str(existing_m.client_id or existing_m.id),
                 "match_id": str(existing_m.match_id),
                 "sender_id": str(existing_m.sender_id),
                 "text": text_content.strip(),
@@ -477,16 +527,13 @@ async def send_chat_message(
     # Encrypt before persisting in PostgreSQL messages table (E2EE at rest)
     storage_encrypted = encrypt_message_storage(text_content.strip(), str(match_uuid))
 
-    msg_kwargs = {
-        "match_id": match_uuid,
-        "sender_id": current_user.id,
-        "encrypted_text": storage_encrypted,
-        "status": "delivered",
-    }
-    if target_msg_id:
-        msg_kwargs["id"] = target_msg_id
-
-    msg = Message(**msg_kwargs)
+    msg = Message(
+        match_id=match_uuid,
+        sender_id=current_user.id,
+        encrypted_text=storage_encrypted,
+        status="delivered",
+        client_id=raw_client_id if raw_client_id else None,
+    )
     db.add(msg)
     await db.commit()
     await db.refresh(msg)
@@ -503,7 +550,8 @@ async def send_chat_message(
             "text": text_content.strip(),
             "created_at": msg.created_at.isoformat() if msg.created_at else datetime.utcnow().isoformat(),
             "id": str(msg.id),
-            "client_id": str(msg.id),
+            "client_id": str(msg.client_id or msg.id),
+            "status": "delivered",
         }
         await manager.send_direct_message(str(recipient_id), ws_msg)
 
@@ -536,6 +584,7 @@ async def send_chat_message(
     return {
         "status": "sent",
         "id": str(msg.id),
+        "client_id": str(msg.client_id or msg.id),
         "match_id": str(msg.match_id),
         "sender_id": str(msg.sender_id),
         "text": text_content.strip(),

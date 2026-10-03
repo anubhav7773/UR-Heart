@@ -95,7 +95,7 @@ class MyPersonaScreen extends ConsumerWidget {
                 isDark: isDark,
                 onEditAvatar: () =>
                     _showPhotoUploadModal(context, ref, isDark, 0, isAvatar: true),
-                onVerifyKyc: () => _openLiveVideoKycModal(context, ref),
+                onVerifyKyc: () => _openLivePhotoKycModal(context, ref),
               ),
               if (!state.profile.hasVerifiedCrest)
                 _buildSanctuaryKycPromptCard(context, ref, isDark),
@@ -364,7 +364,7 @@ class MyPersonaScreen extends ConsumerWidget {
     }
   }
 
-  void _openLiveVideoKycModal(BuildContext context, WidgetRef ref) {
+  void _openLivePhotoKycModal(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -472,12 +472,12 @@ class MyPersonaScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              icon: const Icon(Icons.videocam_rounded, size: 18),
+              icon: const Icon(Icons.camera_alt_rounded, size: 18),
               label: const Text(
-                'Begin 3-Second Live Reflection ✨',
+                'Begin Live Photo Reflection ✨',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               ),
-              onPressed: () => _openLiveVideoKycModal(context, ref),
+              onPressed: () => _openLivePhotoKycModal(context, ref),
             ),
           ),
         ],

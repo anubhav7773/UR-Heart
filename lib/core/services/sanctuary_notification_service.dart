@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -134,10 +135,25 @@ class SanctuaryNotificationService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ur_heart_fcm_token', token);
-      final secureToken = await SecureSessionStorage.instance.getAuthToken();
-      final authToken = (secureToken != null && secureToken.isNotEmpty)
-          ? secureToken
-          : (prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token'));
+
+      String? authToken;
+      try {
+        final fbUser = FirebaseAuth.instance.currentUser;
+        if (fbUser != null) {
+          authToken = await fbUser.getIdToken();
+          if (authToken != null && authToken.isNotEmpty) {
+            await SecureSessionStorage.instance.saveAuthToken(authToken);
+          }
+        }
+      } catch (_) {}
+
+      if (authToken == null || authToken.isEmpty) {
+        final secureToken = await SecureSessionStorage.instance.getAuthToken();
+        authToken = (secureToken != null && secureToken.isNotEmpty)
+            ? secureToken
+            : (prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token'));
+      }
+
       if (authToken != null && authToken.isNotEmpty) {
         await _dispatchTokenToBackend(token, authToken);
         debugPrint('[FCM REGISTER] Token registered with backend successfully.');
@@ -162,12 +178,25 @@ class SanctuaryNotificationService {
         }
         if (token == null || token.isEmpty) return;
 
-        final secureToken = await SecureSessionStorage.instance.getAuthToken();
-        final authToken = (explicitAuthToken != null && explicitAuthToken.isNotEmpty)
-            ? explicitAuthToken
-            : ((secureToken != null && secureToken.isNotEmpty)
-                ? secureToken
-                : (prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token')));
+        String? authToken = explicitAuthToken;
+        if (authToken == null || authToken.isEmpty) {
+          try {
+            final fbUser = FirebaseAuth.instance.currentUser;
+            if (fbUser != null) {
+              authToken = await fbUser.getIdToken();
+              if (authToken != null && authToken.isNotEmpty) {
+                await SecureSessionStorage.instance.saveAuthToken(authToken);
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (authToken == null || authToken.isEmpty) {
+          final secureToken = await SecureSessionStorage.instance.getAuthToken();
+          authToken = (secureToken != null && secureToken.isNotEmpty)
+              ? secureToken
+              : (prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token'));
+        }
 
         if (authToken != null && authToken.isNotEmpty) {
           await _dispatchTokenToBackend(token, authToken);
@@ -213,13 +242,14 @@ class SanctuaryNotificationService {
       'https://urheart.asiverticals.me',
       'https://ur-heart.onrender.com',
     ];
+    String currentAuthToken = authToken;
     for (final base in candidateUrls) {
       try {
         final dio = Dio(BaseOptions(
           baseUrl: base,
           connectTimeout: const Duration(seconds: 5),
           receiveTimeout: const Duration(seconds: 5),
-          headers: {'Authorization': 'Bearer $authToken'},
+          headers: {'Authorization': 'Bearer $currentAuthToken'},
         ));
         final resp = await dio.post<dynamic>(
           '/api/v1/notifications/register-token',
@@ -229,6 +259,34 @@ class SanctuaryNotificationService {
           debugPrint('[FCM DISPATCH] Successfully linked token to $base');
           return;
         }
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 401) {
+          try {
+            final fbUser = FirebaseAuth.instance.currentUser;
+            if (fbUser != null) {
+              final fresh = await fbUser.getIdToken(true);
+              if (fresh != null && fresh.isNotEmpty) {
+                currentAuthToken = fresh;
+                await SecureSessionStorage.instance.saveAuthToken(fresh);
+                final retryDio = Dio(BaseOptions(
+                  baseUrl: base,
+                  connectTimeout: const Duration(seconds: 5),
+                  receiveTimeout: const Duration(seconds: 5),
+                  headers: {'Authorization': 'Bearer $currentAuthToken'},
+                ));
+                final retryResp = await retryDio.post<dynamic>(
+                  '/api/v1/notifications/register-token',
+                  data: {'fcm_token': token},
+                );
+                if (retryResp.statusCode == 200) {
+                  debugPrint('[FCM DISPATCH] Successfully linked refreshed token to $base');
+                  return;
+                }
+              }
+            }
+          } catch (_) {}
+        }
+        debugPrint('[FCM DISPATCH NOTICE] Failed dispatching to $base: $dioErr');
       } catch (e) {
         debugPrint('[FCM DISPATCH NOTICE] Failed dispatching to $base: $e');
       }
@@ -265,6 +323,71 @@ class SanctuaryNotificationService {
       _handleNavigationData(data);
     } catch (e) {
       debugPrint('[NOTIFICATIONS] Tap decode error: $e');
+    }
+  }
+
+  /// Safely shows notifications in a background isolate without requesting UI permissions
+  Future<void> showBackgroundNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? subText,
+    String? payload,
+    String channelId = dialogueChannelId,
+    String channelName = dialogueChannelName,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initSettings = InitializationSettings(android: androidSettings);
+      await _notificationsPlugin.initialize(settings: initSettings);
+
+      final androidPlatform = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlatform != null) {
+        const dialogueChannel = AndroidNotificationChannel(
+          dialogueChannelId,
+          dialogueChannelName,
+          description: dialogueChannelDesc,
+          importance: Importance.max,
+          enableVibration: true,
+          playSound: true,
+          showBadge: true,
+        );
+        await androidPlatform.createNotificationChannel(dialogueChannel);
+      }
+
+      final androidDetails = AndroidNotificationDetails(
+        channelId,
+        channelName,
+        channelDescription: dialogueChannelDesc,
+        importance: Importance.max,
+        priority: Priority.high,
+        styleInformation: BigTextStyleInformation(
+          body,
+          contentTitle: title,
+          summaryText: subText ?? 'UR-Heart Sanctuary',
+        ),
+        icon: '@mipmap/ic_launcher',
+        color: const Color(0xFF1B4332), // Sacred Pine
+        enableLights: true,
+        ledColor: const Color(0xFFD4AF37), // Sacred Gold
+        ledOnMs: 500,
+        ledOffMs: 500,
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList([0, 250, 200, 250]),
+        category: AndroidNotificationCategory.message,
+      );
+
+      await _notificationsPlugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(android: androidDetails),
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('[NOTIFICATIONS] Background notification display error: $e');
     }
   }
 

@@ -343,7 +343,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 ),
               ),
               const SizedBox(height: 16.0),
-              // Live Video KYC Highlighted Card (EVA AI Verified)
+              // Live Photo KYC Highlighted Card (EVA AI Verified)
               Container(
                 padding: const EdgeInsets.all(16.0),
                 decoration: BoxDecoration(
@@ -353,7 +353,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(state.isKycVerified ? Icons.verified : Icons.videocam, size: 32.0, color: verifiedTeal),
+                    Icon(state.isKycVerified ? Icons.verified : Icons.camera_alt_rounded, size: 32.0, color: verifiedTeal),
                     const SizedBox(width: 12.0),
                     Expanded(
                       child: Column(

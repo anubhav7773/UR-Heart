@@ -264,7 +264,7 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
                               color: isDark ? Colors.white10 : Colors.black12,
                               child: Center(
                                 child: _cameraUnavailable
-                                    ? Icon(Icons.videocam_off_outlined, size: 48, color: sub)
+                                    ? Icon(Icons.no_photography_outlined, size: 48, color: sub)
                                     : const CircularProgressIndicator(strokeWidth: 2),
                               ),
                             )),

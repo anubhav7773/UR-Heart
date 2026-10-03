@@ -438,6 +438,11 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     );
 
     state = state.copyWith(messages: [...state.messages, newMsg]);
+
+    // Automatically acknowledge and mark message as read since user is actively viewing dialogue
+    try {
+      await _chatRepository.markMessagesAsRead(state.matchId);
+    } catch (_) {}
   }
 
   Future<bool> sendMessage(String text) async {

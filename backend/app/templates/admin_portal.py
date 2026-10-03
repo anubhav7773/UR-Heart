@@ -677,7 +677,7 @@ def get_admin_portal_html() -> str:
             <td>${item.declared_dob} (${item.declared_age} yrs)</td>
             <td><span class="badge ${item.groq_match_score >= 80 ? 'badge-green' : 'badge-gold'}">${item.groq_match_score}%</span></td>
             <td>${item.groq_reasoning}</td>
-            <td><a href="${item.anchor_photo_url}" target="_blank" style="color: var(--gold);">Photo</a> | <a href="${item.kyc_video_url}" target="_blank" style="color: var(--gold);">Video</a></td>
+            <td><a href="${item.anchor_photo_url}" target="_blank" style="color: var(--gold);">Photo</a> | <a href="${item.kyc_video_url}" target="_blank" style="color: var(--gold);">Selfie Photo</a></td>
             <td>
               <button class="action-btn btn-approve" onclick="resolveKyc(${item.id}, '${item.user_id}', 'approve')">Approve</button>
               <button class="action-btn btn-reject" onclick="resolveKyc(${item.id}, '${item.user_id}', 'reject')">Reject</button>

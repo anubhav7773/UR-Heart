@@ -31,4 +31,5 @@ class Message(Base):
     )
     encrypted_text = Column(Text, nullable=False)
     status = Column(String(20), nullable=False, default="delivered")  # 'sent', 'delivered', 'read'
+    client_id = Column(String(64), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

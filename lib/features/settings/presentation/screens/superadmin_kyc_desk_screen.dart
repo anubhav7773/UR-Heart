@@ -4,7 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/theme_controller.dart';
 
-/// Screen for Superadmin KYC Video Verification & EVA AI Escalations
+/// Screen for Superadmin KYC Photo Verification & EVA AI Escalations
 class SuperadminKycDeskScreen extends ConsumerWidget {
   static const String routeName = '/admin/kyc-desk';
 
@@ -79,7 +79,7 @@ class SuperadminKycDeskScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Pending KYC Video Escalations (0)',
+                'Pending KYC Photo Escalations (0)',
                 style: AppTypography.titleH2.copyWith(fontSize: 16, color: headlineColor),
               ),
               const SizedBox(height: 8),
@@ -98,7 +98,7 @@ class SuperadminKycDeskScreen extends ConsumerWidget {
                         Icon(Icons.verified_rounded, size: 48, color: goldColor),
                         const SizedBox(height: 12),
                         Text(
-                          'All Video KYC Reflections Clear',
+                          'All Photo KYC Reflections Clear',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,

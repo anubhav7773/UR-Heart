@@ -116,36 +116,34 @@ async def secure_chat_websocket_endpoint(websocket: WebSocket):
                 async def _persist_and_notify_bg(mid_val, auth_uid_val, rec_uuid_val, payload_data):
                     try:
                         from app.core.database import async_session_factory
-                        from app.models.domain.chat import Message
+                        from app.models.domain.message import Message
                         from app.api.v1.endpoints.chat_api import encrypt_message_storage
                         from sqlalchemy import select
 
-                        msg_id_raw = payload_data.get("id") or payload_data.get("client_id")
-                        target_msg_uuid = None
-                        if msg_id_raw:
-                            try:
-                                target_msg_uuid = UUID(str(msg_id_raw).strip())
-                            except Exception:
-                                target_msg_uuid = None
-
+                        msg_id_raw = str(payload_data.get("id") or payload_data.get("client_id") or "").strip()
                         text_body = payload_data.get("text") or payload_data.get("content") or payload_data.get("ciphertext") or ""
 
                         if mid_val and text_body:
                             async with async_session_factory() as session:
                                 already_saved = False
-                                if target_msg_uuid:
-                                    existing_res = await session.execute(select(Message.id).where(Message.id == target_msg_uuid))
+                                if msg_id_raw:
+                                    existing_res = await session.execute(
+                                        select(Message.id).where(
+                                            Message.match_id == mid_val,
+                                            Message.client_id == msg_id_raw
+                                        )
+                                    )
                                     if existing_res.scalar_one_or_none():
                                         already_saved = True
 
                                 if not already_saved:
                                     storage_encrypted = encrypt_message_storage(str(text_body).strip(), str(mid_val))
                                     msg_entry = Message(
-                                        id=target_msg_uuid or uuid4(),
                                         match_id=mid_val,
                                         sender_id=auth_uid_val,
                                         encrypted_text=storage_encrypted,
                                         status="delivered",
+                                        client_id=msg_id_raw if msg_id_raw else None,
                                     )
                                     session.add(msg_entry)
                                     await session.commit()
@@ -168,6 +166,61 @@ async def secure_chat_websocket_endpoint(websocket: WebSocket):
 
                 import asyncio
                 asyncio.create_task(_persist_and_notify_bg(clean_mid, authenticated_user_id, recipient_uuid, data))
+
+            # 3. Read status acknowledgment (Read receipts across sockets)
+            elif event_type in ("ack_read", "read_receipt", "mark_read") or data.get("action") in ("ack_read", "mark_read", "read_receipt"):
+                match_id = str(data.get("match_id", "")).strip()
+                clean_mid = None
+                if match_id:
+                    for prefix in ("conn_", "conn-", "match-", "match_", "spark_", "spark-"):
+                        if match_id.startswith(prefix):
+                            match_id = match_id[len(prefix):]
+                            break
+                    try:
+                        clean_mid = UUID(match_id)
+                    except Exception:
+                        clean_mid = None
+
+                async def _handle_read_ack_bg(mid_val, auth_uid_val):
+                    if not mid_val:
+                        return
+                    try:
+                        from app.core.database import async_session_factory
+                        from app.models.domain.message import Message
+                        from app.models.domain.match import Match
+                        from sqlalchemy import update, select
+
+                        async with async_session_factory() as session:
+                            stmt = (
+                                update(Message)
+                                .where(
+                                    Message.match_id == mid_val,
+                                    Message.sender_id != auth_uid_val,
+                                    Message.status != "read"
+                                )
+                                .values(status="read")
+                            )
+                            await session.execute(stmt)
+                            await session.commit()
+
+                            m_res = await session.execute(select(Match).where(Match.id == mid_val))
+                            m = m_res.scalar_one_or_none()
+                            if m:
+                                partner_id = m.user2_id if str(m.user1_id) == str(auth_uid_val) else m.user1_id
+                                await manager.send_direct_message(
+                                    str(partner_id),
+                                    {
+                                        "type": "read_receipt",
+                                        "action": "status_update",
+                                        "match_id": str(mid_val),
+                                        "status": "read"
+                                    }
+                                )
+                    except Exception as err:
+                        logger.warning("Read ack handler error: %s", err)
+
+                import asyncio
+                asyncio.create_task(_handle_read_ack_bg(clean_mid, authenticated_user_id))
 
             # 3. Stage advance & Bridge events
             elif event_type in ("STAGE_ADVANCE_REQUEST", "stage_advanced", "bridge_reveal_request", "bridge_consent"):

@@ -25,7 +25,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final title = message.notification?.title ?? message.data['title']?.toString();
     final body = message.notification?.body ?? message.data['body']?.toString();
     if (title != null && title.isNotEmpty) {
-      await SanctuaryNotificationService.instance.showSystemNotification(
+      await SanctuaryNotificationService.instance.showBackgroundNotification(
         id: message.hashCode,
         title: title,
         body: body ?? '',

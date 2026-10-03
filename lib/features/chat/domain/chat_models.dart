@@ -28,8 +28,16 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final rawClientId = json['client_id']?.toString();
+    final rawId = json['id']?.toString();
+    final effectiveId = (rawClientId != null && rawClientId.isNotEmpty)
+        ? rawClientId
+        : (rawId != null && rawId.isNotEmpty
+            ? rawId
+            : 'msg_${DateTime.now().millisecondsSinceEpoch}');
+
     return ChatMessage(
-      id: json['id'] as String? ?? 'msg_${DateTime.now().millisecondsSinceEpoch}',
+      id: effectiveId,
       matchId: json['match_id'] as String? ?? '',
       senderId: json['sender_id'] as String? ?? '',
       recipientId: json['recipient_id'] as String? ?? '',

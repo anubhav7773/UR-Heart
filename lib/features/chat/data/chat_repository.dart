@@ -57,16 +57,31 @@ class ChatRepository {
 
   void _subscribeToWebSocketEvents() {
     _wsService?.eventStream.listen((event) {
-      final action = event['action'];
-      if (action == 'status_update') {
+      final action = event['action'] ?? event['type'];
+      if (action == 'status_update' || action == 'read_receipt') {
         final matchId = event['match_id'] as String?;
         final msgId = event['message_id'] as String?;
         final statusStr = event['status'] as String?;
-        if (matchId != null && msgId != null && statusStr != null) {
-          _updateMessageStatusLocally(matchId, msgId, statusStr);
+        if (matchId != null && statusStr != null) {
+          if (msgId != null) {
+            _updateMessageStatusLocally(matchId, msgId, statusStr);
+          } else if (statusStr == 'read') {
+            _updateAllMyMessagesStatusLocally(matchId, MessageDeliveryStatus.read);
+          }
         }
       }
     });
+  }
+
+  void _updateAllMyMessagesStatusLocally(String matchId, MessageDeliveryStatus newStatus) {
+    final list = _messagesByMatch[matchId];
+    if (list != null) {
+      for (int i = 0; i < list.length; i++) {
+        if (list[i].isMe && list[i].status != newStatus) {
+          list[i] = list[i].copyWith(status: newStatus);
+        }
+      }
+    }
   }
 
   void _updateMessageStatusLocally(String matchId, String msgId, String statusStr) {
@@ -222,6 +237,7 @@ class ChatRepository {
           list[i] = list[i].copyWith(status: MessageDeliveryStatus.read);
           _wsService?.sendJson({
             'action': 'ack_read',
+            'type': 'ack_read',
             'match_id': matchId,
             'message_id': list[i].id,
             'sender_id': list[i].senderId,
@@ -233,6 +249,18 @@ class ChatRepository {
     if (convIdx != -1) {
       _conversations[convIdx] = _conversations[convIdx].copyWith(unreadCount: 0);
     }
+
+    // Persist read status directly to PostgreSQL backend
+    try {
+      String cleanId = matchId.trim();
+      for (final prefix in ['conn_', 'match-', 'match_', 'spark_']) {
+        if (cleanId.startsWith(prefix)) {
+          cleanId = cleanId.substring(prefix.length);
+          break;
+        }
+      }
+      await _dio.post<dynamic>('/api/v1/chat/threads/$cleanId/read');
+    } catch (_) {}
   }
 
   /// Fetches live Sacred Bridge progression & genuine contact enclave status
