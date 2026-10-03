@@ -104,6 +104,143 @@ async def test_sec11_ai_vision_fail_closed_kyc(mock_user):
 
 
 @pytest.mark.asyncio
+async def test_photo_pose_selfie_kyc_fail_closed_when_models_down(mock_user):
+    """
+    Test: Photo Pose Selfie KYC Fail-Closed Security Test
+    When valid base64 selfie and anchor images are submitted but AI vision models
+    are rate-limited (HTTP 429) or unavailable, the system MUST NOT auto-approve.
+    It MUST strictly return status='pending_manual_review', leave user kyc_status=False,
+    and insert an escalation for human Sentinel review.
+    """
+    from app.services.eva_identity_engine import KycAiEvaluation
+    mock_user.kyc_status = False
+    added_escalations = []
+
+    async def mock_db():
+        session = AsyncMock()
+        mock_res = MagicMock()
+        mock_res.scalar_one_or_none.return_value = None
+        session.execute = AsyncMock(return_value=mock_res)
+        session.add = MagicMock(side_effect=lambda x: added_escalations.append(x))
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = mock_db
+
+    valid_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+    fail_closed_eval = KycAiEvaluation(
+        is_live_human=False,
+        face_match_score=0,
+        estimated_age_bracket="unknown",
+        is_underage=False,
+        rejection_reason="Automated biometric evaluation temporarily unavailable due to upstream AI rate-limits. Escalated to Sentinel Desk for manual verification.",
+        status="pending_manual_review"
+    )
+
+    with patch("app.services.eva_identity_engine.EvaIdentityEngine.verify_kyc_liveness", return_value=fail_closed_eval):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/v1/kyc/verify-live",
+                json={
+                    "anchor_b64": valid_png_b64,
+                    "selfie_b64": valid_png_b64,
+                }
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["is_live_human"] is False
+            assert data["face_match_score"] == 0
+            assert data["status"] == "pending_manual_review"
+            assert mock_user.kyc_status is False  # ZERO automated pass on model error
+            assert len(added_escalations) == 1
+            assert added_escalations[0].user_id == mock_user.id
+            assert added_escalations[0].status == "pending"
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_photo_pose_selfie_kyc_approved_when_ai_passes(mock_user):
+    """
+    Test: Photo Pose Selfie KYC Success Test
+    When valid base64 selfie and anchor images match with score >= 75 and liveness confirmed,
+    the user is approved and kyc_status becomes True.
+    """
+    from app.services.eva_identity_engine import KycAiEvaluation
+    mock_user.kyc_status = False
+
+    async def mock_db():
+        session = AsyncMock()
+        mock_res = MagicMock()
+        mock_res.scalar_one_or_none.return_value = None
+        session.execute = AsyncMock(return_value=mock_res)
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = mock_db
+
+    valid_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+    approved_eval = KycAiEvaluation(
+        is_live_human=True,
+        face_match_score=92,
+        estimated_age_bracket="22-28",
+        is_underage=False,
+        rejection_reason="",
+        status="approved"
+    )
+
+    with patch("app.services.eva_identity_engine.EvaIdentityEngine.verify_kyc_liveness", return_value=approved_eval):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/v1/kyc/verify-live",
+                json={
+                    "anchor_b64": valid_png_b64,
+                    "selfie_b64": valid_png_b64,
+                }
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["is_live_human"] is True
+            assert data["face_match_score"] == 92
+            assert data["status"] == "approved"
+            assert mock_user.kyc_status is True  # Successfully verified
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_eva_identity_engine_direct_fail_closed_on_upstream_429():
+    """
+    Direct Unit Test: Verifies EvaIdentityEngine.verify_kyc_liveness strictly returns
+    status='pending_manual_review' when upstream AI endpoints return 429 rate limit.
+    """
+    from app.services.eva_identity_engine import EvaIdentityEngine
+    valid_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+    mock_429_resp = MagicMock()
+    mock_429_resp.status_code = 429
+    mock_429_resp.text = '{"error":{"message":"Rate limit reached"}}'
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_429_resp):
+        eval_res = await EvaIdentityEngine.verify_kyc_liveness(
+            user_id=uuid.uuid4(),
+            anchor_b64=valid_png_b64,
+            frames_b64=[valid_png_b64],
+        )
+        assert eval_res.is_live_human is False
+        assert eval_res.face_match_score == 0
+        assert eval_res.status == "pending_manual_review"
+
+
+@pytest.mark.asyncio
 async def test_sec13_ws_ticket_single_use_lifecycle(mock_user):
     """
     Test 3: WSS Ephemeral Ticket Single-Use Replay Test (SEC-13 Test)

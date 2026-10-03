@@ -193,12 +193,60 @@ class ProfileRepository {
       }
     } catch (_) {}
 
-    // Fallback: approve valid real camera recording stream
+    // Fail-Closed Security Policy: if network or backend fails, route to manual Sentinel review (NEVER auto-approve)
     return const KycVerificationResult(
-      isApproved: true,
-      isPendingReview: false,
-      message: 'KYC Verified: Verified Sanctuary Crest awarded by EVA AI.',
+      isApproved: false,
+      isPendingReview: true,
+      message: 'Reflection submitted to Sanctuary Sentinel for manual review.',
     );
+  }
+
+  /// Submits live photo pose selfie to EVA AI Vision KYC on Render
+  Future<KycVerificationResult> submitSelfieKyc({
+    required String userId,
+    required String selfieBase64,
+    String? anchorPhotoB64,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/v1/kyc/verify-live',
+        data: {
+          'anchor_b64': anchorPhotoB64 ?? '',
+          'selfie_b64': selfieBase64,
+        },
+      );
+      final data = response.data;
+      final status = data?['status'] as String? ?? 'pending_manual_review';
+      final isLive = data?['is_live_human'] == true;
+      final score = data?['face_match_score'] as int? ?? 0;
+      final reason = data?['rejection_reason'] as String? ?? '';
+
+      if (status == 'approved' && isLive && score >= 75) {
+        return const KycVerificationResult(
+          isApproved: true,
+          isPendingReview: false,
+          message: 'KYC Verified: Real Liveness Confirmed by EVA AI.',
+        );
+      } else if (status == 'rejected') {
+        return KycVerificationResult(
+          isApproved: false,
+          isPendingReview: false,
+          message: reason.isNotEmpty ? reason : 'Biometric match rejected.',
+        );
+      } else {
+        return KycVerificationResult(
+          isApproved: false,
+          isPendingReview: true,
+          message: reason.isNotEmpty ? reason : 'Reflection submitted to Sanctuary Sentinel for manual review.',
+        );
+      }
+    } catch (_) {
+      return const KycVerificationResult(
+        isApproved: false,
+        isPendingReview: true,
+        message: 'Reflection submitted to Sanctuary Sentinel for manual review.',
+      );
+    }
   }
 
   /// Saves complete user profile to database via PUT /api/v1/profile/me (ACT-22 Fix)

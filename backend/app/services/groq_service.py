@@ -270,8 +270,13 @@ class GroqAiService:
                 groq_match_score=score,
                 groq_reasoning=reason[:250],
                 anchor_photo_url=f"users/{user_id}/moments/slot_1.webp",
-                kyc_video_url=f"kyc_ephemeral/{user_id}/kyc_video.mp4",
+                kyc_video_url=f"kyc_ephemeral/{user_id}/kyc_selfie.webp",
                 status="pending"
             )
             db.add(escalation)
+            await db.commit()
+        else:
+            existing.groq_match_score = score
+            existing.groq_reasoning = reason[:250]
+            existing.status = "pending"
             await db.commit()

@@ -232,10 +232,12 @@ class EvaIdentityEngine:
         local_face_found = cls._detect_faces_opencv_safe([clean_anchor] + comparison_frames)
 
         prompt_text = (
-            "You are the Sanctuary Identity Sentinel. Image 1 is profile portrait. "
-            "Images 2 and 3 are consecutive frames from a 3-second live selfie video.\n"
-            "Evaluate biometric liveness, natural micro-movement across frames, and facial match.\n"
-            "Return ONLY a raw JSON object with these keys: "
+            "You are the Sanctuary Identity Sentinel. Image 1 is the user's primary profile portrait (Slot 1). "
+            "Image 2 (and any following images) is a live verification selfie captured by the user.\n"
+            "1. Biometric Match: Compare eye spacing, nose bridge, jawline, and facial structure between Image 1 and Image 2. Face match score MUST be between 0 and 100.\n"
+            "2. Liveness Check: Verify Image 2 is a genuine 3D living person, not a photo of a screen, printed paper photo, or spoof replay.\n"
+            "3. Age Check: Verify user appears to be an adult (age 18+).\n"
+            "Return ONLY a valid raw JSON object with these exact keys:\n"
             "{\"is_live_human\": true, \"face_match_score\": 85, \"estimated_age_bracket\": \"22-28\", "
             "\"is_underage\": false, \"rejection_reason\": \"\"}"
         )
@@ -248,9 +250,6 @@ class EvaIdentityEngine:
         # 2. Primary: Dynamic Groq Vision Model Pool
         groq_models = [
             "qwen/qwen3.8-27b",
-            "meta-llama/llama-4-scout-17b-preview",
-            "llama-3.2-11b-vision-preview",
-            "llama-3.2-90b-vision-preview",
         ]
         groq_key = (
             getattr(settings, "EVA_IDENTITY_API_KEY", "") or
@@ -285,11 +284,12 @@ class EvaIdentityEngine:
         or_key = getattr(settings, "OPENROUTER_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "") or ""
         if or_key:
             or_models = [
-                "meta-llama/llama-3.2-11b-vision-instruct:free",
-                "qwen/qwen-2-vl-72b-instruct:free",
-                "google/gemini-2.0-flash-exp:free",
+                "google/gemini-2.0-flash-001",
+                "meta-llama/llama-3.2-11b-vision-instruct",
+                "qwen/qwen-2.5-vl-72b-instruct",
+                "openrouter/free",
                 "qwen/qwen3.8-27b:free",
-                "google/gemma-4-26b-a4b-it:free",
+                "google/gemini-2.0-flash-exp:free",
             ]
             for o_model in or_models:
                 try:
@@ -312,22 +312,18 @@ class EvaIdentityEngine:
                 except Exception as e:
                     logger.warning("OpenRouter Vision (%s) error: %s", o_model, e)
 
-        # 4. Graceful Fallback: Validate image payload structure
-        if (cls._is_valid_image(clean_anchor) or len(clean_anchor) > 1000) and (len(extracted_frames) >= 1 or len(comparison_frames) >= 1):
-            logger.info("Remote Vision APIs unavailable/rate-limited; verified valid biometric frames for user %s", user_id)
-            return KycAiEvaluation(
-                is_live_human=True,
-                face_match_score=85,
-                estimated_age_bracket="22-28",
-                is_underage=False,
-                rejection_reason="",
-                status="approved"
-            )
-
+        # 4. Strict Fail-Closed Sentinel: Remote Vision APIs unavailable/rate-limited
+        # Zero automated pass. User is routed to manual review; kyc_status remains False.
+        logger.warning(
+            "Remote Vision APIs unavailable or rate-limited for user %s. Strictly FAILING CLOSED to pending_manual_review.",
+            user_id
+        )
         return KycAiEvaluation(
             is_live_human=False,
             face_match_score=0,
-            rejection_reason="Automated biometric verification timed out. Routed to manual review.",
+            estimated_age_bracket="unknown",
+            is_underage=False,
+            rejection_reason="Automated biometric evaluation temporarily unavailable due to upstream AI rate-limits. Escalated to Sentinel Desk for manual verification.",
             status="pending_manual_review"
         )
 
@@ -340,36 +336,46 @@ class EvaIdentityEngine:
             if match:
                 data = json.loads(match.group(0))
                 score = int(data.get("face_match_score", 0))
-                is_live = bool(data.get("is_live_human", False)) or local_face
+                is_live = bool(data.get("is_live_human", False))
                 is_underage = bool(data.get("is_underage", False))
                 reason = data.get("rejection_reason", "") or ""
 
-                if (is_live or local_face) and score >= 60 and not is_underage:
+                if is_underage:
                     return KycAiEvaluation(
-                        is_live_human=True,
-                        face_match_score=max(score, 85),
-                        estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
-                        is_underage=False,
-                        rejection_reason="",
-                        status="approved"
-                    )
-                elif is_underage:
-                    return KycAiEvaluation(
-                        is_live_human=True,
+                        is_live_human=is_live,
                         face_match_score=score,
                         estimated_age_bracket=data.get("estimated_age_bracket", "under_18"),
                         is_underage=True,
                         rejection_reason="Underage profile detected.",
                         status="rejected"
                     )
-                else:
+                elif is_live and score >= 75:
+                    return KycAiEvaluation(
+                        is_live_human=True,
+                        face_match_score=score,
+                        estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
+                        is_underage=False,
+                        rejection_reason="",
+                        status="approved"
+                    )
+                elif score < 40 or not is_live:
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
                         estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
-                        is_underage=is_underage,
-                        rejection_reason=reason or "Biometric threshold not met. Routed to manual review.",
-                        status="rejected" if (score < 40 and not is_live) else "pending_manual_review"
+                        is_underage=False,
+                        rejection_reason=reason or "Biometric match score insufficient or liveness unconfirmed.",
+                        status="rejected"
+                    )
+                else:
+                    # Borderline score (40 - 74): route to manual review, NEVER auto-approve
+                    return KycAiEvaluation(
+                        is_live_human=is_live,
+                        face_match_score=score,
+                        estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
+                        is_underage=False,
+                        rejection_reason=reason or "Biometric match confidence ambiguous. Escalated for human Sentinel review.",
+                        status="pending_manual_review"
                     )
         except Exception as e:
             logger.warning("Failed to parse KYC JSON: %s", e)

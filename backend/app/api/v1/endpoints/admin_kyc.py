@@ -113,7 +113,7 @@ async def resolve_kyc_ticket(
         .values(
             status="approved" if is_approved else "rejected",
             reviewed_at=datetime.now(timezone.utc),
-            reviewed_by=SUPERADMIN_EMAIL
+            reviewed_by=getattr(admin, "email", "asiverticals@gmail.com")
         )
     )
     await db.commit()

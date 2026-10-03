@@ -363,7 +363,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: titleColor)),
                           const SizedBox(height: 2.0),
                           Text(
-                            state.isKycVerified ? 'EVA AI verified identity · 100% genuine human.' : 'Gentle 3-second live selfie video reflection.',
+                            state.isKycVerified ? 'EVA AI verified identity · 100% genuine human.' : 'Quick live photo pose selfie reflection.',
                             style: AppTypography.caption.copyWith(color: mutedColor),
                           ),
                         ],

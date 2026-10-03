@@ -13,6 +13,7 @@ router = APIRouter(prefix="/kyc", tags=["KYC Biometric Verification"])
 
 class VerifyLiveKycPayload(BaseModel):
     anchor_b64: str = Field(..., description="Base64 encoded anchor profile portrait")
+    selfie_b64: Optional[str] = Field(None, description="Base64 encoded live photo pose selfie snapshot")
     frames_b64: List[str] = Field(default_factory=list, description="Base64 encoded frames from live video")
     video_b64: Optional[str] = Field(None, description="Base64 encoded video clip")
 
@@ -24,11 +25,19 @@ async def verify_live_kyc(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Evaluates video KYC using fail-closed Groq Vision Sentinel.
-    If corrupted or ambiguous, fails closed, sets status to pending_manual_review,
-    and inserts row into admin_kyc_escalations table.
+    Evaluates Live Photo Pose Selfie KYC (or fallback video frames) using fail-closed Vision Sentinel.
+    If ambiguous or models unavailable, strictly fails closed (status: pending_manual_review),
+    leaves kyc_status=False, and routes escalation to admin_kyc_escalations table.
     """
-    frames = payload.frames_b64 if payload.frames_b64 else ([payload.video_b64] if payload.video_b64 else [])
+    if payload.selfie_b64 and len(payload.selfie_b64.strip()) > 50:
+        frames = [payload.selfie_b64.strip()]
+    elif payload.frames_b64:
+        frames = payload.frames_b64
+    elif payload.video_b64:
+        frames = [payload.video_b64]
+    else:
+        frames = []
+
     evaluation = await GroqAiService.verify_kyc_liveness_secure(
         user_id=current_user.id,
         anchor_b64=payload.anchor_b64,
@@ -36,14 +45,28 @@ async def verify_live_kyc(
         db_session=db
     )
 
-    if evaluation.status == "approved" or (evaluation.is_live_human and evaluation.face_match_score >= 70):
-        current_user.kyc_status = True
-        try:
-            await db.commit()
-            await db.refresh(current_user)
+    # Strict Fail-Closed Security Policy: Only set kyc_status=True if all criteria pass
+    is_approved = (
+        evaluation.status == "approved"
+        and evaluation.is_live_human is True
+        and evaluation.face_match_score >= 75
+        and not evaluation.is_underage
+    )
+
+    current_user.kyc_status = is_approved
+    try:
+        await db.commit()
+        await db.refresh(current_user)
+        if is_approved:
             print(f"[KYC VERIFY] User {current_user.id} ({current_user.email}) marked kyc_status=True in DB", flush=True)
-        except Exception as e:
-            await db.rollback()
-            print(f"[KYC VERIFY] DB commit notice: {e}", flush=True)
+        else:
+            print(
+                f"[KYC VERIFY] User {current_user.id} ({current_user.email}) fail-closed: "
+                f"kyc_status=False (status={evaluation.status}, score={evaluation.face_match_score}, live={evaluation.is_live_human})",
+                flush=True
+            )
+    except Exception as e:
+        await db.rollback()
+        print(f"[KYC VERIFY] DB commit notice: {e}", flush=True)
 
     return evaluation
