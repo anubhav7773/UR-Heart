@@ -48,8 +48,8 @@ class MockFeedRepository extends FeedRepository {
   }
 
   @override
-  Future<int> recordSwipe({required String targetUserId, required String swipeType, String? letterText}) async {
-    return 10;
+  Future<SwipeResult> recordSwipe({required String targetUserId, required String swipeType, String? letterText}) async {
+    return const SwipeResult(swipesRemaining: 10, directLettersCount: 2);
   }
 
   @override

@@ -117,7 +117,7 @@ async def get_my_authenticated_profile(
         "preferred_age_min": current_user.preferred_age_min,
         "preferred_age_max": current_user.preferred_age_max,
         "contact_bridge_handle": current_user.contact_bridge_encrypted,
-        "role": current_user.role or ("superadmin" if (current_user.email or "").lower() in ["asiverticals@gmail.com", "kshtriyaanubhav9120@gmail.com"] else "user")
+        "role": current_user.role or ("superadmin" if (current_user.email or "").lower() == "asiverticals@gmail.com" else "user")
     }
 
 

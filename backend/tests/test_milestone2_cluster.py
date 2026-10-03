@@ -132,20 +132,20 @@ async def test_exit_criterion_4_superadmin_security_lock():
     """
     Exit Criterion 4: Superadmin Security Lock.
     Regular user token on /api/v1/admin/kyc/escalations -> HTTP 403 Forbidden.
-    kshtriyaanubhav9120@gmail.com -> HTTP 200 OK.
+    asiverticals@gmail.com -> HTTP 200 OK.
     """
     regular_user = User(
         id=uuid.uuid4(),
         auth_id=uuid.uuid4(),
         full_name="Regular Member",
-        email="member@sanctuary.app"
+        email="kshtriyaanubhav9120@gmail.com"
     )
 
     superadmin_user = User(
         id=uuid.uuid4(),
         auth_id=uuid.uuid4(),
-        full_name="Kshtriya Anubhav",
-        email="kshtriyaanubhav9120@gmail.com"
+        full_name="Asi Verticals Sovereign",
+        email="asiverticals@gmail.com"
     )
 
     async def mock_regular():

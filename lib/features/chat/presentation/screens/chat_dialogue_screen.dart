@@ -17,6 +17,7 @@ import '../widgets/text_only_chat_input_bar.dart';
 import '../widgets/eva_bonding_spark_bar.dart';
 import '../../../ai_sanctuary/presentation/widgets/ai_dialogue_coach_sheet.dart';
 import '../../../../core/media/sanctuary_image_resolver.dart';
+import '../../../profile/presentation/screens/seeker_profile_detail_screen.dart';
 
 class ChatDialogueArguments {
   final String matchId, recipientId, recipientName, sharedContextQuote;
@@ -259,6 +260,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
             isOnline: isOnline,
             peer: peer,
             args: args,
+            matchId: mId,
             pine: pine,
             primaryText: primaryText,
             subText: subText,
@@ -609,6 +611,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
     required bool isOnline,
     required Map<String, dynamic> peer,
     required ChatDialogueArguments? args,
+    String? matchId,
     required Color pine,
     required Color primaryText,
     required Color subText,
@@ -645,6 +648,19 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
             ? DarkSanctuaryTokens.surfaceCardBorder
             : LightSanctuaryTokens.surfaceCardBorder;
 
+        void navigateToFullProfile() {
+          Navigator.of(ctx).pop();
+          final detailArgs = SeekerProfileDetailArgs.fromPeer(
+            peer: peer,
+            args: args,
+            matchId: matchId,
+          );
+          Navigator.of(context).pushNamed(
+            SeekerProfileDetailScreen.routeName,
+            arguments: detailArgs,
+          );
+        }
+
         return Container(
           decoration: BoxDecoration(
             color: cardBg,
@@ -674,60 +690,69 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 46,
-                        backgroundColor: pine.withValues(alpha: 0.15),
-                        backgroundImage: resolveSanctuaryImageProvider(avatarUrl),
-                        child: !hasValidAvatar
-                            ? Text(
-                                displayName.isNotEmpty ? displayName[0] : 'S',
-                                style: TextStyle(
-                                  color: pine,
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
-                      ),
-                      if (isOnline)
-                        Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? DarkSanctuaryTokens.badgeOnline
-                                : LightSanctuaryTokens.badgeOnline,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: cardBg, width: 2.5),
-                          ),
+                  InkWell(
+                    onTap: navigateToFullProfile,
+                    borderRadius: BorderRadius.circular(50),
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        CircleAvatar(
+                          radius: 46,
+                          backgroundColor: pine.withValues(alpha: 0.15),
+                          backgroundImage: resolveSanctuaryImageProvider(avatarUrl),
+                          child: !hasValidAvatar
+                              ? Text(
+                                  displayName.isNotEmpty ? displayName[0] : 'S',
+                                  style: TextStyle(
+                                    color: pine,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
                         ),
-                    ],
+                        if (isOnline)
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? DarkSanctuaryTokens.badgeOnline
+                                  : LightSanctuaryTokens.badgeOnline,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: cardBg, width: 2.5),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          displayName,
-                          style: TextStyle(
-                            fontFamily: 'Serif',
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: primaryText,
+                  InkWell(
+                    onTap: navigateToFullProfile,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            displayName,
+                            style: TextStyle(
+                              fontFamily: 'Serif',
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: primaryText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      if (isVerified) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.verified, size: 20, color: pine),
+                        if (isVerified) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.verified, size: 20, color: pine),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Container(
@@ -884,21 +909,43 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                       ),
                     ),
                   ],
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: pine,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: primaryText,
+                            side: BorderSide(color: cardBorder),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Back to Chat',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
                       ),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Back to Dialogue',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: pine,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                          onPressed: navigateToFullProfile,
+                          icon: const Icon(Icons.person_pin_circle_outlined,
+                              size: 18),
+                          label: const Text('View Full Profile ✨',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -909,3 +956,4 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
     );
   }
 }
+

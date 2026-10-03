@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -436,6 +437,37 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
   void updateDirectLetters(int count) {
     state = state.copyWith(directLetters: count);
     SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', count));
+  }
+
+  void consumeDirectLetter([int count = 1]) {
+    final nextLetters = math.max(0, state.directLetters - count);
+    state = state.copyWith(directLetters: nextLetters);
+    SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_direct_letters', nextLetters));
+  }
+
+  void consumeSwipe([int count = 1]) {
+    final nextSwipes = math.max(0, state.swipesRemaining - count);
+    state = state.copyWith(swipesRemaining: nextSwipes);
+    SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_swipes_remaining', nextSwipes));
+  }
+
+  void consumeRevealToken([int count = 1]) {
+    final nextTokens = math.max(0, state.revealTokensCount - count);
+    state = state.copyWith(revealTokensCount: nextTokens);
+    SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_reveal_tokens', nextTokens));
+  }
+
+  void syncWithFeedBalances({int? swipes, int? directLetters}) {
+    final updatedSwipes = swipes ?? state.swipesRemaining;
+    final updatedLetters = directLetters ?? state.directLetters;
+    state = state.copyWith(
+      swipesRemaining: updatedSwipes,
+      directLetters: updatedLetters,
+    );
+    SharedPreferences.getInstance().then((p) {
+      if (swipes != null) p.setInt('ur_heart_swipes_remaining', updatedSwipes);
+      if (directLetters != null) p.setInt('ur_heart_direct_letters', updatedLetters);
+    });
   }
 
   Future<void> purchasePackage(String productId, [BuildContext? context]) async {

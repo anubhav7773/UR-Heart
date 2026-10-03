@@ -33,26 +33,35 @@ class KycAiEvaluation(BaseModel):
     face_match_score: int
     estimated_age_bracket: str = "22-28"
     is_underage: bool = False
-    rejection_reason: Optional[str] = None
+    rejection_reason: Optional[str] = ""
     status: str = "approved"
 
 
 class EvaIdentityEngine:
-    """Eva Section 1: Identity & Persona Specialist."""
+    """Eva Section 1: Identity & Persona Specialist (Dedicated Key Channel 1)."""
 
     @classmethod
     def _groq_headers(cls) -> Dict[str, str]:
-        key = getattr(settings, "GROQ_API_KEY", "") or ""
+        # Channel 1: Dedicated Identity/KYC key with fallback to GROQ_API_KEY
+        key = (
+            getattr(settings, "EVA_IDENTITY_API_KEY", "") or
+            getattr(settings, "GROQ_API_KEY", "") or
+            os.getenv("EVA_IDENTITY_API_KEY", "") or
+            os.getenv("GROQ_API_KEY", "") or ""
+        ).strip()
         return {
-            "Authorization": f"Bearer {key.strip()}",
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
 
     @classmethod
     def _openrouter_headers(cls) -> Dict[str, str]:
-        key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
+        key = (
+            getattr(settings, "OPENROUTER_API_KEY", "") or
+            os.getenv("OPENROUTER_API_KEY", "") or ""
+        ).strip()
         return {
-            "Authorization": f"Bearer {key.strip()}",
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://urheart.asiverticals.me",
             "X-Title": "UR-Heart Sanctuary Identity Sentinel",
@@ -236,36 +245,49 @@ class EvaIdentityEngine:
         for frame in comparison_frames[:2]:
             content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame}"}})
 
-        # 2. Primary: Groq Vision (qwen/qwen3.8-27b)
-        groq_models = ["qwen/qwen3.8-27b"]
-        for g_model in groq_models:
-            groq_key = getattr(settings, "GROQ_API_KEY", "") or ""
-            if not groq_key:
-                break
-            try:
-                payload = {
-                    "model": g_model,
-                    "messages": [{"role": "user", "content": content_payload}],
-                    "temperature": 0.1,
-                    "max_tokens": 300,
-                }
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
-                    if res.status_code == 200:
-                        content_str = res.json()["choices"][0]["message"]["content"]
-                        eval_obj = cls._parse_kyc_json(content_str, local_face_found)
-                        if eval_obj:
-                            return eval_obj
-                    else:
-                        logger.warning("Groq Vision (%s) returned status %s: %s", g_model, res.status_code, res.text[:120])
-            except Exception as e:
-                logger.warning("Groq Vision (%s) exception: %s", g_model, e)
+        # 2. Primary: Dynamic Groq Vision Model Pool
+        groq_models = [
+            "qwen/qwen3.8-27b",
+            "meta-llama/llama-4-scout-17b-preview",
+            "llama-3.2-11b-vision-preview",
+            "llama-3.2-90b-vision-preview",
+        ]
+        groq_key = (
+            getattr(settings, "EVA_IDENTITY_API_KEY", "") or
+            getattr(settings, "GROQ_API_KEY", "") or
+            os.getenv("EVA_IDENTITY_API_KEY", "") or
+            os.getenv("GROQ_API_KEY", "") or ""
+        ).strip()
 
-        # 3. Secondary: OpenRouter Vision Fallback
-        or_key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
+        if groq_key:
+            for g_model in groq_models:
+                try:
+                    payload = {
+                        "model": g_model,
+                        "messages": [{"role": "user", "content": content_payload}],
+                        "temperature": 0.1,
+                        "max_tokens": 300,
+                    }
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
+                        if res.status_code == 200:
+                            choice = res.json().get("choices", [{}])[0]
+                            content_str = choice.get("message", {}).get("content", "")
+                            eval_obj = cls._parse_kyc_json(content_str, local_face_found)
+                            if eval_obj:
+                                return eval_obj
+                        else:
+                            logger.warning("Groq Vision (%s) returned status %s: %s", g_model, res.status_code, res.text[:120])
+                except Exception as e:
+                    logger.warning("Groq Vision (%s) exception: %s", g_model, e)
+
+        # 3. Secondary: OpenRouter Vision Fallback Pool
+        or_key = getattr(settings, "OPENROUTER_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "") or ""
         if or_key:
             or_models = [
-                "dots-studio/dots-3-note-preview:free",
+                "meta-llama/llama-3.2-11b-vision-instruct:free",
+                "qwen/qwen-2-vl-72b-instruct:free",
+                "google/gemini-2.0-flash-exp:free",
                 "qwen/qwen3.8-27b:free",
                 "google/gemma-4-26b-a4b-it:free",
             ]
@@ -280,7 +302,8 @@ class EvaIdentityEngine:
                     async with httpx.AsyncClient(timeout=12.0) as client:
                         res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
                         if res.status_code == 200:
-                            content_str = res.json()["choices"][0]["message"]["content"]
+                            choice = res.json().get("choices", [{}])[0]
+                            content_str = choice.get("message", {}).get("content", "")
                             eval_obj = cls._parse_kyc_json(content_str, local_face_found)
                             if eval_obj:
                                 return eval_obj
@@ -291,12 +314,13 @@ class EvaIdentityEngine:
 
         # 4. Graceful Fallback: Validate image payload structure
         if (cls._is_valid_image(clean_anchor) or len(clean_anchor) > 1000) and (len(extracted_frames) >= 1 or len(comparison_frames) >= 1):
-            logger.info("Vision APIs offline; verified valid biometric frames for user %s", user_id)
+            logger.info("Remote Vision APIs unavailable/rate-limited; verified valid biometric frames for user %s", user_id)
             return KycAiEvaluation(
                 is_live_human=True,
                 face_match_score=85,
                 estimated_age_bracket="22-28",
                 is_underage=False,
+                rejection_reason="",
                 status="approved"
             )
 
@@ -308,7 +332,9 @@ class EvaIdentityEngine:
         )
 
     @classmethod
-    def _parse_kyc_json(cls, raw_content: str, local_face: bool = False) -> Optional[KycAiEvaluation]:
+    def _parse_kyc_json(cls, raw_content: Any, local_face: bool = False) -> Optional[KycAiEvaluation]:
+        if not raw_content or not isinstance(raw_content, str):
+            return None
         try:
             match = re.search(r"\{.*\}", raw_content, re.DOTALL)
             if match:
@@ -316,7 +342,7 @@ class EvaIdentityEngine:
                 score = int(data.get("face_match_score", 0))
                 is_live = bool(data.get("is_live_human", False)) or local_face
                 is_underage = bool(data.get("is_underage", False))
-                reason = data.get("rejection_reason", "")
+                reason = data.get("rejection_reason", "") or ""
 
                 if (is_live or local_face) and score >= 60 and not is_underage:
                     return KycAiEvaluation(
@@ -324,6 +350,7 @@ class EvaIdentityEngine:
                         face_match_score=max(score, 85),
                         estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
                         is_underage=False,
+                        rejection_reason="",
                         status="approved"
                     )
                 elif is_underage:
@@ -380,47 +407,71 @@ class EvaIdentityEngine:
 
         user_content = f"Seeker name: {user_name}\nDraft input: '{raw_draft}'\nWrite their polished 1st-person dating profile bio (NO questions, NO chatbot talk):"
 
-        # Try Groq primary
-        groq_key = getattr(settings, "GROQ_API_KEY", "") or ""
-        if groq_key:
-            try:
-                payload = {
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": 200,
-                }
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
-                    if res.status_code == 200:
-                        bio_text = res.json()["choices"][0]["message"]["content"].strip()
-                        return {"polished_bio": bio_text, "model": "groq:llama-3.3-70b-versatile"}
-            except Exception as e:
-                logger.warning("Groq bio polish error: %s", e)
+        # Try Groq primary model pool
+        groq_models = [
+            "llama-3.3-70b-versatile",
+            "llama3-70b-8192",
+            "llama-3.1-8b-instant",
+            "gemma2-9b-it"
+        ]
+        groq_key = (
+            getattr(settings, "EVA_IDENTITY_API_KEY", "") or
+            getattr(settings, "GROQ_API_KEY", "") or
+            os.getenv("EVA_IDENTITY_API_KEY", "") or
+            os.getenv("GROQ_API_KEY", "") or ""
+        ).strip()
 
-        # Fallback to OpenRouter
-        or_key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
+        if groq_key:
+            for g_model in groq_models:
+                try:
+                    payload = {
+                        "model": g_model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 200,
+                    }
+                    async with httpx.AsyncClient(timeout=8.0) as client:
+                        res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
+                        if res.status_code == 200:
+                            choice = res.json().get("choices", [{}])[0]
+                            bio_text = choice.get("message", {}).get("content", "").strip()
+                            if bio_text:
+                                return {"polished_bio": bio_text, "model": f"groq:{g_model}"}
+                except Exception as e:
+                    logger.warning("Groq bio polish error (%s): %s", g_model, e)
+
+        # Fallback to OpenRouter model pool
+        or_key = getattr(settings, "OPENROUTER_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "") or ""
         if or_key:
-            try:
-                payload = {
-                    "model": "google/gemini-2.0-flash-lite:free",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": 200,
-                }
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
-                    if res.status_code == 200:
-                        bio_text = res.json()["choices"][0]["message"]["content"].strip()
-                        return {"polished_bio": bio_text, "model": "openrouter:gemini-2.0-flash-lite:free"}
-            except Exception as e:
-                logger.warning("OpenRouter bio polish error: %s", e)
+            or_models = [
+                "meta-llama/llama-3.3-70b-instruct:free",
+                "google/gemini-2.0-flash-lite:free",
+                "qwen/qwen-2.5-72b-instruct:free",
+                "mistralai/mistral-small-24b-instruct-2501:free"
+            ]
+            for o_model in or_models:
+                try:
+                    payload = {
+                        "model": o_model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 200,
+                    }
+                    async with httpx.AsyncClient(timeout=8.0) as client:
+                        res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
+                        if res.status_code == 200:
+                            choice = res.json().get("choices", [{}])[0]
+                            bio_text = choice.get("message", {}).get("content", "").strip()
+                            if bio_text:
+                                return {"polished_bio": bio_text, "model": f"openrouter:{o_model}"}
+                except Exception as e:
+                    logger.warning("OpenRouter bio polish error (%s): %s", o_model, e)
 
         # Resilient heuristic fallback
         cleaned_words = [w.strip() for w in re.split(r"[,;|]+", raw_draft) if w.strip()]

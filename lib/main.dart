@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +20,19 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (_) {}
+
+  try {
+    final title = message.notification?.title ?? message.data['title']?.toString();
+    final body = message.notification?.body ?? message.data['body']?.toString();
+    if (title != null && title.isNotEmpty) {
+      await SanctuaryNotificationService.instance.showSystemNotification(
+        id: message.hashCode,
+        title: title,
+        body: body ?? '',
+        payload: jsonEncode(message.data),
+      );
+    }
+  } catch (_) {}
   debugPrint('[FCM BACKGROUND PUSH] ${message.messageId} title=${message.notification?.title}');
 }
 
@@ -39,6 +53,7 @@ Future<void> main() async {
   // Initialize ultra-premium outside-the-app system tray push notifications
   try {
     await SanctuaryNotificationService.instance.initialize();
+    SanctuaryNotificationService.syncStoredFcmToken();
   } catch (_) {}
 
   // Pre-resolve initial route from session storage to prevent flashes on app relaunch

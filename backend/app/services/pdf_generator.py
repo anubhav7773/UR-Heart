@@ -122,7 +122,7 @@ class StatutoryPdfGenerator:
                 Paragraph("<b>Data Fiduciary:</b>", body_style),
                 Paragraph("Asiverticals Pvt Ltd", body_style),
                 Paragraph("<b>Grievance Officer:</b>", body_style),
-                Paragraph("kshtriyaanubhav9120@gmail.com", body_style)
+                Paragraph("asiverticals@gmail.com", body_style)
             ],
             [
                 Paragraph("<b>Statutory Jurisdiction:</b>", body_style),

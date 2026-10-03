@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/services/sanctuary_notification_service.dart';
 import '../../../core/storage/secure_session_storage.dart';
 
 /// Result envelope for Google Sign-In operations
@@ -196,6 +197,7 @@ class GoogleAuthService {
       // SEC-HIGH-05: Hardware-Backed Secure Session Storage Migration
       if (idToken != null) {
         await SecureSessionStorage.instance.saveAuthToken(idToken);
+        SanctuaryNotificationService.syncStoredFcmToken(idToken);
       }
       await SecureSessionStorage.instance.saveUserSession(
         userId: userId,

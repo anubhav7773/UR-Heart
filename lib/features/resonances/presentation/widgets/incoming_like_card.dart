@@ -173,9 +173,12 @@ class IncomingLikeCard extends StatelessWidget {
                         children: [
                           Text(isDirect ? '💌' : '⚡', style: const TextStyle(fontSize: 12)),
                           const SizedBox(width: 4),
-                          Text(
-                            isDirect ? 'Open Direct Dialogue' : 'Spark Direct Connection',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          Flexible(
+                            child: Text(
+                              isDirect ? 'Direct Dialogue' : 'Spark Connection',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),

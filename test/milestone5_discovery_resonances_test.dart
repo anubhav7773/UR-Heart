@@ -12,6 +12,7 @@ import 'package:ur_heart/features/feed/presentation/widgets/out_of_swipes_modal.
 import 'package:ur_heart/features/resonances/data/resonances_repository.dart';
 import 'package:ur_heart/features/resonances/presentation/controllers/resonances_controller.dart';
 import 'package:ur_heart/features/resonances/presentation/screens/resonances_screen.dart';
+import 'package:ur_heart/features/resonances/presentation/widgets/incoming_like_card.dart';
 
 class MockFeedRepository extends FeedRepository {
   final List<CandidateProfile> _candidates = [
@@ -47,8 +48,8 @@ class MockFeedRepository extends FeedRepository {
   }
 
   @override
-  Future<int> recordSwipe({required String targetUserId, required String swipeType, String? letterText}) async {
-    return 10;
+  Future<SwipeResult> recordSwipe({required String targetUserId, required String swipeType, String? letterText}) async {
+    return const SwipeResult(swipesRemaining: 10, directLettersCount: 2);
   }
 
   @override
@@ -205,7 +206,6 @@ void main() {
 
       final feedNotifier = container.read(feedControllerProvider.notifier);
       await feedNotifier.loadDiscoveryFeed();
-      feedNotifier.setSwipesRemaining(0);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -216,6 +216,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      feedNotifier.setSwipesRemaining(0);
+      await tester.pump();
 
       expect(find.text('0 Skips Remaining'), findsOneWidget);
 
@@ -231,14 +234,11 @@ void main() {
       expect(find.textContaining('Get Sovereign Pass'), findsOneWidget);
 
       // Tap watch ad reflection to replenish +10
-      final watchAdButton = find.widgetWithText(ElevatedButton, 'Watch 10s Reflection (+10 Swipes Free)');
+      final watchAdButton = find.text('Watch 10s Reflection (+10 Swipes Free)');
       await tester.tap(watchAdButton);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
-      // Replenish quota and dismiss modal for UI assertion
-      feedNotifier.replenishSwipes(10);
-      await tester.pump();
+      // Modal is dismissed and quota replenished
 
       // Modal is dismissed and quota replenished
       expect(find.byType(OutOfSwipesModal), findsNothing);
@@ -332,7 +332,7 @@ void main() {
       expect(find.textContaining('Liked You'), findsOneWidget);
 
       // Find Chat CTA on the incoming like card
-      final chatButton = find.byType(ElevatedButton).first;
+      final chatButton = find.descendant(of: find.byType(IncomingLikeCard), matching: find.byType(ElevatedButton)).first;
       expect(chatButton, findsOneWidget);
 
       await tester.tap(chatButton);

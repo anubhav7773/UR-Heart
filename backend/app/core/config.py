@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_API_URL: str = "https://openrouter.ai/api/v1/chat/completions"
 
+    # Eva Dual Dedicated Channels (Channel 1: Identity/KYC, Channel 2: Companion/Sparks)
+    EVA_IDENTITY_API_KEY: str = ""
+    EVA_COMPANION_API_KEY: str = ""
+
     # Firebase Admin & Storage
     FIREBASE_PROJECT_ID: str = "ur-heart-44b46"
     FIREBASE_STORAGE_BUCKET: str = "ur-heart-44b46.firebasestorage.app"
@@ -62,7 +66,8 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str = "stripe_webhook_secret_sanctuary_2026"
 
     # Superadmin Sentinel Gate
-    SUPERADMIN_EMAIL: str = "kshtriyaanubhav9120@gmail.com"
+    SUPERADMIN_EMAIL: str = "asiverticals@gmail.com"
+    SUPERADMIN_SECRET_KEY: str = "asiverticals_sovereign_sanctuary_2026"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "backend/.env", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")),

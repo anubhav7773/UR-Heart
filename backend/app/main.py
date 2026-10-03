@@ -24,6 +24,7 @@ from typing import List
 from app.core.config import get_settings, validate_production_env
 from app.core.exceptions import SanctuaryException
 from app.core.limiter import limiter
+from app.templates.admin_portal import get_admin_portal_html
 
 settings = get_settings()
 
@@ -1177,6 +1178,16 @@ async def sanctuary_appinfo_overview(request: Request):
     Primary destination for in-app statutory portal links and browser seekers.
     """
     return HTMLResponse(content=get_sanctuary_overview_html(), status_code=200)
+
+
+@app.get("/admin", response_class=HTMLResponse, tags=["Superadmin Portal"])
+@app.get("/admin/portal", response_class=HTMLResponse, tags=["Superadmin Portal"])
+async def sanctuary_admin_portal(request: Request):
+    """
+    Dedicated Zero-Trust Web Admin Portal (SEC-HIGH-01).
+    Exclusively authorized for sovereign administrator asiverticals@gmail.com.
+    """
+    return HTMLResponse(content=get_admin_portal_html(), status_code=200)
 
 
 @app.api_route("/", methods=["GET", "HEAD"], tags=["Render Health"])

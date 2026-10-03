@@ -76,7 +76,7 @@ class SettingsController extends StateNotifier<SettingsState> {
           prefs.getString('profile_email') ??
           prefs.getString('email') ??
           '';
-      final isSuper = savedEmail.trim().toLowerCase() == 'kshtriyaanubhav9120@gmail.com';
+      final isSuper = savedEmail.trim().toLowerCase() == 'asiverticals@gmail.com';
       final savedRole = prefs.getString('user_role') ?? (isSuper ? 'superadmin' : null);
 
       if (savedEmail.isNotEmpty || savedRole != null) {
@@ -93,7 +93,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   void setUserEmail(String email) {
     final clean = email.trim().toLowerCase();
-    final isSuper = clean == 'kshtriyaanubhav9120@gmail.com';
+    final isSuper = clean == 'asiverticals@gmail.com';
     _repo.setUserEmail(email);
     state = state.copyWith(
       settings: state.settings.copyWith(

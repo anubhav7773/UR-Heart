@@ -29,6 +29,7 @@ def _dispatch_fcm_push(fcm_token: str, title: str, body: str, data: Optional[Dic
         from app.services.firebase_auth_service import FirebaseAuthService
         app = FirebaseAuthService.get_app()
         if not app:
+            logger.info("[FCM PUSH NOTICE] Firebase Admin App not initialized; skipping outside-app push.")
             return
 
         from firebase_admin import messaging
@@ -150,14 +151,21 @@ def push_notification(
                     if token_in_db:
                         USER_FCM_TOKENS[user_key] = token_in_db
                         _dispatch_fcm_push(token_in_db, title, body, data)
-            except Exception:
-                pass
+                    else:
+                        logger.info("[FCM PUSH NOTICE] No device token registered in DB for user %s", user_key)
+            except Exception as db_err:
+                logger.warning("[FCM DB CHECK ERROR] user=%s err=%s", user_key, db_err)
+
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(_check_db_and_push())
-        except Exception:
-            pass
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            loop.create_task(_check_db_and_push())
+        else:
+            import threading
+            threading.Thread(target=lambda: asyncio.run(_check_db_and_push()), daemon=True).start()
 
 
 class RegisterTokenRequest(BaseModel):

@@ -11,14 +11,14 @@ from app.models.domain.user import User
 async def test_admin_kyc_security_check():
     """
     Superadmin Security Gate Test:
-    Ensures that authenticated users WITHOUT kshtriyaanubhav9120@gmail.com receive HTTP 403 Forbidden.
+    Ensures that authenticated users WITHOUT asiverticals@gmail.com receive HTTP 403 Forbidden.
     """
-    # 1. Non-admin user simulation
+    # 1. Non-admin user simulation (including previously old admin email)
     fake_user = User(
         id=uuid.uuid4(),
         auth_id=uuid.uuid4(),
         full_name="Regular User",
-        email="regular_user@example.com"
+        email="kshtriyaanubhav9120@gmail.com"
     )
 
     async def mock_get_current_user_non_admin():
@@ -40,8 +40,8 @@ async def test_admin_kyc_security_check():
     superadmin_user = User(
         id=uuid.uuid4(),
         auth_id=uuid.uuid4(),
-        full_name="Kshtriya Anubhav",
-        email="kshtriyaanubhav9120@gmail.com"
+        full_name="Asi Verticals Sovereign",
+        email="asiverticals@gmail.com"
     )
 
     async def mock_get_current_user_admin():
@@ -215,3 +215,153 @@ async def test_ad_claim_reward_whatsapp_reveal_cycle():
         assert data3["reveal_tokens_count"] == 1
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_web_admin_portal_html_routes():
+    """
+    Dedicated Web Admin URL Verification:
+    Ensures /admin and /admin/portal render the luxury sovereign admin portal,
+    strictly locking to asiverticals@gmail.com with zero leaks of legacy credentials.
+    """
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res1 = await client.get("/admin")
+        assert res1.status_code == 200
+        assert "text/html" in res1.headers["content-type"]
+        assert "asiverticals@gmail.com" in res1.text
+        assert "kshtriyaanubhav9120@gmail.com" not in res1.text
+        assert "UR-Heart Sovereign Command" in res1.text
+
+        res2 = await client.get("/admin/portal")
+        assert res2.status_code == 200
+        assert "asiverticals@gmail.com" in res2.text
+
+
+@pytest.mark.asyncio
+async def test_admin_portal_security_and_operations():
+    """
+    Superadmin Portal Operations Gate:
+    1. Rejects non-admin / legacy email (kshtriyaanubhav9120@gmail.com) with 403 Forbidden.
+    2. Allows asiverticals@gmail.com to access stats, users, config, and audit logs.
+    """
+    # 1. Non-admin test
+    unauth_user = User(
+        id=uuid.uuid4(),
+        auth_id=uuid.uuid4(),
+        full_name="Former Admin",
+        email="kshtriyaanubhav9120@gmail.com"
+    )
+    app.dependency_overrides[get_current_user] = lambda: unauth_user
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res_fail = await client.get("/api/v1/admin/portal/stats")
+        assert res_fail.status_code == 403
+        assert "Sanctuary Sovereign privileges" in res_fail.json().get("message", "")
+
+    # 2. Authorized asiverticals@gmail.com Superadmin test
+    sovereign_admin = User(
+        id=uuid.uuid4(),
+        auth_id=uuid.uuid4(),
+        full_name="Asi Verticals Sovereign",
+        email="asiverticals@gmail.com"
+    )
+
+    async def mock_db():
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = 10
+        mock_result.scalars.return_value.all.return_value = []
+        mock_session.execute.return_value = mock_result
+        mock_session.commit = AsyncMock()
+        yield mock_session
+
+    app.dependency_overrides[get_current_user] = lambda: sovereign_admin
+    app.dependency_overrides[get_db] = mock_db
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # A. Stats
+        res_stats = await client.get("/api/v1/admin/portal/stats")
+        assert res_stats.status_code == 200
+        stats = res_stats.json()
+        assert stats["superadmin"] == "asiverticals@gmail.com"
+        assert stats["status"] == "healthy"
+
+        # B. Users
+        res_users = await client.get("/api/v1/admin/portal/users")
+        assert res_users.status_code == 200
+        assert isinstance(res_users.json(), list)
+
+        # C. Config Read
+        res_cfg = await client.get("/api/v1/admin/portal/config")
+        assert res_cfg.status_code == 200
+        assert res_cfg.json()["superadmin_email"] == "asiverticals@gmail.com"
+
+        # D. Config Update
+        res_cfg_up = await client.put(
+            "/api/v1/admin/portal/config",
+            json={"config": {"maintenance_mode": False, "strict_ai_moderation": True}}
+        )
+        assert res_cfg_up.status_code == 200
+        assert res_cfg_up.json()["status"] == "success"
+
+        # E. Audit Logs
+        res_audit = await client.get("/api/v1/admin/portal/audit-logs")
+        assert res_audit.status_code == 200
+        assert isinstance(res_audit.json(), list)
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_admin_portal_sovereign_login():
+    """
+    Direct Sovereign Master Key Login Gate Test:
+    1. Forbids non-superadmin emails (403 Forbidden).
+    2. Rejects invalid secret keys (401 Unauthorized).
+    3. Issues 7-day signed JWT access token for asiverticals@gmail.com with correct key.
+    """
+    transport = ASGITransport(app=app)
+
+    async def mock_db():
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
+        mock_session.commit = AsyncMock()
+        mock_session.refresh = AsyncMock()
+        yield mock_session
+
+    from app.core.database import get_db
+    app.dependency_overrides[get_db] = mock_db
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Invalid email attempt
+        res_wrong_email = await client.post(
+            "/api/v1/admin/portal/auth/login",
+            json={"email": "kshtriyaanubhav9120@gmail.com", "secret_key": "asiverticals_sovereign_sanctuary_2026"}
+        )
+        assert res_wrong_email.status_code == 403
+
+        # 2. Invalid secret key attempt
+        res_wrong_key = await client.post(
+            "/api/v1/admin/portal/auth/login",
+            json={"email": "asiverticals@gmail.com", "secret_key": "wrong_key_attempt"}
+        )
+        assert res_wrong_key.status_code == 401
+
+        # 3. Successful Sovereign login
+        res_success = await client.post(
+            "/api/v1/admin/portal/auth/login",
+            json={"email": "asiverticals@gmail.com", "secret_key": "asiverticals_sovereign_sanctuary_2026"}
+        )
+        assert res_success.status_code == 200
+        data = res_success.json()
+        assert data["status"] == "success"
+        assert "access_token" in data
+        assert data["role"] == "superadmin"
+        assert data["email"] == "asiverticals@gmail.com"
+
+    app.dependency_overrides.clear()
+

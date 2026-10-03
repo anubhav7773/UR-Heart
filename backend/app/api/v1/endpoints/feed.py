@@ -13,6 +13,7 @@ from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
 from app.models.domain.legal import BlockedUser
 from app.services.streak_engine import StreakEngine
+from app.services.resonance_engine import ResonanceEngine
 
 router = APIRouter(tags=["Discovery Feed & Swipes"])
 
@@ -116,19 +117,30 @@ async def get_discovery_feed(
         primary_avatar = u.avatar_url.strip() if (u.avatar_url and u.avatar_url.strip()) else (clean_photos[0] if clean_photos else "")
 
         age = _calculate_age(u.dob)
+        score, insight, authentic_tags = ResonanceEngine.calculate_mutual_resonance(current_user, u)
+        dist_km = ResonanceEngine.compute_distance(current_user, u)
+
+        cand_bio = u.bio.strip() if (u.bio and u.bio.strip()) else "Mindful seeker walking an intentional path."
+        cand_intention = u.bio.strip() if (u.bio and u.bio.strip()) else "Seeking slow, thoughtful connection in the sanctuary."
+
         cards.append({
             "id": str(u.id),
             "full_name": u.full_name,
             "age": age,
             "gender": u.gender,
+            "profession": u.profession or "Mindful Seeker",
+            "education": u.education or "",
             "looking_for": u.interested_in or "Men",
             "location_name": u.location_name or "Saket, Ayodhya",
-            "distance_km": 2.5,
-            "resonance_score": 92 + (int(u.id.int % 7) if hasattr(u.id, "int") else 3),
-            "bio": u.bio or "Mindful seeker cultivating authentic connection.",
-            "ai_resonance_insight": "Shared reverence for depth, patience, and authentic conversation.",
-            "authentic_intention": u.bio or "Looking for an intentional sanctuary.",
-            "tags": [u.profession, "Mindfulness", "Slow Living"] if u.profession else ["Mindfulness", "Art & Literature", "Stillness"],
+            "distance_km": dist_km,
+            "resonance_score": score,
+            "ai_insight": insight,
+            "ai_resonance_insight": insight,
+            "bio": cand_bio,
+            "authentic_intention": cand_intention,
+            "intent_quote": cand_intention,
+            "interests": authentic_tags,
+            "tags": authentic_tags,
             "avatar_url": primary_avatar,
             "avatar": primary_avatar,
             "photos": clean_photos,
@@ -367,7 +379,8 @@ async def record_swipe(
         "swipe_type": payload.swipe_type,
         "is_match": is_match,
         "match_id": match_id,
-        "swipes_remaining": current_user.swipes_remaining if current_user else 24
+        "swipes_remaining": current_user.swipes_remaining if current_user else 24,
+        "direct_letters_count": current_user.direct_letters_count if (current_user and current_user.direct_letters_count is not None) else 0,
     }
 
 

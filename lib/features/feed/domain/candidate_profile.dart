@@ -8,6 +8,7 @@ class CandidateProfile {
   final String locationName;
   final double distanceKm;
   final int resonanceScore;
+  final String aiInsight;
   final String intentQuote;
   final List<String> interests;
   final String avatarUrl;
@@ -25,6 +26,7 @@ class CandidateProfile {
     required this.locationName,
     required this.distanceKm,
     required this.resonanceScore,
+    this.aiInsight = 'A shared reverence for quiet reflection connects your paths.',
     required this.intentQuote,
     required this.interests,
     this.avatarUrl = '',
@@ -63,8 +65,9 @@ class CandidateProfile {
       locationName: json['location_name'] as String? ?? json['location'] as String? ?? 'Ayodhya, UP',
       distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 1.5,
       resonanceScore: json['resonance_score'] as int? ?? 90,
-      intentQuote: json['intent_quote'] as String? ?? json['bio'] as String? ?? 'Authentic Intention: Seeking slow conversations.',
-      interests: List<String>.from(json['interests'] as List? ?? ['Architecture', 'Tea']),
+      aiInsight: json['ai_insight'] as String? ?? json['ai_resonance_insight'] as String? ?? 'A shared reverence for quiet reflection connects your paths.',
+      intentQuote: json['intent_quote'] as String? ?? json['authentic_intention'] as String? ?? json['bio'] as String? ?? 'Authentic Intention: Seeking slow conversations.',
+      interests: List<String>.from(json['interests'] as List? ?? json['tags'] as List? ?? ['Mindfulness', 'Presence']),
       avatarUrl: resolvedAvatar,
       photoUrls: allPhotos,
       blurHashes: List<String>.from(json['blur_hashes'] as List? ?? ['L6PZfSi_.AyE_3t7t7R**0o#DgR4']),
@@ -82,6 +85,7 @@ class CandidateProfile {
     String? locationName,
     double? distanceKm,
     int? resonanceScore,
+    String? aiInsight,
     String? intentQuote,
     List<String>? interests,
     String? avatarUrl,
@@ -99,6 +103,7 @@ class CandidateProfile {
       locationName: locationName ?? this.locationName,
       distanceKm: distanceKm ?? this.distanceKm,
       resonanceScore: resonanceScore ?? this.resonanceScore,
+      aiInsight: aiInsight ?? this.aiInsight,
       intentQuote: intentQuote ?? this.intentQuote,
       interests: interests ?? this.interests,
       avatarUrl: avatarUrl ?? this.avatarUrl,
@@ -118,10 +123,13 @@ class CandidateProfile {
     'location_name': locationName,
     'distance_km': distanceKm,
     'resonance_score': resonanceScore,
-    'ai_insight': intentQuote,
+    'ai_insight': aiInsight,
+    'ai_resonance_insight': aiInsight,
     'intent_quote': intentQuote,
+    'authentic_intention': intentQuote,
     'bio': intentQuote,
     'interests': interests,
+    'tags': interests,
     'avatar_url': avatarUrl.isNotEmpty ? avatarUrl : (photoUrls.isNotEmpty ? photoUrls.first : ''),
     'avatar': avatarUrl.isNotEmpty ? avatarUrl : (photoUrls.isNotEmpty ? photoUrls.first : ''),
     'photos': photoUrls,
@@ -140,6 +148,7 @@ class CandidateProfile {
     bool targetIsIncognito = false,
   }) {
     if (targetIsIncognito) return false;
+    if (userGender.trim().isEmpty) return true;
 
     final normTargetGender = _normalizeGender(targetGender);
     final normUserGender = _normalizeGender(userGender);

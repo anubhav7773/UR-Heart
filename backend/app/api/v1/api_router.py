@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     account_incinerator,
     admin_kyc,
+    admin_portal,
     ads_ssv,
     ai_cluster,
     auth,
@@ -42,8 +43,9 @@ api_router.include_router(moderation.router)
 # 3. 360° AI Suite Router (Icebreakers, Bio Polish, Vision KYC)
 api_router.include_router(ai_cluster.router)
 
-# 4. Superadmin KYC Sentinel Desk
+# 4. Superadmin KYC Sentinel Desk & Management Portal
 api_router.include_router(admin_kyc.router)
+api_router.include_router(admin_portal.router)
 
 # 5. Ad SSV Verifier Router
 api_router.include_router(ads_ssv.router)

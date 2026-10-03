@@ -16,9 +16,10 @@ from app.services.kyc_purge import purge_ephemeral_kyc_video
 router = APIRouter(prefix="/admin/kyc", tags=["Superadmin KYC Sentinel"])
 settings = get_settings()
 def get_admin_emails() -> set[str]:
-    emails = {"asiverticals@gmail.com", "kshtriyaanubhav9120@gmail.com"}
+    emails = {"asiverticals@gmail.com"}
     if getattr(settings, "SUPERADMIN_EMAIL", None):
         emails.add(settings.SUPERADMIN_EMAIL.strip().lower())
+    emails.discard("")
     return emails
 
 
@@ -59,7 +60,7 @@ async def list_pending_escalations(
 ):
     """
     Lists pending KYC escalations for human Sentinel review.
-    Strictly locked to kshtriyaanubhav9120@gmail.com.
+    Strictly locked to asiverticals@gmail.com.
     """
     stmt = (
         select(AdminKycEscalation)

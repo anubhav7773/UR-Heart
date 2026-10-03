@@ -208,7 +208,7 @@ class AuthRepository {
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
         }
 
-        final isSuperadmin = (cleanEmail == 'kshtriyaanubhav9120@gmail.com');
+        final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com');
         await SecureSessionStorage.instance.saveUserSession(
           userId: userId,
           email: cleanEmail,
@@ -304,7 +304,7 @@ class AuthRepository {
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
           final matchedEmail = data['email']?.toString() ?? cleanEmail;
-          final isSuperadmin = (matchedEmail?.toLowerCase().trim() == 'kshtriyaanubhav9120@gmail.com');
+          final isSuperadmin = (matchedEmail?.toLowerCase().trim() == 'asiverticals@gmail.com');
           final isCompleted = data['is_profile_completed'] == true;
           await SecureSessionStorage.instance.saveUserSession(
             userId: data['user_id']?.toString() ?? data['id']?.toString(),
@@ -369,7 +369,7 @@ class AuthRepository {
             // SEC-HIGH-05: Hardware-Backed Secure Session Storage
             await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
-            final isSuperadmin = (cleanEmail == 'kshtriyaanubhav9120@gmail.com');
+            final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com');
             final isCompleted = data['is_profile_completed'] == true;
             await SecureSessionStorage.instance.saveUserSession(
               userId: data['user_id']?.toString() ?? data['id']?.toString(),

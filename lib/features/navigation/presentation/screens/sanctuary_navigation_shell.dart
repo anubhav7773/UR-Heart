@@ -15,6 +15,7 @@ import '../../../resonances/presentation/screens/resonances_screen.dart';
 import '../../../rewards/presentation/screens/growth_hub_screen.dart';
 import '../../../ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
 import '../../../../core/services/sanctuary_notification_service.dart';
+import '../../../../core/storage/secure_session_storage.dart';
 import '../widgets/whatsapp_notification_banner.dart';
 import '../widgets/ios_pwa_install_banner.dart';
 
@@ -66,7 +67,10 @@ class _SanctuaryNavigationShellState
       final storedSeen = prefs.getStringList('sanctuary_seen_notification_ids') ?? [];
       _seenNotificationIds.addAll(storedSeen);
 
-      final authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+      final secureToken = await SecureSessionStorage.instance.getAuthToken();
+      final authToken = (secureToken != null && secureToken.isNotEmpty)
+          ? secureToken
+          : (prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token'));
       if (authToken != null && authToken.isNotEmpty) {
         SanctuaryNotificationService.syncStoredFcmToken(authToken);
       }
@@ -209,11 +213,37 @@ class _SanctuaryNavigationShellState
           matchId: mId,
           senderId: sId,
         );
-      } else if (nType.contains('streak')) {
+      } else if (nType == 'streak_claimed' ||
+          nType.contains('claimed') ||
+          nType.contains('secured')) {
         final streakVal = nData['streak_count'] as int? ?? 1;
+        final boostVal = nData['boost_points'] as int?;
+        SanctuaryNotificationService.instance.showStreakSecuredNotification(
+          streakCount: streakVal,
+          title: nTitle.isNotEmpty ? nTitle : '🔥 Day $streakVal Streak Secured!',
+          body: nBody.isNotEmpty
+              ? nBody
+              : 'You earned +1 Boost Point! Your profile is prioritized at the top of the discovery deck for 24 hours.',
+          boostPoints: boostVal,
+        );
+      } else if (nType == 'streak_broken' || nType.contains('broken')) {
+        SanctuaryNotificationService.instance.showSystemNotification(
+          id: (notifId ?? 'notif').hashCode,
+          title: nTitle.isNotEmpty ? nTitle : '🥀 Streak Broken & Downgraded',
+          body: nBody.isNotEmpty
+              ? nBody
+              : 'Your sanctuary streak expired. Take a reflection to resurrect your presence.',
+          subText: 'Sanctuary Growth',
+        );
+      } else if (nType.contains('streak') || nType.contains('expir')) {
+        final streakVal = nData['streak_count'] as int? ?? 1;
+        final hoursVal =
+            nData['hours_left'] as int? ?? nData['hours_remaining'] as int? ?? 4;
         SanctuaryNotificationService.instance.showStreakAlertNotification(
           streakCount: streakVal,
-          hoursRemaining: 6,
+          hoursRemaining: hoursVal,
+          title: nTitle.isNotEmpty ? nTitle : null,
+          body: nBody.isNotEmpty ? nBody : null,
         );
       } else if (nType.contains('pass')) {
         final aName = nData['sender_name']?.toString() ??

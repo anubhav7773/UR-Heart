@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -188,18 +187,14 @@ class FeedScreen extends ConsumerWidget {
                   final growthLetters = ref.read(growthHubControllerProvider).directLetters;
                   final prefs = await SharedPreferences.getInstance();
                   final cachedLetters = prefs.getInt('ur_heart_direct_letters') ?? 0;
-                  final effectiveLetters = math.max(
-                    feedState.directLettersCount,
-                    math.max(growthLetters, cachedLetters),
-                  );
+                  final effectiveLetters = feedState.directLettersCount > 0
+                      ? feedState.directLettersCount
+                      : (growthLetters > 0 ? growthLetters : cachedLetters);
                   if (effectiveLetters <= 0) {
                     if (context.mounted) {
                       _showOutOfDirectLetters(context, ref);
                     }
                   } else {
-                    if (feedState.directLettersCount < effectiveLetters) {
-                      feedNotifier.setDirectLettersCount(effectiveLetters);
-                    }
                     if (context.mounted) {
                       _openDirectLetterModal(context, current, feedNotifier, isDark, ref);
                     }

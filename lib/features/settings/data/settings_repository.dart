@@ -31,7 +31,12 @@ class SettingsRepository {
   SanctuarySettings getSettings() => _settings;
 
   void setUserEmail(String email) {
-    _settings = _settings.copyWith(userEmail: email);
+    final clean = email.trim().toLowerCase();
+    final isSuper = clean == 'asiverticals@gmail.com';
+    _settings = _settings.copyWith(
+      userEmail: email,
+      userRole: isSuper ? 'superadmin' : 'user',
+    );
   }
 
   /// Persists incognito, discreet mode & alerts directly to database

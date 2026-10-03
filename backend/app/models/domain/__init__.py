@@ -14,6 +14,7 @@ from app.models.domain.legal import (
     UnderageQuarantineRegistry,
     ConsentAuditLog,
 )
+from app.models.domain.audit_log import AdminAuditLog
 
 __all__ = [
     "User",
@@ -30,4 +31,5 @@ __all__ = [
     "GrievanceDossier",
     "UnderageQuarantineRegistry",
     "ConsentAuditLog",
+    "AdminAuditLog",
 ]

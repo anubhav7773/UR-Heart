@@ -40,7 +40,7 @@ class IncomingLikeProfile {
         (json['swipe_type']?.toString().toLowerCase() == 'direct');
     return IncomingLikeProfile(
       id: json['id'] as String? ?? 'like_${DateTime.now().millisecondsSinceEpoch}',
-      senderId: json['sender_id'] as String? ?? json['user_id'] as String? ?? '',
+      senderId: json['sender_id'] as String? ?? json['user_id'] as String? ?? json['actor_id'] as String? ?? '',
       fullName: json['full_name'] as String? ?? json['name'] as String? ?? 'Seeker',
       age: json['age'] as int? ?? 24,
       photoUrl: json['photo_url'] as String? ??

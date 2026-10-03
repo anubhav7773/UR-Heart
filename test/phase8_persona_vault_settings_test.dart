@@ -9,7 +9,6 @@ import 'package:ur_heart/features/legal_vault/data/vault_repository.dart';
 import 'package:ur_heart/features/legal_vault/presentation/screens/vault_legal_screen.dart';
 import 'package:ur_heart/features/settings/data/settings_repository.dart';
 import 'package:ur_heart/features/settings/presentation/screens/sanctuary_settings_screen.dart';
-import 'package:ur_heart/features/settings/presentation/widgets/superadmin_sentinel_tile.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -193,16 +192,16 @@ void main() {
       await tester.pumpWidget(createTestApp(const SanctuarySettingsScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('👑 Superadmin KYC Sentinel'), findsNothing);
-      expect(find.byType(SuperadminSentinelTile), findsOneWidget);
-      expect(find.byIcon(Icons.admin_panel_settings_rounded), findsNothing);
+      expect(find.text('SOVEREIGN SENTINEL DESK'), findsNothing);
+      expect(find.text('Open KYC Escalation Desk ➔'), findsNothing);
+      expect(find.byIcon(Icons.admin_panel_settings), findsNothing);
     });
 
-    testWidgets('kshtriyaanubhav9120@gmail.com exclusively renders Gold Sentinel Tile',
+    testWidgets('asiverticals@gmail.com exclusively renders Gold Sentinel Tile',
         (tester) async {
       setMobileScreen(tester);
       final repo = SettingsRepository();
-      repo.setUserEmail('kshtriyaanubhav9120@gmail.com');
+      repo.setUserEmail('asiverticals@gmail.com');
 
       await tester.pumpWidget(
         ProviderScope(
@@ -219,10 +218,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('👑 Superadmin KYC Sentinel'), findsOneWidget);
-      expect(find.byIcon(Icons.admin_panel_settings_rounded), findsOneWidget);
+      expect(find.text('SOVEREIGN SENTINEL DESK'), findsOneWidget);
+      expect(find.text('Open KYC Escalation Desk ➔'), findsOneWidget);
+      expect(find.byIcon(Icons.admin_panel_settings), findsOneWidget);
 
-      await tester.tap(find.text('👑 Superadmin KYC Sentinel'));
+      await tester.tap(find.text('Open KYC Escalation Desk ➔'));
       await tester.pumpAndSettle();
 
       expect(find.text('Admin KYC Desk'), findsOneWidget);

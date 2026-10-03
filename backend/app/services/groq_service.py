@@ -24,7 +24,7 @@ class KycAiEvaluation(BaseModel):
     face_match_score: int = Field(default=0, ge=0, le=100)
     estimated_age_bracket: str = Field(default="unknown")
     is_underage: bool = Field(default=True)
-    rejection_reason: str = Field(default="")
+    rejection_reason: Optional[str] = Field(default="")
     status: str = Field(default="pending_manual_review")
 
 
@@ -243,7 +243,7 @@ class GroqAiService:
             face_match_score=eval_result.face_match_score,
             estimated_age_bracket=eval_result.estimated_age_bracket,
             is_underage=eval_result.is_underage,
-            rejection_reason=eval_result.rejection_reason,
+            rejection_reason=eval_result.rejection_reason or "",
             status=eval_result.status
         )
 

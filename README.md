@@ -203,7 +203,7 @@ UR-Heart conforms to enterprise-grade security standards and statutory digital p
    - Explicit informed consent gate prior to account creation.
    - Comprehensive Privacy Policy at `https://urheart.asiverticals.me/privacy`.
    - Web-accessible Account Incinerator at `https://urheart.asiverticals.me/delete-account`.
-   - Dedicated Statutory Grievance Officer: Anubhav Singh (`kshtriyaanubhav9120@gmail.com`).
+   - Dedicated Statutory Grievance Officer: Anubhav Singh (`asiverticals@gmail.com`).
 2. **Zero Hardcoded Secrets**:
    - Zero production API keys, database passwords, or JWT secrets reside in the codebase.
    - Externalized environment variables through `.env` and Render dashboard.

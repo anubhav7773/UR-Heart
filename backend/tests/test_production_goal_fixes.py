@@ -220,7 +220,7 @@ def test_web_sanctuary_store_flow():
     from app.core.security import require_superadmin
     from app.models.domain.user import User
     import uuid
-    admin_user = User(id=uuid.uuid4(), email="kshtriyaanubhav9120@gmail.com", full_name="Anubhav Singh")
+    admin_user = User(id=uuid.uuid4(), email="asiverticals@gmail.com", full_name="Anubhav Singh")
     app.dependency_overrides[require_superadmin] = lambda: admin_user
     try:
         res_approve = client.post(f"/api/v1/store/orders/{order_id}/approve")

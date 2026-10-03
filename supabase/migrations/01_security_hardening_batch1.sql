@@ -12,7 +12,7 @@ CHECK (role IN ('user', 'moderator', 'superadmin'));
 UPDATE public.users 
 SET role = 'superadmin' 
 WHERE auth_id IN (
-    SELECT id FROM auth.users WHERE email = 'kshtriyaanubhav9120@gmail.com'
+    SELECT id FROM auth.users WHERE email = 'asiverticals@gmail.com'
 );
 
 -- ============================================================================

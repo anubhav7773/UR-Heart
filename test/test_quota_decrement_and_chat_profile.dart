@@ -27,7 +27,7 @@ class FakeFeedRepository implements FeedRepository {
           fullName: 'Priya',
           age: 24,
           gender: 'Female',
-          lookingFor: 'Long-term',
+          lookingFor: 'Everyone',
           locationName: 'Delhi',
           distanceKm: 5.0,
           resonanceScore: 90,
@@ -50,7 +50,7 @@ class FakeFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<int> recordSwipe({
+  Future<SwipeResult> recordSwipe({
     required String targetUserId,
     required String swipeType,
     String? letterText,
@@ -58,7 +58,10 @@ class FakeFeedRepository implements FeedRepository {
     if (swipeType == 'direct' && serverDirectLetters > 0) {
       serverDirectLetters--;
     }
-    return serverSwipesRemaining;
+    return SwipeResult(
+      swipesRemaining: serverSwipesRemaining,
+      directLettersCount: serverDirectLetters,
+    );
   }
 
   @override

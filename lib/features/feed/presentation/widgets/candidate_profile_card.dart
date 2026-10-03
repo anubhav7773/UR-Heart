@@ -148,17 +148,20 @@ class _CandidateProfileCardState extends State<CandidateProfileCard> {
                               AiResonanceInsightBox(
                                 isDark: widget.isDark,
                                 insightText: widget.candidate['ai_insight'] as String? ??
-                                    widget.candidate['intent_quote'] as String? ??
-                                    'A shared reverence for quiet reflection and literature connects your paths.',
-                                resonanceScore: widget.candidate['resonance_score'] as int? ?? 94,
+                                    widget.candidate['ai_resonance_insight'] as String? ??
+                                    'A shared reverence for quiet reflection and intentional connection connects your paths.',
+                                resonanceScore: (widget.candidate['resonance_score'] as num?)?.toInt() ?? 90,
                               ),
                               const SizedBox(height: 16),
                               MindfulIntentCard(
                                 isDark: widget.isDark,
-                                bio: widget.candidate['bio'] as String? ??
+                                bio: widget.candidate['authentic_intention'] as String? ??
+                                    widget.candidate['bio'] as String? ??
                                     widget.candidate['intent_quote'] as String? ??
                                     '',
-                                interestTags: (widget.candidate['interests'] as List<dynamic>?)?.cast<String>() ?? [],
+                                interestTags: (widget.candidate['interests'] as List<dynamic>?)?.cast<String>() ??
+                                    (widget.candidate['tags'] as List<dynamic>?)?.cast<String>() ??
+                                    [],
                               ),
                             ],
                           ),

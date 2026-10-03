@@ -82,6 +82,9 @@ _OUT_OF_DOMAIN_PATTERNS = [
     # Hacking / Reverse Engineering / Exploits
     r"\b(hack|hacker|hacking|crack|cracker|cracking|exploit|bypass|ddos|phishing|malware|reverse\s+engineer|sqli|xss|penetration\s+test|payload|trojan|ransomware)\b",
     r"\bhow\s+to\s+(hack|crack|break\s+into|steal|spy)\b",
+    # Politics / Elections / Government
+    r"\b(election|elections|politics|political|politician|parliament|congress|bjp|democrat|republican)\b",
+    r"\b(vote\s+for|who\s+to\s+vote|who\s+will\s+win|upcoming\s+election)\b",
     # General trivia / school / unrelated
     r"\b(solve\s+.*equation|integral|derivative|calculus|math\s+problem|quantum\s+physics)\b",
     r"\bwho\s+is\s+the\s+(president|prime\s+minister|king|queen)\s+of\b",

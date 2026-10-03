@@ -19,6 +19,7 @@ import '../../features/settings/presentation/screens/superadmin_kyc_desk_screen.
 import '../../features/rewards/presentation/screens/growth_hub_screen.dart';
 import '../../features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
 import '../../features/ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
+import '../../features/profile/presentation/screens/seeker_profile_detail_screen.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
 import '../theme/theme_controller.dart';
@@ -74,6 +75,7 @@ class URHeartApp extends ConsumerWidget {
         SuperadminKycDeskScreen.routeName: (context) => const SuperadminKycDeskScreen(),
         EvaSanctuaryScreen.routeName: (context) => const EvaSanctuaryScreen(),
         SanctuaryAppInfoScreen.routeName: (context) => const SanctuaryAppInfoScreen(),
+        SeekerProfileDetailScreen.routeName: (context) => const SeekerProfileDetailScreen(),
       },
       onGenerateRoute: (settings) {
         final routeName = settings.name ?? '';

@@ -26,7 +26,9 @@ services:
       - key: FIREBASE_STORAGE_BUCKET
         value: ur-heart-44b46.firebasestorage.app
       - key: SUPERADMIN_EMAIL
-        value: kshtriyaanubhav9120@gmail.com
+        value: asiverticals@gmail.com
+      - key: SUPERADMIN_SECRET_KEY
+        value: asiverticals_sovereign_sanctuary_2026
       - key: META_AUDIENCE_SSV_SECRET
         value: meta_ssv_secret_sanctuary_2026
       - key: UNITY_ADS_SSV_SECRET

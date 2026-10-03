@@ -264,8 +264,8 @@ async def require_superadmin(
         (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower(),
         (os.getenv("SUPERADMIN_EMAIL") or "").strip().lower(),
         "asiverticals@gmail.com",
-        "kshtriyaanubhav9120@gmail.com",
     }
+    admin_whitelist.discard("")
     
     # Check both verified email and database role claim
     user_email = (getattr(current_user, "email", "") or "").strip().lower()

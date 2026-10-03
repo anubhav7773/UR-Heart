@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../app/ur_heart_app.dart';
+import '../constants/api_endpoints.dart';
+import '../storage/secure_session_storage.dart';
 import '../../features/chat/presentation/services/web_security_stub.dart'
     if (dart.library.js_interop) '../../features/chat/presentation/services/web_security_web.dart';
 
@@ -126,14 +128,16 @@ class SanctuaryNotificationService {
   }
 
   _isInitialized = true;
-  debugPrint('[NOTIFICATIONS] SanctuaryNotificationService initialized successfully.');
 }
 
   static Future<void> _registerFcmTokenWithBackend(String token) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ur_heart_fcm_token', token);
-      final authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+      final secureToken = await SecureSessionStorage.instance.getAuthToken();
+      final authToken = (secureToken != null && secureToken.isNotEmpty)
+          ? secureToken
+          : (prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token'));
       if (authToken != null && authToken.isNotEmpty) {
         await _dispatchTokenToBackend(token, authToken);
         debugPrint('[FCM REGISTER] Token registered with backend successfully.');
@@ -143,11 +147,33 @@ class SanctuaryNotificationService {
     }
   }
 
-  static void syncStoredFcmToken(String authToken) {
-    SharedPreferences.getInstance().then((prefs) {
-      final token = prefs.getString('ur_heart_fcm_token');
-      if (token != null && token.isNotEmpty) {
-        _dispatchTokenToBackend(token, authToken).ignore();
+  static void syncStoredFcmToken([String? explicitAuthToken]) {
+    Future<void>.microtask(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        String? token = prefs.getString('ur_heart_fcm_token');
+        if (token == null || token.isEmpty) {
+          if (!kIsWeb) {
+            token = await FirebaseMessaging.instance.getToken();
+            if (token != null && token.isNotEmpty) {
+              await prefs.setString('ur_heart_fcm_token', token);
+            }
+          }
+        }
+        if (token == null || token.isEmpty) return;
+
+        final secureToken = await SecureSessionStorage.instance.getAuthToken();
+        final authToken = (explicitAuthToken != null && explicitAuthToken.isNotEmpty)
+            ? explicitAuthToken
+            : ((secureToken != null && secureToken.isNotEmpty)
+                ? secureToken
+                : (prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token')));
+
+        if (authToken != null && authToken.isNotEmpty) {
+          await _dispatchTokenToBackend(token, authToken);
+        }
+      } catch (e) {
+        debugPrint('[FCM SYNC NOTICE] $e');
       }
     });
   }
@@ -183,16 +209,16 @@ class SanctuaryNotificationService {
 
   static Future<void> _dispatchTokenToBackend(String token, String authToken) async {
     final candidateUrls = [
-      'https://app.urheart.asiverticals.me',
-      'https://ur-heart.onrender.com',
+      ApiEndpoints.defaultBaseUrl,
       'https://urheart.asiverticals.me',
+      'https://ur-heart.onrender.com',
     ];
     for (final base in candidateUrls) {
       try {
         final dio = Dio(BaseOptions(
           baseUrl: base,
-          connectTimeout: const Duration(seconds: 4),
-          receiveTimeout: const Duration(seconds: 4),
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
           headers: {'Authorization': 'Bearer $authToken'},
         ));
         final resp = await dio.post<dynamic>(
@@ -203,7 +229,9 @@ class SanctuaryNotificationService {
           debugPrint('[FCM DISPATCH] Successfully linked token to $base');
           return;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[FCM DISPATCH NOTICE] Failed dispatching to $base: $e');
+      }
     }
   }
 
@@ -383,6 +411,8 @@ class SanctuaryNotificationService {
   Future<void> showStreakAlertNotification({
     required int streakCount,
     required int hoursRemaining,
+    String? title,
+    String? body,
   }) async {
     final payload = jsonEncode({
       'target_route': '/growth',
@@ -390,9 +420,35 @@ class SanctuaryNotificationService {
 
     await showSystemNotification(
       id: 9991,
-      title: 'Mindful Presence Expiring 🔥',
-      body: 'Your $streakCount-day flame will extinguish in $hoursRemaining hours. Take a gentle 10s reflection to preserve your sanctuary presence.',
+      title: title ?? 'Mindful Presence Expiring 🔥',
+      body: body ??
+          'Your $streakCount-day flame will extinguish in $hoursRemaining hours. Take a gentle 10s reflection to preserve your sanctuary presence.',
       subText: 'Streak Defense',
+      payload: payload,
+      channelId: presenceChannelId,
+      channelName: presenceChannelName,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+  }
+
+  /// 🌟 24-Hour Streak Claimed & Secured Celebration
+  Future<void> showStreakSecuredNotification({
+    required int streakCount,
+    String? title,
+    String? body,
+    int? boostPoints,
+  }) async {
+    final payload = jsonEncode({
+      'target_route': '/growth',
+    });
+
+    await showSystemNotification(
+      id: 9992,
+      title: title ?? '🔥 Day $streakCount Streak Secured!',
+      body: body ??
+          'You earned +${boostPoints ?? 1} Boost Point! Your profile is prioritized at the top of the discovery deck for 24 hours.',
+      subText: 'Mindful Sanctuary',
       payload: payload,
       channelId: presenceChannelId,
       channelName: presenceChannelName,

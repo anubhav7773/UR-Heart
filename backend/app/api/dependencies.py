@@ -91,8 +91,8 @@ async def require_superadmin(current_user: User = Depends(get_current_user)) -> 
         (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower(),
         (os.getenv("SUPERADMIN_EMAIL") or "").strip().lower(),
         "asiverticals@gmail.com",
-        "kshtriyaanubhav9120@gmail.com",
     }
+    admin_whitelist.discard("")
     user_email = (getattr(current_user, "email", "") or "").strip().lower()
 
     if user_email not in admin_whitelist:

@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/feed_repository.dart';
+import '../../../growth/presentation/controllers/growth_hub_controller.dart';
 
 /// Immutable state container for Sanctuary Discovery Feed
 class FeedState {
@@ -50,8 +52,9 @@ class FeedState {
 /// Controller managing card swipe gestures, quota exhaustion gate, and pass stack
 class FeedController extends StateNotifier<FeedState> {
   final FeedRepository _repository;
+  final Ref? _ref;
 
-  FeedController(this._repository) : super(const FeedState()) {
+  FeedController(this._repository, [this._ref]) : super(const FeedState()) {
     loadDiscoveryFeed();
   }
 
@@ -84,11 +87,17 @@ class FeedController extends StateNotifier<FeedState> {
       }).toList();
 
       if (!mounted) return;
+      final serverSwipes = deck.swipesRemaining ?? state.swipesRemaining;
       state = state.copyWith(
         candidates: filtered,
-        swipesRemaining: deck.swipesRemaining ?? state.swipesRemaining,
+        swipesRemaining: serverSwipes,
         directLettersCount: resolvedLetters,
         isLoading: false,
+      );
+
+      _ref?.read(growthHubControllerProvider.notifier).syncWithFeedBalances(
+        swipes: serverSwipes,
+        directLetters: resolvedLetters,
       );
     } catch (e) {
       if (!mounted) return;
@@ -123,17 +132,23 @@ class FeedController extends StateNotifier<FeedState> {
     final updatedPassed = List<CandidateProfile>.from(state.passedProfiles)
       ..insert(0, candidate);
 
+    final nextSwipes = math.max(0, state.swipesRemaining - 1);
     state = state.copyWith(
       candidates: updatedCandidates,
       passedProfiles: updatedPassed,
+      swipesRemaining: nextSwipes,
     );
+    _ref?.read(growthHubControllerProvider.notifier).consumeSwipe();
 
     try {
-      final remaining = await _repository.recordSwipe(
+      final result = await _repository.recordSwipe(
         targetUserId: candidate.id,
         swipeType: 'pass',
       );
-      state = state.copyWith(swipesRemaining: remaining);
+      state = state.copyWith(swipesRemaining: result.swipesRemaining);
+      _ref?.read(growthHubControllerProvider.notifier).syncWithFeedBalances(
+        swipes: result.swipesRemaining,
+      );
       return true;
     } catch (e) {
       // Revert if error
@@ -155,16 +170,22 @@ class FeedController extends StateNotifier<FeedState> {
     final updatedCandidates = List<CandidateProfile>.from(state.candidates)
       ..removeAt(0);
 
+    final nextSwipes = math.max(0, state.swipesRemaining - 1);
     state = state.copyWith(
       candidates: updatedCandidates,
+      swipesRemaining: nextSwipes,
     );
+    _ref?.read(growthHubControllerProvider.notifier).consumeSwipe();
 
     try {
-      final remaining = await _repository.recordSwipe(
+      final result = await _repository.recordSwipe(
         targetUserId: candidate.id,
         swipeType: 'like',
       );
-      state = state.copyWith(swipesRemaining: remaining);
+      state = state.copyWith(swipesRemaining: result.swipesRemaining);
+      _ref?.read(growthHubControllerProvider.notifier).syncWithFeedBalances(
+        swipes: result.swipesRemaining,
+      );
       return true;
     } catch (e) {
       await loadDiscoveryFeed();
@@ -186,23 +207,39 @@ class FeedController extends StateNotifier<FeedState> {
     final updatedCandidates = List<CandidateProfile>.from(state.candidates)
       ..removeAt(0);
 
-    final nextLetters = currentLetters - 1;
+    final nextLetters = math.max(0, currentLetters - 1);
+    final nextSwipes = math.max(0, state.swipesRemaining - 1);
     state = state.copyWith(
       candidates: updatedCandidates,
       directLettersCount: nextLetters,
+      swipesRemaining: nextSwipes,
     );
 
     try {
       await prefs.setInt('ur_heart_direct_letters', nextLetters);
+      await prefs.setInt('ur_heart_swipes_remaining', nextSwipes);
     } catch (_) {}
 
+    _ref?.read(growthHubControllerProvider.notifier).syncWithFeedBalances(
+      swipes: nextSwipes,
+      directLetters: nextLetters,
+    );
+
     try {
-      final remaining = await _repository.recordSwipe(
+      final result = await _repository.recordSwipe(
         targetUserId: candidate.id,
         swipeType: 'direct',
         letterText: letterText,
       );
-      state = state.copyWith(swipesRemaining: remaining);
+      final finalLetters = result.directLettersCount ?? nextLetters;
+      state = state.copyWith(
+        swipesRemaining: result.swipesRemaining,
+        directLettersCount: finalLetters,
+      );
+      _ref?.read(growthHubControllerProvider.notifier).syncWithFeedBalances(
+        swipes: result.swipesRemaining,
+        directLetters: finalLetters,
+      );
       return true;
     } catch (e) {
       await loadDiscoveryFeed();
@@ -248,5 +285,5 @@ class FeedController extends StateNotifier<FeedState> {
 final feedControllerProvider =
     StateNotifierProvider<FeedController, FeedState>((ref) {
   final repo = ref.watch(feedRepositoryProvider);
-  return FeedController(repo);
+  return FeedController(repo, ref);
 });

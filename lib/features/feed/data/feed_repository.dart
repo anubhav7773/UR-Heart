@@ -19,6 +19,21 @@ class DiscoveryDeckResponse {
   });
 }
 
+/// Result container for completed swipe action
+class SwipeResult {
+  final int swipesRemaining;
+  final int? directLettersCount;
+  final bool isMatch;
+  final String? matchId;
+
+  const SwipeResult({
+    required this.swipesRemaining,
+    this.directLettersCount,
+    this.isMatch = false,
+    this.matchId,
+  });
+}
+
 /// Data repository for discovery feed, swipe actions, and pass vault
 class FeedRepository {
   final Dio _dio;
@@ -73,8 +88,8 @@ class FeedRepository {
     }
   }
 
-  /// Dispatches swipe action. Server returns verified remaining swipes balance.
-  Future<int> recordSwipe({
+  /// Dispatches swipe action. Server returns verified remaining swipes and letters balances.
+  Future<SwipeResult> recordSwipe({
     required String targetUserId,
     required String swipeType, // 'like', 'pass', 'superlike', 'direct'
     String? letterText,
@@ -91,9 +106,21 @@ class FeedRepository {
 
       final dynamic data = response.data;
       if (data is Map<String, dynamic>) {
-        return data['swipes_remaining'] as int? ?? 0;
+        final swipes = data['swipes_remaining'] as int? ?? 0;
+        final letters = data['direct_letters_count'] as int?;
+        final isMatch = data['is_match'] as bool? ?? false;
+        final matchId = data['match_id'] as String?;
+        _lastSwipesRemaining = swipes;
+        if (letters != null) _lastDirectLettersCount = letters;
+
+        return SwipeResult(
+          swipesRemaining: swipes,
+          directLettersCount: letters,
+          isMatch: isMatch,
+          matchId: matchId,
+        );
       }
-      return 0;
+      return const SwipeResult(swipesRemaining: 0);
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;

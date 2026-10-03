@@ -252,7 +252,9 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
   }
 
   void _showProgressionDialog(BuildContext context, WidgetRef ref) {
-    final revealTokens = bridgeData['reveal_tokens_count'] as int? ?? 0;
+    final growthTokens = ref.read(growthHubControllerProvider).revealTokensCount;
+    final bridgeTokens = bridgeData['reveal_tokens_count'] as int? ?? 0;
+    final revealTokens = bridgeTokens > 0 ? bridgeTokens : growthTokens;
 
     showDialog<void>(
       context: context,
@@ -315,6 +317,7 @@ class SacredBridgeAppBarAction extends ConsumerWidget {
                     .redeemBridgeRevealToken();
                 if (ok) {
                   try {
+                    ref.read(growthHubControllerProvider.notifier).consumeRevealToken();
                     ref.read(growthHubControllerProvider.notifier).syncUserData();
                   } catch (_) {}
                 }
