@@ -72,6 +72,20 @@ class ProfileRepository {
     }
   }
 
+  /// Fetches another seeker's live profile, photos, and calculated resonance from PostgreSQL.
+  Future<Map<String, dynamic>> fetchPeerProfile(String userId) async {
+    try {
+      final response = await dio.get<dynamic>('/api/v1/profile/$userId');
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return <String, dynamic>{};
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
   /// Redeems friend's referral code with backend
   Future<Map<String, dynamic>> redeemReferralCode(String code) async {
     try {

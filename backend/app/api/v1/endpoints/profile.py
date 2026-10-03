@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional, List
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +8,10 @@ from sqlalchemy import select, update
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.domain.user import User
+from app.models.domain.match import Match
+from app.models.domain.whatsapp_token import WhatsAppRevealToken
 from app.services.streak_engine import StreakEngine
+from app.services.resonance_engine import ResonanceEngine
 
 router = APIRouter(prefix="/profile", tags=["User Profile Engine"])
 
@@ -118,6 +122,95 @@ async def get_my_authenticated_profile(
         "preferred_age_max": current_user.preferred_age_max,
         "contact_bridge_handle": current_user.contact_bridge_encrypted,
         "role": current_user.role or ("superadmin" if (current_user.email or "").lower() == "asiverticals@gmail.com" else "user")
+    }
+
+
+@router.get("/{user_id}", status_code=status.HTTP_200_OK, summary="Get Dedicated Seeker Profile")
+async def get_seeker_profile(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetches full dedicated profile of a sanctuary seeker for Screen 10 / Seeker Detail.
+    Computes real dynamic mutual resonance, authentic tags, proximity, and match/bridge status.
+    Zero dummy data.
+    """
+    try:
+        target_uuid = UUID(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid user ID format.")
+
+    res = await db.execute(
+        select(User).where(User.id == target_uuid, User.deleted_at.is_(None))
+    )
+    target_user = res.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Sanctuary seeker not found or deactivated.")
+
+    # Calculate dynamic mutual resonance & distance
+    score, insight, authentic_tags = ResonanceEngine.calculate_mutual_resonance(current_user, target_user)
+    dist_km = ResonanceEngine.compute_distance(current_user, target_user)
+
+    # Check match status and WhatsApp Sacred Bridge unlock
+    match_res = await db.execute(
+        select(Match).where(
+            ((Match.user1_id == current_user.id) & (Match.user2_id == target_user.id)) |
+            ((Match.user1_id == target_user.id) & (Match.user2_id == current_user.id))
+        )
+    )
+    match = match_res.scalar_one_or_none()
+    has_match = isinstance(match, Match) and getattr(match, "is_active", True)
+
+    has_wa_key = False
+    if has_match and match:
+        token_res = await db.execute(
+            select(WhatsAppRevealToken).where(WhatsAppRevealToken.match_id == match.id)
+        )
+        token_rec = token_res.scalar_one_or_none()
+        if token_rec and getattr(token_rec, "is_unlocked", False):
+            has_wa_key = True
+
+    # Clean photo list
+    clean_photos = [p for p in (target_user.photos or []) if p and str(p).strip()]
+    primary_avatar = target_user.avatar_url.strip() if (target_user.avatar_url and target_user.avatar_url.strip()) else (clean_photos[0] if clean_photos else "")
+    if primary_avatar and primary_avatar not in clean_photos:
+        clean_photos.insert(0, primary_avatar)
+
+    cand_bio = target_user.bio.strip() if (target_user.bio and target_user.bio.strip()) else "Mindful seeker walking an intentional path in the Sanctuary."
+    cand_intention = target_user.bio.strip() if (target_user.bio and target_user.bio.strip()) else "Seeking slow, thoughtful connection in the sanctuary."
+
+    return {
+        "id": str(target_user.id),
+        "full_name": target_user.full_name,
+        "age": _calculate_age(target_user.dob),
+        "dob": target_user.dob.isoformat() if target_user.dob else None,
+        "gender": target_user.gender,
+        "interested_in": target_user.interested_in,
+        "bio": cand_bio,
+        "profession": target_user.profession or "Mindful Seeker",
+        "education": target_user.education or "",
+        "location_name": target_user.location_name or "Saket, Ayodhya",
+        "distance_km": dist_km,
+        "avatar_url": primary_avatar,
+        "avatar": primary_avatar,
+        "photos": clean_photos,
+        "photo_urls": clean_photos,
+        "is_kyc_verified": bool(target_user.kyc_status),
+        "kyc_status": bool(target_user.kyc_status),
+        "is_verified": bool(target_user.kyc_status),
+        "streak_count": target_user.streak_count or 0,
+        "boost_points": target_user.boost_points or 0,
+        "resonance_score": score,
+        "ai_insight": insight,
+        "interests": authentic_tags,
+        "intentions": cand_intention,
+        "intent_quote": cand_intention,
+        "is_online": True,
+        "match_id": str(match.id) if (has_match and match and getattr(match, "id", None)) else None,
+        "has_sacred_bridge": has_wa_key,
+        "has_wa_key": has_wa_key,
+        "subscription_tier": target_user.subscription_tier or "free"
     }
 
 

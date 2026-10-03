@@ -32,12 +32,29 @@ class IgnoredProfilesController extends StateNotifier<IgnoredProfilesState> {
 
   IgnoredProfilesController(this._repository, this._ref)
       : super(const IgnoredProfilesState()) {
-    syncFromFeedController();
+    loadPassedProfiles();
+  }
+
+  /// Fetches passed candidates directly from PostgreSQL via GET /api/v1/swipes/passed
+  Future<void> loadPassedProfiles() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final backendPassed = await _repository.getPassedProfiles();
+      if (backendPassed.isNotEmpty) {
+        state = state.copyWith(passedProfiles: backendPassed, isLoading: false);
+        return;
+      }
+      // Fallback to local session passes if backend is empty
+      final feedPassed = _ref.read(feedControllerProvider).passedProfiles;
+      state = state.copyWith(passedProfiles: feedPassed, isLoading: false);
+    } catch (_) {
+      final feedPassed = _ref.read(feedControllerProvider).passedProfiles;
+      state = state.copyWith(passedProfiles: feedPassed, isLoading: false);
+    }
   }
 
   void syncFromFeedController() {
-    final feedPassed = _ref.read(feedControllerProvider).passedProfiles;
-    state = state.copyWith(passedProfiles: feedPassed);
+    loadPassedProfiles();
   }
 
   /// Revisit action: restores profile back to discovery deck via DELETE /api/v1/swipes/pass/{target_id}

@@ -9,6 +9,7 @@ class PhotoCarouselWithDots extends StatefulWidget {
   final bool isDark;
   final bool isKycVerified;
   final String locationTag;
+  final void Function(int index)? onPhotoTap;
 
   const PhotoCarouselWithDots({
     super.key,
@@ -17,6 +18,7 @@ class PhotoCarouselWithDots extends StatefulWidget {
     required this.isDark,
     this.isKycVerified = false,
     this.locationTag = 'Saket, Ayodhya',
+    this.onPhotoTap,
   });
 
   @override
@@ -139,6 +141,24 @@ class _PhotoCarouselWithDotsState extends State<PhotoCarouselWithDots> {
                     ),
                   );
                 }),
+              ),
+            ),
+          // Zoom / Lightbox Trigger Button
+          if (widget.onPhotoTap != null)
+            Positioned(
+              top: 26,
+              right: 14,
+              child: GestureDetector(
+                onTap: () => widget.onPhotoTap?.call(_currentIndex),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                  ),
+                  child: const Icon(Icons.fullscreen, color: Colors.white, size: 18),
+                ),
               ),
             ),
           // Location & KYC Badge Overlay

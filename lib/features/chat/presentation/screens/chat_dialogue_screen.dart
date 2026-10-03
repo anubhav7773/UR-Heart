@@ -250,7 +250,18 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
         leading: BackButton(color: primaryText),
         titleSpacing: 0,
         title: InkWell(
-          onTap: () => _showPeerProfileModal(
+          onTap: () {
+            final detailArgs = SeekerProfileDetailArgs.fromPeer(
+              peer: peer,
+              args: args,
+              matchId: mId,
+            );
+            Navigator.of(context).pushNamed(
+              SeekerProfileDetailScreen.routeName,
+              arguments: detailArgs,
+            );
+          },
+          onLongPress: () => _showPeerProfileModal(
             context: context,
             isDark: isDark,
             displayName: displayName,

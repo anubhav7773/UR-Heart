@@ -127,6 +127,23 @@ class FeedRepository {
     }
   }
 
+  /// Retrieves all passed profiles from the Pass Vault (PostgreSQL).
+  Future<List<dynamic>> getPassedProfiles() async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/swipes/passed');
+      final data = response.data;
+      if (data is Map<String, dynamic> && data['passed_candidates'] is List) {
+        return data['passed_candidates'] as List<dynamic>;
+      } else if (data is List) {
+        return data;
+      }
+      return <dynamic>[];
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
   /// Restores passed profile from pass vault back to active deck.
   Future<bool> restorePassedProfile(String targetUserId) async {
     try {

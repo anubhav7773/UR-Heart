@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, not_, or_
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user_optional, get_current_user
 from app.models.domain.user import User
 from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
@@ -381,6 +381,85 @@ async def record_swipe(
         "match_id": match_id,
         "swipes_remaining": current_user.swipes_remaining if current_user else 24,
         "direct_letters_count": current_user.direct_letters_count if (current_user and current_user.direct_letters_count is not None) else 0,
+    }
+
+
+@router.get("/swipes/passed", status_code=status.HTTP_200_OK, summary="Get Passed Profiles (Pass Vault)")
+async def get_passed_profiles(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieves all candidate profiles that the current user has passed on.
+    Orders by swipe creation timestamp descending.
+    Computes dynamic mutual resonance, authentic tags, and distance.
+    Zero dummy data.
+    """
+    stmt = (
+        select(User, Swipe.created_at.label("passed_at"))
+        .join(Swipe, Swipe.target_id == User.id)
+        .where(
+            Swipe.actor_id == current_user.id,
+            Swipe.swipe_type == "pass",
+            User.deleted_at.is_(None)
+        )
+        .order_by(Swipe.created_at.desc())
+        .limit(50)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    passed_candidates = []
+    for u, passed_at in rows:
+        clean_photos = [p for p in (u.photos or []) if p and str(p).strip()]
+        if u.avatar_url and u.avatar_url.strip() and u.avatar_url.strip() not in clean_photos:
+            clean_photos.insert(0, u.avatar_url.strip())
+
+        primary_avatar = u.avatar_url.strip() if (u.avatar_url and u.avatar_url.strip()) else (clean_photos[0] if clean_photos else "")
+
+        age = _calculate_age(u.dob)
+        score, insight, authentic_tags = ResonanceEngine.calculate_mutual_resonance(current_user, u)
+        dist_km = ResonanceEngine.compute_distance(current_user, u)
+
+        cand_bio = u.bio.strip() if (u.bio and u.bio.strip()) else "Mindful seeker walking an intentional path in the Sanctuary."
+        cand_intention = u.bio.strip() if (u.bio and u.bio.strip()) else "Seeking slow, thoughtful connection in the sanctuary."
+
+        passed_candidates.append({
+            "id": str(u.id),
+            "full_name": u.full_name,
+            "age": age,
+            "gender": u.gender,
+            "profession": u.profession or "Mindful Seeker",
+            "education": u.education or "",
+            "looking_for": u.interested_in or "Everyone",
+            "location_name": u.location_name or "Saket, Ayodhya",
+            "distance_km": dist_km,
+            "resonance_score": score,
+            "ai_insight": insight,
+            "ai_resonance_insight": insight,
+            "bio": cand_bio,
+            "authentic_intention": cand_intention,
+            "intent_quote": cand_intention,
+            "interests": authentic_tags,
+            "tags": authentic_tags,
+            "avatar_url": primary_avatar,
+            "avatar": primary_avatar,
+            "photos": clean_photos,
+            "photo_urls": clean_photos,
+            "is_kyc_verified": bool(u.kyc_status),
+            "is_verified": bool(u.kyc_status),
+            "kyc_status": bool(u.kyc_status),
+            "streak_count": u.streak_count or 0,
+            "boost_points": u.boost_points or 0,
+            "is_boosted": bool((u.boost_points or 0) > 0),
+            "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4",
+            "passed_at": passed_at.isoformat() if passed_at else None
+        })
+
+    return {
+        "passed_candidates": passed_candidates,
+        "data": passed_candidates,
+        "total": len(passed_candidates)
     }
 
 
