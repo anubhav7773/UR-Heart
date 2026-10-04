@@ -40,6 +40,13 @@ def _sanitize_credential_dict(cred_dict: Dict[str, Any]) -> Dict[str, Any]:
         return cred_dict
 
     cred = dict(cred_dict)
+
+    # Clean other string fields of any accidental backticks or quotes
+    for key in ("client_email", "project_id", "private_key_id"):
+        val = cred.get(key)
+        if val and isinstance(val, str):
+            cred[key] = val.replace("`", "").strip().strip("'\"")
+
     pk = cred.get("private_key")
     if pk and isinstance(pk, str):
         # 1. Strip markdown backticks, leading/trailing whitespace and quotes
