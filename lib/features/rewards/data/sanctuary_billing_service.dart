@@ -93,7 +93,7 @@ class SanctuaryBillingService {
       ProductDetails(
         id: 'urheart_pass_weekly',
         title: '1-Week Sovereign Sprint',
-        description: 'Mindful sovereign pass for 7 days',
+        description: 'Mindful sovereign pass for 7 days (200 swipes)',
         price: '\$4.99',
         rawPrice: 4.99,
         currencyCode: 'USD',
@@ -101,7 +101,7 @@ class SanctuaryBillingService {
       ProductDetails(
         id: 'urheart_pass_monthly',
         title: '1-Month Sovereign Pass',
-        description: 'Unlimited unmasked resonances for 30 days',
+        description: '5 direct letters & 1,000 swipes for 30 days',
         price: '\$14.99',
         rawPrice: 14.99,
         currencyCode: 'USD',
@@ -109,7 +109,7 @@ class SanctuaryBillingService {
       ProductDetails(
         id: 'urheart_pass_lifetime',
         title: '1-Year Sovereign Pass',
-        description: 'Sovereign entitlement and zero ads for 365 days',
+        description: 'Sovereign entitlement, unlimited swipes & zero ads for 365 days',
         price: '\$59.99',
         rawPrice: 59.99,
         currencyCode: 'USD',

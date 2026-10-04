@@ -69,6 +69,7 @@ async def test_web_store_catalogue_specifications():
         lifetime = products["urheart_pass_lifetime"]
         assert lifetime["duration_days"] == 365
         assert "365 Days" in lifetime["name"] or "1-Year" in lifetime["name"]
+        assert lifetime["price_inr"] == 1499
 
         # 2. Global passport
         passport = products["urheart_pack_global_passport"]
@@ -210,11 +211,12 @@ async def test_web_store_html_pricing_and_validity_alignment():
         assert resp_store.status_code == 200
         text = resp_store.text
 
-        # 1. 1-Year Sovereign Pass alignment (365 Days, ₹799)
+        # 1. 1-Year Sovereign Pass alignment (365 Days, ₹1,499)
         assert "1-Year Sovereign Pass" in text
         assert "365 Days Access" in text
         assert "365-Day Sovereign Crest" in text
-        assert "₹799" in text
+        assert "₹1,499" in text
+        assert "selectProduct('urheart_pass_lifetime', 1499" in text
 
         # 2. 24h Global Passport alignment (24h, ₹99)
         assert "24h Global Passport" in text

@@ -19,6 +19,7 @@ class PurchaseVerificationRequest(BaseModel):
     product_id: str = Field(..., min_length=3, max_length=80)
     purchase_token: str = Field(..., min_length=10)
     transaction_id: str = Field(..., min_length=4, max_length=150)
+    currency: Optional[str] = Field("USD", max_length=10)
 
 
 def _validate_store_cryptographic_receipt(store: str, purchase_token: str, transaction_id: str) -> bool:
@@ -79,26 +80,35 @@ async def verify_client_store_purchase(
     platform_fee = 0.0
     tier = "free"
     duration_days = 0
+    swipes_grant = 0
+    direct_letters_grant = 0
 
     if is_valid:
+        is_inr = (getattr(payload, "currency", "USD") or "USD").upper() == "INR"
         if "weekly" in payload.product_id:
             tier = "weekly"
-            amount_gross = 4.99
+            amount_gross = 49.0 if is_inr else 4.99
             duration_days = 7
+            swipes_grant = 100 if is_inr else 200
         elif "monthly" in payload.product_id:
             tier = "monthly"
-            amount_gross = 14.99
+            amount_gross = 149.0 if is_inr else 14.99
             duration_days = 30
+            swipes_grant = 500 if is_inr else 1000
+            direct_letters_grant = 5
         elif "lifetime" in payload.product_id:
             tier = "lifetime"
-            amount_gross = 59.99
+            amount_gross = 1499.0 if is_inr else 59.99
             duration_days = 365
+            swipes_grant = 999999
+            direct_letters_grant = 10
         elif "direct_letters" in payload.product_id:
-            amount_gross = 1.99
+            amount_gross = 49.0 if is_inr else 1.99
+            direct_letters_grant = 3
         elif "instant_contact" in payload.product_id:
-            amount_gross = 1.49
+            amount_gross = 29.0 if is_inr else 1.49
         elif "global_passport" in payload.product_id:
-            amount_gross = 1.99
+            amount_gross = 99.0 if is_inr else 1.99
             duration_days = 1
 
         platform_fee = round(amount_gross * 0.15, 2)  # Store 15% tier
@@ -120,15 +130,15 @@ async def verify_client_store_purchase(
                 subscription_tier=tier,
                 subscription_expires_at=expires_at,
                 is_ad_free=True,
-                swipes_remaining=999999,
-                direct_letters_count=User.direct_letters_count + 5
+                swipes_remaining=User.swipes_remaining + swipes_grant,
+                direct_letters_count=User.direct_letters_count + direct_letters_grant
             )
         )
     elif "direct_letters" in payload.product_id:
         await db.execute(
             update(User)
             .where(User.id == current_user.id)
-            .values(direct_letters_count=User.direct_letters_count + 3)
+            .values(direct_letters_count=User.direct_letters_count + direct_letters_grant)
         )
     elif "instant_contact" in payload.product_id:
         current_user.reveal_tokens_count = (current_user.reveal_tokens_count or 0) + 1
@@ -136,6 +146,15 @@ async def verify_client_store_purchase(
             update(User)
             .where(User.id == current_user.id)
             .values(reveal_tokens_count=User.reveal_tokens_count + 1)
+        )
+    elif "global_passport" in payload.product_id:
+        await db.execute(
+            update(User)
+            .where(User.id == current_user.id)
+            .values(
+                subscription_expires_at=expires_at,
+                is_ad_free=True
+            )
         )
 
     # 4. Insert Financial Audit Ledger (Checklist Point 5 & 6)

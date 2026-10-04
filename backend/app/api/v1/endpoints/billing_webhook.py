@@ -1,7 +1,7 @@
 import os
 import hmac
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from uuid import UUID
 from fastapi import APIRouter, Request, HTTPException, status, Depends, Header
@@ -70,10 +70,17 @@ async def process_revenuecat_event(
         expires_at = datetime.fromtimestamp(exp_ms / 1000.0, tz=timezone.utc) if exp_ms else None
 
         tier = "monthly"
+        curr = (event.get("currency") or "USD").upper()
+        swipes_grant = 500 if curr == "INR" else 1000
+        letters_grant = 5
         if "weekly" in product_id:
             tier = "weekly"
+            swipes_grant = 100 if curr == "INR" else 200
+            letters_grant = 0
         elif "lifetime" in product_id:
             tier = "lifetime"
+            swipes_grant = 999999
+            letters_grant = 10
 
         # Entitlement Grant
         await db.execute(
@@ -83,8 +90,8 @@ async def process_revenuecat_event(
                 subscription_tier=tier,
                 subscription_expires_at=expires_at,
                 is_ad_free=True,
-                swipes_remaining=999999,
-                direct_letters_count=User.direct_letters_count + 5
+                swipes_remaining=User.swipes_remaining + swipes_grant,
+                direct_letters_count=User.direct_letters_count + letters_grant
             )
         )
 
@@ -180,13 +187,22 @@ async def process_razorpay_webhook(
         db.add(iap_audit)
 
         # Grant Entitlement
+        tier = "monthly" if "monthly" in product_id else ("weekly" if "weekly" in product_id else "lifetime")
+        swipes_grant = 500 if tier == "monthly" else (100 if tier == "weekly" else 999999)
+        letters_grant = 5 if tier == "monthly" else (0 if tier == "weekly" else 10)
+        dur_days = 30 if tier == "monthly" else (7 if tier == "weekly" else 365)
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(days=dur_days)
+
         await db.execute(
             update(User)
             .where(User.id == user_uuid)
             .values(
-                subscription_tier="monthly" if "monthly" in product_id else "weekly",
+                subscription_tier=tier,
+                subscription_expires_at=expires_at,
                 is_ad_free=True,
-                swipes_remaining=999999
+                swipes_remaining=User.swipes_remaining + swipes_grant,
+                direct_letters_count=User.direct_letters_count + letters_grant
             )
         )
         await db.commit()

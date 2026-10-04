@@ -293,9 +293,9 @@ def test_stateless_persistence_across_restarts():
             transaction_reference=order_id,
             product_identifier="urheart_pass_lifetime",
             status="pending_verification",
-            amount_gross=799.0,
+            amount_gross=1499.0,
             platform_fee=0.0,
-            amount_net=799.0,
+            amount_net=1499.0,
             purchased_at=datetime.now(timezone.utc)
         )
         ledger_res = MagicMock()

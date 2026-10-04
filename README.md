@@ -217,14 +217,16 @@ UR-Heart conforms to enterprise-grade security standards and statutory digital p
 ## 💰 Monetization & In-App Economy
 
 ### Product Catalog (Google Play & Web Sanctuary Store)
-| Product Identifier | Name | Tier | Price (INR / USD) | Entitlements |
-| :--- | :--- | :--- | :--- | :--- |
-| `urheart_pass_weekly` | 1-Week Sovereign Sprint | Weekly | ₹49 / $4.99 | 100% Ad-Free, Unlimited Swipes, 10 Bonus Reflections |
-| `urheart_pass_monthly` | 1-Month Sovereign Pass | Monthly | ₹149 / $14.99 | All Weekly perks + 5 Weekly Direct Letters + Eva AI Priority Counsel |
-| `urheart_pass_lifetime` | Lifetime Sovereign Crest | Lifetime | ₹799 / $59.99 | One-time permanent access, infinite resonances, permanent VIP badge |
-| `urheart_key_instant_contact`| Instant Contact Key | Consumable | ₹29 / $1.49 | Bypasses 3-ad ritual to instantly reveal WhatsApp/Phone |
-| `urheart_pack_direct_letters` | 3 Direct Letters Pack | Consumable | ₹49 / $1.99 | Direct message to recipient's private inbox without prior match |
-| `urheart_pack_global_passport`| 48h Global Passport | Consumable | ₹79 / $2.99 | Teleport to any global city for 48 hours |
+| Product Identifier | Name | Tier | In-App Price (INR / USD) | Swipes & Quotas | Key Entitlements |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `urheart_pass_weekly` | 1-Week Sovereign Sprint | Weekly (7 Days) | ₹49 / $4.99 | 100 Swipes (₹) / 200 Swipes ($)<br>*(Web: 110 Swipes)* | 100% Ad-Free, Priority Discovery |
+| `urheart_pass_monthly` | 1-Month Sovereign Pass | Monthly (30 Days) | ₹149 / $14.99 | 500 Swipes (₹) / 1,000 Swipes ($)<br>*(Web: 550 Swipes)* | 5 Direct Letters *(Web: 6)*, Eva AI Priority Counsel, 100% Ad-Free |
+| `urheart_pass_lifetime` | 1-Year Sovereign Pass | Annual (365 Days) | ₹1,499 / $59.99 | Unlimited Swipes (365d) | Sovereign Profile Crest, 10 Direct Letters *(Web: 11)*, Unlimited Swipes |
+| `urheart_key_instant_contact`| Instant Contact Key | Consumable | ₹29 / $1.49 | — | Bypasses 3-ad ritual to instantly reveal WhatsApp/Phone |
+| `urheart_pack_direct_letters` | Direct Letters Pack | Consumable | ₹49 / $1.99 | 3 Direct Notes<br>*(Web: 4 Notes)* | Direct message to recipient's private inbox without prior match |
+| `urheart_pack_global_passport`| 24h Global Passport | Consumable | ₹99 / $1.99 | 24 Hours Access<br>*(Web: +10 Bonus Swipes)* | Standalone city teleportation for 24 hours |
+
+> **Web Sanctuary Store Perk Guarantee**: All purchases made via `urheart.asiverticals.me/store` receive **+10% Extra Perks** (extra swipes, bonus notes, etc.) across all tiers at identical validity and standard pricing.
 
 ---
 

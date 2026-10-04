@@ -31,8 +31,8 @@ STORE_PRODUCTS = {
         "price_usd": 4.99,
         "duration_days": 7,
         "tier": "weekly",
-        "bonus": "10% Extra Reflections + Ad-Free",
-        "features": ["Unlimited Card Discovery", "10 Extra Reflections", "Zero Advertisements", "Instant Fast Pass"]
+        "bonus": "110 Swipes (+10% Web Bonus) + 100% Ad-Free",
+        "features": ["110 Sovereign Swipes (+10% Web Bonus)", "10 Extra Reflections", "100% Ad-Free Silence (7 Days)", "Instant Fast Pass"]
     },
     "urheart_pass_monthly": {
         "id": "urheart_pass_monthly",
@@ -42,19 +42,19 @@ STORE_PRODUCTS = {
         "price_usd": 14.99,
         "duration_days": 30,
         "tier": "monthly",
-        "bonus": "5 Weekly Direct Letters + VIP Badge",
-        "features": ["Unlimited Swipes & Discoveries", "5 Weekly Direct Letters", "100% Ad-Free Silence", "Eva AI Priority Counsel", "Global Passport Access"]
+        "bonus": "550 Swipes + 6 Direct Letters (+10% Web Bonus)",
+        "features": ["550 Sovereign Swipes (+10% Web Bonus)", "6 Guaranteed Direct Letters", "100% Ad-Free Silence (30 Days)", "Eva AI Priority Counsel", "VIP Sovereign Badge"]
     },
     "urheart_pass_lifetime": {
         "id": "urheart_pass_lifetime",
         "name": "1-Year Sovereign Pass",
         "badge": "365 Days Access",
-        "price_inr": 799,
+        "price_inr": 1499,
         "price_usd": 59.99,
         "duration_days": 365,
         "tier": "lifetime",
         "bonus": "365 Days Sovereign Crest + Infinite Passes",
-        "features": ["365 Days Sovereign Crest", "Infinite Resonances for 1 Year", "Full Legal Vault Export Access", "Stage 3 Reveal Token with Mutual Consent", "100% Ad-Free Silence"]
+        "features": ["365 Days Sovereign Crest", "Infinite Resonances for 1 Year", "11 Direct Letters (+10% Web Bonus)", "Full Legal Vault Export Access", "Stage 3 Reveal Token with Mutual Consent", "100% Ad-Free Silence (365 Days)"]
     },
     "urheart_key_instant_contact": {
         "id": "urheart_key_instant_contact",
@@ -75,8 +75,8 @@ STORE_PRODUCTS = {
         "price_usd": 1.99,
         "duration_days": 0,
         "tier": "micro",
-        "bonus": "Reach Their Private Inbox Directly",
-        "features": ["3 Guaranteed Direct Notes", "Bypasses Standard Matching Queue", "High Resonance Visibility"]
+        "bonus": "4 Guaranteed Direct Notes (+10% Web Bonus)",
+        "features": ["4 Guaranteed Direct Notes (+10% Web Bonus)", "Bypasses Standard Matching Queue", "High Resonance Visibility"]
     },
     "urheart_pack_global_passport": {
         "id": "urheart_pack_global_passport",
@@ -87,7 +87,7 @@ STORE_PRODUCTS = {
         "duration_days": 1,
         "tier": "micro",
         "bonus": "Explore Any World City for 24 Hours",
-        "features": ["Teleport to Mumbai, Delhi, London, NYC", "Explore Global Kinships", "Full 24 Hours Access"]
+        "features": ["Teleport to Mumbai, Delhi, London, NYC", "Explore Global Kinships", "Full 24 Hours Access", "+10 Bonus Swipes (+10% Web Bonus)"]
     }
 }
 
@@ -410,7 +410,31 @@ async def approve_store_order(
 
     # Apply sovereign perks in database
     if user:
-        if tier in ["weekly", "monthly", "lifetime"]:
+        if tier == "weekly":
+            await db.execute(
+                update(User)
+                .where(User.id == user.id)
+                .values(
+                    subscription_tier=tier,
+                    subscription_expires_at=expires_at,
+                    is_ad_free=True,
+                    swipes_remaining=User.swipes_remaining + 110,
+                    direct_letters_count=User.direct_letters_count + 1
+                )
+            )
+        elif tier == "monthly":
+            await db.execute(
+                update(User)
+                .where(User.id == user.id)
+                .values(
+                    subscription_tier=tier,
+                    subscription_expires_at=expires_at,
+                    is_ad_free=True,
+                    swipes_remaining=User.swipes_remaining + 550,
+                    direct_letters_count=User.direct_letters_count + 6
+                )
+            )
+        elif tier == "lifetime":
             await db.execute(
                 update(User)
                 .where(User.id == user.id)
@@ -419,14 +443,14 @@ async def approve_store_order(
                     subscription_expires_at=expires_at,
                     is_ad_free=True,
                     swipes_remaining=999999,
-                    direct_letters_count=User.direct_letters_count + (10 if tier == "monthly" else 5)
+                    direct_letters_count=User.direct_letters_count + 11
                 )
             )
         elif "direct_letters" in product_id:
             await db.execute(
                 update(User)
                 .where(User.id == user.id)
-                .values(direct_letters_count=User.direct_letters_count + 5)
+                .values(direct_letters_count=User.direct_letters_count + 4)
             )
         elif "instant_contact" in product_id:
             await db.execute(
@@ -440,7 +464,7 @@ async def approve_store_order(
                 .where(User.id == user.id)
                 .values(
                     subscription_expires_at=expires_at,
-                    swipes_remaining=999999,
+                    swipes_remaining=User.swipes_remaining + 10,
                     is_ad_free=True
                 )
             )
@@ -1084,10 +1108,10 @@ async def serve_web_sanctuary_store(request: Request):
             <span class="product-card-badge">Most Mindful</span>
             <div class="product-name">1-Month Sovereign Pass</div>
             <div class="product-price">₹149 <span style="font-size:12px; color:var(--text-muted);">/ $14.99</span></div>
-            <div class="product-bonus">✨ 10% Extra Web Passes</div>
+            <div class="product-bonus">✨ +10% Web Bonus Perks</div>
             <ul class="product-features">
-              <li>Unlimited Swipes & Discoveries</li>
-              <li>5 Weekly Direct Letters</li>
+              <li>550 Sovereign Swipes (+10% Web Bonus)</li>
+              <li>6 Guaranteed Direct Letters</li>
               <li>100% Ad-Free Silence (30 Days)</li>
               <li>Eva AI Priority Counsel</li>
             </ul>
@@ -1097,23 +1121,24 @@ async def serve_web_sanctuary_store(request: Request):
             <span class="product-card-badge">Popular</span>
             <div class="product-name">1-Week Sovereign Sprint</div>
             <div class="product-price">₹49 <span style="font-size:12px; color:var(--text-muted);">/ $4.99</span></div>
-            <div class="product-bonus">✨ 7-Day Complete Silence</div>
+            <div class="product-bonus">✨ +10% Web Bonus Perks</div>
             <ul class="product-features">
-              <li>Unlimited Card Discovery</li>
+              <li>110 Sovereign Swipes (+10% Web Bonus)</li>
               <li>10 Bonus Reflections</li>
-              <li>Zero Advertisements (7 Days)</li>
+              <li>100% Ad-Free Silence (7 Days)</li>
               <li>Instant Fast Pass</li>
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_pass_lifetime', 799, '1-Year Sovereign Pass')">
+          <div class="product-card" onclick="selectProduct('urheart_pass_lifetime', 1499, '1-Year Sovereign Pass')">
             <span class="product-card-badge">365 Days Access</span>
             <div class="product-name">1-Year Sovereign Pass</div>
-            <div class="product-price">₹799 <span style="font-size:12px; color:var(--text-muted);">/ $59.99</span></div>
+            <div class="product-price">₹1,499 <span style="font-size:12px; color:var(--text-muted);">/ $59.99</span></div>
             <div class="product-bonus">✨ 365-Day Sovereign Crest</div>
             <ul class="product-features">
               <li>365 Days Sovereign Crest</li>
               <li>Infinite Resonances for 1 Year</li>
+              <li>11 Direct Letters (+10% Web Bonus)</li>
               <li>Full Legal Vault Export Access</li>
               <li>Stage 3 Reveal Token (Mutual Consent Required)</li>
               <li>100% Ad-Free Silence (365 Days)</li>
@@ -1136,9 +1161,9 @@ async def serve_web_sanctuary_store(request: Request):
             <span class="product-card-badge">Micro</span>
             <div class="product-name">3 Direct Letters Pack</div>
             <div class="product-price">₹49 <span style="font-size:12px; color:var(--text-muted);">/ $1.99</span></div>
-            <div class="product-bonus">✨ Reach Their Private Box</div>
+            <div class="product-bonus">✨ +10% Web Bonus Perks</div>
             <ul class="product-features">
-              <li>3 Guaranteed Direct Notes (+ Web Bonus)</li>
+              <li>4 Guaranteed Direct Notes (+10% Web Bonus)</li>
               <li>Priority Kinship Inbox Delivery</li>
               <li>Bypasses Standard Discovery Queue</li>
             </ul>
@@ -1152,6 +1177,7 @@ async def serve_web_sanctuary_store(request: Request):
             <ul class="product-features">
               <li>Teleport to Any Global City</li>
               <li>24 Hours Unrestricted Access</li>
+              <li>+10 Bonus Swipes (+10% Web Bonus)</li>
               <li>Explore Worldwide Kinships</li>
             </ul>
           </div>

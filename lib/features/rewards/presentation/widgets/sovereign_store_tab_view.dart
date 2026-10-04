@@ -49,12 +49,12 @@ class SovereignStoreTabView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10.0),
                 Text(
-                  'Pure Silence · Infinite Resonances · 100% Ad-Free',
+                  'Pure Silence · Focused Resonances · 100% Ad-Free',
                   style: TextStyle(fontSize: 15.0, fontWeight: FontWeight.bold, color: primaryText),
                 ),
                 const SizedBox(height: 6.0),
                 Text(
-                  'Unlimited card discovery, 5 weekly direct letters, instantaneous contact unmasking, and global passport access.',
+                  'Curated card discovery, priority counsel, instantaneous contact unmasking, and 100% ad-free experience.',
                   style: TextStyle(fontSize: 12.0, color: subText, height: 1.4),
                 ),
               ],
@@ -62,7 +62,7 @@ class SovereignStoreTabView extends ConsumerWidget {
           ),
           const SizedBox(height: 14.0),
 
-          // Web Store Uplink Banner (10% Bonus / Sovereign Discount)
+          // Web Store Uplink Banner (10% Bonus / Sovereign Perks)
           InkWell(
             borderRadius: BorderRadius.circular(16.0),
             onTap: () => ref.read(growthHubControllerProvider.notifier).openWebStore(null, context),
@@ -81,9 +81,9 @@ class SovereignStoreTabView extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Sanctuary Web Store (10% Extra Passes)',
+                        Text('Sanctuary Web Store (+10% Bonus Perks)',
                             style: TextStyle(color: terracotta, fontSize: 13.0, fontWeight: FontWeight.bold)),
-                        Text('Visit urheart.asiverticals.me/store for web checkout via UPI/Cards.',
+                        Text('Visit urheart.asiverticals.me/store for web checkout with +10% extra perks on all passes.',
                             style: TextStyle(color: subText, fontSize: 11.0)),
                       ],
                     ),
@@ -98,11 +98,11 @@ class SovereignStoreTabView extends ConsumerWidget {
           // Subscriptions Group
           Text('SOVEREIGN PASSES', style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: subText, letterSpacing: 0.8)),
           const SizedBox(height: 10.0),
-          _buildSubscriptionTile(context, ref, title: '1-Week Sovereign Sprint', priceText: '\$4.99 / ₹49', badgeText: 'Popular', productId: 'urheart_pass_weekly'),
+          _buildSubscriptionTile(context, ref, title: '1-Week Sovereign Sprint', priceText: '₹49 (100 Swipes) · \$4.99 (200 Swipes)', badgeText: '7 Days Access', productId: 'urheart_pass_weekly'),
           const SizedBox(height: 10.0),
-          _buildSubscriptionTile(context, ref, title: '1-Month Sovereign Pass', priceText: '\$14.99 / ₹149', badgeText: 'Most Mindful', productId: 'urheart_pass_monthly', isHighlighted: true),
+          _buildSubscriptionTile(context, ref, title: '1-Month Sovereign Pass', priceText: '₹149 (500 Swipes) · \$14.99 (1000 Swipes)', badgeText: '30 Days Access', productId: 'urheart_pass_monthly', isHighlighted: true),
           const SizedBox(height: 10.0),
-          _buildSubscriptionTile(context, ref, title: '1-Year Sovereign Pass', priceText: '\$59.99 / ₹799', badgeText: '365 Days Access', productId: 'urheart_pass_lifetime'),
+          _buildSubscriptionTile(context, ref, title: '1-Year Sovereign Pass', priceText: '₹1,499 / \$59.99', badgeText: '365 Days Access', productId: 'urheart_pass_lifetime'),
           const SizedBox(height: 22.0),
 
           // A La Carte Micro-Store
@@ -112,7 +112,7 @@ class SovereignStoreTabView extends ConsumerWidget {
           const SizedBox(height: 8.0),
           _buildMicroPackRow(context, ref, '3 Direct Letters Pack', 'Reach their private inbox', '\$1.99 / ₹49', 'urheart_pack_direct_letters', surface, primaryText, subText, pine),
           const SizedBox(height: 8.0),
-          _buildMicroPackRow(context, ref, '24h Global Passport', 'Teleport to any global city for 24h', '\$1.99 / ₹99', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
+          _buildMicroPackRow(context, ref, '24h Global Passport', 'Teleport to any global city for 24h', '₹99 / \$1.99', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
           const SizedBox(height: 18.0),
 
           // Google Play Policy Restore Purchases Link
