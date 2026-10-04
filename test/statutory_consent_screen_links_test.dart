@@ -11,7 +11,7 @@ void main() {
       expect(ApiEndpoints.officialDomain, 'urheart.asiverticals.me');
       expect(ApiEndpoints.termsOfServiceUrl, 'https://urheart.asiverticals.me/terms');
       expect(ApiEndpoints.privacyPolicyUrl, 'https://urheart.asiverticals.me/privacy');
-      expect(ApiEndpoints.webSanctuaryUrl, 'https://urheart.asiverticals.me');
+      expect(ApiEndpoints.webSanctuaryUrl, 'https://urheart.asiverticals.me/appinfo');
       expect(ApiEndpoints.deleteAccountUrl, 'https://urheart.asiverticals.me/delete-account');
     });
 

@@ -191,12 +191,21 @@ async def test_appinfo_and_overview_rendering():
         assert "UR-Heart" in resp_appinfo.text
         assert "The 9 Core Sanctuary Subsystems" in resp_appinfo.text
         assert "Discovery Deck & Resonance Engine" in resp_appinfo.text
+        assert "25 Free Daily Intentional Swipes" in resp_appinfo.text or "25 / Day" in resp_appinfo.text
+        assert "3-Engine Industry-Grade AI Suite" in resp_appinfo.text
+        assert "Groq API" in resp_appinfo.text
+        assert "OpenRouter API" in resp_appinfo.text
+        assert "Google Gemini API" in resp_appinfo.text
+        assert "Night Sanctuary Slumber Mode" in resp_appinfo.text
+        assert "Hardware Satellite GPS" in resp_appinfo.text
         assert "Sanctuary Web Store" in resp_appinfo.text
+        assert "/delete-account" in resp_appinfo.text
 
         # 2. /overview
         resp_overview = await client.get("/overview")
         assert resp_overview.status_code == 200
         assert "The 9 Core Sanctuary Subsystems" in resp_overview.text
+        assert "3-Engine Industry-Grade AI Suite" in resp_overview.text
 
 
 @pytest.mark.asyncio
@@ -237,7 +246,13 @@ async def test_web_store_html_pricing_and_validity_alignment():
         assert "Most Mindful" in text
         assert "₹149" in text
 
-        # 5. Statutory billing terms box
+        # 5. Statutory billing terms box and navigation
         assert "Sovereign Billing Terms & Conditions" in text
         assert "Mutual Consent Guarantee" in text
+        assert "/appinfo" in text
+        assert "Platform Overview" in text
+        assert "+10% Extra Perks Included" in text
+        assert "/privacy" in text
+        assert "/terms" in text
+        assert "/delete-account" in text
 

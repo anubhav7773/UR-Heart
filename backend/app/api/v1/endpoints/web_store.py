@@ -1069,16 +1069,22 @@ async def serve_web_sanctuary_store(request: Request):
         <div class="brand-logo">♥</div>
         <div class="brand-title">UR-Heart</div>
       </a>
-      <div class="domain-tag">
-        <div class="dot"></div>
-        <span>urheart.asiverticals.me</span>
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+        <a href="/appinfo" style="color: var(--gold); text-decoration: none; font-size: 13px; font-weight: 600;">📖 Platform Overview</a>
+        <a href="/privacy" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">🛡️ Privacy</a>
+        <a href="/terms" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">⚖️ Terms</a>
+        <a href="/delete-account" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">🗑️ Deletion</a>
+        <div class="domain-tag">
+          <div class="dot"></div>
+          <span>urheart.asiverticals.me</span>
+        </div>
       </div>
     </div>
 
     <!-- Header -->
     <div class="store-header">
       <h1>Sovereign Web Store</h1>
-      <p>Official direct checkout with 10% bonus passes. Zero surveillance, zero app-store taxes, and instant cryptographic crest activation.</p>
+      <p>Official direct checkout with +10% extra bonus perks on all passes. Zero surveillance, zero app-store taxes, and instant cryptographic crest activation.</p>
     </div>
 
     <!-- LIVE STEP TRACKER (With Live Step Count) -->
@@ -1264,12 +1270,12 @@ async def serve_web_sanctuary_store(request: Request):
             <span id="sumSeekerEmail" style="color:#FFF;">seeker@urheart.app</span>
           </div>
           <div class="summary-row">
-            <span>Standard App Store Price</span>
-            <span id="sumStandardPrice">₹165</span>
+            <span>Sanctuary Standard Price</span>
+            <span id="sumStandardPrice">₹149</span>
           </div>
-          <div class="summary-row discount">
-            <span>Web Sanctuary Privilege Discount</span>
-            <span>-10% (Zero Platform Tax)</span>
+          <div class="summary-row discount" style="color:var(--emerald);">
+            <span>Web Sanctuary Advantage</span>
+            <span>+10% Extra Perks Included</span>
           </div>
           <div class="summary-row total">
             <span>Total Payable Amount</span>
@@ -1324,7 +1330,15 @@ async def serve_web_sanctuary_store(request: Request):
   </div>
 
   <footer>
-    <p>© 2026 Asiverticals. All rights reserved. • <a href="https://urheart.asiverticals.me">urheart.asiverticals.me</a> • <a href="/">Sanctuary Home</a></p>
+    <p>
+      © 2026 Asiverticals (Sole Proprietor: Anubhav Singh). All rights reserved. • 
+      <a href="https://urheart.asiverticals.me">urheart.asiverticals.me</a> • 
+      <a href="/appinfo">Platform Overview</a> • 
+      <a href="/privacy">Privacy Policy</a> • 
+      <a href="/terms">Terms & EULA</a> • 
+      <a href="/delete-account">Account Deletion</a> • 
+      <a href="/">Sanctuary Home</a>
+    </p>
   </footer>
 
   <script>
@@ -1390,7 +1404,7 @@ async def serve_web_sanctuary_store(request: Request):
 
       // Update Summary
       document.getElementById("sumItemName").innerText = name;
-      document.getElementById("sumStandardPrice").innerText = "₹" + Math.round(price * 1.15);
+      document.getElementById("sumStandardPrice").innerText = "₹" + price;
       document.getElementById("sumTotalAmount").innerText = "₹" + price;
 
       // Update QR Code

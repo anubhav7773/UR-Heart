@@ -159,7 +159,7 @@ class StatutoryLinksCard extends StatelessWidget {
           ),
           const SizedBox(height: 8.0),
 
-          // Portal 4: Official Parent Web Sanctuary
+          // Portal 4: Official Parent Web Sanctuary & App Overview
           _buildPortalTile(
             context: context,
             icon: Icons.language_rounded,

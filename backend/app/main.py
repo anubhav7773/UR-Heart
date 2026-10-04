@@ -790,10 +790,12 @@ def get_sanctuary_overview_html() -> str:
       </a>
       <nav class="nav-links">
         <a href="#manifesto">Manifesto</a>
-        <a href="#features">9 Subsystems</a>
+        <a href="#subsystems">9 Subsystems</a>
+        <a href="#ai-architecture">3-Engine AI</a>
         <a href="#journey">Seeker Journey</a>
+        <a href="#economics">Sovereign Store</a>
         <a href="#governance">DPDP Legal Desk</a>
-        <a href="/store" class="nav-cta">Web Store (10% Bonus) 🛒</a>
+        <a href="/store" class="nav-cta">Web Store (+10% Bonus) 🛒</a>
       </nav>
     </header>
 
@@ -810,21 +812,22 @@ def get_sanctuary_overview_html() -> str:
 
       <div class="hero-actions">
         <a class="btn btn-primary" href="urheart://open">🚀 Open UR-Heart App</a>
-        <a class="btn btn-gold" href="/store">🛒 Sanctuary Web Store (10% Bonus)</a>
+        <a class="btn btn-gold" href="/store">🛒 Sanctuary Web Store (+10% Perks)</a>
         <a class="btn btn-secondary" href="/privacy">🛡️ DPDP Privacy Policy</a>
         <a class="btn btn-secondary" href="/terms">⚖️ Community EULA</a>
+        <a class="btn btn-secondary" href="/delete-account">🗑️ Account Deletion</a>
       </div>
     </section>
 
     <!-- Stat Banner -->
     <div class="stat-banner">
       <div class="stat-card">
-        <div class="stat-num">10 / Day</div>
+        <div class="stat-num">25 / Day</div>
         <div class="stat-label">Mindful Swipe Quota</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">100% Verified</div>
-        <div class="stat-label">Eva Live 3s KYC Liveness</div>
+        <div class="stat-num">3-Engine AI</div>
+        <div class="stat-label">Groq • OpenRouter • Gemini</div>
       </div>
       <div class="stat-card">
         <div class="stat-num">Stage 3</div>
@@ -843,7 +846,7 @@ def get_sanctuary_overview_html() -> str:
         Modern dating platforms operate like dopamine casinos. They optimize algorithms for addictive infinite scrolling, superficial micro-second snap judgments, ghosting culture, and surveillance capitalism. When human beings are reduced to endless playing cards, loneliness multiplies.
       </p>
       <p>
-        <strong>UR-Heart is the sacred alternative.</strong> We introduce deliberate deceleration: a sacred cap of 10 daily intentional swipes, verified human identities through 3-second biometric KYC liveness challenges, deep soul-aligned resonance matching, poetic direct courtship letters, and graduated contact bridges that shield your private contact handles until genuine bilateral trust is proven.
+        <strong>UR-Heart is the sacred alternative.</strong> We introduce deliberate deceleration: a sacred cap of 25 daily intentional swipes, verified human identities through 3-second biometric KYC liveness challenges, deep soul-aligned resonance matching, poetic direct courtship letters, and graduated contact bridges that shield your private contact handles until genuine bilateral trust is proven.
       </p>
       <p style="margin-bottom:0; color:var(--gold); font-weight:600;">
         "We do not commodify human affection. We cultivate intentional kinship."
@@ -851,7 +854,7 @@ def get_sanctuary_overview_html() -> str:
     </section>
 
     <!-- 9 Core Subsystems -->
-    <h2 class="section-title" id="features">The 9 Core Sanctuary Subsystems</h2>
+    <h2 class="section-title" id="subsystems">The 9 Core Sanctuary Subsystems</h2>
     <p class="section-desc">An exhaustive breakdown of every architectural pillar and feature built into UR-Heart.</p>
 
     <div class="features-grid">
@@ -866,29 +869,120 @@ def get_sanctuary_overview_html() -> str:
             </div>
           </div>
           <p class="feature-text">
-            A deliberate deck capped at <strong>10 Free Daily Swipes</strong> (resetting daily at midnight IST) to eradicate mindless dopamine loops. Every profile computes a real-time <strong>Resonance Score (%)</strong> derived from mutual values, emotional intentions, and lifestyle prompts. Features <strong>1.1 km Fuzzy Geolocation Shielding</strong> so exact GPS coordinates are never broadcast.
+            A deliberate deck capped at <strong>25 Free Daily Intentional Swipes</strong> (resetting daily at midnight IST) to eradicate mindless dopamine loops. Every profile computes a real-time <strong>Resonance Score (%)</strong> derived from mutual values, emotional intentions, and lifestyle prompts. Features <strong>1.1 km Fuzzy Geolocation Shielding</strong> so exact domestic coordinates are never broadcast.
           </p>
         </div>
         <div class="feature-chips">
-          <span class="chip">10 Swipes/Day Cap</span>
+          <span class="chip">25 Swipes/Day Cap</span>
           <span class="chip">Resonance Algorithm</span>
           <span class="chip">1.1km Fuzzy Geo</span>
-          <span class="chip">6 Curated Photo Slots</span>
+          <span class="chip">5 Moments Photo Gallery</span>
         </div>
       </div>
 
-      <!-- 2. Direct Letters -->
+      <!-- 2. 3-Engine Industry-Grade AI Architecture -->
+      <div class="feature-card" id="ai-architecture">
+        <div>
+          <div class="feature-header">
+            <div class="feature-icon coral">🧠</div>
+            <div>
+              <div class="feature-num">Subsystem 02</div>
+              <div class="feature-title">3-Engine Industry-Grade AI Suite</div>
+            </div>
+          </div>
+          <p class="feature-text">
+            Strict separation of duties across 3 specialized intelligence engines:
+            <br>• <strong>Groq API</strong>: Powers 3s active biometric KYC face & liveness verification with zero-catfish assurance, plus Deep Narrative Bio Polish synthesizing keywords (e.g. <em>"student disciplined lawyer"</em>) into magnetic first-person bios.
+            <br>• <strong>OpenRouter API</strong>: Powers the Sanctuary Companion (Eva AI Advisor) grounded strictly in UR-Heart's mindful syllabus with 100% domain refusal guardrails.
+            <br>• <strong>Google Gemini API</strong>: Powers the Real-Time Dialogue Wingman in 1-on-1 chats with 3 contextual suggestions (🔥 Spark, 🌱 Resonance, ☕ Segue) and coach insights.
+          </p>
+        </div>
+        <div class="feature-chips">
+          <span class="chip">Groq KYC & Bio Polish</span>
+          <span class="chip">OpenRouter Companion</span>
+          <span class="chip">Gemini Chat Wingman</span>
+          <span class="chip">100% Domain Guardrails</span>
+        </div>
+      </div>
+
+      <!-- 3. Night Sanctuary Slumber Mode -->
       <div class="feature-card">
         <div>
           <div class="feature-header">
-            <div class="feature-icon coral">💌</div>
+            <div class="feature-icon emerald">🌙</div>
             <div>
-              <div class="feature-num">Subsystem 02</div>
+              <div class="feature-num">Subsystem 03</div>
+              <div class="feature-title">Night Sanctuary Slumber Mode</div>
+            </div>
+          </div>
+          <p class="feature-text">
+            Active nightly from <strong>10:00 PM to 6:00 AM IST</strong>. Protects nocturnal peace, healthy sleep hygiene, and digital wellness by discouraging late-night scrolling. Integrated with device proximity and accelerometer hardware sensors: resting your phone face-down tracks mindful slumber and earns bonus morning discovery swipes.
+          </p>
+        </div>
+        <div class="feature-chips">
+          <span class="chip">10 PM - 6 AM Slumber</span>
+          <span class="chip">Hardware Face-Down Sensors</span>
+          <span class="chip">Morning Bonus Swipes</span>
+          <span class="chip">Nocturnal Peace</span>
+        </div>
+      </div>
+
+      <!-- 4. Hardware Satellite GPS & Anti-Spoofing Perimeter -->
+      <div class="feature-card">
+        <div>
+          <div class="feature-header">
+            <div class="feature-icon">🛰️</div>
+            <div>
+              <div class="feature-num">Subsystem 04</div>
+              <div class="feature-title">Hardware Satellite GPS & Anti-Spoofing</div>
+            </div>
+          </div>
+          <p class="feature-text">
+            Native hardware telemetry directly verifies authentic GPS satellite constellations. Actively intercepts and rejects Android mock location providers, developer fake-GPS spoofing tools, and sudden VPN teleportation hops. Calculates distances with an intentional <strong>1.1 km fuzzy offset</strong> to protect domestic perimeter privacy.
+          </p>
+        </div>
+        <div class="feature-chips">
+          <span class="chip">Hardware Satellite GPS</span>
+          <span class="chip">Anti-Mock Detection</span>
+          <span class="chip">VPN-Hop Defense</span>
+          <span class="chip">1.1km Perimeter Shield</span>
+        </div>
+      </div>
+
+      <!-- 5. The Sacred Bridge (Graduated Reveal) -->
+      <div class="feature-card">
+        <div>
+          <div class="feature-header">
+            <div class="feature-icon coral">🌉</div>
+            <div>
+              <div class="feature-num">Subsystem 05</div>
+              <div class="feature-title">The Sacred Bridge (Graduated Reveal)</div>
+            </div>
+          </div>
+          <p class="feature-text">
+            Eliminates premature off-platform harassment and contact harvesting. <strong>Stage 1:</strong> Soulful text-only dialogue. <strong>Stage 2:</strong> Mutual photo moments exchange. <strong>Stage 3:</strong> Graduated Bridge Unlock — verified WhatsApp handle or phone number is revealed strictly upon <strong>bilateral mutual consent</strong>. Stored using AES-256-GCM encryption. Instant Contact Key fast-tracks the ritual but strictly requires mutual peer consent.
+          </p>
+        </div>
+        <div class="feature-chips">
+          <span class="chip">3-Stage Protocol</span>
+          <span class="chip">Bilateral Mutual Consent</span>
+          <span class="chip">AES-256-GCM Encryption</span>
+          <span class="chip">Anti-Harvesting Shield</span>
+        </div>
+      </div>
+
+      <!-- 6. Direct Letters (Golden Envelopes) -->
+      <div class="feature-card">
+        <div>
+          <div class="feature-header">
+            <div class="feature-icon emerald">💌</div>
+            <div>
+              <div class="feature-num">Subsystem 06</div>
               <div class="feature-title">Direct Letters (Golden Envelopes)</div>
             </div>
           </div>
           <p class="feature-text">
-            Bypass blind matching through the lost art of courtship. Compose a thoughtful, poetic letter directly attached to a seeker's heart. Arrives in a distinct <strong>Sacred Golden Envelope</strong> in the recipient's inbox with opening animations. Protected by token scarcity to eliminate unwanted spam.
+            Bypass blind matching through the lost art of courtship. Compose a thoughtful, poetic letter directly attached to a seeker's heart. Arrives in a distinct <strong>Sacred Golden Envelope</strong> in the recipient's private inbox with opening animations. Protected by token scarcity to eliminate unwanted spam and cultivate meaningful dialogue.
           </p>
         </div>
         <div class="feature-chips">
@@ -896,94 +990,6 @@ def get_sanctuary_overview_html() -> str:
           <span class="chip">Golden Envelope Inbox</span>
           <span class="chip">Token-Gated Scarcity</span>
           <span class="chip">Priority Delivery</span>
-        </div>
-      </div>
-
-      <!-- 3. Reciprocal Matches & 1:1 Encrypted Dialogues -->
-      <div class="feature-card">
-        <div>
-          <div class="feature-header">
-            <div class="feature-icon emerald">💬</div>
-            <div>
-              <div class="feature-num">Subsystem 03</div>
-              <div class="feature-title">Reciprocal Matches & Encrypted Dialogues</div>
-            </div>
-          </div>
-          <p class="feature-text">
-            Dialogues unlock strictly when two souls reciprocally match or accept a Direct Letter. Powered by real-time WebSocket infrastructure. Features an active <strong>Pre-Storage Moderation Shield</strong> that filters slurs, off-platform harassment, and extortion attempts before messages ever touch persistent storage.
-          </p>
-        </div>
-        <div class="feature-chips">
-          <span class="chip">Mutual Match Only</span>
-          <span class="chip">WebSocket Real-Time</span>
-          <span class="chip">Pre-Storage Moderation</span>
-          <span class="chip">Ephemeral Message Purge</span>
-        </div>
-      </div>
-
-      <!-- 4. The Sacred Bridge -->
-      <div class="feature-card">
-        <div>
-          <div class="feature-header">
-            <div class="feature-icon">🌉</div>
-            <div>
-              <div class="feature-num">Subsystem 04</div>
-              <div class="feature-title">The Sacred Bridge (Graduated Reveal)</div>
-            </div>
-          </div>
-          <p class="feature-text">
-            Eliminates premature off-platform harassment. <strong>Stage 1:</strong> Soulful text dialogue. <strong>Stage 2:</strong> Photo exchange & mutual readiness. <strong>Stage 3:</strong> Graduated Bridge Unlock — verified WhatsApp handle or contact crest is revealed strictly upon mutual bilateral consent (after 50+ exchanged messages or mutual agreement). Stored using AES-256 encryption.
-          </p>
-        </div>
-        <div class="feature-chips">
-          <span class="chip">3-Stage Protocol</span>
-          <span class="chip">Bilateral Consent</span>
-          <span class="chip">AES-256 Storage</span>
-          <span class="chip">Anti-Scraping Shield</span>
-        </div>
-      </div>
-
-      <!-- 5. Eva AI Companion -->
-      <div class="feature-card">
-        <div>
-          <div class="feature-header">
-            <div class="feature-icon coral">✨</div>
-            <div>
-              <div class="feature-num">Subsystem 05</div>
-              <div class="feature-title">Eva AI Sanctuary Confidante</div>
-            </div>
-          </div>
-          <p class="feature-text">
-            Your 24/7 empathetic wingwoman and conversational confidante. Fluent in English and conversational Hinglish. Offers mindful conversation starters, unpacks dating anxieties, assists in articulating genuine reflections, and reminds users of healthy boundaries. 100% sandboxed—never used for public AI training or ads.
-          </p>
-        </div>
-        <div class="feature-chips">
-          <span class="chip">Bilingual / Hinglish</span>
-          <span class="chip">Empathetic Coach</span>
-          <span class="chip">Contextual Icebreakers</span>
-          <span class="chip">Sandboxed Privacy</span>
-        </div>
-      </div>
-
-      <!-- 6. Eva Live 3-Second Biometric KYC Liveness -->
-      <div class="feature-card">
-        <div>
-          <div class="feature-header">
-            <div class="feature-icon emerald">🛡️</div>
-            <div>
-              <div class="feature-num">Subsystem 06</div>
-              <div class="feature-title">Eva Live 3s Biometric KYC Liveness</div>
-            </div>
-          </div>
-          <p class="feature-text">
-            A zero-catfish sanctuary. Users undergo an active 3-second biometric liveness challenge with randomized micro-actions (blink, smile, turn head) verified via computer vision anti-spoofing. Confirmed seekers earn the permanent <strong>Sacred Check Crest</strong>. <em>Raw biometric video frames are ephemerally discarded immediately after validation.</em>
-          </p>
-        </div>
-        <div class="feature-chips">
-          <span class="chip">Active 3s Challenge</span>
-          <span class="chip">Anti-Spoofing Vision</span>
-          <span class="chip">Sacred Check Crest</span>
-          <span class="chip">Ephemeral Frame Purge</span>
         </div>
       </div>
 
@@ -998,36 +1004,42 @@ def get_sanctuary_overview_html() -> str:
             </div>
           </div>
           <p class="feature-text">
-            Nurtures authentic communication consistency without toxic pressure. Daily consecutive dialogues earn sacred flame streaks and Kinship tokens. Features a <strong>36-Hour Grace Window</strong> and gradual decay rather than harsh punitive resets. Streak freeze charms are earnable through mindful community engagement.
+            Nurtures authentic communication consistency without toxic pressure. Daily consecutive dialogues earn sacred flame streaks and Kinship reflections. Features a generous <strong>36-Hour Grace Window</strong> and gradual decay rather than harsh punitive resets. Streak freeze charms are earnable through mindful community engagement.
           </p>
         </div>
         <div class="feature-chips">
           <span class="chip">Sacred Flame Streaks</span>
           <span class="chip">36-Hour Grace Window</span>
           <span class="chip">Streak Freeze Charms</span>
-          <span class="chip">Kinship Token Rewards</span>
+          <span class="chip">Kinship Reflections</span>
         </div>
       </div>
 
-      <!-- 8. Sovereign Web Store & Transparent Pricing -->
-      <div class="feature-card">
+      <!-- 8. Sovereign Economy & Multi-Tier Store -->
+      <div class="feature-card" id="economics">
         <div>
           <div class="feature-header">
             <div class="feature-icon coral">🛒</div>
             <div>
               <div class="feature-num">Subsystem 08</div>
-              <div class="feature-title">Sovereign Web Store & Direct Checkout</div>
+              <div class="feature-title">Sovereign Store & Transparent Economy</div>
             </div>
           </div>
           <p class="feature-text">
-            Direct web checkout at <code>urheart.asiverticals.me/store</code> supporting instant UPI (Google Pay, PhonePe, Paytm, BHIM), Indian NetBanking, and Credit/Debit Cards via Razorpay webhooks, alongside Google Play Billing. Features a <strong>10% Sovereign Web Bonus</strong> on all direct purchases. Zero recurring traps or deceptive dark patterns.
+            Transparent, fair pricing across Google Play, Apple App Store, and the Sanctuary Web Store (<code>urheart.asiverticals.me/store</code>).
+            <br>• <strong>Weekly Pass</strong>: ₹49 (100 Swipes) / $4.99 (200 Swipes) · <em>Web Store: 110 Swipes (+10% Bonus)</em>
+            <br>• <strong>Monthly Pass</strong>: ₹149 (500 Swipes) / $14.99 (1,000 Swipes) + 5 Direct Letters · <em>Web Store: 550 Swipes + 6 Letters</em>
+            <br>• <strong>1-Year Sovereign Pass</strong>: ₹1,499 / $59.99 · 365 Days Unlimited Swipes + 10 Direct Letters · <em>Web Store: 11 Letters (+10% Bonus)</em>
+            <br>• <strong>24h Global Passport</strong>: ₹99 / $1.99 standalone city teleportation (24h) · <em>Web: +10 Bonus Swipes</em>
+            <br>• <strong>Direct Letters Pack</strong>: ₹49 / $1.99 (3 Notes · <em>Web: 4 Notes</em>)
+            <br>• <strong>Instant Contact Key</strong>: ₹29 / $1.49 (Requires mutual consent)
           </p>
         </div>
         <div class="feature-chips">
-          <span class="chip">10% Web Bonus</span>
-          <span class="chip">UPI / NetBanking / Cards</span>
-          <span class="chip">Google Play Billing</span>
-          <span class="chip">Zero Dark Patterns</span>
+          <span class="chip">+10% Web Store Bonus</span>
+          <span class="chip">Instant UPI / NetBanking / Cards</span>
+          <span class="chip">Zero Subscription Traps</span>
+          <span class="chip">Cryptographic Ledger</span>
         </div>
       </div>
 
@@ -1042,14 +1054,14 @@ def get_sanctuary_overview_html() -> str:
             </div>
           </div>
           <p class="feature-text">
-            Engineered under India's <strong>DPDP Act 2023</strong> and Section 79 of the IT Act 2000. Features <strong>Section 9 Child Protection</strong> (absolute 18+ adult age gate & quarantine), <strong>Section 11 Data Portability</strong> (JSON archive download), <strong>Section 14 Lawful Nominee</strong> designation, and <strong>Section 12 Account Incinerator</strong> with public deletion at <code>/delete-account</code>.
+            Engineered strictly under India's <strong>DPDP Act 2023</strong> and Section 79 of the IT Act 2000. Features <strong>Section 9 Child Protection</strong> (absolute 18+ adult age gate via verified DOB), <strong>Section 11 Data Portability</strong> (machine-readable JSON archive export), <strong>Section 14 Lawful Nominee</strong> designation, and <strong>Section 12 Cryptographic Account Incinerator</strong> with public deletion at <code>/delete-account</code> without app login.
           </p>
         </div>
         <div class="feature-chips">
           <span class="chip">DPDP Act 2023 Compliant</span>
           <span class="chip">Section 79 Safe Harbor</span>
           <span class="chip">24h SLA Grievance Desk</span>
-          <span class="chip">Account Incinerator</span>
+          <span class="chip">Account Incinerator (/delete-account)</span>
         </div>
       </div>
     </div>
@@ -1072,22 +1084,22 @@ def get_sanctuary_overview_html() -> str:
       <div class="step-card">
         <div class="step-badge">STEP 03</div>
         <div class="step-title">Eva Live 3s KYC Liveness</div>
-        <div class="step-desc">Complete a 3-second anti-spoofing micro-gesture test. Instantly earn the verified Sacred Check Crest on your 6-moment persona card.</div>
+        <div class="step-desc">Complete a 3-second anti-spoofing micro-gesture test via Groq vision. Instantly earn the verified Sacred Check Crest on your 5-moment persona card.</div>
       </div>
       <div class="step-card">
         <div class="step-badge">STEP 04</div>
         <div class="step-title">Intentional Daily Discovery</div>
-        <div class="step-desc">Review your curated 10 daily profiles with computed Resonance Scores and 1.1km fuzzy distance shields. No endless swiping exhaustion.</div>
+        <div class="step-desc">Review your curated 25 daily profiles with computed Resonance Scores and 1.1km fuzzy distance shields. No endless swiping exhaustion.</div>
       </div>
       <div class="step-card">
         <div class="step-badge">STEP 05</div>
         <div class="step-title">Direct Letter or Mutual Match</div>
-        <div class="step-desc">Send a heartfelt Golden Envelope letter or exchange reciprocal likes to initiate a protected 1:1 sanctuary dialogue chamber.</div>
+        <div class="step-desc">Send a heartfelt Golden Envelope letter or exchange reciprocal likes to initiate a protected 1:1 sanctuary dialogue chamber with Google Gemini Wingman support.</div>
       </div>
       <div class="step-card">
         <div class="step-badge">STEP 06</div>
         <div class="step-title">Graduated Sacred Bridge</div>
-        <div class="step-desc">Build genuine trust through shielded text, mutual photo requests, and finally unlock verified WhatsApp contact handles upon bilateral consent.</div>
+        <div class="step-desc">Build genuine trust through shielded text, mutual photo requests, and finally unlock verified WhatsApp contact handles upon bilateral mutual consent.</div>
       </div>
     </div>
 
@@ -1108,27 +1120,32 @@ def get_sanctuary_overview_html() -> str:
           <tr>
             <td><strong>Daily Swipes</strong></td>
             <td>Unlimited / 100+ (Dopamine casino addiction)</td>
-            <td><strong>10 Mindful Swipes / Day</strong> (Conscious deceleration)</td>
+            <td><strong>25 Mindful Swipes / Day</strong> (Conscious deceleration)</td>
           </tr>
           <tr>
             <td><strong>Identity Verification</strong></td>
             <td>Optional or easily faked with static selfies</td>
-            <td><strong>Eva Live 3s Active KYC</strong> (Zero-catfish guarantee)</td>
+            <td><strong>Eva Live 3s Active KYC (Groq)</strong> (Zero-catfish guarantee)</td>
+          </tr>
+          <tr>
+            <td><strong>AI Assistance</strong></td>
+            <td>None or commercial ad-tracking bots</td>
+            <td><strong>3 Specialized Engines</strong> (Groq KYC/Bio • OpenRouter Eva • Gemini Wingman)</td>
           </tr>
           <tr>
             <td><strong>Contact Sharing</strong></td>
             <td>Unregulated; leads to early off-platform stalking</td>
-            <td><strong>Graduated Sacred Bridge</strong> (3-stage bilateral consent)</td>
+            <td><strong>Graduated Sacred Bridge</strong> (3-stage bilateral mutual consent)</td>
           </tr>
           <tr>
             <td><strong>Data Surveillance</strong></td>
             <td>Data sold to brokers & programmatic ad networks</td>
-            <td><strong>DPDP Act 2023 Zero-Surveillance</strong> (No ad brokers)</td>
+            <td><strong>DPDP Act 2023 Zero-Surveillance</strong> (No ad brokers, full privacy)</td>
           </tr>
           <tr>
             <td><strong>Location Privacy</strong></td>
             <td>Exact GPS coordinates tracked & exposed</td>
-            <td><strong>1.1 km Fuzzy Geolocation Shield</strong></td>
+            <td><strong>1.1 km Fuzzy Geolocation Shield & Anti-Spoofing</strong></td>
           </tr>
           <tr>
             <td><strong>Grievance Mechanism</strong></td>

@@ -81,7 +81,7 @@ class SovereignStoreTabView extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Sanctuary Web Store (+10% Bonus Perks)',
+                        Text('Sanctuary Web Store (10% Extra Passes)',
                             style: TextStyle(color: terracotta, fontSize: 13.0, fontWeight: FontWeight.bold)),
                         Text('Visit urheart.asiverticals.me/store for web checkout with +10% extra perks on all passes.',
                             style: TextStyle(color: subText, fontSize: 11.0)),
