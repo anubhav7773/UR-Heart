@@ -288,30 +288,22 @@ class AiOrchestrator:
         user_draft_reply: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Provides 3 mindful reply paths or coaches a user's drafted message.
+        Delegates dialogue wingman requests to GeminiWingmanEngine (Engine 3).
         """
-        prompt = (
-            f"Match Name: {partner_name}\n"
-            f"Last message received: \"{last_incoming_message[:300]}\"\n"
+        from app.services.gemini_wingman_engine import GeminiWingmanEngine
+        result = await GeminiWingmanEngine.generate_wingman_guidance(
+            partner_name=partner_name,
+            last_incoming_message=last_incoming_message,
+            user_draft_reply=user_draft_reply
         )
-        if user_draft_reply:
-            prompt += f"User's draft reply: \"{user_draft_reply[:300]}\"\n"
-            prompt += (
-                "Task: Provide thoughtful, mindful feedback on the user's draft in 2 sentences, "
-                "then provide 2 refined alternatives (one warm & playful, one deep & grounded)."
-            )
-        else:
-            prompt += (
-                "Task: Suggest 3 authentic, grounded reply paths for the user. "
-                "1) Curious & Thoughtful, 2) Playful & Light, 3) Clear & Intentional. "
-                "Keep each suggestion under 25 words."
-            )
-
-        result = await cls.chat_with_eva(
-            user_message=prompt,
-            context_metadata={"screen": "ChatDialogue", "partner_name": partner_name}
-        )
-        return result
+        return {
+            "reply": result.get("reply", ""),
+            "coach_insight": result.get("coach_insight", ""),
+            "suggestions": result.get("suggestions", []),
+            "is_guarded": result.get("is_guarded", False),
+            "status": "success",
+            "engine": result.get("engine")
+        }
 
     @classmethod
     async def assist_grievance_filing(

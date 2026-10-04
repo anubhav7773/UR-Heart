@@ -135,11 +135,28 @@ class AiSanctuaryRepository {
     };
   }
 
-  /// Get real-time in-chat wingman advice
+  /// Get real-time in-chat wingman advice (text formatted)
   Future<String> getDialogueCoaching({
     required String partnerName,
     required String lastIncomingMessage,
     String? userDraftReply,
+  }) async {
+    final result = await getDialogueWingmanGuidance(
+      partnerName: partnerName,
+      lastIncomingMessage: lastIncomingMessage,
+      userDraftReply: userDraftReply,
+    );
+    return result.formattedReply;
+  }
+
+  /// Get structured 3-tier wingman guidance powered by Gemini Engine 3
+  Future<WingmanGuidanceResult> getDialogueWingmanGuidance({
+    required String partnerName,
+    required String lastIncomingMessage,
+    String? userDraftReply,
+    String? partnerBio,
+    List<String>? partnerInterests,
+    List<Map<String, dynamic>>? recentMessages,
   }) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
@@ -149,15 +166,60 @@ class AiSanctuaryRepository {
           'last_incoming_message': lastIncomingMessage,
           if (userDraftReply != null && userDraftReply.isNotEmpty)
             'user_draft_reply': userDraftReply,
+          if (partnerBio != null && partnerBio.isNotEmpty)
+            'partner_bio': partnerBio,
+          if (partnerInterests != null && partnerInterests.isNotEmpty)
+            'partner_interests': partnerInterests,
+          if (recentMessages != null && recentMessages.isNotEmpty)
+            'recent_messages': recentMessages,
         },
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        return response.data!['reply']?.toString() ?? '';
+        final data = response.data!;
+        final rawSuggestions = data['suggestions'] as List<dynamic>? ?? [];
+        final suggestions = rawSuggestions.map((s) {
+          final map = s as Map<String, dynamic>;
+          return WingmanSuggestionItem(
+            type: map['type']?.toString() ?? 'spark',
+            label: map['label']?.toString() ?? 'Suggestion',
+            text: map['text']?.toString() ?? '',
+          );
+        }).toList();
+
+        return WingmanGuidanceResult(
+          coachInsight: data['coach_insight']?.toString() ?? '',
+          suggestions: suggestions,
+          formattedReply: data['reply']?.toString() ?? '',
+          isGuarded: data['is_guarded'] as bool? ?? false,
+          engine: data['engine']?.toString(),
+        );
       }
     } catch (_) {}
 
-    return 'Try sharing what resonated with you from their message, or ask an open-ended question about what brings them quiet joy.';
+    return const WingmanGuidanceResult(
+      coachInsight: 'Keep the connection natural and grounded.',
+      suggestions: [
+        WingmanSuggestionItem(
+          type: 'spark',
+          label: '🔥 Playful Spark',
+          text: 'Haha that sounds intriguing! Are you always this adventurous?',
+        ),
+        WingmanSuggestionItem(
+          type: 'resonance',
+          label: '🌱 Deep Resonance',
+          text: 'I really value quiet moments like that. What helps you unwind after a long day?',
+        ),
+        WingmanSuggestionItem(
+          type: 'segue',
+          label: '☕ Smooth Segue',
+          text: 'Speaking of which, do you have a favorite local coffee spot or quiet hideaway?',
+        ),
+      ],
+      formattedReply: 'Try sharing what resonated with you from their message, or ask an open-ended question about what brings them quiet joy.',
+      isGuarded: false,
+      engine: 'fallback',
+    );
   }
 
   /// Get empathetic statutory grievance assistance under IT Rules 2021
@@ -181,4 +243,32 @@ class AiSanctuaryRepository {
 
     return 'Your emotional safety is our top priority. We have recorded your concern. Please select the category that best describes the incident and attach any screenshots for our Statutory Grievance Officer.';
   }
+}
+
+class WingmanSuggestionItem {
+  final String type;
+  final String label;
+  final String text;
+
+  const WingmanSuggestionItem({
+    required this.type,
+    required this.label,
+    required this.text,
+  });
+}
+
+class WingmanGuidanceResult {
+  final String coachInsight;
+  final List<WingmanSuggestionItem> suggestions;
+  final String formattedReply;
+  final bool isGuarded;
+  final String? engine;
+
+  const WingmanGuidanceResult({
+    required this.coachInsight,
+    required this.suggestions,
+    required this.formattedReply,
+    required this.isGuarded,
+    this.engine,
+  });
 }

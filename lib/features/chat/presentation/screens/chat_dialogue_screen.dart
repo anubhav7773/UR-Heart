@@ -369,20 +369,13 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                   const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
             ),
             tooltip: 'Eva Dialogue Wingman',
-            onPressed: () {
-              final rName = args?.recipientName ??
-                  (peer['full_name'] as String? ?? 'Seeker');
-              final lastMsg = dialogueState.messages.isNotEmpty
-                  ? dialogueState.messages.last.text
-                  : 'Start a thoughtful, slow dialogue.';
-              AiDialogueCoachSheet.show(
-                context: context,
-                partnerName: rName,
-                lastIncomingMessage: lastMsg,
-                isDark: isDark,
-                onApplyReply: (_) {},
-              );
-            },
+            onPressed: () => _openWingmanCoach(
+              context,
+              isDark,
+              args,
+              peer,
+              dialogueState,
+            ),
           ),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert_rounded, color: primaryText),
@@ -562,6 +555,13 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                   controller: _chatInputController,
                   onSendMessage: (cleanText) => notifier.sendMessage(cleanText),
                   onViolation: (violation) => notifier.setViolationAlert(violation),
+                  onWingmanPressed: () => _openWingmanCoach(
+                    context,
+                    isDark,
+                    args,
+                    peer,
+                    dialogueState,
+                  ),
                 ),
               ],
             ),
@@ -609,6 +609,53 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
             ),
         ],
       ),
+    );
+  }
+
+  void _openWingmanCoach(
+    BuildContext context,
+    bool isDark,
+    ChatDialogueArguments? args,
+    Map<String, dynamic> peer,
+    ChatDialogueState dialogueState,
+  ) {
+    final String rName = args?.recipientName ??
+        (peer['full_name'] as String? ?? 'Seeker');
+    final String lastMsg = dialogueState.messages.isNotEmpty
+        ? dialogueState.messages.last.text
+        : 'Start a thoughtful, slow dialogue.';
+    final String pBio = (args != null && args.bio.isNotEmpty
+            ? args.bio
+            : (peer['bio'] as String? ?? ''))
+        .trim();
+    final List<String> pInterests = (args != null && args.interests.isNotEmpty
+        ? args.interests
+        : ((peer['interests'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const <String>[]));
+    final List<Map<String, dynamic>> recentMsgs = dialogueState.messages
+        .map((ChatMessage m) => <String, dynamic>{
+              'sender': m.isMe ? 'me' : rName,
+              'text': m.text,
+              'isMe': m.isMe,
+            })
+        .toList();
+
+    AiDialogueCoachSheet.show(
+      context: context,
+      partnerName: rName,
+      lastIncomingMessage: lastMsg,
+      isDark: isDark,
+      partnerBio: pBio,
+      partnerInterests: pInterests,
+      recentMessages: recentMsgs,
+      onApplyReply: (selectedReply) {
+        _chatInputController.text = selectedReply;
+        _chatInputController.selection = TextSelection.fromPosition(
+          TextPosition(offset: selectedReply.length),
+        );
+      },
     );
   }
 

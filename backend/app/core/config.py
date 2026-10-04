@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     EVA_IDENTITY_API_KEY: str = ""
     EVA_COMPANION_API_KEY: str = ""
 
+    # Google AI Studio Gemini Engine (Dialogue Realtime Wingman)
+    GEMINI_API_KEY: str = ""
+    GEMINI_API_URL: str = "https://generativelanguage.googleapis.com/v1beta/models"
+
     # Firebase Admin & Storage
     FIREBASE_PROJECT_ID: str = "ur-heart-44b46"
     FIREBASE_STORAGE_BUCKET: str = "ur-heart-44b46.firebasestorage.app"

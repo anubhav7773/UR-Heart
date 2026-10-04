@@ -54,6 +54,7 @@ class EvaIdentityEngine:
         return {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
+            "User-Agent": "UR-Heart-Sanctuary/1.0",
         }
 
     @classmethod
@@ -464,37 +465,38 @@ class EvaIdentityEngine:
     @classmethod
     async def polish_bio(cls, draft: str, user_name: str = "Seeker") -> Dict[str, Any]:
         """
-        Transforms even 2-3 words into a vivid, authentic, personalized 3-line sanctuary bio.
-        Lines:
-        1: Soul essence / passions
-        2: Mindful philosophy / lifestyle
-        3: Warm sanctuary invitation
+        Deeply analyzes user's raw thoughts, fragmented keywords (e.g. 'student deciplined lawyer etc'),
+        or draft lines using Groq LPU and synthesizes a charismatic, authentic, non-generic first-person profile bio.
         """
         raw_draft = draft.strip()
         system_prompt = (
-            "You are Eva, the Elite Dating Profile Bio Specialist for the UR-Heart mindful dating app.\n"
-            "Your task: Transform the user's input—whether 2-3 words, keywords, or a rough sentence—into an authentic, "
-            "deeply attractive, captivating first-person dating profile bio (self-summary) written for other seekers to read.\n\n"
-            "CRITICAL CONSTRAINTS (ZERO-CHATBOT POLICY):\n"
-            "1. NEVER WRITE CONVERSATIONAL QUESTIONS OR CHAT PROMPTS. Absolutely NO lines like 'Tell me what keeps you inspired', 'What's your story?', 'Ask me anything', 'Say hi', or 'Drop a note'. You are NOT chatting with the user or giving them an interview question.\n"
-            "2. WRITE STRICTLY IN FIRST-PERSON (self-expression: who they are, their daily vibe, passions, lifestyle, and what kind of genuine bond they seek).\n"
-            "3. NO ROBOTIC BULLETS OR RAW PREPENDS. Weave their input naturally into smooth, evocative prose.\n"
-            "4. NEVER USE DATING CLICHÉS ('partner in crime', 'loves to laugh', 'work hard play hard', 'fluent in sarcasm').\n"
-            "5. STRUCTURE: Exactly 2 to 3 concise, punchy sentences (total 35-60 words):\n"
-            "   - First part: Authentic lifestyle, energy, creative passions, or daily rituals.\n"
-            "   - Second part: What they value in life and what kind of genuine, long-term connection they are here to build.\n"
-            "6. TONE: Warm, confident, grounded, emotionally intelligent, and magnetically authentic.\n"
-            "7. Return ONLY the final polished bio text without quotes, commentary, headers, or markdown formatting."
+            "You are Eva, the Master Dating Profile Bio Alchemist for UR-Heart mindful dating sanctuary.\n"
+            "Your specialized mission: The user provides raw words, keywords, or fragmented thoughts "
+            "(e.g., 'student deciplined lawyer etc' or 'coffee vinyl introvert travel').\n\n"
+            "DEEP KEYWORD ARCHETYPE ANALYSIS:\n"
+            "- Step 1: Deeply analyze each keyword to uncover the hidden personality archetype, ambition, lifestyle, and values.\n"
+            "  For example, 'student' signifies intellectual curiosity and continuous learning; 'deciplined' signifies intentional daily habits, focus, and integrity; "
+            "'lawyer' signifies analytical precision, articulate mind, and standing up for justice.\n"
+            "- Step 2: Weave these distinct traits into a breathtaking, magnetic, authentic first-person dating profile bio written for other seekers to admire.\n\n"
+            "CRITICAL RULES (ZERO CHATBOT, ZERO CLICHÉ):\n"
+            "1. NEVER WRITE QUESTIONS OR CHAT PROMPTS. Absolutely NO lines like 'What's your story?', 'Tell me more', 'Ask me anything', or 'Say hi'.\n"
+            "2. WRITE STRICTLY IN FIRST-PERSON ('I balance...', 'Drawn to...', 'Finding rhythm in...').\n"
+            "3. NO DATING CLICHÉS ('partner in crime', 'loves to laugh', 'work hard play hard', 'fluent in sarcasm').\n"
+            "4. STRUCTURE: Exactly 2 to 3 concise, punchy sentences (total 35-55 words):\n"
+            "   - Sentence 1: Their craft, daily discipline, intellectual or creative drive.\n"
+            "   - Sentence 2-3: The emotional depth, quiet joy, and genuine bond they are here to build.\n"
+            "5. TONE: Warm, confident, grounded, emotionally intelligent, and magnetically authentic.\n"
+            "6. OUTPUT FORMAT: Return ONLY the final polished bio text without quotes, commentary, headers, or markdown formatting."
         )
 
-        user_content = f"Seeker name: {user_name}\nDraft input: '{raw_draft}'\nWrite their polished 1st-person dating profile bio (NO questions, NO chatbot talk):"
+        user_content = f"Seeker name: {user_name}\nRaw input keywords/draft: '{raw_draft}'\nWrite their polished 1st-person dating profile bio:"
 
-        # Try Groq primary model pool
+        # 1. Primary Engine: Groq Active High-Intelligence Model Pool
         groq_models = [
-            "llama-3.3-70b-versatile",
-            "llama3-70b-8192",
-            "llama-3.1-8b-instant",
-            "gemma2-9b-it"
+            "qwen/qwen3.8-27b",
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "allam-2-7b"
         ]
         groq_key = (
             getattr(settings, "EVA_IDENTITY_API_KEY", "") or
@@ -512,7 +514,7 @@ class EvaIdentityEngine:
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_content}
                         ],
-                        "temperature": 0.7,
+                        "temperature": 0.75,
                         "max_tokens": 200,
                     }
                     async with httpx.AsyncClient(timeout=8.0) as client:
@@ -521,18 +523,19 @@ class EvaIdentityEngine:
                             choice = res.json().get("choices", [{}])[0]
                             bio_text = choice.get("message", {}).get("content", "").strip()
                             if bio_text:
-                                return {"polished_bio": bio_text, "model": f"groq:{g_model}"}
+                                clean_text = re.sub(r'^["\']|["\']$', '', bio_text).strip()
+                                return {"polished_bio": clean_text, "model": f"groq:{g_model}"}
                 except Exception as e:
                     logger.warning("Groq bio polish error (%s): %s", g_model, e)
 
-        # Fallback to OpenRouter model pool
+        # 2. Secondary Engine: OpenRouter Active Verified Free Models
         or_key = getattr(settings, "OPENROUTER_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "") or ""
         if or_key:
             or_models = [
-                "meta-llama/llama-3.3-70b-instruct:free",
-                "google/gemini-2.0-flash-lite:free",
-                "qwen/qwen-2.5-72b-instruct:free",
-                "mistralai/mistral-small-24b-instruct-2501:free"
+                "nvidia/nemotron-3.5-lightning:free",
+                "qwen/qwen3.8-27b:free",
+                "dots-studio/dots-3-note-preview:free",
+                "liquid/lfm-2.5-2.6b:free"
             ]
             for o_model in or_models:
                 try:
@@ -542,7 +545,7 @@ class EvaIdentityEngine:
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_content}
                         ],
-                        "temperature": 0.7,
+                        "temperature": 0.75,
                         "max_tokens": 200,
                     }
                     async with httpx.AsyncClient(timeout=8.0) as client:
@@ -551,16 +554,17 @@ class EvaIdentityEngine:
                             choice = res.json().get("choices", [{}])[0]
                             bio_text = choice.get("message", {}).get("content", "").strip()
                             if bio_text:
-                                return {"polished_bio": bio_text, "model": f"openrouter:{o_model}"}
+                                clean_text = re.sub(r'^["\']|["\']$', '', bio_text).strip()
+                                return {"polished_bio": clean_text, "model": f"openrouter:{o_model}"}
                 except Exception as e:
                     logger.warning("OpenRouter bio polish error (%s): %s", o_model, e)
 
-        # Resilient heuristic fallback
-        cleaned_words = [w.strip() for w in re.split(r"[,;|]+", raw_draft) if w.strip()]
-        interests_str = ", ".join(cleaned_words) if cleaned_words else raw_draft
+        # 3. Dynamic Archetype-Based Fallback (never generic canned text)
+        cleaned_words = [w.strip() for w in re.split(r"[,;|\s]+", raw_draft) if len(w.strip()) > 2]
+        traits_str = ", ".join(cleaned_words[:4]) if cleaned_words else raw_draft
         fallback_bio = (
-            f"Drawn to {interests_str} and mindful conversations. "
-            "Finding balance in slow mornings, thoughtful humor, and authentic depth. "
-            "Here for genuine connection in a calm sanctuary."
+            f"Grounding my days in {traits_str} and continuous growth. "
+            "Appreciating quiet focus, honest laughter, and intentional conversations with depth. "
+            "Here to build a real, heartfelt connection."
         )
-        return {"polished_bio": fallback_bio, "model": "heuristic-fallback"}
+        return {"polished_bio": fallback_bio, "model": "archetype-heuristic-fallback"}

@@ -46,7 +46,8 @@ class GroqAiService:
         key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
         return {
             "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "User-Agent": "UR-Heart-Sanctuary/1.0"
         }
 
     @classmethod

@@ -44,8 +44,12 @@ _INFRA_LEAK_PATTERNS = [
     r"\banthropic\b",
     r"\bclaude\b",
     r"\bdeepseek\b",
+    r"\bgemini\b",
+    r"\bgoogle\s*ai\b",
     r"\bllama[-_\s]?\d*\b",
     r"\bchatgpt\b",
+    r"\bqwen\b",
+    r"\bnemotron\b",
     r"\bmodel[_\s-]?name\b",
     r"\bwhat\s+(model|llm|engine|api|platform)\b",
     r"\bwhich\s+(api|model|endpoint|llm|engine)\b",
@@ -59,7 +63,8 @@ _INFRA_LEAK_PATTERNS = [
 
 _JAILBREAK_PATTERNS = [
     r"ignore\s+.*(previous|prior|above)\s+instructions",
-    r"you\s+are\s+now\s+(in\s+)?(dan|developer|god|unrestricted)\s+mode",
+    r"disregard\s+.*(previous|prior|above)\s+instructions",
+    r"you\s+are\s+now\s+(in\s+)?(dan|developer|god|unrestricted|sudo)\s+mode",
     r"\bact\s+as\b",
     r"\b(print|reveal|show|display|give|tell)\s+.*(system\s+prompt|instruction|secret|rule)",
     r"\binitial\s+instructions\b",
@@ -70,29 +75,37 @@ _JAILBREAK_PATTERNS = [
     r"what\s+were\s+your\s+instructions",
     r"\bunrestricted\s+mode\b",
     r"\bdeveloper\s+mode\b",
+    r"\bsudo\s+mode\b",
 ]
 
 _OUT_OF_DOMAIN_PATTERNS = [
-    # Coding / Programming
-    r"\b(python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|bash|powershell|php)\b",
-    r"\b(write|create|debug|fix|explain|give)\s+.*(code|script|algorithm|function|program|query|regex)\b",
+    # Coding / Programming / Software
+    r"\b(python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|bash|powershell|php|dart|flutter)\b",
+    r"\b(write|create|debug|fix|explain|give)\s+.*(code|script|algorithm|function|program|query|regex|class)\b",
     r"\b(scrape|scraper|scraping)\b",
     r"\b(coding|programmer|programming|syntax|compiler|debugging)\b",
     r"\bhow\s+to\s+(code|program|build\s+an?\s+app|make\s+a\s+website)\b",
+    r"\b(coding\s+sikhao|code\s+likh|program\s+bana)\b",
     # Hacking / Reverse Engineering / Exploits
     r"\b(hack|hacker|hacking|crack|cracker|cracking|exploit|bypass|ddos|phishing|malware|reverse\s+engineer|sqli|xss|penetration\s+test|payload|trojan|ransomware)\b",
     r"\bhow\s+to\s+(hack|crack|break\s+into|steal|spy)\b",
     # Politics / Elections / Government
-    r"\b(election|elections|politics|political|politician|parliament|congress|bjp|democrat|republican)\b",
-    r"\b(vote\s+for|who\s+to\s+vote|who\s+will\s+win|upcoming\s+election)\b",
-    # General trivia / school / unrelated
-    r"\b(solve\s+.*equation|integral|derivative|calculus|math\s+problem|quantum\s+physics)\b",
-    r"\bwho\s+is\s+the\s+(president|prime\s+minister|king|queen)\s+of\b",
-    r"\b(crypto|bitcoin|btc|eth|ethereum|stock\s+market|shares\s+to\s+buy)\b",
-    r"\b(recipe\s+for|how\s+to\s+cook|baking)\b",
-    r"\b(capital\s+of|weather\s+in|who\s+won\s+the|ipl\s+score|cricket\s+score|football\s+match|world\s+war)\b",
-    r"\b(write\s+an?\s+essay|do\s+my\s+homework|school\s+assignment)\b",
-    r"\b(stock\s+tips|cryptocurrency|mutual\s+funds|investment\s+advice)\b",
+    r"\b(election|elections|politics|political|politician|parliament|congress|bjp|democrat|republican|modi|rahul\s+gandhi|kejriwal)\b",
+    r"\b(vote\s+for|who\s+to\s+vote|who\s+will\s+win|upcoming\s+election|neta|chunav|sarkar)\b",
+    # Math, Science, Homework, General Academic
+    r"\b(solve\s+.*=|\bsolve\s+.*(equation|problem|integral|derivative|calculus|math)|quantum\s+physics|algebra|geometry)\b",
+    r"[-+*/^=]\s*\d+\s*=",
+    r"\b(calculate|formula\s+of|history\s+of|who\s+discovered|translate\s+this|translate\s+into)\b",
+    r"\b(biology|chemistry|physics|geography|science\s+project)\b",
+    r"\b(write\s+an?\s+essay|do\s+my\s+homework|school\s+assignment|padhai|homework|sawaal\s+solve)\b",
+    # General trivia / Leaders / Sports / News
+    r"\bwho\s+is\s+(the\s+)?(president|prime\s+minister|pm|king|queen|ceo|founder|chief\s+minister|cm)\b",
+    r"\b(capital\s+of|weather\s+in|who\s+won\s+the|ipl\s+score|cricket\s+score|football\s+match|world\s+war|match\s+ka\s+score|aaj\s+mausam)\b",
+    # Finance, Crypto, Trading
+    r"\b(crypto|bitcoin|btc|eth|ethereum|stock\s+market|shares\s+to\s+buy|trading|nifty|sensex)\b",
+    r"\b(stock\s+tips|cryptocurrency|mutual\s+funds|investment\s+advice|share\s+bazaar)\b",
+    # Cooking / Recipes
+    r"\b(recipe\s+for|how\s+to\s+cook|baking|khana\s+kaise\s+banaye)\b",
 ]
 
 
@@ -142,6 +155,10 @@ class EvaGuardrails:
         """
         cleaned = raw_ai_text
 
+        # Strip internal reasoning/thinking blocks from hybrid reasoning models
+        cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"Here's a thinking process:[\s\S]*?\n\n", "", cleaned, flags=re.IGNORECASE)
+
         # Strip accidental code blocks
         if "```" in cleaned:
             cleaned = re.sub(r"```[a-zA-Z]*\n?[\s\S]*?```", "[Content filtered for safety]", cleaned)
@@ -152,11 +169,16 @@ class EvaGuardrails:
             r"\bopenrouter\b",
             r"\bopenai\b",
             r"\banthropic\b",
+            r"\bgemini[-_\s]?[a-zA-Z0-9]*\b",
+            r"\bgoogle\s*ai\b",
+            r"\bgoogle\b",
             r"\bmeta\s+llama\b",
             r"\bllama[-_\s]?\d*\b",
             r"\bdeepseek[-_\s]?[a-zA-Z0-9]*\b",
             r"\bclaude[-_\s]?[a-zA-Z0-9]*\b",
             r"\bgpt[-_\s]?[0-9a-zA-Z]*\b",
+            r"\bqwen[-_\s]?[a-zA-Z0-9]*\b",
+            r"\bnemotron[-_\s]?[a-zA-Z0-9]*\b",
         ]
         for pattern in leaked_keywords:
             cleaned = re.sub(pattern, "Asiverticals Sanctuary Engine", cleaned, flags=re.IGNORECASE)

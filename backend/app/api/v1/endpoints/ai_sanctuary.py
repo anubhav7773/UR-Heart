@@ -21,12 +21,32 @@ class EvaChatResponse(BaseModel):
     reply: str
     is_guarded: bool
     status: str = "success"
+    model: Optional[str] = None
+
+
+class WingmanSuggestion(BaseModel):
+    type: str  # "spark" | "resonance" | "segue"
+    label: str  # "🔥 Playful Spark" | "🌱 Deep Resonance" | "☕ Smooth Segue"
+    text: str
 
 
 class DialogueCoachRequest(BaseModel):
     partner_name: str = Field(..., max_length=100)
     last_incoming_message: str = Field(..., max_length=300)
     user_draft_reply: Optional[str] = Field(None, max_length=300)
+    partner_id: Optional[str] = Field(None, max_length=100)
+    partner_bio: Optional[str] = Field(None, max_length=500)
+    partner_interests: Optional[List[str]] = None
+    recent_messages: Optional[List[Dict[str, Any]]] = None
+
+
+class WingmanResponse(BaseModel):
+    coach_insight: str = ""
+    suggestions: List[WingmanSuggestion] = []
+    reply: str
+    is_guarded: bool = False
+    status: str = "success"
+    engine: Optional[str] = None
 
 
 class ChatSparksRequest(BaseModel):
@@ -53,44 +73,78 @@ async def chat_with_eva(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Conversational endpoint with Eva AI Sanctuary.
+    Conversational endpoint with Eva AI Sanctuary (Section 2 - OpenRouter Engine).
     SEC-HIGH-03: Strictly bound to authenticated User session with 30 msgs/hour rate limit.
     Enforces 100% domain boundary, Asiverticals attribution, and zero API platform leakage.
     """
-    result = await AiOrchestrator.chat_with_eva(
+    from app.services.eva_companion_engine import EvaCompanionEngine
+    user_name = getattr(current_user, "full_name", "Seeker") or "Seeker"
+    result = await EvaCompanionEngine.chat_companion(
         user_message=payload.message,
-        conversation_history=payload.history,
-        context_metadata=payload.context
+        chat_history=payload.history,
+        user_name=user_name,
+        context=payload.context
     )
 
     return EvaChatResponse(
         reply=result["reply"],
-        is_guarded=result.get("is_guarded", False),
-        status=result.get("status", "success")
+        is_guarded=result.get("denied", False),
+        status="success",
+        model=result.get("model")
     )
 
 
-@router.post("/wingman", response_model=EvaChatResponse, status_code=status.HTTP_200_OK)
-@limiter.limit("20/hour")
+@router.post("/wingman", response_model=WingmanResponse, status_code=status.HTTP_200_OK)
+@limiter.limit("30/hour")
 async def get_dialogue_coaching(
     request: Request,
     payload: DialogueCoachRequest,
     current_user: User = Depends(get_current_user)
 ):
     """
-    Real-time in-chat mindful wingman advice on what to reply to a match.
-    SEC-HIGH-03: Authenticated session required with 20 calls/hour rate limiting.
+    Real-time in-chat mindful wingman advice powered by GeminiWingmanEngine (Engine 3).
+    Synthesizes both seekers' profiles and dialogue context to craft 3 magnetic suggestions.
+    SEC-HIGH-03: Authenticated session required with 30 calls/hour rate limiting.
     """
-    result = await AiOrchestrator.get_dialogue_coaching(
+    from app.services.gemini_wingman_engine import GeminiWingmanEngine
+
+    my_profile = {
+        "full_name": getattr(current_user, "full_name", "You"),
+        "bio": getattr(current_user, "bio", ""),
+        "interests": getattr(current_user, "interests", []) or [],
+        "intentions": getattr(current_user, "intentions", ""),
+    }
+    partner_profile = {
+        "full_name": payload.partner_name,
+        "bio": payload.partner_bio or "",
+        "interests": payload.partner_interests or [],
+    }
+
+    result = await GeminiWingmanEngine.generate_wingman_guidance(
         partner_name=payload.partner_name,
         last_incoming_message=payload.last_incoming_message,
-        user_draft_reply=payload.user_draft_reply
+        user_draft_reply=payload.user_draft_reply,
+        my_profile=my_profile,
+        partner_profile=partner_profile,
+        recent_messages=payload.recent_messages or []
     )
 
-    return EvaChatResponse(
-        reply=result["reply"],
+    suggestions_list = [
+        WingmanSuggestion(
+            type=s.get("type", "spark"),
+            label=s.get("label", "Suggestion"),
+            text=s.get("text", "")
+        )
+        for s in result.get("suggestions", [])
+    ]
+
+    return WingmanResponse(
+        coach_insight=result.get("coach_insight", ""),
+        suggestions=suggestions_list,
+        reply=result.get("reply", ""),
         is_guarded=result.get("is_guarded", False),
-        status=result.get("status", "success")
+        status=result.get("status", "success"),
+        engine=result.get("engine")
     )
 
 

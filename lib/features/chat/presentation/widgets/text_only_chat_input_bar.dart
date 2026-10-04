@@ -8,6 +8,7 @@ class TextOnlyChatInputBar extends StatefulWidget {
   final void Function(String message) onSendMessage;
   final void Function(String violation)? onViolation;
   final TextEditingController? controller;
+  final VoidCallback? onWingmanPressed;
 
   const TextOnlyChatInputBar({
     super.key,
@@ -15,6 +16,7 @@ class TextOnlyChatInputBar extends StatefulWidget {
     required this.onSendMessage,
     this.onViolation,
     this.controller,
+    this.onWingmanPressed,
   });
 
   @override
@@ -77,6 +79,35 @@ class _TextOnlyChatInputBarState extends State<TextOnlyChatInputBar> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (widget.onWingmanPressed != null) ...[
+            Container(
+              margin: const EdgeInsets.only(right: 8.0, bottom: 2.0),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFFFF5E7E),
+                    Color(0xFF4E9F76),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF5E7E).withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18.0),
+                tooltip: 'Eva Wingman (Ab kya msg kru?)',
+                onPressed: widget.onWingmanPressed,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+              ),
+            ),
+          ],
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14.0),
