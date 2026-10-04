@@ -23,6 +23,19 @@ class SanctuaryNotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
+  final Set<String> _seenNotificationIds = {};
+
+  /// Checks if notification was already presented on this device within the active session.
+  /// Prevents double-notification when both WebSocket and FCM deliver the same event.
+  bool markNotificationSeen(String? notifId) {
+    if (notifId == null || notifId.isEmpty) return false;
+    if (_seenNotificationIds.contains(notifId)) return true;
+    _seenNotificationIds.add(notifId);
+    if (_seenNotificationIds.length > 500) {
+      _seenNotificationIds.clear();
+    }
+    return false;
+  }
 
   static const String dialogueChannelId = 'ur_heart_sacred_dialogue';
   static const String dialogueChannelName = 'UR-Heart Sacred Dialogues';
@@ -109,13 +122,23 @@ class SanctuaryNotificationService {
 
     // Foreground push message listener: Show system notification immediately
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final notifId = message.data['notif_id']?.toString() ?? message.messageId;
+      if (notifId != null && markNotificationSeen(notifId)) {
+        return;
+      }
       final notif = message.notification;
-      if (notif != null) {
+      final title = notif?.title ?? message.data['title']?.toString();
+      final body = notif?.body ?? message.data['body']?.toString();
+      if (title != null && title.isNotEmpty) {
+        final notifType = message.data['type']?.toString().toLowerCase() ?? '';
+        final isStreak = notifType.contains('streak');
         showSystemNotification(
-          id: message.hashCode,
-          title: notif.title ?? 'UR-Heart Notification',
-          body: notif.body ?? '',
+          id: notifId?.hashCode ?? message.hashCode,
+          title: title,
+          body: body ?? '',
           payload: jsonEncode(message.data),
+          channelId: isStreak ? presenceChannelId : dialogueChannelId,
+          channelName: isStreak ? presenceChannelName : dialogueChannelName,
         );
       }
     });
@@ -123,6 +146,15 @@ class SanctuaryNotificationService {
     // Background push tapped
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       _handleNavigationData(message.data);
+    });
+
+    // Handle push notification tap when the app was launched from terminated state
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handleNavigationData(message.data);
+        });
+      }
     });
   } catch (fcmError) {
     debugPrint('[FCM INIT NOTICE] $fcmError');
@@ -368,7 +400,7 @@ class SanctuaryNotificationService {
           contentTitle: title,
           summaryText: subText ?? 'UR-Heart Sanctuary',
         ),
-        icon: '@mipmap/ic_launcher',
+        icon: '@drawable/ic_stat_urheart',
         color: const Color(0xFF1B4332), // Sacred Pine
         enableLights: true,
         ledColor: const Color(0xFFD4AF37), // Sacred Gold
@@ -422,7 +454,7 @@ class SanctuaryNotificationService {
         contentTitle: title,
         summaryText: subText ?? 'UR-Heart Sanctuary',
       ),
-      icon: '@mipmap/ic_launcher',
+      icon: '@drawable/ic_stat_urheart',
       color: const Color(0xFF1B4332), // Sacred Pine
       enableLights: true,
       ledColor: const Color(0xFFD4AF37), // Sacred Gold

@@ -90,6 +90,23 @@ async def lifespan(app: FastAPI):
     import asyncio
     from app.core.database import async_session_factory
     from app.services.streak_engine import StreakEngine
+    from app.api.v1.endpoints import notifications as notifications_module
+
+    # Capture main loop so push_notification() is safe from worker threads
+    notifications_module.set_main_loop(asyncio.get_running_loop())
+
+    async def _fcm_startup_probe():
+        try:
+            probe = await asyncio.to_thread(notifications_module.probe_fcm_authorization)
+            print(
+                f"[FCM STARTUP] credentials={probe.get('firebase_credentials')} "
+                f"authorized={probe.get('fcm_authorized')} error={probe.get('error')}",
+                flush=True,
+            )
+        except Exception as e:
+            print(f"[FCM STARTUP] probe error: {e}", flush=True)
+
+    fcm_probe_task = asyncio.create_task(_fcm_startup_probe())
 
     streak_worker_stop = asyncio.Event()
 

@@ -149,15 +149,33 @@ async def secure_chat_websocket_endpoint(websocket: WebSocket):
                                     await session.commit()
 
                         if rec_uuid_val:
+                            sender_name = "Sanctuary Seeker"
+                            try:
+                                async with async_session_factory() as s_sess:
+                                    from app.models.domain.user import User
+                                    u_res = await s_sess.execute(select(User.full_name).where(User.id == auth_uid_val))
+                                    s_row = u_res.scalar_one_or_none()
+                                    if s_row:
+                                        sender_name = s_row
+                            except Exception:
+                                pass
+
+                            raw_text = payload_data.get("text") or payload_data.get("content")
+                            if raw_text and str(raw_text).strip():
+                                clean_snippet = str(raw_text).strip()[:80]
+                            else:
+                                clean_snippet = "Sent you a new mindful dialogue message."
+
                             from app.api.v1.endpoints.notifications import push_notification
                             push_notification(
                                 user_id=str(rec_uuid_val),
                                 notif_type="message",
-                                title="New Mindful Dialogue 💬",
-                                body=str(payload_data.get("text") or "New encrypted dialogue message")[:80],
+                                title=f"Message from {sender_name} 💬",
+                                body=clean_snippet,
                                 data={
                                     "match_id": str(mid_val) if mid_val else "",
                                     "sender_id": str(auth_uid_val),
+                                    "sender_name": sender_name,
                                     "target_route": "/chat-dialogue",
                                 }
                             )

@@ -22,15 +22,27 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   } catch (_) {}
 
   try {
-    final title = message.notification?.title ?? message.data['title']?.toString();
-    final body = message.notification?.body ?? message.data['body']?.toString();
-    if (title != null && title.isNotEmpty) {
-      await SanctuaryNotificationService.instance.showBackgroundNotification(
-        id: message.hashCode,
-        title: title,
-        body: body ?? '',
-        payload: jsonEncode(message.data),
-      );
+    // If message already had an OS notification payload, Android system tray displays it natively.
+    // Only synthesize local notification for pure data payloads to prevent duplicate alerts.
+    if (message.notification == null) {
+      final title = message.data['title']?.toString();
+      final body = message.data['body']?.toString();
+      if (title != null && title.isNotEmpty) {
+        final notifType = message.data['type']?.toString().toLowerCase() ?? '';
+        final isStreak = notifType.contains('streak');
+        await SanctuaryNotificationService.instance.showBackgroundNotification(
+          id: message.data['notif_id']?.hashCode ?? message.hashCode,
+          title: title,
+          body: body ?? '',
+          payload: jsonEncode(message.data),
+          channelId: isStreak
+              ? SanctuaryNotificationService.presenceChannelId
+              : SanctuaryNotificationService.dialogueChannelId,
+          channelName: isStreak
+              ? SanctuaryNotificationService.presenceChannelName
+              : SanctuaryNotificationService.dialogueChannelName,
+        );
+      }
     }
   } catch (_) {}
   debugPrint('[FCM BACKGROUND PUSH] ${message.messageId} title=${message.notification?.title}');

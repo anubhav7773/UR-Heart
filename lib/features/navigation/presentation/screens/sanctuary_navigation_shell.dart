@@ -43,7 +43,8 @@ class SanctuaryNavigationShell extends ConsumerStatefulWidget {
 }
 
 class _SanctuaryNavigationShellState
-    extends ConsumerState<SanctuaryNavigationShell> {
+    extends ConsumerState<SanctuaryNavigationShell>
+    with WidgetsBindingObserver {
   DateTime? _lastBackPressTime;
   Timer? _notificationPoller;
   StreamSubscription<Map<String, dynamic>>? _wsSubscription;
@@ -54,8 +55,16 @@ class _SanctuaryNavigationShellState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeSeenAndStartPoller();
     _listenToRealtimeWebSocket();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      SanctuaryNotificationService.syncStoredFcmToken();
+    }
   }
 
   Future<void> _initializeSeenAndStartPoller() async {
@@ -178,7 +187,10 @@ class _SanctuaryNavigationShellState
   }
 
   Future<void> _dispatchSingleNotification(Map<String, dynamic> notif) async {
-    final notifId = notif['id']?.toString();
+    final notifId = notif['id']?.toString() ?? notif['data']?['notif_id']?.toString();
+    if (notifId != null && SanctuaryNotificationService.instance.markNotificationSeen(notifId)) {
+      return;
+    }
     if (notifId != null && _seenNotificationIds.contains(notifId)) {
       return;
     }
@@ -305,6 +317,7 @@ class _SanctuaryNavigationShellState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notificationPoller?.cancel();
     _wsSubscription?.cancel();
     _seenNotificationIds.clear();

@@ -555,29 +555,19 @@ async def send_chat_message(
         }
         await manager.send_direct_message(str(recipient_id), ws_msg)
 
-        def _dispatch_fcm():
-            try:
-                from app.api.v1.endpoints.notifications import push_notification
-                push_notification(
-                    user_id=str(recipient_id),
-                    notif_type="message",
-                    title=f"Message from {current_user.full_name} 💬",
-                    body=text_content[:80],
-                    data={
-                        "match_id": str(match_uuid),
-                        "sender_id": str(current_user.id),
-                        "sender_name": current_user.full_name,
-                        "target_route": "/chat-dialogue",
-                    }
-                )
-            except Exception as e:
-                print(f"[CHAT MESSAGE NOTIF] Notice: {e}", flush=True)
-
-        try:
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(None, _dispatch_fcm)
-        except Exception:
-            _dispatch_fcm()
+        from app.api.v1.endpoints.notifications import push_notification
+        push_notification(
+            user_id=str(recipient_id),
+            notif_type="message",
+            title=f"Message from {current_user.full_name} 💬",
+            body=text_content[:80],
+            data={
+                "match_id": str(match_uuid),
+                "sender_id": str(current_user.id),
+                "sender_name": current_user.full_name,
+                "target_route": "/chat-dialogue",
+            }
+        )
     except Exception as e:
         print(f"[CHAT MESSAGE RELAY] Notice: {e}", flush=True)
 

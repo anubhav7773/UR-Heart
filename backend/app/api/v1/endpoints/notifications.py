@@ -22,72 +22,198 @@ NOTIFICATION_STORE: Dict[str, List[Dict[str, Any]]] = {}
 # Active device FCM token registry (cached in memory for high-throughput push)
 USER_FCM_TOKENS: Dict[str, str] = {}
 
+# Main server event loop (captured in FastAPI lifespan). Allows push_notification()
+# to be called safely from worker threads without touching the DB pool from a foreign loop.
+_MAIN_LOOP: Optional[asyncio.AbstractEventLoop] = None
 
-def _dispatch_fcm_push(fcm_token: str, title: str, body: str, data: Optional[Dict[str, Any]] = None) -> None:
-    """Dispatches true outside-the-app push notification via Firebase Cloud Messaging."""
+# Android notification channels (must match Flutter SanctuaryNotificationService)
+DIALOGUE_CHANNEL_ID = "ur_heart_sacred_dialogue"
+PRESENCE_CHANNEL_ID = "ur_heart_presence_channel"
+ANDROID_NOTIFICATION_ICON = "ic_stat_urheart"
+FCM_TTL_SECONDS = 24 * 60 * 60
+
+# Strong references to in-flight delivery tasks (prevents premature GC of create_task results)
+_BG_TASKS: set = set()
+
+
+def _log(line: str) -> None:
+    """Render only surfaces stdout reliably; print with flush and ASCII-safe fallback."""
+    try:
+        print(line, flush=True)
+    except Exception:
+        print(line.encode("ascii", "replace").decode("ascii"), flush=True)
+
+
+def set_main_loop(loop: Optional[asyncio.AbstractEventLoop]) -> None:
+    global _MAIN_LOOP
+    _MAIN_LOOP = loop
+
+
+def channel_for_type(notif_type: str) -> str:
+    return PRESENCE_CHANNEL_ID if "streak" in (notif_type or "").lower() else DIALOGUE_CHANNEL_ID
+
+
+def build_fcm_message(
+    fcm_token: str,
+    title: str,
+    body: str,
+    data: Optional[Dict[str, Any]] = None,
+    notif_type: str = "system",
+    notif_id: Optional[str] = None,
+):
+    """Builds a high-priority FCM v1 message delivered by the OS even when the app is killed."""
+    from firebase_admin import messaging
+
+    # FCM data values must be strings
+    clean_data: Dict[str, str] = {}
+    for k, v in (data or {}).items():
+        if v is None:
+            continue
+        clean_data[str(k)] = str(v)
+    clean_data.setdefault("type", notif_type)
+    clean_data.setdefault("title", title)
+    clean_data.setdefault("body", body)
+    if notif_id:
+        clean_data["notif_id"] = notif_id
+
+    click_link = clean_data.get("target_route") or "/"
+
+    return messaging.Message(
+        token=fcm_token,
+        notification=messaging.Notification(title=title, body=body),
+        data=clean_data,
+        android=messaging.AndroidConfig(
+            priority="high",
+            ttl=FCM_TTL_SECONDS,
+            notification=messaging.AndroidNotification(
+                channel_id=channel_for_type(notif_type),
+                sound="default",
+                click_action="FLUTTER_NOTIFICATION_CLICK",
+                icon=ANDROID_NOTIFICATION_ICON,
+                color="#1B4332",
+                tag=notif_id,
+                default_vibrate_timings=True,
+                priority="max",
+                visibility="public",
+            ),
+        ),
+        webpush=messaging.WebpushConfig(
+            headers={"Urgency": "high"},
+            notification=messaging.WebpushNotification(
+                title=title,
+                body=body,
+                icon="/icons/Icon-192.png",
+                badge="/favicon.png",
+            ),
+            fcm_options=messaging.WebpushFCMOptions(link=click_link),
+        ),
+        apns=messaging.APNSConfig(
+            headers={"apns-priority": "10"},
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(
+                    alert=messaging.ApsAlert(title=title, body=body),
+                    sound="default",
+                    badge=1,
+                )
+            ),
+        ),
+    )
+
+
+def _dispatch_fcm_push(
+    fcm_token: str,
+    title: str,
+    body: str,
+    data: Optional[Dict[str, Any]] = None,
+    notif_type: str = "system",
+    notif_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Synchronously sends one FCM push. Returns a result dict:
+      {"ok": True, "message_id": ...} or {"ok": False, "error": ..., "token_invalid": bool}
+    Run via asyncio.to_thread from async code so the event loop is never blocked.
+    """
     try:
         from app.services.firebase_auth_service import FirebaseAuthService
         app = FirebaseAuthService.get_app()
-        if not app:
-            logger.info("[FCM PUSH NOTICE] Firebase Admin App not initialized; skipping outside-app push.")
-            return
+        if not app or not FirebaseAuthService._has_credentials:
+            _log("[FCM PUSH FAILED] Firebase Admin credentials unavailable; outside-app push skipped.")
+            return {"ok": False, "error": "firebase_credentials_unavailable", "token_invalid": False}
 
         from firebase_admin import messaging
 
-        # Ensure all data values are string format for FCM protocol
-        clean_data = {}
-        if data:
-            for k, v in data.items():
-                clean_data[str(k)] = str(v)
-
-        click_link = clean_data.get("target_route") or "/"
-
-        msg = messaging.Message(
-            token=fcm_token,
-            notification=messaging.Notification(
-                title=title,
-                body=body,
-            ),
-            data=clean_data,
-            android=messaging.AndroidConfig(
-                priority="high",
-                notification=messaging.AndroidNotification(
-                    channel_id="ur_heart_sacred_dialogue",
-                    sound="default",
-                    click_action="FLUTTER_NOTIFICATION_CLICK",
-                    icon="@mipmap/ic_launcher",
-                    color="#1B4332",
-                ),
-            ),
-            webpush=messaging.WebpushConfig(
-                headers={"Urgency": "high"},
-                notification=messaging.WebpushNotification(
-                    title=title,
-                    body=body,
-                    icon="/icons/Icon-192.png",
-                    badge="/favicon.png",
-                ),
-                fcm_options=messaging.WebpushFCMOptions(
-                    link=click_link,
-                ),
-            ),
-            apns=messaging.APNSConfig(
-                payload=messaging.APNSPayload(
-                    aps=messaging.Aps(
-                        alert=messaging.ApsAlert(
-                            title=title,
-                            body=body,
-                        ),
-                        sound="default",
-                        badge=1,
-                    )
-                )
-            ),
-        )
-        messaging.send(msg, app=app)
-        logger.info("[FCM PUSH SENT] token=...%s title='%s'", fcm_token[-8:], title)
+        msg = build_fcm_message(fcm_token, title, body, data, notif_type, notif_id)
+        message_id = messaging.send(msg, app=app)
+        _log(f"[FCM PUSH SENT] type={notif_type} token=...{fcm_token[-8:]} title='{title}' id={message_id}")
+        return {"ok": True, "message_id": message_id}
     except Exception as e:
-        logger.warning("[FCM PUSH NOTICE] Dispatch failed: %s", e)
+        token_invalid = False
+        try:
+            from firebase_admin import messaging
+            token_invalid = isinstance(e, (messaging.UnregisteredError, messaging.SenderIdMismatchError))
+        except Exception:
+            pass
+        _log(f"[FCM PUSH FAILED] type={notif_type} token=...{fcm_token[-8:]} {type(e).__name__}: {e}")
+        return {"ok": False, "error": f"{type(e).__name__}: {e}", "token_invalid": token_invalid}
+
+
+async def _purge_invalid_token(user_key: str, token: str) -> None:
+    if USER_FCM_TOKENS.get(user_key) == token:
+        USER_FCM_TOKENS.pop(user_key, None)
+    try:
+        from sqlalchemy import update
+        async with async_session_factory() as session:
+            await session.execute(
+                update(User).where(User.id == UUID(user_key), User.fcm_token == token).values(fcm_token=None)
+            )
+            await session.commit()
+        _log(f"[FCM TOKEN PURGED] user={user_key} stale token removed")
+    except Exception as e:
+        _log(f"[FCM TOKEN PURGE NOTICE] user={user_key} {e}")
+
+
+async def _resolve_fcm_token(user_key: str) -> Optional[str]:
+    token = USER_FCM_TOKENS.get(user_key)
+    if token:
+        return token
+    try:
+        async with async_session_factory() as session:
+            res = await session.execute(select(User.fcm_token).where(User.id == UUID(user_key)))
+            token = res.scalar_one_or_none()
+            if token:
+                USER_FCM_TOKENS[user_key] = token
+            return token
+    except Exception as e:
+        _log(f"[FCM DB CHECK ERROR] user={user_key} {e}")
+        return None
+
+
+async def _deliver(user_key: str, entry: Dict[str, Any]) -> None:
+    """Runs on the main event loop: WebSocket (UI sync) + FCM (system notification)."""
+    try:
+        await manager.send_direct_message(user_key, {
+            "type": "sanctuary_notification",
+            "notification": entry,
+        })
+    except Exception:
+        pass
+
+    token = await _resolve_fcm_token(user_key)
+    if not token:
+        _log(f"[FCM NO TOKEN] user={user_key} type={entry['type']} (device not registered)")
+        return
+
+    result = await asyncio.to_thread(
+        _dispatch_fcm_push,
+        token,
+        entry["title"],
+        entry["body"],
+        entry.get("data") or {},
+        entry["type"],
+        entry["id"],
+    )
+    if not result.get("ok") and result.get("token_invalid"):
+        await _purge_invalid_token(user_key, token)
 
 
 def push_notification(
@@ -98,8 +224,9 @@ def push_notification(
     data: Optional[Dict[str, Any]] = None
 ) -> None:
     """
-    Enqueues in-app notification, triggers real-time WebSocket delivery if user is online,
-    and dispatches FCM background push notification if device token is registered.
+    Enqueues in-app notification, then delivers it in real time via WebSocket (UI sync)
+    and FCM (OS-level push that arrives even when the app is closed).
+    Safe to call from async handlers, background tasks, and worker threads.
     """
     user_key = str(user_id)
     if user_key not in NOTIFICATION_STORE:
@@ -116,56 +243,30 @@ def push_notification(
         "created_at": datetime.utcnow().isoformat()
     }
     NOTIFICATION_STORE[user_key].insert(0, entry)
+    _log(f"[NOTIFICATION ENQUEUED] user={user_key} type={notif_type} title='{title}'")
 
     try:
-        print(f"[NOTIFICATION ENQUEUED] user={user_key} type={notif_type} title='{title}'", flush=True)
-    except Exception:
-        safe_title = title.encode("ascii", "replace").decode("ascii")
-        print(f"[NOTIFICATION ENQUEUED] user={user_key} type={notif_type} title='{safe_title}'", flush=True)
+        running = asyncio.get_running_loop()
+    except RuntimeError:
+        running = None
 
-    # 1. Real-time WebSocket delivery to connected client
-    try:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.get_event_loop()
-        if loop and loop.is_running():
-            loop.create_task(manager.send_direct_message(user_key, {
-                "type": "sanctuary_notification",
-                "notification": entry
-            }))
-    except Exception:
-        pass
+    if running is not None and running.is_running():
+        task = running.create_task(_deliver(user_key, entry))
+        _BG_TASKS.add(task)
+        task.add_done_callback(_BG_TASKS.discard)
+        return
 
-    # 2. Outside-the-app Background FCM Push
-    fcm_token = USER_FCM_TOKENS.get(user_key)
-    if fcm_token:
-        _dispatch_fcm_push(fcm_token, title, body, data)
+    # Called from a worker thread: hand off to the main loop (DB pool is bound to it)
+    if _MAIN_LOOP is not None and _MAIN_LOOP.is_running():
+        asyncio.run_coroutine_threadsafe(_deliver(user_key, entry), _MAIN_LOOP)
+        return
+
+    # No server loop (scripts/tests): only a RAM-cached token can be used safely
+    token = USER_FCM_TOKENS.get(user_key)
+    if token:
+        _dispatch_fcm_push(token, title, body, data, notif_type, entry["id"])
     else:
-        # Check DB asynchronously if not yet in RAM cache
-        async def _check_db_and_push():
-            try:
-                async with async_session_factory() as session:
-                    res = await session.execute(select(User.fcm_token).where(User.id == UUID(user_key)))
-                    token_in_db = res.scalar_one_or_none()
-                    if token_in_db:
-                        USER_FCM_TOKENS[user_key] = token_in_db
-                        _dispatch_fcm_push(token_in_db, title, body, data)
-                    else:
-                        logger.info("[FCM PUSH NOTICE] No device token registered in DB for user %s", user_key)
-            except Exception as db_err:
-                logger.warning("[FCM DB CHECK ERROR] user=%s err=%s", user_key, db_err)
-
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            loop.create_task(_check_db_and_push())
-        else:
-            import threading
-            threading.Thread(target=lambda: asyncio.run(_check_db_and_push()), daemon=True).start()
+        _log(f"[FCM NO LOOP] user={user_key} type={notif_type} queued in-app only")
 
 
 class RegisterTokenRequest(BaseModel):
@@ -260,3 +361,60 @@ async def mark_notifications_read(
             n["is_read"] = True
 
     return {"status": "success", "unread_count": sum(1 for n in items if not n.get("is_read", False))}
+
+
+def probe_fcm_authorization() -> Dict[str, Any]:
+    """
+    Dry-run FCM send (nothing is delivered). Proves the service account is allowed
+    to send pushes (cloudmessaging.messages.create) for this Firebase project.
+    """
+    try:
+        from app.services.firebase_auth_service import FirebaseAuthService
+        app = FirebaseAuthService.get_app()
+        if not app or not FirebaseAuthService._has_credentials:
+            return {"firebase_credentials": False, "fcm_authorized": False, "error": "firebase_credentials_unavailable"}
+        from firebase_admin import messaging
+        probe = messaging.Message(
+            topic="urheart_push_health_probe",
+            notification=messaging.Notification(title="probe", body="probe"),
+        )
+        messaging.send(probe, dry_run=True, app=app)
+        return {"firebase_credentials": True, "fcm_authorized": True, "error": None}
+    except Exception as e:
+        return {"firebase_credentials": True, "fcm_authorized": False, "error": f"{type(e).__name__}: {e}"}
+
+
+@router.get("/push-health", status_code=status.HTTP_200_OK, summary="Background Push Delivery Health")
+async def push_health(current_user: User = Depends(get_current_user)):
+    """Reports whether outside-the-app pushes can reach the calling user's device."""
+    probe = await asyncio.to_thread(probe_fcm_authorization)
+    token = await _resolve_fcm_token(str(current_user.id))
+    return {
+        "status": "success",
+        **probe,
+        "token_registered": bool(token),
+        "token_suffix": token[-8:] if token else None,
+    }
+
+
+@router.post("/test-push", status_code=status.HTTP_200_OK, summary="Send Test Push To My Device")
+async def send_test_push(current_user: User = Depends(get_current_user)):
+    """Sends a real FCM push to the caller's own registered device and returns the raw result."""
+    user_key = str(current_user.id)
+    token = await _resolve_fcm_token(user_key)
+    if not token:
+        raise HTTPException(status_code=404, detail="No FCM device token registered for this account.")
+    import uuid as _uuid
+    notif_id = f"test_{_uuid.uuid4().hex[:10]}"
+    result = await asyncio.to_thread(
+        _dispatch_fcm_push,
+        token,
+        "UR-Heart Test Notification 🔔",
+        "Background push delivery is working on this device.",
+        {"target_route": "/main"},
+        "system_test",
+        notif_id,
+    )
+    if not result.get("ok") and result.get("token_invalid"):
+        await _purge_invalid_token(user_key, token)
+    return {"status": "success" if result.get("ok") else "failed", **result}
