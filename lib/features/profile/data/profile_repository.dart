@@ -25,9 +25,80 @@ class ProfileRepository {
   static const String _groqApiKey =
       String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
 
+  static UserProfile? _staticPrewarmedProfile;
+
   ProfileRepository([this._apiClient, this._dio])
-      : _currentProfile = _emptyInitialProfile() {
+      : _currentProfile = _staticPrewarmedProfile ?? _emptyInitialProfile() {
     loadProfileFromStorage();
+  }
+
+  /// Hydrates static in-memory profile synchronously from SharedPreferences during app startup
+  static void prewarmStatic(SharedPreferences prefs) {
+    try {
+      final activeUserId = prefs.getString('ur_heart_user_id') ?? prefs.getString('profile_user_id');
+
+      // 1. Try user-specific JSON cache
+      if (activeUserId != null && activeUserId.isNotEmpty) {
+        final userJsonStr = prefs.getString('cached_profile_json_$activeUserId');
+        if (userJsonStr != null && userJsonStr.isNotEmpty) {
+          final decoded = jsonDecode(userJsonStr) as Map<String, dynamic>;
+          final prof = UserProfile.fromJson(decoded);
+          if (prof.isLoaded) {
+            _staticPrewarmedProfile = prof;
+            return;
+          }
+        }
+      }
+
+      // 2. Try active profile JSON cache
+      final activeJsonStr = prefs.getString('cached_profile_json_active');
+      if (activeJsonStr != null && activeJsonStr.isNotEmpty) {
+        final decoded = jsonDecode(activeJsonStr) as Map<String, dynamic>;
+        final prof = UserProfile.fromJson(decoded);
+        if (prof.isLoaded) {
+          _staticPrewarmedProfile = prof;
+          return;
+        }
+      }
+
+      // 3. Fallback to individual legacy keys if present
+      final savedName = prefs.getString('profile_full_name') ?? prefs.getString('ur_heart_user_name');
+      if (savedName != null && savedName.trim().isNotEmpty) {
+        final savedAge = prefs.getInt('profile_age') ?? prefs.getInt('ur_heart_user_age') ?? 0;
+        final savedAvatar = prefs.getString('profile_photo_slot_1') ?? '';
+        final isKyc = prefs.getBool('profile_is_kyc_verified') ?? false;
+        final moments = ['', '', '', ''];
+        for (int i = 2; i <= 5; i++) {
+          final slotPath = prefs.getString('profile_photo_slot_$i');
+          if (slotPath != null && (slotPath.startsWith('http') || File(slotPath).existsSync())) {
+            moments[i - 2] = slotPath;
+          }
+        }
+
+        _staticPrewarmedProfile = UserProfile(
+          id: activeUserId ?? '',
+          fullName: savedName,
+          email: prefs.getString('ur_heart_user_email') ?? '',
+          age: savedAge,
+          dobVerificationPill: prefs.getString('profile_dob') ?? '',
+          gender: prefs.getString('profile_gender') ?? '',
+          interestedIn: prefs.getString('profile_interested_in') ?? '',
+          maskedWhatsApp: '',
+          memberSinceText: 'Member of Sanctuary',
+          hasVerifiedCrest: isKyc,
+          location: prefs.getString('profile_location') ?? '',
+          bio: prefs.getString('profile_bio') ?? '',
+          profession: prefs.getString('profile_profession') ?? '',
+          education: prefs.getString('profile_education') ?? '',
+          minAgePref: 18.0,
+          maxAgePref: 35.0,
+          avatarUrl: (savedAvatar.startsWith('http') || File(savedAvatar).existsSync()) ? savedAvatar : '',
+          momentPhotos: moments,
+        );
+      }
+    } catch (e) {
+      debugPrint('[ProfileRepository.prewarmStatic] notice: $e');
+    }
   }
 
   Dio get dio => _dio ?? _apiClient?.dio ?? Dio();
@@ -36,7 +107,7 @@ class ProfileRepository {
         id: '',
         fullName: '',
         email: '',
-        age: 18,
+        age: 0,
         dobVerificationPill: '',
         gender: '',
         interestedIn: '',
@@ -57,6 +128,7 @@ class ProfileRepository {
 
   void reset() {
     _currentProfile = _emptyInitialProfile();
+    _staticPrewarmedProfile = null;
   }
 
   static UserProfile getEmptyProfile() => _emptyInitialProfile();
@@ -67,10 +139,13 @@ class ProfileRepository {
       final response = await dio.get<dynamic>('/api/v1/profile/me');
       final profile = UserPersonaModel.fromJson(response.data as Map<String, dynamic>);
       _currentProfile = profile;
+      _staticPrewarmedProfile = profile;
       final prefs = await SharedPreferences.getInstance();
       if (profile.id.isNotEmpty) {
         await prefs.setString('profile_user_id', profile.id);
+        await prefs.setString('cached_profile_json_${profile.id}', jsonEncode(profile.toJson()));
       }
+      await prefs.setString('cached_profile_json_active', jsonEncode(profile.toJson()));
       if (profile.referralCode.isNotEmpty) {
         await prefs.setString('profile_referral_code', profile.referralCode);
         await prefs.setString('ur_heart_user_referral_code', profile.referralCode);
@@ -118,15 +193,48 @@ class ProfileRepository {
       final secureUserId = await SecureSessionStorage.instance.getUserId();
       final currentUserId = secureUserId ?? prefs.getString('ur_heart_user_id');
       final storedProfileUserId = prefs.getString('profile_user_id');
+
+      // 1. Prioritize user-specific JSON cache for currentUserId
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        final userCacheStr = prefs.getString('cached_profile_json_$currentUserId');
+        if (userCacheStr != null && userCacheStr.isNotEmpty) {
+          try {
+            final profile = UserProfile.fromJson(jsonDecode(userCacheStr) as Map<String, dynamic>);
+            if (profile.isLoaded) {
+              _currentProfile = profile;
+              _staticPrewarmedProfile = profile;
+              return _currentProfile;
+            }
+          } catch (_) {}
+        }
+      }
+
       final bool isSameUser = (currentUserId != null &&
           currentUserId.isNotEmpty &&
           storedProfileUserId != null &&
           storedProfileUserId.isNotEmpty &&
           storedProfileUserId == currentUserId);
 
-      // If switching accounts or account mismatch, return empty profile immediately
+      // 2. Check active JSON cache if user IDs match or no previous mismatch
+      if (isSameUser || storedProfileUserId == null || storedProfileUserId.isEmpty) {
+        final activeCacheStr = prefs.getString('cached_profile_json_active');
+        if (activeCacheStr != null && activeCacheStr.isNotEmpty) {
+          try {
+            final profile = UserProfile.fromJson(jsonDecode(activeCacheStr) as Map<String, dynamic>);
+            if (profile.isLoaded) {
+              _currentProfile = profile;
+              _staticPrewarmedProfile = profile;
+              return _currentProfile;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // If switching accounts or account mismatch, return empty profile only if no cache exists
       if (!isSameUser && (storedProfileUserId != null || currentUserId == null)) {
-        _currentProfile = _emptyInitialProfile();
+        if (_currentProfile.id.isNotEmpty && _currentProfile.id != currentUserId) {
+          _currentProfile = _emptyInitialProfile();
+        }
         return _currentProfile;
       }
 
@@ -200,6 +308,14 @@ class ProfileRepository {
         avatarUrl: avatar.isNotEmpty ? avatar : _currentProfile.avatarUrl,
         momentPhotos: moments,
       );
+
+      if (_currentProfile.isLoaded) {
+        _staticPrewarmedProfile = _currentProfile;
+        await prefs.setString('cached_profile_json_active', jsonEncode(_currentProfile.toJson()));
+        if (_currentProfile.id.isNotEmpty) {
+          await prefs.setString('cached_profile_json_${_currentProfile.id}', jsonEncode(_currentProfile.toJson()));
+        }
+      }
     } catch (e) {
       debugPrint('[ProfileRepository] Error loading storage: $e');
     }
@@ -209,12 +325,17 @@ class ProfileRepository {
   /// Persists edits directly to public.users table via PUT /api/v1/profile/me.
   Future<UserProfile> updateProfile(UserProfile updated) async {
     _currentProfile = updated;
+    _staticPrewarmedProfile = updated;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('profile_bio', updated.bio);
       await prefs.setString('profile_profession', updated.profession);
       await prefs.setString('profile_education', updated.education);
       await prefs.setString('profile_location', updated.location);
+      await prefs.setString('cached_profile_json_active', jsonEncode(updated.toJson()));
+      if (updated.id.isNotEmpty) {
+        await prefs.setString('cached_profile_json_${updated.id}', jsonEncode(updated.toJson()));
+      }
 
       final response = await dio.put<dynamic>(
         '/api/v1/profile/me',

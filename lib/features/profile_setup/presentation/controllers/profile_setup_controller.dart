@@ -11,6 +11,7 @@ import '../../../../core/services/image_moderation_service.dart';
 import '../../../../core/services/real_gps_location_service.dart';
 import '../../../../core/storage/secure_session_storage.dart';
 import '../../data/profile_repository.dart';
+import '../../../profile/data/profile_repository.dart' as main_profile;
 
 class ProfileSetupState {
   final Map<int, String> photoSlots;
@@ -567,6 +568,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     await prefs.setString('profile_contact_bridge_platform', state.contactBridgePlatform);
     await prefs.setString('profile_contact_bridge_handle', state.contactBridgeHandle);
     await prefs.setBool('ur_heart_profile_setup_completed', true);
+    main_profile.ProfileRepository.prewarmStatic(prefs);
 
     final email = prefs.getString('ur_heart_user_email') ?? '';
     final lat = prefs.getDouble('profile_gps_latitude');

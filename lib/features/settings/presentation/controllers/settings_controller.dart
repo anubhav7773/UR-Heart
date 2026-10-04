@@ -226,6 +226,7 @@ class SettingsController extends StateNotifier<SettingsState> {
       await prefs.remove('ur_heart_user_id');
       await prefs.remove('profile_user_id');
       await prefs.remove('cached_profile_json');
+      await prefs.remove('cached_profile_json_active');
       await prefs.remove('cached_profile_hash');
       await prefs.remove('ur_heart_fcm_token_registered_user');
       await prefs.remove('profile_full_name');

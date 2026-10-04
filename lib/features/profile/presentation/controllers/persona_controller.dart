@@ -10,6 +10,7 @@ import '../../data/profile_repository.dart';
 
 class PersonaState {
   final UserProfile profile;
+  final bool isInitialLoading;
   final bool isSaving;
   final bool isPolishing;
   final String? successMessage;
@@ -17,6 +18,7 @@ class PersonaState {
 
   const PersonaState({
     required this.profile,
+    this.isInitialLoading = false,
     this.isSaving = false,
     this.isPolishing = false,
     this.successMessage,
@@ -24,9 +26,11 @@ class PersonaState {
   });
 
   List<String> get moments => profile.momentsUrls;
+  bool get isReady => profile.isLoaded || !isInitialLoading;
 
   PersonaState copyWith({
     UserProfile? profile,
+    bool? isInitialLoading,
     bool? isSaving,
     bool? isPolishing,
     String? successMessage,
@@ -34,6 +38,7 @@ class PersonaState {
   }) {
     return PersonaState(
       profile: profile ?? this.profile,
+      isInitialLoading: isInitialLoading ?? this.isInitialLoading,
       isSaving: isSaving ?? this.isSaving,
       isPolishing: isPolishing ?? this.isPolishing,
       successMessage: successMessage,
@@ -46,14 +51,20 @@ class PersonaController extends StateNotifier<PersonaState> {
   final ProfileRepository _repo;
 
   PersonaController(this._repo)
-      : super(PersonaState(profile: _repo.getProfile())) {
+      : super(PersonaState(
+          profile: _repo.getProfile(),
+          isInitialLoading: _repo.getProfile().isPlaceholder,
+        )) {
     _loadInitialProfile();
   }
 
   Future<void> _loadInitialProfile() async {
     final cached = await _repo.loadProfileFromStorage();
     if (!mounted) return;
-    state = state.copyWith(profile: cached);
+    state = state.copyWith(
+      profile: cached,
+      isInitialLoading: cached.isPlaceholder,
+    );
 
     try {
       final remote = await _repo.fetchMyProfile();
@@ -88,14 +99,23 @@ class PersonaController extends StateNotifier<PersonaState> {
         gender: remote.gender.isNotEmpty ? remote.gender : cached.gender,
         interestedIn: remote.interestedIn.isNotEmpty ? remote.interestedIn : cached.interestedIn,
       );
-      state = state.copyWith(profile: updatedProfile);
+      state = state.copyWith(
+        profile: updatedProfile,
+        isInitialLoading: false,
+      );
     } catch (e) {
       debugPrint('[PersonaController] Remote profile sync notice: $e');
+      if (mounted && state.isInitialLoading) {
+        state = state.copyWith(isInitialLoading: false);
+      }
     }
   }
 
   void reset() {
-    state = PersonaState(profile: ProfileRepository.getEmptyProfile());
+    state = PersonaState(
+      profile: ProfileRepository.getEmptyProfile(),
+      isInitialLoading: true,
+    );
   }
 
   Future<void> refreshProfile() async {

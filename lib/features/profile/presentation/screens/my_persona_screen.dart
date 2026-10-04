@@ -90,38 +90,42 @@ class MyPersonaScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PersonaTabsHeader(activeIndex: 0, isDark: isDark),
-              PersonaHeaderCard(
-                profile: state.profile,
-                isDark: isDark,
-                onEditAvatar: () =>
-                    _showPhotoUploadModal(context, ref, isDark, 0, isAvatar: true),
-                onVerifyKyc: () => _openLivePhotoKycModal(context, ref),
-              ),
-              if (!state.profile.hasVerifiedCrest)
-                _buildSanctuaryKycPromptCard(context, ref, isDark),
-              MomentsMediaGrid(
-                photos: state.profile.momentPhotos,
-                isDark: isDark,
-                onReplaceSlot: (slot) =>
-                    _showPhotoUploadModal(context, ref, isDark, slot, isAvatar: false),
-              ),
-              LockedCredentialsCard(
-                profile: state.profile,
-                isDark: isDark,
-              ),
-              PreferencesSliderCard(
-                profile: state.profile,
-                isDark: isDark,
-                isPolishing: state.isPolishing,
-                isSaving: state.isSaving,
-                onUpdateGps: notifier.refreshLocation,
-                onPolishBio: notifier.polishBioWithGroq,
-                onBioChanged: notifier.updateBio,
-                onProfessionChanged: notifier.updateProfession,
-                onEducationChanged: notifier.updateEducation,
-                onAgeRangeChanged: notifier.updateAgeRange,
-                onSaveChanges: notifier.saveProfile,
-              ),
+              if (state.isInitialLoading && state.profile.isPlaceholder)
+                _buildSanctuarySkeleton(isDark)
+              else ...[
+                PersonaHeaderCard(
+                  profile: state.profile,
+                  isDark: isDark,
+                  onEditAvatar: () =>
+                      _showPhotoUploadModal(context, ref, isDark, 0, isAvatar: true),
+                  onVerifyKyc: () => _openLivePhotoKycModal(context, ref),
+                ),
+                if (state.profile.isLoaded && !state.profile.hasVerifiedCrest)
+                  _buildSanctuaryKycPromptCard(context, ref, isDark),
+                MomentsMediaGrid(
+                  photos: state.profile.momentPhotos,
+                  isDark: isDark,
+                  onReplaceSlot: (slot) =>
+                      _showPhotoUploadModal(context, ref, isDark, slot, isAvatar: false),
+                ),
+                LockedCredentialsCard(
+                  profile: state.profile,
+                  isDark: isDark,
+                ),
+                PreferencesSliderCard(
+                  profile: state.profile,
+                  isDark: isDark,
+                  isPolishing: state.isPolishing,
+                  isSaving: state.isSaving,
+                  onUpdateGps: notifier.refreshLocation,
+                  onPolishBio: notifier.polishBioWithGroq,
+                  onBioChanged: notifier.updateBio,
+                  onProfessionChanged: notifier.updateProfession,
+                  onEducationChanged: notifier.updateEducation,
+                  onAgeRangeChanged: notifier.updateAgeRange,
+                  onSaveChanges: notifier.saveProfile,
+                ),
+              ],
               const SizedBox(height: 32),
             ],
           ),
@@ -482,6 +486,138 @@ class MyPersonaScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSanctuarySkeleton(bool isDark) {
+    final cardBg = isDark
+        ? DarkSanctuaryTokens.surfaceCard
+        : LightSanctuaryTokens.surfaceCard;
+    final cardBorder = isDark
+        ? DarkSanctuaryTokens.surfaceCardBorder
+        : LightSanctuaryTokens.surfaceCardBorder;
+    final shimmerBase = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header Card Skeleton
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cardBorder, width: 1),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 38,
+                backgroundColor: shimmerBase,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 20,
+                      width: 140,
+                      decoration: BoxDecoration(
+                        color: shimmerBase,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      height: 14,
+                      width: 100,
+                      decoration: BoxDecoration(
+                        color: shimmerBase,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 14,
+                      width: 70,
+                      decoration: BoxDecoration(
+                        color: shimmerBase,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Crest / Banner Skeleton
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          height: 90,
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cardBorder, width: 1),
+          ),
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: isDark
+                    ? DarkSanctuaryTokens.primaryCoral
+                    : LightSanctuaryTokens.terracottaAccent,
+              ),
+            ),
+          ),
+        ),
+        // Moments Grid Skeleton
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cardBorder, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 18,
+                width: 160,
+                decoration: BoxDecoration(
+                  color: shimmerBase,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              const SizedBox(height: 12),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                children: List.generate(
+                  4,
+                  (index) => Container(
+                    decoration: BoxDecoration(
+                      color: shimmerBase,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

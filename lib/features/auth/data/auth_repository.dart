@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_session_storage.dart';
 import '../../../core/services/sanctuary_notification_service.dart';
+import '../../profile/data/profile_repository.dart';
 import 'google_auth_service.dart';
 
 /// Result wrapper for authentication operations
@@ -164,6 +165,7 @@ class AuthRepository {
         await prefs.setBool('ur_heart_profile_setup_completed', true);
         await prefs.setBool('ur_heart_has_entered_sanctuary', true);
       }
+      ProfileRepository.prewarmStatic(prefs);
     } catch (_) {}
 
     if (result.idToken != null) {
@@ -243,6 +245,7 @@ class AuthRepository {
           await prefs.setBool('ur_heart_profile_setup_completed', true);
           await prefs.setBool('ur_heart_has_entered_sanctuary', true);
         }
+        ProfileRepository.prewarmStatic(prefs);
 
         return AuthResult.success(
           userId: userId,

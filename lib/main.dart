@@ -12,6 +12,7 @@ import 'core/app/ur_heart_app.dart';
 import 'core/services/activity_logger_service.dart';
 import 'core/services/sanctuary_notification_service.dart';
 import 'core/storage/secure_session_storage.dart';
+import 'features/profile/data/profile_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -72,6 +73,7 @@ Future<void> main() async {
   String? resolvedInitialRoute;
   try {
     final prefs = await SharedPreferences.getInstance();
+    ProfileRepository.prewarmStatic(prefs);
     final secureToken = await SecureSessionStorage.instance.getAuthToken();
     final storedAuthToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
     final hasBackendToken = (secureToken != null && secureToken.isNotEmpty) ||

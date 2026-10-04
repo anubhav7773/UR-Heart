@@ -63,14 +63,49 @@ class UserProfile {
   });
 
   bool get isStreakActive => secondsRemaining > 0 && streakCount > 0;
+  bool get isLoaded => fullName.trim().isNotEmpty;
+  bool get isPlaceholder => !isLoaded;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'full_name': fullName,
+    'email': email,
+    'age': age,
+    'dob': dobVerificationPill,
+    'gender': gender,
+    'interested_in': interestedIn,
+    'contact_bridge_masked': maskedWhatsApp,
+    'kyc_status': hasVerifiedCrest,
+    'location_name': location,
+    'bio': bio,
+    'profession': profession,
+    'education': education,
+    'preferred_age_min': minAgePref,
+    'preferred_age_max': maxAgePref,
+    'avatar_url': avatarUrl,
+    'photos': momentPhotos,
+    'referral_code': referralCode,
+    'swipes_remaining': swipesRemaining,
+    'direct_letters_count': directLettersCount,
+    'is_ad_free': isAdFree,
+    'night_slumber': nightSlumber,
+    'subscription_tier': subscriptionTier,
+    'reward_balance': rewardBalance,
+    'streak_count': streakCount,
+    'boost_points': boostPoints,
+    'reveal_tokens_count': revealTokensCount,
+    'seconds_remaining': secondsRemaining,
+  };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
-    final rawAvatar = (json['avatar_url'] as String? ?? '').trim();
+    final rawAvatar = ((json['avatar_url'] ?? json['avatarUrl']) as String? ?? '').trim();
     final rawPhotos = (json['photos'] is List
             ? (json['photos'] as List<dynamic>)
             : (json['moment_photos'] is List
                 ? (json['moment_photos'] as List<dynamic>)
-                : const <dynamic>[]))
+                : (json['momentPhotos'] is List
+                    ? (json['momentPhotos'] as List<dynamic>)
+                    : const <dynamic>[])))
         .map((e) => e?.toString().trim() ?? '')
         .toList();
 
@@ -104,40 +139,44 @@ class UserProfile {
       resolvedMoments = resolvedMoments.sublist(0, 4);
     }
 
+    final name = (json['full_name'] ?? json['fullName']) as String? ?? '';
+    final parsedAge = (json['age'] is num) ? (json['age'] as num).toInt() : 0;
+
     return UserProfile(
       id: json['id'] as String? ?? '',
-      fullName: json['full_name'] as String? ?? 'Seeker',
+      fullName: name,
       email: json['email'] as String? ?? '',
-      age: json['age'] as int? ?? 24,
-      dobVerificationPill: json['dob'] as String? ?? 'Verified via DigiLocker',
-      gender: json['gender'] as String? ?? 'Seeker',
-      interestedIn: json['interested_in'] as String? ?? 'Everyone',
-      maskedWhatsApp: json['contact_bridge_masked'] as String? ?? '+91 **** ****',
-      memberSinceText: 'Member of Sanctuary',
+      age: parsedAge,
+      dobVerificationPill: json['dob'] as String? ?? json['dobVerificationPill'] as String? ?? '',
+      gender: json['gender'] as String? ?? '',
+      interestedIn: (json['interested_in'] ?? json['interestedIn']) as String? ?? '',
+      maskedWhatsApp: (json['contact_bridge_masked'] ?? json['maskedWhatsApp']) as String? ?? '',
+      memberSinceText: json['memberSinceText'] as String? ?? 'Member of Sanctuary',
       hasVerifiedCrest: json['kyc_status'] as bool? ??
-          (json['is_kyc_verified'] as bool? ??
-              (json['is_kyc'] as bool? ?? false)),
-      location: json['location_name'] as String? ?? json['location'] as String? ?? 'Ayodhya, UP',
+          (json['hasVerifiedCrest'] as bool? ??
+              (json['is_kyc_verified'] as bool? ??
+                  (json['is_kyc'] as bool? ?? false))),
+      location: (json['location_name'] ?? json['location']) as String? ?? '',
       bio: json['bio'] as String? ?? '',
       profession: json['profession'] as String? ?? '',
       education: json['education'] as String? ?? '',
-      minAgePref: (json['preferred_age_min'] as num?)?.toDouble() ?? 18.0,
-      maxAgePref: (json['preferred_age_max'] as num?)?.toDouble() ?? 35.0,
+      minAgePref: ((json['preferred_age_min'] ?? json['minAgePref']) as num?)?.toDouble() ?? 18.0,
+      maxAgePref: ((json['preferred_age_max'] ?? json['maxAgePref']) as num?)?.toDouble() ?? 35.0,
       avatarUrl: resolvedAvatar,
       momentPhotos: resolvedMoments,
-      referralCode: json['referral_code'] as String? ?? '',
-      swipesRemaining: json['swipes_remaining'] as int? ?? 10,
-      directLettersCount: json['direct_letters_count'] as int? ?? 0,
-      isAdFree: json['is_ad_free'] as bool? ?? false,
-      nightSlumber: json['night_slumber'] as bool? ?? false,
-      subscriptionTier: json['subscription_tier'] as String? ?? 'free',
-      rewardBalance: json['reward_balance'] as int? ?? 0,
-      streakCount: json['streak_count'] as int? ?? 0,
-      boostPoints: json['boost_points'] as int? ?? 0,
-      revealTokensCount: json['reveal_tokens_count'] as int? ?? 0,
+      referralCode: (json['referral_code'] ?? json['referralCode']) as String? ?? '',
+      swipesRemaining: (json['swipes_remaining'] ?? json['swipesRemaining']) as int? ?? 10,
+      directLettersCount: (json['direct_letters_count'] ?? json['directLettersCount']) as int? ?? 0,
+      isAdFree: (json['is_ad_free'] ?? json['isAdFree']) as bool? ?? false,
+      nightSlumber: (json['night_slumber'] ?? json['nightSlumber']) as bool? ?? false,
+      subscriptionTier: (json['subscription_tier'] ?? json['subscriptionTier']) as String? ?? 'free',
+      rewardBalance: (json['reward_balance'] ?? json['rewardBalance']) as int? ?? 0,
+      streakCount: (json['streak_count'] ?? json['streakCount']) as int? ?? 0,
+      boostPoints: (json['boost_points'] ?? json['boostPoints']) as int? ?? 0,
+      revealTokensCount: (json['reveal_tokens_count'] ?? json['revealTokensCount']) as int? ?? 0,
       secondsRemaining: (json['streak_info'] is Map && json['streak_info']['seconds_remaining'] != null)
           ? (json['streak_info']['seconds_remaining'] as int)
-          : (json['seconds_remaining'] as int? ?? 0),
+          : ((json['seconds_remaining'] ?? json['secondsRemaining']) as int? ?? 0),
     );
   }
 

@@ -73,16 +73,20 @@ class PersonaHeaderCard extends StatelessWidget {
                       : LightSanctuaryTokens.chipBackground,
                   backgroundImage: avatarProvider,
                   child: avatarProvider == null
-                      ? Text(
-                          profile.fullName.isNotEmpty
-                              ? profile.fullName[0].toUpperCase()
-                              : 'U',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            color: headlineColor,
-                          ),
-                        )
+                      ? (profile.fullName.trim().isNotEmpty
+                          ? Text(
+                              profile.fullName.trim()[0].toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: headlineColor,
+                              ),
+                            )
+                          : Icon(
+                              Icons.person_rounded,
+                              size: 38,
+                              color: mutedColor.withOpacity(0.4),
+                            ))
                       : null,
                 ),
                 Positioned(
@@ -122,109 +126,117 @@ class PersonaHeaderCard extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        '${profile.fullName}, ${profile.age}',
+                        profile.isLoaded
+                            ? (profile.age > 0 ? '${profile.fullName}, ${profile.age}' : profile.fullName)
+                            : '',
                         style: AppTypography.titleH2.copyWith(color: headlineColor),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (profile.hasVerifiedCrest) ...[
-                      const SizedBox(width: 6),
-                      Tooltip(
-                        message: 'Verified Sanctuary Member · Live KYC Confirmed',
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: crestColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: crestColor, width: 0.8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.verified_rounded,
-                                  size: 13, color: crestColor),
-                              const SizedBox(width: 3),
-                              Text(
-                                'CREST',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: crestColor,
+                    if (profile.isLoaded) ...[
+                      if (profile.hasVerifiedCrest) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: 'Verified Sanctuary Member · Live KYC Confirmed',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: crestColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: crestColor, width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified_rounded,
+                                    size: 13, color: crestColor),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'CREST',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: crestColor,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      const SizedBox(width: 6),
-                      InkWell(
-                        onTap: onVerifyKyc,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: (isDark
-                                    ? DarkSanctuaryTokens.primaryCoral
-                                    : LightSanctuaryTokens.terracottaAccent)
-                                .withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isDark
-                                  ? DarkSanctuaryTokens.primaryCoral
-                                  : LightSanctuaryTokens.terracottaAccent,
-                              width: 0.8,
+                              ],
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.shield_outlined,
-                                size: 12,
+                        ),
+                      ] else ...[
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: onVerifyKyc,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (isDark
+                                      ? DarkSanctuaryTokens.primaryCoral
+                                      : LightSanctuaryTokens.terracottaAccent)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
                                 color: isDark
                                     ? DarkSanctuaryTokens.primaryCoral
                                     : LightSanctuaryTokens.terracottaAccent,
+                                width: 0.8,
                               ),
-                              const SizedBox(width: 3),
-                              Text(
-                                'VERIFY ✨',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w700,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.shield_outlined,
+                                  size: 12,
                                   color: isDark
                                       ? DarkSanctuaryTokens.primaryCoral
                                       : LightSanctuaryTokens.terracottaAccent,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 3),
+                                Text(
+                                  'VERIFY ✨',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark
+                                        ? DarkSanctuaryTokens.primaryCoral
+                                        : LightSanctuaryTokens.terracottaAccent,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  profile.memberSinceText,
-                  style: AppTypography.bodySmall.copyWith(color: mutedColor),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.location_on_outlined, size: 14, color: mutedColor),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        profile.location,
-                        style: AppTypography.bodySmall.copyWith(color: mutedColor),
-                        overflow: TextOverflow.ellipsis,
+                if (profile.isLoaded && profile.memberSinceText.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    profile.memberSinceText,
+                    style: AppTypography.bodySmall.copyWith(color: mutedColor),
+                  ),
+                ],
+                if (profile.location.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 14, color: mutedColor),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          profile.location,
+                          style: AppTypography.bodySmall.copyWith(color: mutedColor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
