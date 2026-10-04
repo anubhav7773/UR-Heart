@@ -305,8 +305,9 @@ async def update_my_profile(
         if handle:
             update_data["contact_bridge_encrypted"] = str(handle)
 
-    if "is_kyc_verified" in update_data:
-        update_data["kyc_status"] = update_data.pop("is_kyc_verified")
+    # Defense-in-depth: Disallow client manipulation of KYC status
+    update_data.pop("is_kyc_verified", None)
+    update_data.pop("kyc_status", None)
 
     update_data.pop("photo_slots_count", None)
     email_val = update_data.pop("email", None)
@@ -499,9 +500,8 @@ async def create_or_update_profile(
     if loc_name:
         up_vals["location_name"] = loc_name
     
-    kyc_val = payload.is_kyc if payload.is_kyc is not None else payload.is_kyc_verified
-    if kyc_val is not None:
-        up_vals["kyc_status"] = kyc_val
+    # Defense-in-depth: Disallow client manipulation of KYC status during setup
+    # KYC status is strictly managed by /api/v1/kyc/verify-live or superadmin desk
 
     bridge_platform_val = payload.bridge_platform or payload.contact_bridge_type
     if bridge_platform_val:

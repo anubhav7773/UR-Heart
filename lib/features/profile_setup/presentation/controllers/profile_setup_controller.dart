@@ -523,15 +523,17 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
   }
 
   /// Live Photo Pose Selfie evaluated by EVA AI (Tinder/Bumble Industry Standard)
-  Future<void> executeSelfieKyc({
+  Future<KycVerificationResult> executeSelfieKyc({
     required String selfieBase64,
     String? anchorPhotoB64,
+    String? expectedPose,
     String userId = 'me',
   }) async {
     final result = await _repository.submitSelfieKyc(
       userId: userId,
       selfieBase64: selfieBase64,
       anchorPhotoB64: anchorPhotoB64,
+      expectedPose: expectedPose,
     );
     state = state.copyWith(
       isKycVerified: result.isApproved,
@@ -541,6 +543,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('profile_is_kyc_verified', result.isApproved);
+    return result;
   }
 
   Future<bool> completeSetup() async {

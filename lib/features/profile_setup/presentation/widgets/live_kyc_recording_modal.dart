@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../core/network/dio_client.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -453,35 +452,18 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
         }
       }
 
-      // Execute controller update for reactive UI updates
-      try {
-        await ref.read(profileSetupControllerProvider.notifier).executeSelfieKyc(
-              selfieBase64: selfieB64,
-              anchorPhotoB64: anchor,
-            );
-      } catch (_) {}
-
-      final dio = ref.read(dioClientProvider).dio;
-      final response = await dio.post<Map<String, dynamic>>(
-        '/api/v1/kyc/verify-live',
-        data: {
-          'anchor_b64': anchor,
-          'selfie_b64': selfieB64,
-        },
-      );
-
-      final status = response.data?['status'] as String? ?? 'pending_manual_review';
-      final isLive = response.data?['is_live_human'] == true;
-      final score = response.data?['face_match_score'] as int? ?? 0;
-      final isApproved = status == 'approved' && isLive && score >= 75;
-      final message = (response.data?['rejection_reason'] as String?) ??
-          (isApproved
-              ? 'Identity Authenticated! Golden Sanctuary Crest awarded.'
-              : 'Reflection submitted to Sanctuary Sentinel. Pending manual verification.');
+      // Single-flight verified KYC verification via controller & repository
+      final result = await ref
+          .read(profileSetupControllerProvider.notifier)
+          .executeSelfieKyc(
+            selfieBase64: selfieB64,
+            anchorPhotoB64: anchor,
+            expectedPose: _currentPose.title,
+          );
 
       if (mounted) {
         Navigator.of(context).pop();
-        widget.onKycCompleted?.call(isApproved, message);
+        widget.onKycCompleted?.call(result.isApproved, result.message);
       }
     } catch (e) {
       if (mounted) {

@@ -29,12 +29,14 @@ OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 
 
 class KycAiEvaluation(BaseModel):
-    is_live_human: bool
-    face_match_score: int
-    estimated_age_bracket: str = "22-28"
+    is_live_human: bool = False
+    face_match_score: int = 0
+    pose_matched: bool = True
+    estimated_age_bracket: str = "unknown"
     is_underage: bool = False
     rejection_reason: Optional[str] = ""
-    status: str = "approved"
+    status: str = "pending_manual_review"
+    analysis_summary: Optional[str] = ""
 
 
 class EvaIdentityEngine:
@@ -199,14 +201,15 @@ class EvaIdentityEngine:
         user_id: UUID,
         anchor_b64: str,
         frames_b64: List[str],
+        expected_pose: Optional[str] = None,
         db_session: Any = None
     ) -> KycAiEvaluation:
         """
-        Evaluates Video KYC liveness with multi-model failover:
+        Evaluates Photo/Video KYC liveness with multi-model failover:
         1. Safe local OpenCV heuristic (if available)
         2. Production Groq Vision (`qwen/qwen3.8-27b`)
-        3. OpenRouter Vision fallback (`dots-studio/dots-3-note-preview:free`, `qwen/qwen3.8-27b:free`)
-        4. Resilient image dimension & biometric presence validation
+        3. OpenRouter Free Multimodal Vision fallback (qwen/qwen3.8-27b:free, google/gemma-4-31b-it:free)
+        4. Strict Fail-Closed Policy: If all models rate-limited/failed, strictly returns status=pending_manual_review.
         """
         extracted_frames = cls.extract_image_frames(frames_b64)
         clean_anchor = anchor_b64.split(",")[-1] if "," in anchor_b64 else anchor_b64
@@ -214,9 +217,11 @@ class EvaIdentityEngine:
         # Fail closed immediately if neither valid anchor nor video frames exist
         anchor_valid = cls._is_valid_image(clean_anchor)
         if not anchor_valid and not extracted_frames:
+            logger.warning("[KYC FAIL-CLOSED] User %s: Corrupted or missing anchor/frames.", user_id)
             return KycAiEvaluation(
                 is_live_human=False,
                 face_match_score=0,
+                pose_matched=False,
                 rejection_reason="Corrupted or invalid image frames received.",
                 status="pending_manual_review"
             )
@@ -231,15 +236,33 @@ class EvaIdentityEngine:
         # 1. Safe local check
         local_face_found = cls._detect_faces_opencv_safe([clean_anchor] + comparison_frames)
 
+        pose_instruction = (
+            f"4. Pose Challenge Check: The user was instructed to perform the following pose: \"{expected_pose}\". "
+            f"Inspect Image 2 to verify if the person is actively performing this pose (pose_matched: true or false).\n"
+        ) if expected_pose else ""
+
         prompt_text = (
             "You are the Sanctuary Identity Sentinel. Image 1 is the user's primary profile portrait (Slot 1). "
-            "Image 2 (and any following images) is a live verification selfie captured by the user.\n"
-            "1. Biometric Match: Compare eye spacing, nose bridge, jawline, and facial structure between Image 1 and Image 2. Face match score MUST be between 0 and 100.\n"
-            "2. Liveness Check: Verify Image 2 is a genuine 3D living person, not a photo of a screen, printed paper photo, or spoof replay.\n"
+            "Image 2 is a live verification selfie captured by the user right now.\n"
+            "Perform strict biometric analysis:\n"
+            "1. Biometric Match: Compare eye spacing, nose bridge, jawline, and facial structure between Image 1 and Image 2. Face match score MUST be an integer between 0 and 100 based strictly on facial similarity.\n"
+            "2. Liveness Check: Verify Image 2 is a genuine 3D living person, not a photo of a screen, printed paper photo, AI avatar, deepfake, or spoof replay.\n"
             "3. Age Check: Verify user appears to be an adult (age 18+).\n"
-            "Return ONLY a valid raw JSON object with these exact keys:\n"
-            "{\"is_live_human\": true, \"face_match_score\": 85, \"estimated_age_bracket\": \"22-28\", "
-            "\"is_underage\": false, \"rejection_reason\": \"\"}"
+            f"{pose_instruction}"
+            "CRITICAL INSTRUCTIONS:\n"
+            "- You MUST visually inspect the actual image pixels.\n"
+            "- If images are missing, corrupt, blank, or not showing a human face, face_match_score MUST be 0 and is_live_human MUST be false.\n"
+            "- Do NOT copy sample values.\n"
+            "Return ONLY a valid raw JSON object with this exact schema:\n"
+            "{\n"
+            '  "is_live_human": <true or false>,\n'
+            '  "face_match_score": <integer from 0 to 100>,\n'
+            '  "pose_matched": <true or false>,\n'
+            '  "estimated_age_bracket": "<age bracket string like 20-25>",\n'
+            '  "is_underage": <true or false>,\n'
+            '  "rejection_reason": "<empty string if passed, or specific reason if rejected/failed>",\n'
+            '  "analysis_summary": "<brief description of face, eyes, and pose seen in images>"\n'
+            "}"
         )
 
         content_payload: List[Dict[str, Any]] = [{"type": "text", "text": prompt_text}]
@@ -247,7 +270,7 @@ class EvaIdentityEngine:
         for frame in comparison_frames[:2]:
             content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame}"}})
 
-        # 2. Primary: Dynamic Groq Vision Model Pool
+        # 2. Primary: Groq Vision
         groq_models = [
             "qwen/qwen3.8-27b",
         ]
@@ -261,74 +284,89 @@ class EvaIdentityEngine:
         if groq_key:
             for g_model in groq_models:
                 try:
+                    logger.info("[KYC VISION REQUEST] User %s: Calling Groq Vision (%s)...", user_id, g_model)
                     payload = {
                         "model": g_model,
                         "messages": [{"role": "user", "content": content_payload}],
                         "temperature": 0.1,
                         "max_tokens": 300,
                     }
-                    async with httpx.AsyncClient(timeout=10.0) as client:
+                    async with httpx.AsyncClient(timeout=12.0) as client:
                         res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
                         if res.status_code == 200:
                             choice = res.json().get("choices", [{}])[0]
                             content_str = choice.get("message", {}).get("content", "")
-                            eval_obj = cls._parse_kyc_json(content_str, local_face_found)
+                            eval_obj = cls._parse_kyc_json(content_str, expected_pose, local_face_found)
                             if eval_obj:
+                                logger.info(
+                                    "[KYC VISION SUCCESS] User %s via Groq (%s): status=%s, score=%s, live=%s, pose=%s",
+                                    user_id, g_model, eval_obj.status, eval_obj.face_match_score, eval_obj.is_live_human, eval_obj.pose_matched
+                                )
                                 return eval_obj
                         else:
                             logger.warning("Groq Vision (%s) returned status %s: %s", g_model, res.status_code, res.text[:120])
                 except Exception as e:
                     logger.warning("Groq Vision (%s) exception: %s", g_model, e)
 
-        # 3. Secondary: OpenRouter Vision Fallback Pool
+        # 3. Secondary: OpenRouter Validated Free Multimodal Pool (NO text-only models)
         or_key = getattr(settings, "OPENROUTER_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "") or ""
         if or_key:
             or_models = [
-                "google/gemini-2.0-flash-001",
-                "meta-llama/llama-3.2-11b-vision-instruct",
-                "qwen/qwen-2.5-vl-72b-instruct",
-                "openrouter/free",
                 "qwen/qwen3.8-27b:free",
-                "google/gemini-2.0-flash-exp:free",
+                "google/gemma-4-31b-it:free",
+                "google/gemma-4-26b-a4b-it:free",
+                "dots-studio/dots-3-note-preview:free",
             ]
             for o_model in or_models:
                 try:
+                    logger.info("[KYC VISION REQUEST] User %s: Calling OpenRouter Vision (%s)...", user_id, o_model)
                     payload = {
                         "model": o_model,
                         "messages": [{"role": "user", "content": content_payload}],
                         "temperature": 0.1,
                         "max_tokens": 300,
                     }
-                    async with httpx.AsyncClient(timeout=12.0) as client:
+                    async with httpx.AsyncClient(timeout=14.0) as client:
                         res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
                         if res.status_code == 200:
                             choice = res.json().get("choices", [{}])[0]
                             content_str = choice.get("message", {}).get("content", "")
-                            eval_obj = cls._parse_kyc_json(content_str, local_face_found)
+                            eval_obj = cls._parse_kyc_json(content_str, expected_pose, local_face_found)
                             if eval_obj:
+                                logger.info(
+                                    "[KYC VISION SUCCESS] User %s via OpenRouter (%s): status=%s, score=%s, live=%s, pose=%s",
+                                    user_id, o_model, eval_obj.status, eval_obj.face_match_score, eval_obj.is_live_human, eval_obj.pose_matched
+                                )
                                 return eval_obj
                         else:
-                            logger.warning("OpenRouter Vision (%s) returned status %s", o_model, res.status_code)
+                            logger.warning("OpenRouter Vision (%s) returned status %s: %s", o_model, res.status_code, res.text[:120])
                 except Exception as e:
                     logger.warning("OpenRouter Vision (%s) error: %s", o_model, e)
 
         # 4. Strict Fail-Closed Sentinel: Remote Vision APIs unavailable/rate-limited
         # Zero automated pass. User is routed to manual review; kyc_status remains False.
         logger.warning(
-            "Remote Vision APIs unavailable or rate-limited for user %s. Strictly FAILING CLOSED to pending_manual_review.",
+            "[KYC VISION FAIL-CLOSED] All AI vision models failed or rate-limited for user %s. Strictly FAILING CLOSED to pending_manual_review. kyc_status remains False.",
             user_id
         )
         return KycAiEvaluation(
             is_live_human=False,
             face_match_score=0,
+            pose_matched=False,
             estimated_age_bracket="unknown",
             is_underage=False,
             rejection_reason="Automated biometric evaluation temporarily unavailable due to upstream AI rate-limits. Escalated to Sentinel Desk for manual verification.",
-            status="pending_manual_review"
+            status="pending_manual_review",
+            analysis_summary="All remote AI vision providers failed or rate-limited."
         )
 
     @classmethod
-    def _parse_kyc_json(cls, raw_content: Any, local_face: bool = False) -> Optional[KycAiEvaluation]:
+    def _parse_kyc_json(
+        cls,
+        raw_content: Any,
+        expected_pose: Optional[str] = None,
+        local_face: bool = False
+    ) -> Optional[KycAiEvaluation]:
         if not raw_content or not isinstance(raw_content, str):
             return None
         try:
@@ -337,45 +375,83 @@ class EvaIdentityEngine:
                 data = json.loads(match.group(0))
                 score = int(data.get("face_match_score", 0))
                 is_live = bool(data.get("is_live_human", False))
+                pose_matched = bool(data.get("pose_matched", True)) if expected_pose else True
                 is_underage = bool(data.get("is_underage", False))
                 reason = data.get("rejection_reason", "") or ""
+                summary = data.get("analysis_summary", "") or ""
+
+                lower_summary = summary.lower()
+                lower_reason = reason.lower()
+                # Sentinel Defense: Detect blind text model responses that confess to missing images
+                if "no image" in lower_summary or "no image" in lower_reason or "cannot see" in lower_summary or "no visual" in lower_summary or "no visual" in lower_reason:
+                    return KycAiEvaluation(
+                        is_live_human=False,
+                        face_match_score=0,
+                        pose_matched=False,
+                        estimated_age_bracket="unknown",
+                        is_underage=False,
+                        rejection_reason="No visual input or face could be identified in selfie.",
+                        status="rejected",
+                        analysis_summary=summary
+                    )
 
                 if is_underage:
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
+                        pose_matched=pose_matched,
                         estimated_age_bracket=data.get("estimated_age_bracket", "under_18"),
                         is_underage=True,
-                        rejection_reason="Underage profile detected.",
-                        status="rejected"
+                        rejection_reason=reason or "Underage profile detected.",
+                        status="rejected",
+                        analysis_summary=summary
                     )
-                elif is_live and score >= 75:
+
+                if expected_pose and not pose_matched:
+                    return KycAiEvaluation(
+                        is_live_human=is_live,
+                        face_match_score=score,
+                        pose_matched=False,
+                        estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
+                        is_underage=False,
+                        rejection_reason=reason or f"Challenge pose '{expected_pose}' not detected.",
+                        status="rejected",
+                        analysis_summary=summary
+                    )
+
+                if is_live and score >= 75 and pose_matched and not is_underage:
                     return KycAiEvaluation(
                         is_live_human=True,
                         face_match_score=score,
+                        pose_matched=True,
                         estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
                         is_underage=False,
                         rejection_reason="",
-                        status="approved"
+                        status="approved",
+                        analysis_summary=summary
                     )
                 elif score < 40 or not is_live:
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
+                        pose_matched=pose_matched,
                         estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
                         is_underage=False,
                         rejection_reason=reason or "Biometric match score insufficient or liveness unconfirmed.",
-                        status="rejected"
+                        status="rejected",
+                        analysis_summary=summary
                     )
                 else:
                     # Borderline score (40 - 74): route to manual review, NEVER auto-approve
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
+                        pose_matched=pose_matched,
                         estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
                         is_underage=False,
                         rejection_reason=reason or "Biometric match confidence ambiguous. Escalated for human Sentinel review.",
-                        status="pending_manual_review"
+                        status="pending_manual_review",
+                        analysis_summary=summary
                     )
         except Exception as e:
             logger.warning("Failed to parse KYC JSON: %s", e)

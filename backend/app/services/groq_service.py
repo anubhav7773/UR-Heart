@@ -22,10 +22,12 @@ OPENROUTER_ENDPOINT = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api
 class KycAiEvaluation(BaseModel):
     is_live_human: bool = Field(default=False)
     face_match_score: int = Field(default=0, ge=0, le=100)
+    pose_matched: bool = Field(default=True)
     estimated_age_bracket: str = Field(default="unknown")
     is_underage: bool = Field(default=True)
     rejection_reason: Optional[str] = Field(default="")
     status: str = Field(default="pending_manual_review")
+    analysis_summary: Optional[str] = Field(default="")
 
 
 def sanitize_prompt_input(user_text: str) -> str:
@@ -212,6 +214,7 @@ class GroqAiService:
         user_id: UUID,
         anchor_b64: str,
         frames_b64: List[str],
+        expected_pose: Optional[str] = None,
         db_session: Any = None
     ) -> KycAiEvaluation:
         """
@@ -223,6 +226,7 @@ class GroqAiService:
             user_id=user_id,
             anchor_b64=anchor_b64,
             frames_b64=frames_b64,
+            expected_pose=expected_pose,
             db_session=db_session
         )
 
@@ -241,10 +245,12 @@ class GroqAiService:
         return KycAiEvaluation(
             is_live_human=eval_result.is_live_human,
             face_match_score=eval_result.face_match_score,
+            pose_matched=eval_result.pose_matched,
             estimated_age_bracket=eval_result.estimated_age_bracket,
             is_underage=eval_result.is_underage,
             rejection_reason=eval_result.rejection_reason or "",
-            status=eval_result.status
+            status=eval_result.status,
+            analysis_summary=eval_result.analysis_summary or ""
         )
 
     @classmethod

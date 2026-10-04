@@ -206,6 +206,7 @@ class ProfileRepository {
     required String userId,
     required String selfieBase64,
     String? anchorPhotoB64,
+    String? expectedPose,
   }) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
@@ -213,15 +214,17 @@ class ProfileRepository {
         data: {
           'anchor_b64': anchorPhotoB64 ?? '',
           'selfie_b64': selfieBase64,
+          if (expectedPose != null && expectedPose.isNotEmpty) 'expected_pose': expectedPose,
         },
       );
       final data = response.data;
       final status = data?['status'] as String? ?? 'pending_manual_review';
       final isLive = data?['is_live_human'] == true;
       final score = data?['face_match_score'] as int? ?? 0;
+      final poseMatched = data?['pose_matched'] != false;
       final reason = data?['rejection_reason'] as String? ?? '';
 
-      if (status == 'approved' && isLive && score >= 75) {
+      if (status == 'approved' && isLive && score >= 75 && poseMatched) {
         return const KycVerificationResult(
           isApproved: true,
           isPendingReview: false,

@@ -16,6 +16,7 @@ class VerifyLiveKycPayload(BaseModel):
     selfie_b64: Optional[str] = Field(None, description="Base64 encoded live photo pose selfie snapshot")
     frames_b64: List[str] = Field(default_factory=list, description="Base64 encoded frames from live video")
     video_b64: Optional[str] = Field(None, description="Base64 encoded video clip")
+    expected_pose: Optional[str] = Field(None, description="Randomized challenge pose requested from user")
 
 
 @router.post("/verify-live", response_model=KycAiEvaluation, status_code=status.HTTP_200_OK)
@@ -42,6 +43,7 @@ async def verify_live_kyc(
         user_id=current_user.id,
         anchor_b64=payload.anchor_b64,
         frames_b64=frames,
+        expected_pose=payload.expected_pose,
         db_session=db
     )
 
@@ -50,6 +52,7 @@ async def verify_live_kyc(
         evaluation.status == "approved"
         and evaluation.is_live_human is True
         and evaluation.face_match_score >= 75
+        and evaluation.pose_matched is True
         and not evaluation.is_underage
     )
 
@@ -62,7 +65,7 @@ async def verify_live_kyc(
         else:
             print(
                 f"[KYC VERIFY] User {current_user.id} ({current_user.email}) fail-closed: "
-                f"kyc_status=False (status={evaluation.status}, score={evaluation.face_match_score}, live={evaluation.is_live_human})",
+                f"kyc_status=False (status={evaluation.status}, score={evaluation.face_match_score}, live={evaluation.is_live_human}, pose={evaluation.pose_matched})",
                 flush=True
             )
     except Exception as e:
