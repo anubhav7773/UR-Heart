@@ -29,6 +29,7 @@ class ApiEndpoints {
 
   // Real-Time Render Activity Telemetry & Logging
   static const String telemetryActivity = '/api/v1/telemetry/activity';
+  static const String telemetryResolveLocation = '/api/v1/telemetry/resolve-location';
 
   // AI Suite & Moderation Routes
   static const String aiPolishBio = '/api/v1/ai/bio-polish';

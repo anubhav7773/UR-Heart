@@ -224,8 +224,10 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     } catch (_) {}
   }
 
-  /// Acquires real hardware GPS coordinates and reverse-geocodes locality
+  /// Acquires authentic GPS coordinates with Patal-Lok subterranean resilience
   Future<String> fetchRealGpsLocation() async {
+    if (state.isAcquiringGps) return state.location;
+
     state = state.copyWith(
       isAcquiringGps: true,
       gpsError: null,
@@ -238,6 +240,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       await prefs.setString('profile_location', result.formattedLocation);
       await prefs.setDouble('profile_gps_latitude', result.latitude);
       await prefs.setDouble('profile_gps_longitude', result.longitude);
+      await prefs.setDouble('profile_gps_accuracy', result.accuracyMeters);
       await prefs.setBool('profile_gps_verified', true);
 
       state = state.copyWith(

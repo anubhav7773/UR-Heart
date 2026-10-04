@@ -246,6 +246,7 @@ class SettingsController extends StateNotifier<SettingsState> {
       await prefs.remove('profile_gps_verified');
       await prefs.remove('profile_gps_latitude');
       await prefs.remove('profile_gps_longitude');
+      await prefs.remove('profile_gps_accuracy');
       await prefs.remove('profile_is_kyc_verified');
       await prefs.remove('profile_interested_in');
       await prefs.remove('profile_min_age');
