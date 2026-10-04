@@ -244,12 +244,12 @@ async def redeem_referral_code(
 
     # Credit rewards to referee (current_user)
     current_user.reward_balance = (current_user.reward_balance or 0) + 20
-    current_user.swipes_remaining = (current_user.swipes_remaining or 25) + 5
-    current_user.direct_letters_count = (current_user.direct_letters_count or 1) + 1
+    current_user.swipes_remaining = (current_user.swipes_remaining or 10) + 5
+    current_user.direct_letters_count = (current_user.direct_letters_count or 0) + 1
 
     # Credit rewards to referrer
     referrer.reward_balance = (referrer.reward_balance or 0) + 20
-    referrer.swipes_remaining = (referrer.swipes_remaining or 25) + 5
+    referrer.swipes_remaining = (referrer.swipes_remaining or 10) + 5
 
     await db.commit()
     await db.refresh(current_user)

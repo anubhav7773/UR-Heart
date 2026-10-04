@@ -28,7 +28,7 @@ def mock_user():
         kyc_status=False,  # Initially unverified
         subscription_tier="free",
         reward_balance=50,
-        swipes_remaining=25,
+        swipes_remaining=10,
         direct_letters_count=1,
         reveal_tokens_count=0,
         is_profile_completed=True,

@@ -27,7 +27,7 @@ def mock_phase1_user():
         kyc_status=True,
         subscription_tier="free",
         reward_balance=100,
-        swipes_remaining=25,
+        swipes_remaining=10,
         is_profile_completed=False,
         night_slumber=False,
         is_incognito=False,

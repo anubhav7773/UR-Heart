@@ -128,8 +128,8 @@ class SanctuaryAppInfoScreen extends ConsumerWidget {
               muted: muted,
               accentColor: pine,
               icon: Icons.spa_outlined,
-              title: '25 Mindful Swipes / Day',
-              desc: 'High-intent discovery capped at 25 daily intentional swipes. Eradicates mindless doomscrolling and honors your emotional focus.',
+              title: '10 Mindful Swipes / Day',
+              desc: 'High-intent discovery capped at 10 daily intentional swipes for new seekers. Replenish +10 swipes anytime by taking a 10s mindful reflection ad, or unlock Sovereign passes for expanded presence.',
             ),
             const SizedBox(height: 12),
 

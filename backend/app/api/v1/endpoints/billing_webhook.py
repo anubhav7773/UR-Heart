@@ -123,7 +123,7 @@ async def process_revenuecat_event(
                 subscription_tier="free",
                 subscription_expires_at=None,
                 is_ad_free=False,
-                swipes_remaining=25
+                swipes_remaining=10
             )
         )
         await db.commit()

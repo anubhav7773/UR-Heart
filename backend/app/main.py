@@ -822,7 +822,7 @@ def get_sanctuary_overview_html() -> str:
     <!-- Stat Banner -->
     <div class="stat-banner">
       <div class="stat-card">
-        <div class="stat-num">25 / Day</div>
+        <div class="stat-num">10 / Day</div>
         <div class="stat-label">Mindful Swipe Quota</div>
       </div>
       <div class="stat-card">
@@ -846,7 +846,7 @@ def get_sanctuary_overview_html() -> str:
         Modern dating platforms operate like dopamine casinos. They optimize algorithms for addictive infinite scrolling, superficial micro-second snap judgments, ghosting culture, and surveillance capitalism. When human beings are reduced to endless playing cards, loneliness multiplies.
       </p>
       <p>
-        <strong>UR-Heart is the sacred alternative.</strong> We introduce deliberate deceleration: a sacred cap of 25 daily intentional swipes, verified human identities through 3-second biometric KYC liveness challenges, deep soul-aligned resonance matching, poetic direct courtship letters, and graduated contact bridges that shield your private contact handles until genuine bilateral trust is proven.
+        <strong>UR-Heart is the sacred alternative.</strong> We introduce deliberate deceleration: an intentional starting deck of 10 daily intentional swipes, replenishable immediately with a brief 10-second reflection or through sovereign passes, verified human identities through 3-second biometric KYC liveness challenges, deep soul-aligned resonance matching, poetic direct courtship letters, and graduated contact bridges that shield your private contact handles until genuine bilateral trust is proven.
       </p>
       <p style="margin-bottom:0; color:var(--gold); font-weight:600;">
         "We do not commodify human affection. We cultivate intentional kinship."
@@ -869,11 +869,12 @@ def get_sanctuary_overview_html() -> str:
             </div>
           </div>
           <p class="feature-text">
-            A deliberate deck capped at <strong>25 Free Daily Intentional Swipes</strong> (resetting daily at midnight IST) to eradicate mindless dopamine loops. Every profile computes a real-time <strong>Resonance Score (%)</strong> derived from mutual values, emotional intentions, and lifestyle prompts. Features <strong>1.1 km Fuzzy Geolocation Shielding</strong> so exact domestic coordinates are never broadcast.
+            A deliberate discovery deck designed to eliminate dopamine burnout: newly onboarded seekers receive <strong>10 Free Daily Intentional Swipes</strong>. When depleted, seekers replenish presence immediately with <strong>+10 Swipes via a 10-second mindful reflection ad</strong>, or acquire Sovereign Passes for expanded presence. Every profile computes a real-time <strong>Resonance Score (%)</strong> derived from mutual values, emotional intentions, and lifestyle prompts, shielded by <strong>1.1 km Fuzzy Geolocation</strong>.
           </p>
         </div>
         <div class="feature-chips">
-          <span class="chip">25 Swipes/Day Cap</span>
+          <span class="chip">10 Swipes Initial Quota</span>
+          <span class="chip">+10 Swipes / 10s Reflection</span>
           <span class="chip">Resonance Algorithm</span>
           <span class="chip">1.1km Fuzzy Geo</span>
           <span class="chip">5 Moments Photo Gallery</span>
@@ -1026,7 +1027,8 @@ def get_sanctuary_overview_html() -> str:
             </div>
           </div>
           <p class="feature-text">
-            Transparent, fair pricing across Google Play, Apple App Store, and the Sanctuary Web Store (<code>urheart.asiverticals.me/store</code>).
+            Transparent zero-paywall dual economy across Google Play, Apple App Store, and the Sanctuary Web Store (<code>urheart.asiverticals.me/store</code>).
+            <br><strong>Dual-Path Philosophy:</strong> Seekers can access all perks 100% free through mindful sponsor reflections (10s = +10 swipes, 20s = 1 direct letter, 30s = bridge reveal token step) OR instantly ascend via Sovereign Passes.
             <br>• <strong>Weekly Pass</strong>: ₹49 (100 Swipes) / $4.99 (200 Swipes) · <em>Web Store: 110 Swipes (+10% Bonus)</em>
             <br>• <strong>Monthly Pass</strong>: ₹149 (500 Swipes) / $14.99 (1,000 Swipes) + 5 Direct Letters · <em>Web Store: 550 Swipes + 6 Letters</em>
             <br>• <strong>1-Year Sovereign Pass</strong>: ₹1,499 / $59.99 · 365 Days Unlimited Swipes + 10 Direct Letters · <em>Web Store: 11 Letters (+10% Bonus)</em>
@@ -1037,6 +1039,7 @@ def get_sanctuary_overview_html() -> str:
         </div>
         <div class="feature-chips">
           <span class="chip">+10% Web Store Bonus</span>
+          <span class="chip">Dual-Path Free Ads or Pass</span>
           <span class="chip">Instant UPI / NetBanking / Cards</span>
           <span class="chip">Zero Subscription Traps</span>
           <span class="chip">Cryptographic Ledger</span>
@@ -1089,7 +1092,7 @@ def get_sanctuary_overview_html() -> str:
       <div class="step-card">
         <div class="step-badge">STEP 04</div>
         <div class="step-title">Intentional Daily Discovery</div>
-        <div class="step-desc">Review your curated 25 daily profiles with computed Resonance Scores and 1.1km fuzzy distance shields. No endless swiping exhaustion.</div>
+        <div class="step-desc">Review your curated 10 daily profiles with computed Resonance Scores and 1.1km fuzzy distance shields. Replenish +10 swipes via 10s reflection ad when quota is reached.</div>
       </div>
       <div class="step-card">
         <div class="step-badge">STEP 05</div>
@@ -1120,7 +1123,7 @@ def get_sanctuary_overview_html() -> str:
           <tr>
             <td><strong>Daily Swipes</strong></td>
             <td>Unlimited / 100+ (Dopamine casino addiction)</td>
-            <td><strong>25 Mindful Swipes / Day</strong> (Conscious deceleration)</td>
+            <td><strong>10 Mindful Swipes / Day</strong> (Conscious deceleration; +10 via 10s reflection)</td>
           </tr>
           <tr>
             <td><strong>Identity Verification</strong></td>

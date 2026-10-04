@@ -26,7 +26,7 @@ def mock_user():
         kyc_status=True,
         subscription_tier="free",
         reward_balance=50,
-        swipes_remaining=25,
+        swipes_remaining=10,
         direct_letters_count=1,
         reveal_tokens_count=0,
         is_profile_completed=True,
@@ -191,7 +191,7 @@ async def test_appinfo_and_overview_rendering():
         assert "UR-Heart" in resp_appinfo.text
         assert "The 9 Core Sanctuary Subsystems" in resp_appinfo.text
         assert "Discovery Deck & Resonance Engine" in resp_appinfo.text
-        assert "25 Free Daily Intentional Swipes" in resp_appinfo.text or "25 / Day" in resp_appinfo.text
+        assert "10 Free Daily Intentional Swipes" in resp_appinfo.text or "10 / Day" in resp_appinfo.text
         assert "3-Engine Industry-Grade AI Suite" in resp_appinfo.text
         assert "Groq API" in resp_appinfo.text
         assert "OpenRouter API" in resp_appinfo.text

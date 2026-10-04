@@ -379,7 +379,7 @@ async def record_swipe(
         "swipe_type": payload.swipe_type,
         "is_match": is_match,
         "match_id": match_id,
-        "swipes_remaining": current_user.swipes_remaining if current_user else 24,
+        "swipes_remaining": current_user.swipes_remaining if current_user else 10,
         "direct_letters_count": current_user.direct_letters_count if (current_user and current_user.direct_letters_count is not None) else 0,
     }
 

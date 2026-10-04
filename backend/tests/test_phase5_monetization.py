@@ -27,7 +27,7 @@ def mock_monetization_user():
         kyc_status=True,
         subscription_tier="free",
         reward_balance=50,
-        swipes_remaining=25,
+        swipes_remaining=10,
         direct_letters_count=1,
         is_profile_completed=True,
         night_slumber=False,
