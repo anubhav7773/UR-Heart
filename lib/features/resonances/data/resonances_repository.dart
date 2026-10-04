@@ -17,9 +17,17 @@ class ResonancesRepository {
       final response = await _dio.get<dynamic>('/api/v1/resonances/likes');
       final dynamic body = response.data;
       final List<dynamic> data = body is Map<String, dynamic>
-          ? (body['likes'] as List<dynamic>? ?? [])
+          ? (body['likes'] as List<dynamic>? ?? body['data'] as List<dynamic>? ?? [])
           : (body as List<dynamic>? ?? []);
-      return data.map((json) => IncomingLikeProfile.fromJson(json as Map<String, dynamic>)).toList();
+      final List<IncomingLikeProfile> results = [];
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          try {
+            results.add(IncomingLikeProfile.fromJson(item));
+          } catch (_) {}
+        }
+      }
+      return results;
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
@@ -32,9 +40,17 @@ class ResonancesRepository {
       final response = await _dio.get<dynamic>('/api/v1/resonances/mutual');
       final dynamic body = response.data;
       final List<dynamic> data = body is Map<String, dynamic>
-          ? (body['connections'] as List<dynamic>? ?? [])
+          ? (body['connections'] as List<dynamic>? ?? body['data'] as List<dynamic>? ?? [])
           : (body as List<dynamic>? ?? []);
-      return data.map((json) => MutualConnection.fromJson(json as Map<String, dynamic>)).toList();
+      final List<MutualConnection> results = [];
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          try {
+            results.add(MutualConnection.fromJson(item));
+          } catch (_) {}
+        }
+      }
+      return results;
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;

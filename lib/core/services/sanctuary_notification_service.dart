@@ -590,5 +590,48 @@ class SanctuaryNotificationService {
       debugPrint('[NOTIFICATIONS] cancelAll warning: $e');
     }
   }
+
+  /// Unregisters FCM device token on backend and clears local cache on user logout
+  Future<void> unregisterFcmToken([String? explicitAuthToken]) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('ur_heart_fcm_token');
+      await prefs.remove('ur_heart_fcm_token');
+
+      String? authToken = explicitAuthToken;
+      if (authToken == null || authToken.isEmpty) {
+        authToken = await SecureSessionStorage.instance.getAuthToken();
+      }
+      if (authToken == null || authToken.isEmpty) {
+        authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+      }
+
+      if (authToken != null && authToken.isNotEmpty) {
+        final candidateUrls = [
+          ApiEndpoints.defaultBaseUrl,
+          'https://urheart.asiverticals.me',
+          'https://ur-heart.onrender.com',
+        ];
+        for (final base in candidateUrls) {
+          try {
+            final dio = Dio(BaseOptions(
+              baseUrl: base,
+              connectTimeout: const Duration(seconds: 4),
+              receiveTimeout: const Duration(seconds: 4),
+              headers: {'Authorization': 'Bearer $authToken'},
+            ));
+            await dio.post<dynamic>(
+              '/api/v1/notifications/unregister-token',
+              data: {'fcm_token': token ?? ''},
+            );
+            debugPrint('[NOTIFICATIONS] Device token unregistered from backend.');
+            break;
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('[NOTIFICATIONS] unregisterFcmToken notice: $e');
+    }
+  }
 }
 

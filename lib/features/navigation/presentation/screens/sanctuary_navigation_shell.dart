@@ -7,7 +7,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../chat/presentation/screens/chats_list_screen.dart';
-import '../../../chat/presentation/screens/chat_dialogue_screen.dart';
 import '../../../chat/data/chat_repository.dart';
 import '../../../feed/presentation/screens/feed_screen.dart';
 import '../../../profile/presentation/screens/my_persona_screen.dart';
@@ -16,7 +15,8 @@ import '../../../rewards/presentation/screens/growth_hub_screen.dart';
 import '../../../ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
 import '../../../../core/services/sanctuary_notification_service.dart';
 import '../../../../core/storage/secure_session_storage.dart';
-import '../widgets/whatsapp_notification_banner.dart';
+import '../../../resonances/presentation/controllers/resonances_controller.dart';
+import '../../../profile/presentation/controllers/persona_controller.dart';
 import '../widgets/ios_pwa_install_banner.dart';
 
 /// Global Navigation Index State Provider for Tab Switching
@@ -50,7 +50,6 @@ class _SanctuaryNavigationShellState
   int _unreadResonanceCount = 0;
   int _unreadChatCount = 0;
   final Set<String> _seenNotificationIds = {};
-  OverlayEntry? _activeNotificationOverlay;
 
   @override
   void initState() {
@@ -95,7 +94,14 @@ class _SanctuaryNavigationShellState
         if (type == 'sanctuary_notification') {
           final notif = event['notification'];
           if (notif is Map<String, dynamic>) {
-            _dispatchSingleNotification(notif, showBanner: true);
+            final nType = notif['type']?.toString().toLowerCase() ?? '';
+            if (nType.contains('like') ||
+                nType.contains('resonate') ||
+                nType.contains('match') ||
+                nType.contains('direct')) {
+              ref.read(resonancesControllerProvider.notifier).loadResonances();
+            }
+            _dispatchSingleNotification(notif);
           }
         } else if (action == 'new_message' || type == 'dialogue_message') {
           final senderName = event['sender_name']?.toString() ?? 'Sanctuary Seeker';
@@ -117,7 +123,7 @@ class _SanctuaryNavigationShellState
               'message': content,
             }
           };
-          _dispatchSingleNotification(notifMap, showBanner: true);
+          _dispatchSingleNotification(notifMap);
         }
       });
     } catch (_) {}
@@ -146,15 +152,32 @@ class _SanctuaryNavigationShellState
             .toList();
 
         if (unreadList.isNotEmpty && mounted) {
+          int chatCount = 0;
+          int resonanceCount = 0;
           for (final notif in unreadList) {
-            _dispatchSingleNotification(notif, showBanner: notif == unreadList.last);
+            final notifId = notif['id']?.toString();
+            if (notifId != null) {
+              _seenNotificationIds.add(notifId);
+            }
+            final nType = notif['type']?.toString().toLowerCase() ?? '';
+            if (nType.contains('message') || nType.contains('chat')) {
+              chatCount++;
+            } else {
+              resonanceCount++;
+            }
+          }
+          if (mounted) {
+            setState(() {
+              _unreadChatCount += chatCount;
+              _unreadResonanceCount += resonanceCount;
+            });
           }
         }
       }
     } catch (_) {}
   }
 
-  Future<void> _dispatchSingleNotification(Map<String, dynamic> notif, {bool showBanner = true}) async {
+  Future<void> _dispatchSingleNotification(Map<String, dynamic> notif) async {
     final notifId = notif['id']?.toString();
     if (notifId != null && _seenNotificationIds.contains(notifId)) {
       return;
@@ -263,11 +286,6 @@ class _SanctuaryNavigationShellState
       }
     } catch (_) {}
 
-    if (showBanner && mounted) {
-      final isDark = ref.read(themeProvider).activeTheme == SanctuaryTheme.dark;
-      _showWhatsAppNotification(notif, isDark);
-    }
-
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(
@@ -285,246 +303,8 @@ class _SanctuaryNavigationShellState
     }
   }
 
-  void _handleNotificationNavigation(Map<String, dynamic> notif) {
-    if (!mounted) return;
-    _dismissActiveNotification();
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-    final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
-    final title = notif['title']?.toString() ?? 'Sanctuary Resonance';
-    final notifData = notif['data'] as Map<String, dynamic>? ?? {};
-
-    // 1. Direct 1:1 Message / Chat -> Direct jump into ChatDialogueScreen
-    if (notifType.contains('message') || notifType.contains('chat')) {
-      final matchId =
-          notifData['match_id']?.toString() ?? notif['match_id']?.toString();
-      final senderId = notifData['sender_id']?.toString() ??
-          notif['sender_id']?.toString() ??
-          'user_peer';
-      final rawSenderName = notifData['sender_name']?.toString() ??
-          title.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
-      final senderName =
-          rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
-
-      final avatarUrl = notifData['sender_avatar']?.toString() ??
-          notifData['avatar_url']?.toString() ??
-          notifData['partner_photo']?.toString() ??
-          '';
-      final age = notifData['sender_age'] as int? ?? notifData['partner_age'] as int? ?? 24;
-
-      ref.read(navigationIndexProvider.notifier).state = 2;
-
-      if (matchId != null && matchId.isNotEmpty) {
-        Navigator.of(context).pushNamed(
-          ChatDialogueScreen.routeName,
-          arguments: ChatDialogueArguments(
-            matchId: matchId,
-            recipientId: senderId,
-            recipientName: senderName,
-            recipientAge: age,
-            recipientAvatarUrl: avatarUrl,
-            isOnline: true,
-            hasWaKey: true,
-            sharedContextQuote: 'Deep Mindful Connection',
-          ),
-        );
-      }
-      return;
-    }
-
-    // 2. Sacred Match Ignited -> Direct jump to ChatDialogueScreen
-    if (notifType.contains('match')) {
-      final matchId =
-          notifData['match_id']?.toString() ?? notif['match_id']?.toString();
-      final partnerId = notifData['partner_id']?.toString() ??
-          notif['partner_id']?.toString() ??
-          'partner_user';
-      final rawPartnerName = notifData['partner_name']?.toString() ??
-          title
-              .replaceAll('Sacred Match Ignited', '')
-              .replaceAll('💫', '')
-              .trim();
-      final partnerName =
-          rawPartnerName.isNotEmpty ? rawPartnerName : 'Soul Seeker';
-      final avatarUrl = notifData['partner_photo']?.toString() ??
-          notifData['sender_avatar']?.toString() ??
-          notifData['avatar_url']?.toString() ??
-          '';
-      final age = notifData['partner_age'] as int? ?? notifData['sender_age'] as int? ?? 24;
-
-      ref.read(navigationIndexProvider.notifier).state = 2;
-
-      if (matchId != null && matchId.isNotEmpty) {
-        Navigator.of(context).pushNamed(
-          ChatDialogueScreen.routeName,
-          arguments: ChatDialogueArguments(
-            matchId: matchId,
-            recipientId: partnerId,
-            recipientName: partnerName,
-            recipientAge: age,
-            recipientAvatarUrl: avatarUrl,
-            isOnline: true,
-            hasWaKey: true,
-            sharedContextQuote: 'Mutual Resonance Ignited',
-          ),
-        );
-      }
-      return;
-    }
-
-    // 3. New incoming direct letter -> If matchId, jump directly to ChatDialogueScreen
-    if (notifType.contains('direct')) {
-      final matchId = notifData['match_id']?.toString() ?? notif['match_id']?.toString();
-      if (matchId != null && matchId.isNotEmpty) {
-        final senderName = notifData['sender_name']?.toString() ??
-            notifData['partner_name']?.toString() ??
-            'Seeker';
-        final senderId = notifData['sender_id']?.toString() ??
-            notifData['partner_id']?.toString() ??
-            'user_peer';
-        final avatarUrl = notifData['sender_avatar']?.toString() ??
-            notifData['partner_photo']?.toString() ??
-            notifData['avatar_url']?.toString() ??
-            '';
-        final age = notifData['sender_age'] as int? ?? notifData['partner_age'] as int? ?? 24;
-
-        ref.read(navigationIndexProvider.notifier).state = 2;
-        Navigator.of(context).pushNamed(
-          ChatDialogueScreen.routeName,
-          arguments: ChatDialogueArguments(
-            matchId: matchId,
-            recipientId: senderId,
-            recipientName: senderName,
-            recipientAge: age,
-            recipientAvatarUrl: avatarUrl,
-            isOnline: true,
-            hasWaKey: false,
-            sharedContextQuote: 'Direct Resonance Letter Received',
-          ),
-        );
-        return;
-      }
-      ref.read(navigationIndexProvider.notifier).state = 1;
-      return;
-    }
-
-    if (notifType.contains('like') || notifType.contains('resonate') || notifType.contains('pass')) {
-      ref.read(navigationIndexProvider.notifier).state = 1;
-      return;
-    }
-
-    // 4. Kinship referral reward / ad reward -> Jump to Growth PRO hub (tab 3)
-    if (notifType.contains('referral') ||
-        notifType.contains('reward') ||
-        notifType.contains('growth') ||
-        notifType.contains('ad')) {
-      ref.read(navigationIndexProvider.notifier).state = 3;
-      return;
-    }
-
-    // 5. KYC / Persona / Profile status notification -> Jump to Persona (tab 4)
-    if (notifType.contains('kyc') ||
-        notifType.contains('profile') ||
-        notifType.contains('persona')) {
-      ref.read(navigationIndexProvider.notifier).state = 4;
-      return;
-    }
-
-    // 6. Custom route if specified
-    final targetRoute = notifData['target_route']?.toString();
-    if (targetRoute != null && targetRoute.isNotEmpty) {
-      if (targetRoute == '/chats' || targetRoute == '/dialogues') {
-        ref.read(navigationIndexProvider.notifier).state = 2;
-      } else if (targetRoute == '/resonances') {
-        ref.read(navigationIndexProvider.notifier).state = 1;
-      } else if (targetRoute == '/growth') {
-        ref.read(navigationIndexProvider.notifier).state = 3;
-      } else if (targetRoute == '/persona' || targetRoute == '/profile') {
-        ref.read(navigationIndexProvider.notifier).state = 4;
-      } else {
-        Navigator.of(context).pushNamed(targetRoute);
-      }
-      return;
-    }
-
-    // Fallback: switch to Resonances
-    ref.read(navigationIndexProvider.notifier).state = 1;
-  }
-
-  void _dismissActiveNotification() {
-    if (_activeNotificationOverlay != null) {
-      try {
-        _activeNotificationOverlay?.remove();
-      } catch (_) {}
-      _activeNotificationOverlay = null;
-    }
-  }
-
-  void _showWhatsAppNotification(Map<String, dynamic> notif, bool isDark) {
-    if (!mounted) return;
-
-    // Immediately remove any active banner so there is strictly NO duplicate banner
-    _dismissActiveNotification();
-
-    final notifType = notif['type']?.toString().toLowerCase() ?? 'system';
-    final rawTitle = notif['title']?.toString() ?? 'Sanctuary Resonance';
-    final message =
-        notif['message']?.toString() ?? notif['body']?.toString() ?? '';
-    final notifId = notif['id']?.toString();
-    final notifData = notif['data'] as Map<String, dynamic>? ?? {};
-
-    // Format WhatsApp-style display title and sender initials
-    String displayTitle = rawTitle;
-    if (notifType.contains('message') || notifType.contains('chat')) {
-      final rawSenderName = notifData['sender_name']?.toString() ??
-          rawTitle.replaceAll('Message from ', '').replaceAll(' 💬', '').trim();
-      displayTitle =
-          rawSenderName.isNotEmpty ? rawSenderName : 'Sanctuary Seeker';
-    }
-
-    final avatarUrl = notifData['sender_avatar']?.toString() ??
-        notifData['avatar_url']?.toString();
-
-    // Mark as read on backend asynchronously
-    if (notifId != null) {
-      try {
-        final apiClient = ref.read(apiClientProvider);
-        apiClient.dio.post<dynamic>(
-          '/api/v1/notifications/mark-read',
-          data: {
-            'notification_ids': [notifId],
-            'notification_id': notifId
-          },
-        );
-      } catch (_) {}
-    }
-
-    final overlay = Overlay.maybeOf(context);
-    if (overlay == null) return;
-
-    _activeNotificationOverlay = OverlayEntry(
-      builder: (context) => WhatsAppNotificationBanner(
-        title: displayTitle,
-        message: message,
-        type: notifType,
-        avatarUrl: avatarUrl,
-        isDark: isDark,
-        onTap: () {
-          _dismissActiveNotification();
-          _handleNotificationNavigation(notif);
-        },
-        onDismiss: () {
-          _dismissActiveNotification();
-        },
-      ),
-    );
-
-    overlay.insert(_activeNotificationOverlay!);
-  }
-
   @override
   void dispose() {
-    _dismissActiveNotification();
     _notificationPoller?.cancel();
     _wsSubscription?.cancel();
     _seenNotificationIds.clear();
@@ -741,8 +521,14 @@ class _SanctuaryNavigationShellState
         child: InkWell(
           onTap: () {
             HapticFeedback.selectionClick();
-            if (index == 1) setState(() => _unreadResonanceCount = 0);
+            if (index == 1) {
+              setState(() => _unreadResonanceCount = 0);
+              ref.read(resonancesControllerProvider.notifier).loadResonances();
+            }
             if (index == 2) setState(() => _unreadChatCount = 0);
+            if (index == 4) {
+              ref.read(personaControllerProvider.notifier).refreshProfile();
+            }
             ref.read(navigationIndexProvider.notifier).state = index;
           },
           splashColor: activeColor.withOpacity(0.1),

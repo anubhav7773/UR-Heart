@@ -85,8 +85,36 @@ async def lifespan(app: FastAPI):
     # STARTUP: Fail-fast secret validation in production
     validate_production_env(settings)
     app.state.http_client = httpx.AsyncClient(timeout=15.0)
+
+    # Background periodic streak engine monitor (Runs every 60s for instant outside-app notifications)
+    import asyncio
+    from app.core.database import async_session_factory
+    from app.services.streak_engine import StreakEngine
+
+    streak_worker_stop = asyncio.Event()
+
+    async def _streak_monitor_loop():
+        # Small initial delay to allow DB pools to warm up
+        await asyncio.sleep(5)
+        while not streak_worker_stop.is_set():
+            try:
+                async with async_session_factory() as session:
+                    await StreakEngine.evaluate_all_active_streaks(session)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"[STREAK MONITOR NOTICE] {e}", flush=True)
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                break
+
+    monitor_task = asyncio.create_task(_streak_monitor_loop())
+
     yield
-    # SHUTDOWN: Gracefully close HTTP client
+    # SHUTDOWN: Gracefully close HTTP client & background tasks
+    streak_worker_stop.set()
+    monitor_task.cancel()
     await app.state.http_client.aclose()
 
 

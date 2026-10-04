@@ -183,12 +183,41 @@ async def register_device_token(
     if not token_val:
         raise HTTPException(status_code=400, detail="fcm_token cannot be empty.")
 
+    # Disassociate this token from any other users in RAM cache
+    for uid, tok in list(USER_FCM_TOKENS.items()):
+        if tok == token_val and uid != str(current_user.id):
+            del USER_FCM_TOKENS[uid]
+
+    # Disassociate this token from any other user in PostgreSQL DB
+    from sqlalchemy import update
+    await db.execute(
+        update(User)
+        .where(User.fcm_token == token_val, User.id != current_user.id)
+        .values(fcm_token=None)
+    )
+
     current_user.fcm_token = token_val
     USER_FCM_TOKENS[str(current_user.id)] = token_val
     await db.commit()
     logger.info("Registered FCM token for user %s: ...%s", current_user.id, token_val[-8:])
 
     return {"status": "success", "message": "FCM device token registered successfully."}
+
+
+@router.post("/unregister-token", status_code=status.HTTP_200_OK, summary="Unregister FCM Push Token")
+async def unregister_device_token(
+    payload: Optional[RegisterTokenRequest] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Disassociates the FCM push token when user logs out."""
+    user_key = str(current_user.id)
+    if user_key in USER_FCM_TOKENS:
+        del USER_FCM_TOKENS[user_key]
+    current_user.fcm_token = None
+    await db.commit()
+    logger.info("Unregistered FCM token for user %s", current_user.id)
+    return {"status": "success", "message": "FCM device token unregistered successfully."}
 
 
 class MarkReadRequest(BaseModel):

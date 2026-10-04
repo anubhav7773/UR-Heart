@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,8 +10,10 @@ import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/controllers/consent_controller.dart';
 import '../../../feed/presentation/controllers/feed_controller.dart';
 import '../../../growth/presentation/controllers/growth_hub_controller.dart';
+import '../../../profile/data/profile_repository.dart';
 import '../../../profile/presentation/controllers/persona_controller.dart';
 import '../../../profile_setup/presentation/controllers/profile_setup_controller.dart';
+import '../../../resonances/presentation/controllers/resonances_controller.dart';
 import '../../../rewards/presentation/controllers/rewards_controller.dart';
 import '../../data/settings_repository.dart';
 
@@ -185,6 +188,12 @@ class SettingsController extends StateNotifier<SettingsState> {
   /// Irrevocably logs out current account, purges all local state,
   /// signs out of Google and Firebase, cancels notifications, and invalidates in-memory controllers.
   Future<void> logout([dynamic context]) async {
+    // 0. Unregister FCM device token on backend before wiping auth tokens
+    try {
+      final token = await SecureSessionStorage.instance.getAuthToken();
+      await SanctuaryNotificationService.instance.unregisterFcmToken(token);
+    } catch (_) {}
+
     // 1. Sign out of Google Identity / One Tap
     try {
       await GoogleSignIn.instance.signOut();
@@ -215,6 +224,10 @@ class SettingsController extends StateNotifier<SettingsState> {
       await prefs.remove('ur_heart_user_email');
       await prefs.remove('ur_heart_user_name');
       await prefs.remove('ur_heart_user_id');
+      await prefs.remove('profile_user_id');
+      await prefs.remove('cached_profile_json');
+      await prefs.remove('cached_profile_hash');
+      await prefs.remove('ur_heart_fcm_token_registered_user');
       await prefs.remove('profile_full_name');
       await prefs.remove('profile_dob');
       await prefs.remove('ur_heart_selected_dob');
@@ -248,7 +261,21 @@ class SettingsController extends StateNotifier<SettingsState> {
       }
     } catch (_) {}
 
-    // 6. Invalidate and reset all in-memory Riverpod controllers
+    // 6. Reset singleton repository memory
+    if (_ref != null) {
+      try {
+        _ref!.read(profileRepositoryProvider).reset();
+        _ref!.invalidate(profileRepositoryProvider);
+      } catch (_) {}
+    }
+
+    // 7. Evict all cached images from Flutter imageCache so User A's avatar & moments are freed
+    try {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+    } catch (_) {}
+
+    // 8. Invalidate and reset all in-memory Riverpod controllers
     if (_ref != null) {
       try {
         _ref!.read(authControllerProvider.notifier).reset();
@@ -259,6 +286,14 @@ class SettingsController extends StateNotifier<SettingsState> {
         _ref!.invalidate(profileSetupControllerProvider);
       } catch (_) {}
       try {
+        _ref!.read(personaControllerProvider.notifier).reset();
+        _ref!.invalidate(personaControllerProvider);
+      } catch (_) {}
+      try {
+        _ref!.read(resonancesControllerProvider.notifier).reset();
+        _ref!.invalidate(resonancesControllerProvider);
+      } catch (_) {}
+      try {
         _ref!.invalidate(feedControllerProvider);
       } catch (_) {}
       try {
@@ -266,9 +301,6 @@ class SettingsController extends StateNotifier<SettingsState> {
       } catch (_) {}
       try {
         _ref!.invalidate(growthHubControllerProvider);
-      } catch (_) {}
-      try {
-        _ref!.invalidate(personaControllerProvider);
       } catch (_) {}
       try {
         _ref!.invalidate(consentProvider);

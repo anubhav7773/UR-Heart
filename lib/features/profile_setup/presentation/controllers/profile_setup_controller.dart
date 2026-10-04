@@ -175,12 +175,28 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       final savedMinAge = prefs.getDouble('profile_min_age') ?? state.minAge;
       final savedMaxAge = prefs.getDouble('profile_max_age') ?? state.maxAge;
 
-      // Restore existing photos from valid storage strings or URLs
+      final secureUserId = await SecureSessionStorage.instance.getUserId();
+      final currentUserId = secureUserId ?? prefs.getString('ur_heart_user_id');
+      final storedProfileUserId = prefs.getString('profile_user_id');
+
+      // Restore existing photos ONLY if authenticated user matches stored profile
+      final bool isSameUser = (currentUserId != null &&
+          currentUserId.isNotEmpty &&
+          storedProfileUserId != null &&
+          storedProfileUserId == currentUserId);
+
       final Map<int, String> restoredSlots = {};
-      for (int i = 1; i <= 5; i++) {
-        final path = prefs.getString('profile_photo_slot_$i');
-        if (path != null && path.trim().isNotEmpty) {
-          restoredSlots[i] = path;
+      if (isSameUser) {
+        for (int i = 1; i <= 5; i++) {
+          final path = prefs.getString('profile_photo_slot_$i');
+          if (path != null && path.trim().isNotEmpty) {
+            restoredSlots[i] = path;
+          }
+        }
+      } else if (storedProfileUserId != null && currentUserId != null) {
+        // Defensive purge of lingering previous user's photo slots
+        for (int i = 1; i <= 5; i++) {
+          await prefs.remove('profile_photo_slot_$i');
         }
       }
 
@@ -305,6 +321,12 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
 
       if (finalUrl.isNotEmpty) {
         await prefs.setString('profile_photo_slot_$slotNumber', finalUrl);
+        final currentUid = await SecureSessionStorage.instance.getUserId() ??
+            prefs.getString('ur_heart_user_id') ??
+            authUid;
+        if (currentUid != null && currentUid.isNotEmpty) {
+          await prefs.setString('profile_user_id', currentUid);
+        }
 
         final updatedSlots = Map<int, String>.from(state.photoSlots);
         updatedSlots[slotNumber] = finalUrl;

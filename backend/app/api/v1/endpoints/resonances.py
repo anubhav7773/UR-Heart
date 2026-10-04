@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, not_
+from sqlalchemy import select, and_, or_, not_, func
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -18,7 +18,7 @@ def _calculate_age(dob: Optional[date]) -> int:
     if not dob:
         return 24
     today = date.today()
-    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    return max(18, today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day)))
 
 
 @router.get("/incoming", status_code=status.HTTP_200_OK, summary="Get Incoming Likes")
@@ -33,28 +33,26 @@ async def get_incoming_likes(
     """
     likes = []
     if current_user:
-        # Subqueries to exclude users with whom current_user already has an active match
-        matched_user2_subq = select(Match.user2_id).where(
-            Match.user1_id == current_user.id,
+        # Check active match existence via NOT EXISTS to avoid SQL NULL subquery traps
+        active_match_exists = select(Match.id).where(
+            or_(
+                and_(Match.user1_id == current_user.id, Match.user2_id == User.id),
+                and_(Match.user2_id == current_user.id, Match.user1_id == User.id)
+            ),
             Match.is_active == True
-        )
-        matched_user1_subq = select(Match.user1_id).where(
-            Match.user2_id == current_user.id,
-            Match.is_active == True
-        )
+        ).exists()
 
         stmt = (
             select(Swipe, User)
             .join(User, User.id == Swipe.actor_id)
             .where(
                 Swipe.target_id == current_user.id,
-                Swipe.swipe_type.in_(["like", "direct"]),
+                func.lower(Swipe.swipe_type).in_(["like", "direct", "superlike"]),
                 User.deleted_at.is_(None),
-                not_(User.id.in_(matched_user2_subq)),
-                not_(User.id.in_(matched_user1_subq))
+                not_(active_match_exists)
             )
             .order_by(Swipe.created_at.desc())
-            .limit(20)
+            .limit(50)
         )
         res = await db.execute(stmt)
         rows = res.all()

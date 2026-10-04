@@ -38,27 +38,35 @@ class IncomingLikeProfile {
   factory IncomingLikeProfile.fromJson(Map<String, dynamic> json) {
     final isDirect = json['is_direct_letter'] as bool? ??
         (json['swipe_type']?.toString().toLowerCase() == 'direct');
+    final rawAge = json['age'];
+    final parsedAge = rawAge is num ? rawAge.toInt() : (int.tryParse(rawAge?.toString() ?? '') ?? 24);
+    final rawScore = json['match_score'];
+    final parsedScore = rawScore is num ? rawScore.toInt() : (int.tryParse(rawScore?.toString() ?? '') ?? 90);
+
     return IncomingLikeProfile(
-      id: json['id'] as String? ?? 'like_${DateTime.now().millisecondsSinceEpoch}',
-      senderId: json['sender_id'] as String? ?? json['user_id'] as String? ?? json['actor_id'] as String? ?? '',
-      fullName: json['full_name'] as String? ?? json['name'] as String? ?? 'Seeker',
-      age: json['age'] as int? ?? 24,
-      photoUrl: json['photo_url'] as String? ??
-          json['avatar_url'] as String? ??
+      id: json['id']?.toString() ?? 'like_${DateTime.now().millisecondsSinceEpoch}',
+      senderId: json['sender_id']?.toString() ??
+          json['user_id']?.toString() ??
+          json['actor_id']?.toString() ??
+          '',
+      fullName: json['full_name']?.toString() ?? json['name']?.toString() ?? 'Seeker',
+      age: parsedAge,
+      photoUrl: json['photo_url']?.toString() ??
+          json['avatar_url']?.toString() ??
           (json['photos'] is List && (json['photos'] as List).isNotEmpty
-              ? (json['photos'] as List).first as String
+              ? (json['photos'] as List).first.toString()
               : ''),
-      blurHash: json['blur_hash'] as String? ?? 'L6PZfSi_.AyE_3t7t7R**0o#DgR4',
-      relativeTime: json['relative_time'] as String? ?? 'recently',
-      sharedInterest: json['shared_interest'] as String? ?? 'Shared Values',
-      matchScore: json['match_score'] as int? ?? 90,
-      swipeType: json['swipe_type'] as String? ?? (isDirect ? 'direct' : 'like'),
+      blurHash: json['blur_hash']?.toString() ?? 'L6PZfSi_.AyE_3t7t7R**0o#DgR4',
+      relativeTime: json['relative_time']?.toString() ?? 'Recently',
+      sharedInterest: json['shared_interest']?.toString() ?? 'Shared Values',
+      matchScore: parsedScore,
+      swipeType: json['swipe_type']?.toString().toLowerCase() ?? (isDirect ? 'direct' : 'like'),
       isDirectLetter: isDirect,
-      categoryTag: json['category_tag'] as String? ?? (isDirect ? 'Direct Letter' : 'Liked You'),
-      letterSnippet: json['letter_snippet'] as String?,
-      bio: json['bio'] as String? ?? '',
-      location: json['location'] as String? ?? json['city'] as String? ?? '',
-      isVerified: json['is_verified'] as bool? ?? false,
+      categoryTag: json['category_tag']?.toString() ?? (isDirect ? 'Direct Letter' : 'Liked You'),
+      letterSnippet: json['letter_snippet']?.toString(),
+      bio: json['bio']?.toString() ?? '',
+      location: json['location']?.toString() ?? json['city']?.toString() ?? '',
+      isVerified: json['is_verified'] == true || json['kyc_status'] == true,
     );
   }
 }
@@ -109,27 +117,30 @@ class MutualConnection {
   factory MutualConnection.fromJson(Map<String, dynamic> json) {
     final isDirect = json['is_direct_letter'] as bool? ??
         (json['category_tag']?.toString().toLowerCase().contains('direct') ?? false);
+    final rawAge = json['age'];
+    final parsedAge = rawAge is num ? rawAge.toInt() : (int.tryParse(rawAge?.toString() ?? '') ?? 25);
+
     return MutualConnection(
-      id: json['id'] as String? ?? 'conn_${DateTime.now().millisecondsSinceEpoch}',
-      matchId: json['match_id'] as String? ?? json['id'] as String? ?? '',
-      partnerId: json['partner_id'] as String? ?? json['recipient_id'] as String? ?? '',
-      fullName: json['full_name'] as String? ?? json['name'] as String? ?? 'Soul Connection',
-      age: json['age'] as int? ?? 25,
-      photoUrl: json['photo_url'] as String? ??
-          json['avatar_url'] as String? ??
-          json['recipient_avatar_url'] as String? ??
+      id: json['id']?.toString() ?? 'conn_${DateTime.now().millisecondsSinceEpoch}',
+      matchId: json['match_id']?.toString() ?? json['id']?.toString() ?? '',
+      partnerId: json['partner_id']?.toString() ?? json['recipient_id']?.toString() ?? '',
+      fullName: json['full_name']?.toString() ?? json['name']?.toString() ?? 'Soul Connection',
+      age: parsedAge,
+      photoUrl: json['photo_url']?.toString() ??
+          json['avatar_url']?.toString() ??
+          json['recipient_avatar_url']?.toString() ??
           '',
-      blurHash: json['blur_hash'] as String? ?? 'L6PZfSi_.AyE_3t7t7R**0o#DgR4',
-      matchedTime: json['matched_time'] as String? ?? 'Today',
-      lastSnippet: json['last_snippet'] as String? ?? 'Connection established.',
-      hasUnreadMessages: json['has_unread'] as bool? ?? false,
-      isOnline: json['is_online'] as bool? ?? true,
-      categoryTag: json['category_tag'] as String? ?? (isDirect ? 'Direct Letter' : 'Mutual Resonance'),
+      blurHash: json['blur_hash']?.toString() ?? 'L6PZfSi_.AyE_3t7t7R**0o#DgR4',
+      matchedTime: json['matched_time']?.toString() ?? 'Today',
+      lastSnippet: json['last_snippet']?.toString() ?? 'Connection established.',
+      hasUnreadMessages: json['has_unread'] == true,
+      isOnline: json['is_online'] != false,
+      categoryTag: json['category_tag']?.toString() ?? (isDirect ? 'Direct Letter' : 'Mutual Resonance'),
       isDirectLetter: isDirect,
-      isVerified: json['is_verified'] as bool? ?? false,
-      bio: json['bio'] as String? ?? '',
-      location: json['location'] as String? ?? '',
-      gender: json['gender'] as String? ?? '',
+      isVerified: json['is_verified'] == true || json['kyc_status'] == true,
+      bio: json['bio']?.toString() ?? '',
+      location: json['location']?.toString() ?? '',
+      gender: json['gender']?.toString() ?? '',
       interests: (json['interests'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }

@@ -150,3 +150,55 @@ def test_resonances_and_threads_peer_endpoints():
         assert res_match.json()["full_name"] == "Meera Sen"
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_fcm_token_registration_and_unregistration():
+    """Verify that registering a token disassociates it from prior users and unregister removes it."""
+    from app.api.v1.endpoints.notifications import USER_FCM_TOKENS, RegisterTokenRequest, register_device_token, unregister_device_token
+
+    user1_id = uuid.uuid4()
+    user2_id = uuid.uuid4()
+    test_token = f"fcm_test_token_{uuid.uuid4().hex}"
+
+    mock_user1 = MagicMock()
+    mock_user1.id = user1_id
+    mock_user2 = MagicMock()
+    mock_user2.id = user2_id
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(return_value=MagicMock())
+
+    # 1. Register token for user 1
+    req1 = RegisterTokenRequest(fcm_token=test_token)
+    res1 = await register_device_token(req1, current_user=mock_user1, db=mock_db)
+    assert res1["status"] == "success"
+    assert USER_FCM_TOKENS.get(str(user1_id)) == test_token
+
+    # 2. Register same token for user 2 -> must be removed from user 1
+    req2 = RegisterTokenRequest(fcm_token=test_token)
+    res2 = await register_device_token(req2, current_user=mock_user2, db=mock_db)
+    assert res2["status"] == "success"
+    assert USER_FCM_TOKENS.get(str(user1_id)) is None
+    assert USER_FCM_TOKENS.get(str(user2_id)) == test_token
+
+    # 3. Unregister token for user 2
+    res_unreg = await unregister_device_token(None, current_user=mock_user2, db=mock_db)
+    assert res_unreg["status"] == "success"
+    assert USER_FCM_TOKENS.get(str(user2_id)) is None
+
+
+@pytest.mark.asyncio
+async def test_streak_engine_evaluation_logic():
+    """Verify StreakEngine.evaluate_all_active_streaks runs without errors."""
+    from app.services.streak_engine import StreakEngine
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalars.return_value.all.return_value = []
+    mock_db.execute = AsyncMock(return_value=mock_res)
+
+    # Should execute smoothly with empty or active streaks
+    evaluated = await StreakEngine.evaluate_all_active_streaks(mock_db)
+    assert isinstance(evaluated, int)
+    assert evaluated >= 0
+

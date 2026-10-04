@@ -11,6 +11,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/activity_logger_service.dart';
 import '../../../core/services/real_gps_location_service.dart';
+import '../../../core/storage/secure_session_storage.dart';
 import '../domain/user_profile_model.dart';
 
 export '../domain/user_profile_model.dart';
@@ -54,14 +55,23 @@ class ProfileRepository {
 
   UserProfile getProfile() => _currentProfile;
 
+  void reset() {
+    _currentProfile = _emptyInitialProfile();
+  }
+
+  static UserProfile getEmptyProfile() => _emptyInitialProfile();
+
   /// Fetches authenticated user's persona directly from PostgreSQL.
   Future<UserPersonaModel> fetchMyProfile() async {
     try {
       final response = await dio.get<dynamic>('/api/v1/profile/me');
       final profile = UserPersonaModel.fromJson(response.data as Map<String, dynamic>);
       _currentProfile = profile;
+      final prefs = await SharedPreferences.getInstance();
+      if (profile.id.isNotEmpty) {
+        await prefs.setString('profile_user_id', profile.id);
+      }
       if (profile.referralCode.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString('profile_referral_code', profile.referralCode);
         await prefs.setString('ur_heart_user_referral_code', profile.referralCode);
       }
@@ -105,6 +115,21 @@ class ProfileRepository {
     try {
       final prefs = await SharedPreferences.getInstance();
 
+      final secureUserId = await SecureSessionStorage.instance.getUserId();
+      final currentUserId = secureUserId ?? prefs.getString('ur_heart_user_id');
+      final storedProfileUserId = prefs.getString('profile_user_id');
+      final bool isSameUser = (currentUserId != null &&
+          currentUserId.isNotEmpty &&
+          storedProfileUserId != null &&
+          storedProfileUserId.isNotEmpty &&
+          storedProfileUserId == currentUserId);
+
+      // If switching accounts or account mismatch, return empty profile immediately
+      if (!isSameUser && (storedProfileUserId != null || currentUserId == null)) {
+        _currentProfile = _emptyInitialProfile();
+        return _currentProfile;
+      }
+
       final savedName = prefs.getString('profile_full_name') ??
           prefs.getString('ur_heart_user_name');
       final savedDob = prefs.getString('profile_dob') ??
@@ -124,14 +149,16 @@ class ProfileRepository {
 
       final List<String> moments = ['', '', '', ''];
       String avatar = '';
-      final slot1 = prefs.getString('profile_photo_slot_1');
-      if (slot1 != null && (slot1.startsWith('http') || File(slot1).existsSync())) {
-        avatar = slot1;
-      }
-      for (int i = 2; i <= 5; i++) {
-        final slotPath = prefs.getString('profile_photo_slot_$i');
-        if (slotPath != null && (slotPath.startsWith('http') || File(slotPath).existsSync())) {
-          moments[i - 2] = slotPath;
+      if (isSameUser) {
+        final slot1 = prefs.getString('profile_photo_slot_1');
+        if (slot1 != null && (slot1.startsWith('http') || File(slot1).existsSync())) {
+          avatar = slot1;
+        }
+        for (int i = 2; i <= 5; i++) {
+          final slotPath = prefs.getString('profile_photo_slot_$i');
+          if (slotPath != null && (slotPath.startsWith('http') || File(slotPath).existsSync())) {
+            moments[i - 2] = slotPath;
+          }
         }
       }
 

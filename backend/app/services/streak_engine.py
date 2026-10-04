@@ -7,11 +7,86 @@ from app.models.domain.user import User
 from app.api.v1.endpoints.notifications import push_notification
 
 
+_WARNED_STREAK_CACHE = set()
+
+
 class StreakEngine:
     """
     24-Hour Mindful Streak & Profile Boosting Engine.
     Handles variable rewards, loss aversion decay penalties, and notifications.
     """
+
+    @staticmethod
+    async def evaluate_all_active_streaks(db: AsyncSession) -> int:
+        """
+        Runs on background server worker.
+        1. Checks expired streaks (now > streak_expires_at), resets streak and sends streak_broken FCM push.
+        2. Checks streaks expiring within 4 hours and sends streak_expiring FCM push.
+        """
+        now = datetime.now(timezone.utc)
+        count = 0
+        try:
+            # 1. Decayed streaks
+            stmt_decay = select(User).where(
+                User.streak_expires_at.isnot(None),
+                User.streak_expires_at < now,
+                User.deleted_at.is_(None)
+            )
+            res_decay = await db.execute(stmt_decay)
+            expired_users = res_decay.scalars().all()
+            for user in expired_users:
+                if (user.streak_count or 0) > 0:
+                    prev_streak = user.streak_count
+                    user.streak_count = 0
+                    user.boost_points = max(0, (user.boost_points or 0) - 2)
+                    user.streak_expires_at = None
+                    push_notification(
+                        user_id=str(user.id),
+                        notif_type="streak_broken",
+                        title="🥀 Streak Broken & Profile Downgraded",
+                        body=f"Your {prev_streak}-day sanctuary streak expired. Your profile discovery ranking was downgraded.",
+                        data={
+                            "action": "open_growth_hub",
+                            "tab": "free_ads",
+                            "streak_count": 0,
+                            "boost_points": user.boost_points,
+                            "reveal_tokens_count": user.reveal_tokens_count
+                        }
+                    )
+                    count += 1
+            if count > 0:
+                await db.commit()
+
+            # 2. Expiring soon warnings (T-4h)
+            stmt_expiring = select(User).where(
+                User.streak_expires_at.isnot(None),
+                User.streak_expires_at >= now,
+                User.streak_expires_at <= now + timedelta(hours=4),
+                User.deleted_at.is_(None)
+            )
+            res_expiring = await db.execute(stmt_expiring)
+            expiring_users = res_expiring.scalars().all()
+            for user in expiring_users:
+                warn_key = f"{user.id}_{user.streak_expires_at.isoformat()}"
+                if warn_key not in _WARNED_STREAK_CACHE:
+                    _WARNED_STREAK_CACHE.add(warn_key)
+                    seconds_left = (user.streak_expires_at - now).total_seconds()
+                    push_notification(
+                        user_id=str(user.id),
+                        notif_type="streak_expiring",
+                        title="🔥 Mindful Streak Expiring Soon!",
+                        body="Only a few hours remain to lock your daily streak. Watch your 30s reflection to keep top profile placement and protect your reveal token.",
+                        data={
+                            "action": "open_growth_hub",
+                            "tab": "free_ads",
+                            "hours_left": max(1, int(seconds_left / 3600)),
+                            "streak_count": user.streak_count or 0
+                        }
+                    )
+        except Exception as e:
+            print(f"[STREAK BACKGROUND CHECK ERROR] {e}", flush=True)
+
+        return count
 
     @staticmethod
     async def evaluate_and_decay_streak(user: User, db: AsyncSession) -> bool:

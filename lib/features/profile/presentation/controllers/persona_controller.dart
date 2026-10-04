@@ -58,45 +58,44 @@ class PersonaController extends StateNotifier<PersonaState> {
     try {
       final remote = await _repo.fetchMyProfile();
       if (!mounted) return;
-      final List<String> mergedMoments = List<String>.from(cached.momentPhotos);
-      while (mergedMoments.length < 4) {
-        mergedMoments.add('');
-      }
-      for (int i = 0; i < remote.momentPhotos.length && i < 4; i++) {
-        if (remote.momentPhotos[i].isNotEmpty) {
-          mergedMoments[i] = remote.momentPhotos[i];
-        }
+
+      // Remote profile is the single source of truth for photos
+      final List<String> remoteMoments = List<String>.from(remote.momentPhotos);
+      while (remoteMoments.length < 4) {
+        remoteMoments.add('');
       }
 
-      final mergedAvatar = remote.avatarUrl.isNotEmpty
-          ? remote.avatarUrl
-          : cached.avatarUrl;
+      final remoteAvatar = remote.avatarUrl;
 
       // Defense-in-depth: Ensure avatar is never mirrored into moment slots
-      if (mergedAvatar.isNotEmpty) {
-        for (int i = 0; i < mergedMoments.length; i++) {
-          if (mergedMoments[i] == mergedAvatar) {
-            mergedMoments[i] = '';
+      if (remoteAvatar.isNotEmpty) {
+        for (int i = 0; i < remoteMoments.length; i++) {
+          if (remoteMoments[i] == remoteAvatar) {
+            remoteMoments[i] = '';
           }
         }
       }
 
-      final mergedProfile = remote.copyWith(
-        avatarUrl: mergedAvatar,
-        momentPhotos: mergedMoments,
+      final updatedProfile = remote.copyWith(
+        avatarUrl: remoteAvatar,
+        momentPhotos: remoteMoments,
         age: (remote.age > 0 && remote.age != 24)
             ? remote.age
             : (cached.age > 0 ? cached.age : remote.age),
-        dobVerificationPill: (cached.dobVerificationPill.isNotEmpty && !cached.dobVerificationPill.contains('DigiLocker'))
-            ? cached.dobVerificationPill
-            : (remote.dobVerificationPill.isNotEmpty ? remote.dobVerificationPill : cached.dobVerificationPill),
+        dobVerificationPill: remote.dobVerificationPill.isNotEmpty
+            ? remote.dobVerificationPill
+            : cached.dobVerificationPill,
         gender: remote.gender.isNotEmpty ? remote.gender : cached.gender,
         interestedIn: remote.interestedIn.isNotEmpty ? remote.interestedIn : cached.interestedIn,
       );
-      state = state.copyWith(profile: mergedProfile);
+      state = state.copyWith(profile: updatedProfile);
     } catch (e) {
       debugPrint('[PersonaController] Remote profile sync notice: $e');
     }
+  }
+
+  void reset() {
+    state = PersonaState(profile: ProfileRepository.getEmptyProfile());
   }
 
   Future<void> refreshProfile() async {

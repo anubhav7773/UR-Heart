@@ -114,6 +114,26 @@ class ResonancesController extends StateNotifier<ResonancesState> {
     return null;
   }
 
+  void reset() {
+    state = const ResonancesState();
+  }
+
+  void handleIncomingLikeNotification(Map<String, dynamic> data) {
+    try {
+      final newLike = IncomingLikeProfile.fromJson(data);
+      final exists = state.incomingLikes.any((l) {
+        final existingId = l is IncomingLikeProfile ? l.senderId : (l is Map ? (l['sender_id'] ?? l['user_id']) : '');
+        return existingId == newLike.senderId && existingId.toString().isNotEmpty;
+      });
+      if (!exists) {
+        state = state.copyWith(
+          incomingLikes: [newLike, ...state.incomingLikes],
+        );
+      }
+    } catch (_) {}
+    loadResonances();
+  }
+
   Future<bool> acceptLikeAndStartChat(dynamic like) async {
     final String senderId = like is Map
         ? (like['user_id'] as String? ?? like['id'] as String? ?? '')

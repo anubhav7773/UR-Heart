@@ -154,12 +154,20 @@ class AuthRepository {
       } catch (_) {}
     }
 
-    if (isProfileCompleted) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (result.userId != null) {
+        await prefs.setString('profile_user_id', result.userId!);
+        await prefs.setString('ur_heart_user_id', result.userId!);
+      }
+      if (isProfileCompleted) {
         await prefs.setBool('ur_heart_profile_setup_completed', true);
         await prefs.setBool('ur_heart_has_entered_sanctuary', true);
-      } catch (_) {}
+      }
+    } catch (_) {}
+
+    if (result.idToken != null) {
+      SanctuaryNotificationService.syncStoredFcmToken(result.idToken!);
     }
 
     return AuthResult.success(
@@ -222,6 +230,10 @@ class AuthRepository {
           await prefs.setString('ur_heart_auth_token', tokenStr.toString());
           await prefs.setString('auth_token', tokenStr.toString());
           SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
+        }
+        if (userId != null) {
+          await prefs.setString('profile_user_id', userId);
+          await prefs.setString('ur_heart_user_id', userId);
         }
         await prefs.setString('ur_heart_user_email', cleanEmail);
         await prefs.setBool('ur_heart_consent_given', true);
