@@ -111,7 +111,11 @@ async def _compile_user_export_bundle(user_id: UUID, request_id: UUID) -> None:
                 "education": user.education,
                 "kyc_verified": user.kyc_status,
                 "subscription_tier": user.subscription_tier,
-                "account_created_at": user.created_at.isoformat() if user.created_at else None
+                "account_created_at": user.created_at.isoformat() if user.created_at else None,
+                "avatar_url": user.avatar_url,
+                "moments": [p for p in (user.photos or []) if p and str(p).strip()],
+                "photos": ([user.avatar_url] if user.avatar_url else []) + [p for p in (user.photos or []) if p and p != user.avatar_url],
+                "photos_count": (1 if user.avatar_url else 0) + len([p for p in (user.photos or []) if p and p != user.avatar_url]),
             },
             "data_nominee": {
                 "nominee_name": nominee.nominee_name if nominee else None,
@@ -200,6 +204,10 @@ async def download_export_pdf(
             select(ConsentAuditLog).where(ConsentAuditLog.user_id == current_user.id)
         )).scalars().all()
 
+        moments_clean = [p for p in (current_user.photos or []) if p and str(p).strip()]
+        avatar_clean = str(current_user.avatar_url or "").strip()
+        all_photos = ([avatar_clean] if avatar_clean else []) + [p for p in moments_clean if p != avatar_clean]
+
         payload = {
             "statutory_authority": "Digital Personal Data Protection Act, 2023 (India)",
             "export_metadata": {
@@ -219,7 +227,11 @@ async def download_export_pdf(
                 "kyc_verified": current_user.kyc_status,
                 "subscription_tier": current_user.subscription_tier,
                 "account_created_at": current_user.created_at.isoformat() if current_user.created_at else None,
-                "photos": current_user.photos or []
+                "avatar_url": avatar_clean,
+                "moments": moments_clean,
+                "photos": all_photos,
+                "photos_count": len(all_photos),
+                "moment_photos_count": len(moments_clean),
             },
             "data_nominee": {
                 "nominee_name": nominee.nominee_name if nominee else None,

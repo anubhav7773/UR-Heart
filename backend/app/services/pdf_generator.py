@@ -147,6 +147,24 @@ class StatutoryPdfGenerator:
         # 3. Section: Profile & Persona Data
         story.append(Paragraph("1. Data Principal Persona & Identity Attributes", h2_style))
         profile = bundle.get("profile_persona", {})
+
+        photos_list = profile.get("photos", [])
+        avatar = profile.get("avatar_url")
+        moments = profile.get("moments")
+        if moments is None:
+            moments = [p for p in photos_list if p != avatar] if avatar else photos_list
+        total_photos = profile.get("photos_count", len(photos_list))
+        if total_photos == 0 and avatar:
+            total_photos = 1
+
+        if avatar and moments:
+            photos_desc = f"{total_photos} Photos Uploaded (1 Profile Avatar + {len(moments)} Sacred Moments · Strict 5-Slot Cap)"
+        elif moments:
+            photos_desc = f"{total_photos} Photos Uploaded ({len(moments)} Sacred Moments · Strict 5-Slot Cap)"
+        elif avatar:
+            photos_desc = f"{total_photos} Photo Uploaded (1 Profile Avatar · Strict 5-Slot Cap)"
+        else:
+            photos_desc = f"{total_photos} Photos (Strict 5-Slot Cap)"
         
         persona_data = [
             [Paragraph("<b>Full Legal / Display Name:</b>", body_style), Paragraph(str(profile.get("full_name", "N/A")), body_style)],
@@ -156,7 +174,7 @@ class StatutoryPdfGenerator:
             [Paragraph("<b>Fuzzy Geolocation Shield:</b>", body_style), Paragraph(f"{profile.get('location_name', 'Saket, Ayodhya')} (1.1 km Truncated Radius)", body_style)],
             [Paragraph("<b>Profession & Education:</b>", body_style), Paragraph(f"{profile.get('profession', 'N/A')} · {profile.get('education', 'N/A')}", body_style)],
             [Paragraph("<b>KYC Liveness Verification:</b>", body_style), Paragraph("VERIFIED (3-Sec Biometric Micro-Gesture)", body_style) if profile.get("kyc_verified") else Paragraph("Pending Liveness Challenge", body_style)],
-            [Paragraph("<b>Moment Photos Uploaded:</b>", body_style), Paragraph(f"{len(profile.get('photos', []))} Photos (Strict 5-Slot Cap)", body_style)],
+            [Paragraph("<b>Profile & Moment Photos:</b>", body_style), Paragraph(photos_desc, body_style)],
             [Paragraph("<b>Subscription Privilege:</b>", body_style), Paragraph(str(profile.get("subscription_tier", "free")).title(), body_style)],
             [Paragraph("<b>Account Inception Date:</b>", body_style), Paragraph(str(profile.get("account_created_at", "N/A")), body_style)],
         ]
