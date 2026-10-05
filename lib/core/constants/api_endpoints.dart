@@ -19,13 +19,12 @@ class ApiEndpoints {
 
   // Core API Routes
   static const String healthCheck = '/api/v1/health';
-  static const String authSessionHandshake = '/api/v1/auth/session';
+  static const String authLogin = '/api/v1/auth/login';
   static const String mediaPresignedUrl = '/api/v1/media/presigned-url';
-  static const String adMobRewardCallback = '/api/v1/ads/admob/callback';
-  static const String chartboostRewardCallback = '/api/v1/ads/chartboost/callback';
-  static const String liftoffRewardCallback = '/api/v1/ads/liftoff/callback';
-  static const String adminKycPending = '/api/v1/admin/kyc/pending';
-  static const String adminKycAction = '/api/v1/admin/kyc/action';
+  static const String adRewardClaim = '/api/v1/ads/claim-reward';
+  static const String adSsvCallback = '/api/v1/ads/verify-reward';
+  static const String adminKycPending = '/api/v1/admin/kyc/pending-queue';
+  static const String adminKycAction = '/api/v1/admin/kyc/resolve';
 
   // Real-Time Render Activity Telemetry & Logging
   static const String telemetryActivity = '/api/v1/telemetry/activity';
@@ -43,7 +42,7 @@ class ApiEndpoints {
   static const String vaultGrievance = '/api/v1/vault/grievance';
   static const String vaultBlockedPerimeter = '/api/v1/vault/blocked';
   static const String userPreferences = '/api/v1/user/preferences';
-  static const String userProfile = '/api/v1/user/profile';
+  static const String userProfile = '/api/v1/profile/me';
   static const String rotateEncryptionKey = '/api/v1/crypto/rotate-key';
 
   // R2 Storage Hierarchy Configuration

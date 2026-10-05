@@ -39,6 +39,7 @@ class StreakEngine:
                     prev_streak = user.streak_count
                     user.streak_count = 0
                     user.boost_points = max(0, (user.boost_points or 0) - 2)
+                    user.reveal_tokens_count = max(0, (user.reveal_tokens_count or 0) - 1)
                     user.streak_expires_at = None
                     push_notification(
                         user_id=str(user.id),
@@ -107,6 +108,7 @@ class StreakEngine:
                 prev_streak = user.streak_count
                 user.streak_count = 0
                 user.boost_points = max(0, (user.boost_points or 0) - 2)
+                user.reveal_tokens_count = max(0, (user.reveal_tokens_count or 0) - 1)
                 user.streak_expires_at = None
 
                 try:

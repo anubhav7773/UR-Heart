@@ -10,20 +10,35 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# Warm connection pool with disabled prepared statement cache for Supabase PgBouncer (Port 6543)
-engine = create_async_engine(
-    settings.SUPABASE_PGBOUNCER_URL,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=300,
-    pool_timeout=10,
-    echo=settings.DEBUG,
-    future=True,
-    connect_args={
+import os
+import sys
+
+is_test_env = ("pytest" in sys.modules) or bool(os.getenv("PYTEST_CURRENT_TEST")) or getattr(settings, "ENVIRONMENT", "").lower() == "test"
+
+engine_kwargs = {
+    "echo": settings.DEBUG,
+    "future": True,
+    "connect_args": {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
     }
+}
+
+if is_test_env:
+    engine_kwargs["poolclass"] = NullPool
+else:
+    engine_kwargs.update({
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_timeout": 10,
+    })
+
+# Connection engine with disabled prepared statement cache for Supabase PgBouncer (Port 6543)
+engine = create_async_engine(
+    settings.SUPABASE_PGBOUNCER_URL,
+    **engine_kwargs
 )
 
 AsyncSessionLocal = async_sessionmaker(

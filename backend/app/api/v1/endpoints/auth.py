@@ -199,7 +199,7 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
             await db.rollback()
             user_uuid = str(new_uuid)
 
-        is_completed = clean_email in COMPLETED_PROFILES
+        is_completed = False
 
     from app.core.security import create_access_token
     session_token = create_access_token({"sub": str(user_uuid), "email": clean_email})
