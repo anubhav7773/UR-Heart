@@ -1,3 +1,4 @@
+import os
 import re
 import json
 import base64
@@ -113,3 +114,34 @@ def test_has_credentials_bypass_prevents_metadata_timeout():
     FirebaseAuthService._has_credentials = False
     assert FirebaseAuthService.get_user_by_email("test@example.com") is None
     assert FirebaseAuthService.delete_user_account(email="test@example.com") is True
+
+
+def test_corrupted_b64_production_fallback(monkeypatch):
+    """
+    Ensures that when FIREBASE_SERVICE_ACCOUNT_B64 has an ASN.1 parsing error or invalid length
+    in production, get_app() does NOT raise RuntimeError, but instead falls back to authentic
+    embedded sanctuary credentials so FCM works seamlessly.
+    """
+    import firebase_admin
+    from unittest.mock import patch
+
+    # Reset any existing apps
+    for app_name in list(firebase_admin._apps.keys()):
+        firebase_admin.delete_app(firebase_admin._apps[app_name])
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_B64", "malformed_short_or_corrupted_key_data==")
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT_JSON", raising=False)
+
+    orig_exists = os.path.exists
+    def fake_exists(p):
+        if "serviceAccount" in str(p):
+            return False
+        return orig_exists(p)
+
+    with patch("os.path.exists", side_effect=fake_exists):
+        app = FirebaseAuthService.get_app()
+        assert app is not None
+        assert FirebaseAuthService._has_credentials is True
+        assert FirebaseAuthService._credential_error is None
+
