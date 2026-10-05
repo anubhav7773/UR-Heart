@@ -54,6 +54,8 @@ def test_build_fcm_message_structure():
     assert msg.android.notification.channel_id == DIALOGUE_CHANNEL_ID
     assert msg.android.notification.icon == ANDROID_NOTIFICATION_ICON
     assert msg.android.notification.tag == "notif_test_456"
+    assert msg.webpush.fcm_options.link.startswith("https://")
+    assert msg.webpush.fcm_options.link == "https://urheart.asiverticals.me/resonances"
 
 
 @pytest.mark.asyncio

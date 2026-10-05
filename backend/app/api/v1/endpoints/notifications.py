@@ -91,6 +91,7 @@ def build_fcm_message(
         requested_route if requested_route in ALLOWED_NOTIFICATION_ROUTES else "/main"
     )
     clean_data["target_route"] = click_link
+    web_link = click_link if click_link.startswith("https://") else f"https://urheart.asiverticals.me{click_link if click_link.startswith('/') else '/' + click_link}"
 
     return messaging.Message(
         token=fcm_token,
@@ -119,7 +120,7 @@ def build_fcm_message(
                 icon="/icons/Icon-192.png",
                 badge="/favicon.png",
             ),
-            fcm_options=messaging.WebpushFCMOptions(link=click_link),
+            fcm_options=messaging.WebpushFCMOptions(link=web_link),
         ),
         apns=messaging.APNSConfig(
             headers={"apns-priority": "10"},

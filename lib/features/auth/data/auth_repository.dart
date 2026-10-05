@@ -126,6 +126,7 @@ class AuthRepository {
 
     // Attempt to register/sync with backend and check profile completion status
     bool isProfileCompleted = false;
+    bool syncSuccessful = false;
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
         '/api/v1/auth/google-sync',
@@ -137,21 +138,32 @@ class AuthRepository {
         },
       );
       if (response.data != null) {
+        syncSuccessful = true;
         isProfileCompleted = response.data!['is_profile_completed'] == true;
+        if (!isProfileCompleted) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('ur_heart_profile_setup_completed');
+            await prefs.remove('ur_heart_has_entered_sanctuary');
+            await prefs.remove('profile_full_name');
+            await prefs.remove('profile_bio');
+            await prefs.remove('profile_photo_slot_1');
+            await prefs.remove('profile_photo_slot_2');
+            await prefs.remove('profile_photo_slot_3');
+            await prefs.remove('profile_photo_slot_4');
+          } catch (_) {}
+        }
       }
     } catch (_) {
       // Offline/local tolerance - proceed with verified Google identity
     }
 
-    // Also check local SharedPreferences as a fallback
-    if (!isProfileCompleted) {
+    // Only check local SharedPreferences as a fallback if network sync failed
+    if (!syncSuccessful && !isProfileCompleted) {
       try {
         final prefs = await SharedPreferences.getInstance();
         isProfileCompleted = (prefs.getBool('ur_heart_profile_setup_completed') ?? false) ||
-                             (prefs.getBool('ur_heart_has_entered_sanctuary') ?? false) ||
-                             (prefs.getString('profile_full_name')?.isNotEmpty ?? false) ||
-                             (prefs.getString('profile_bio')?.isNotEmpty ?? false) ||
-                             (prefs.getString('profile_photo_slot_1')?.isNotEmpty ?? false);
+                             (prefs.getBool('ur_heart_has_entered_sanctuary') ?? false);
       } catch (_) {}
     }
 
@@ -164,6 +176,9 @@ class AuthRepository {
       if (isProfileCompleted) {
         await prefs.setBool('ur_heart_profile_setup_completed', true);
         await prefs.setBool('ur_heart_has_entered_sanctuary', true);
+      } else {
+        await prefs.remove('ur_heart_profile_setup_completed');
+        await prefs.remove('ur_heart_has_entered_sanctuary');
       }
       ProfileRepository.prewarmStatic(prefs);
     } catch (_) {}

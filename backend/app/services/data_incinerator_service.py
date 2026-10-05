@@ -246,6 +246,21 @@ class DataIncineratorService:
         except Exception as e:
             logger.error(f"[DB INCINERATOR ERROR] Failed database deletion: {e}")
 
+        # =========================================================================
+        # 6. IN-MEMORY PROFILE STATE PURGE
+        # =========================================================================
+        try:
+            from app.api.v1.endpoints.profile import COMPLETED_PROFILES
+            if clean_email:
+                COMPLETED_PROFILES.discard(clean_email)
+            if user_id_str:
+                COMPLETED_PROFILES.discard(user_id_str)
+            if display_name:
+                COMPLETED_PROFILES.discard(display_name.strip().lower())
+            logger.info("[INCINERATOR] Purged in-memory profile completion flags.")
+        except Exception:
+            pass
+
         logger.info(f"[DATA INCINERATOR COMPLETE] Summary: {audit_trail}")
         return audit_trail
 

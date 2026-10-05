@@ -73,7 +73,6 @@ async def get_users_me(current_user: User = Depends(get_current_user)) -> UserSe
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.api.v1.endpoints.profile import COMPLETED_PROFILES
 
 
 class GoogleSyncRequest(BaseModel):
@@ -135,12 +134,7 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
             except Exception as e:
                 await db.rollback()
                 print(f"[AUTH GOOGLE SYNC] Auto-provision warning: {e}", flush=True)
-
-        if clean_email in COMPLETED_PROFILES:
-            is_completed = True
-    elif (payload.user_id and payload.user_id.strip().lower() in COMPLETED_PROFILES) or \
-         (payload.display_name and payload.display_name.strip().lower() in COMPLETED_PROFILES):
-        is_completed = True
+            is_completed = False
 
     print(
         f"[AUTH GOOGLE SYNC] Session Synced: user_id={payload.user_id} email={payload.email} "
