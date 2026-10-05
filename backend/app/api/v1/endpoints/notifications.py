@@ -352,8 +352,13 @@ async def register_device_token(
 
     # A token can only belong to one account; remove stale ownership atomically.
     for uid, tok in list(USER_FCM_TOKENS.items()):
-        if token_val in tok and uid != str(current_user.id):
-            tok.discard(token_val)
+        if isinstance(tok, set):
+            if token_val in tok and uid != str(current_user.id):
+                tok.discard(token_val)
+                if not tok:
+                    USER_FCM_TOKENS.pop(uid, None)
+        elif tok == token_val and uid != str(current_user.id):
+            USER_FCM_TOKENS.pop(uid, None)
 
     await db.execute(
         update(DeviceFcmToken)

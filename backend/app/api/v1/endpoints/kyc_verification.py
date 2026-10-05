@@ -62,11 +62,27 @@ async def verify_live_kyc(
         await db.refresh(current_user)
         if is_approved:
             print(f"[KYC VERIFY] User {current_user.id} ({current_user.email}) marked kyc_status=True in DB", flush=True)
+            from app.api.v1.endpoints.notifications import push_notification
+            push_notification(
+                user_id=str(current_user.id),
+                notif_type="kyc_approved",
+                title="Identity Verified! 🛡️",
+                body="Your biometric KYC verification is approved. Sovereign Blue Crest unlocked!",
+                data={"target_route": "/settings", "kyc_status": True}
+            )
         else:
             print(
                 f"[KYC VERIFY] User {current_user.id} ({current_user.email}) fail-closed: "
                 f"kyc_status=False (status={evaluation.status}, score={evaluation.face_match_score}, live={evaluation.is_live_human}, pose={evaluation.pose_matched})",
                 flush=True
+            )
+            from app.api.v1.endpoints.notifications import push_notification
+            push_notification(
+                user_id=str(current_user.id),
+                notif_type="kyc_resubmit",
+                title="KYC Verification Notice 🛡️",
+                body="Liveness verification requires clearer lighting. Please resubmit your portrait.",
+                data={"target_route": "/settings", "kyc_status": False}
             )
     except Exception as e:
         await db.rollback()

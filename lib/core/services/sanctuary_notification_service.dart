@@ -350,6 +350,8 @@ class SanctuaryNotificationService {
         '/resonances',
         '/growth-hub',
         '/streaks',
+        '/settings',
+        '/profile',
       };
       final requestedRoute = data['target_route'];
       final targetRoute = requestedRoute is String &&
@@ -357,12 +359,14 @@ class SanctuaryNotificationService {
           ? requestedRoute
           : '/main';
       if (targetRoute == '/chat-dialogue') {
+        final recId = data['recipient_id'] ?? data['sender_id'] ?? data['partner_id'];
+        final recName = data['recipient_name'] ?? data['sender_name'] ?? data['partner_name'] ?? 'Seeker';
         appNavigatorKey.currentState?.pushNamed(
           '/chat-dialogue',
           arguments: {
             'match_id': data['match_id'],
-            'recipient_id': data['sender_id'],
-            'recipient_name': data['sender_name'] ?? 'Seeker',
+            'recipient_id': recId,
+            'recipient_name': recName,
             'is_online': true,
           },
         );
@@ -561,7 +565,33 @@ class SanctuaryNotificationService {
     );
   }
 
-  /// ðŸ’Œ Direct Sanctuary Letter Notification
+  /// ✨ Inbound Resonance / Like Notification
+  Future<void> showResonanceNotification({
+    required String senderName,
+    required String actorId,
+    String? avatarUrl,
+  }) async {
+    final payload = jsonEncode({
+      'target_route': '/resonances',
+      'actor_id': actorId,
+      'sender_name': senderName,
+      'sender_avatar': avatarUrl,
+    });
+
+    await showSystemNotification(
+      id: ('res_$actorId').hashCode,
+      title: 'New Resonance ✨',
+      body: '$senderName resonated with your profile.',
+      subText: 'Sanctuary Discovery',
+      payload: payload,
+      channelId: dialogueChannelId,
+      channelName: dialogueChannelName,
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+  }
+
+  /// 💌 Direct Sanctuary Letter Notification
   Future<void> showDirectLetterNotification({
     required String senderName,
     required String messageSnippet,

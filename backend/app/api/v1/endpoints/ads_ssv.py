@@ -465,6 +465,24 @@ async def claim_ad_reward(
         flush=True
     )
 
+    try:
+        from app.api.v1.endpoints.notifications import push_notification
+        notif_body = reward_msg if reward_msg else f"Reward granted: +{swipes_to_grant} swipes, +{letters_to_grant} direct letters."
+        push_notification(
+            user_id=str(target_user.id),
+            notif_type="ad_reward",
+            title="Mindful Reflection Complete ✨",
+            body=notif_body,
+            data={
+                "target_route": "/main",
+                "swipes_remaining": target_user.swipes_remaining,
+                "direct_letters_count": target_user.direct_letters_count,
+                "reveal_tokens_count": target_user.reveal_tokens_count or 0,
+            }
+        )
+    except Exception as e:
+        print(f"[AD REWARD PUSH NOTICE] {e}", flush=True)
+
     return {
         "status": "success",
         "ad_type": payload.ad_type,

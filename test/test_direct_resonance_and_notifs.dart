@@ -37,6 +37,9 @@ class FakeWebSocketService implements ChatWebSocketService {
   Stream<Map<String, dynamic>> get eventStream => const Stream.empty();
 
   @override
+  bool get isConnected => false;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

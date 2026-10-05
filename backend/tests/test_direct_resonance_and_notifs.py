@@ -173,14 +173,16 @@ async def test_fcm_token_registration_and_unregistration():
     req1 = RegisterTokenRequest(fcm_token=test_token)
     res1 = await register_device_token(req1, current_user=mock_user1, db=mock_db)
     assert res1["status"] == "success"
-    assert USER_FCM_TOKENS.get(str(user1_id)) == test_token
+    user1_tokens = USER_FCM_TOKENS.get(str(user1_id))
+    assert user1_tokens is not None and test_token in (user1_tokens if isinstance(user1_tokens, set) else {user1_tokens})
 
     # 2. Register same token for user 2 -> must be removed from user 1
     req2 = RegisterTokenRequest(fcm_token=test_token)
     res2 = await register_device_token(req2, current_user=mock_user2, db=mock_db)
     assert res2["status"] == "success"
     assert USER_FCM_TOKENS.get(str(user1_id)) is None
-    assert USER_FCM_TOKENS.get(str(user2_id)) == test_token
+    user2_tokens = USER_FCM_TOKENS.get(str(user2_id))
+    assert user2_tokens is not None and test_token in (user2_tokens if isinstance(user2_tokens, set) else {user2_tokens})
 
     # 3. Unregister token for user 2
     res_unreg = await unregister_device_token(None, current_user=mock_user2, db=mock_db)

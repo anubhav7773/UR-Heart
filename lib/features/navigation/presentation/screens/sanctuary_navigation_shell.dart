@@ -289,6 +289,36 @@ class _SanctuaryNavigationShellState
           title: 'Profile Passed 🍃',
           body: '$aName passed your resonance card.',
         );
+      } else if (nType == 'like' || nType.contains('resonate')) {
+        final aName = nData['sender_name']?.toString() ??
+            nData['actor_name']?.toString() ??
+            'A seeker';
+        final aId = nData['sender_id']?.toString() ??
+            nData['actor_id']?.toString() ??
+            'seeker_1';
+        final aAvatar = nData['sender_avatar']?.toString() ??
+            nData['avatar_url']?.toString();
+        SanctuaryNotificationService.instance.showResonanceNotification(
+          senderName: aName,
+          actorId: aId,
+          avatarUrl: aAvatar,
+        );
+      } else if (nType.contains('kyc')) {
+        SanctuaryNotificationService.instance.showSystemNotification(
+          id: (notifId ?? 'kyc_notif').hashCode,
+          title: nTitle,
+          body: nBody,
+          subText: 'Sanctuary Shield',
+          payload: jsonEncode({'target_route': '/settings'}),
+        );
+      } else if (nType.contains('ad') || nType.contains('reward')) {
+        SanctuaryNotificationService.instance.showSystemNotification(
+          id: (notifId ?? 'ad_notif').hashCode,
+          title: nTitle,
+          body: nBody,
+          subText: 'Sanctuary Rewards',
+          payload: jsonEncode({'target_route': '/main'}),
+        );
       } else {
         SanctuaryNotificationService.instance.showSystemNotification(
           id: (notifId ?? 'notif').hashCode,
