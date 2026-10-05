@@ -15,7 +15,11 @@ const messaging = firebase.messaging();
 
 // Outside-the-app Background Push Handler (triggers when tab is closed/backgrounded)
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background push message:', payload);
+  // Notification payloads are displayed by Firebase/the browser. Rendering them
+  // again here creates duplicate alerts. Data-only messages need custom display.
+  if (payload.notification) {
+    return;
+  }
   const title = (payload.notification && payload.notification.title) ||
                 (payload.data && payload.data.title) ||
                 'UR-Heart Sanctuary';
@@ -28,7 +32,7 @@ messaging.onBackgroundMessage((payload) => {
     icon: '/icons/Icon-192.png',
     badge: '/favicon.png',
     vibrate: [200, 100, 200],
-    tag: 'ur-heart-push',
+    tag: (payload.data && payload.data.notif_id) || ('ur-heart-push-' + Date.now()),
     renotify: true,
     data: payload.data || {},
   };
@@ -39,15 +43,23 @@ messaging.onBackgroundMessage((payload) => {
 // Bring app to focus when user clicks on system tray notification
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const route = event.notification.data && event.notification.data.target_route;
+  const allowedRoutes = new Set([
+    '/', '/main', '/chat-dialogue', '/resonances', '/growth-hub', '/streaks'
+  ]);
+  const target = allowedRoutes.has(route) ? route : '/main';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url && 'focus' in client) {
+        if (client.url && new URL(client.url).origin === self.location.origin) {
+          if ('navigate' in client) {
+            return client.navigate(target).then(() => client.focus());
+          }
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow('/');
+        return clients.openWindow(target);
       }
     })
   );

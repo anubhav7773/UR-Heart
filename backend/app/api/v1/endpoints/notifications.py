@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from datetime import datetime
 import logging
 from typing import Dict, List, Optional, Any
@@ -6,11 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.database import get_db, async_session_factory
 from app.core.security import get_current_user
 from app.models.domain.user import User
+from app.models.domain.device_fcm_token import DeviceFcmToken
 from app.services.chat_manager import manager
 
 logger = logging.getLogger("urheart.notifications")
@@ -20,7 +22,7 @@ router = APIRouter(prefix="/notifications", tags=["In-App Notifications"])
 NOTIFICATION_STORE: Dict[str, List[Dict[str, Any]]] = {}
 
 # Active device FCM token registry (cached in memory for high-throughput push)
-USER_FCM_TOKENS: Dict[str, str] = {}
+USER_FCM_TOKENS: Dict[str, set[str]] = {}
 
 # Main server event loop (captured in FastAPI lifespan). Allows push_notification()
 # to be called safely from worker threads without touching the DB pool from a foreign loop.
@@ -31,6 +33,14 @@ DIALOGUE_CHANNEL_ID = "ur_heart_sacred_dialogue"
 PRESENCE_CHANNEL_ID = "ur_heart_presence_channel"
 ANDROID_NOTIFICATION_ICON = "ic_stat_urheart"
 FCM_TTL_SECONDS = 24 * 60 * 60
+ALLOWED_NOTIFICATION_ROUTES = {
+    "/",
+    "/main",
+    "/chat-dialogue",
+    "/resonances",
+    "/growth-hub",
+    "/streaks",
+}
 
 # Strong references to in-flight delivery tasks (prevents premature GC of create_task results)
 _BG_TASKS: set = set()
@@ -76,7 +86,11 @@ def build_fcm_message(
     if notif_id:
         clean_data["notif_id"] = notif_id
 
-    click_link = clean_data.get("target_route") or "/"
+    requested_route = clean_data.get("target_route", "/")
+    click_link = (
+        requested_route if requested_route in ALLOWED_NOTIFICATION_ROUTES else "/main"
+    )
+    clean_data["target_route"] = click_link
 
     return messaging.Message(
         token=fcm_token,
@@ -94,7 +108,7 @@ def build_fcm_message(
                 tag=notif_id,
                 default_vibrate_timings=True,
                 priority="max",
-                visibility="public",
+                visibility="private",
             ),
         ),
         webpush=messaging.WebpushConfig(
@@ -158,11 +172,20 @@ def _dispatch_fcm_push(
 
 
 async def _purge_invalid_token(user_key: str, token: str) -> None:
-    if USER_FCM_TOKENS.get(user_key) == token:
+    cached = USER_FCM_TOKENS.get(user_key, set())
+    if isinstance(cached, str):
+        cached = {cached}
+        USER_FCM_TOKENS[user_key] = cached
+    cached.discard(token)
+    if not cached:
         USER_FCM_TOKENS.pop(user_key, None)
     try:
-        from sqlalchemy import update
         async with async_session_factory() as session:
+            await session.execute(
+                update(DeviceFcmToken)
+                .where(DeviceFcmToken.user_id == UUID(user_key), DeviceFcmToken.token == token)
+                .values(active=False)
+            )
             await session.execute(
                 update(User).where(User.id == UUID(user_key), User.fcm_token == token).values(fcm_token=None)
             )
@@ -172,20 +195,31 @@ async def _purge_invalid_token(user_key: str, token: str) -> None:
         _log(f"[FCM TOKEN PURGE NOTICE] user={user_key} {e}")
 
 
-async def _resolve_fcm_token(user_key: str) -> Optional[str]:
-    token = USER_FCM_TOKENS.get(user_key)
-    if token:
-        return token
+async def _resolve_fcm_tokens(user_key: str) -> List[str]:
+    cached = USER_FCM_TOKENS.get(user_key, set())
+    tokens = {cached} if isinstance(cached, str) else set(cached)
+    if tokens:
+        return list(tokens)
     try:
         async with async_session_factory() as session:
-            res = await session.execute(select(User.fcm_token).where(User.id == UUID(user_key)))
-            token = res.scalar_one_or_none()
-            if token:
-                USER_FCM_TOKENS[user_key] = token
-            return token
+            res = await session.execute(
+                select(DeviceFcmToken.token).where(
+                    DeviceFcmToken.user_id == UUID(user_key),
+                    DeviceFcmToken.active.is_(True),
+                )
+            )
+            tokens.update(res.scalars().all())
+            legacy = await session.execute(
+                select(User.fcm_token).where(User.id == UUID(user_key))
+            )
+            legacy_token = legacy.scalar_one_or_none()
+            if legacy_token:
+                tokens.add(legacy_token)
+            USER_FCM_TOKENS[user_key] = tokens
+            return list(tokens)
     except Exception as e:
         _log(f"[FCM DB CHECK ERROR] user={user_key} {e}")
-        return None
+        return list(tokens)
 
 
 async def _deliver(user_key: str, entry: Dict[str, Any]) -> None:
@@ -198,22 +232,23 @@ async def _deliver(user_key: str, entry: Dict[str, Any]) -> None:
     except Exception:
         pass
 
-    token = await _resolve_fcm_token(user_key)
-    if not token:
+    tokens = await _resolve_fcm_tokens(user_key)
+    if not tokens:
         _log(f"[FCM NO TOKEN] user={user_key} type={entry['type']} (device not registered)")
         return
 
-    result = await asyncio.to_thread(
-        _dispatch_fcm_push,
-        token,
-        entry["title"],
-        entry["body"],
-        entry.get("data") or {},
-        entry["type"],
-        entry["id"],
-    )
-    if not result.get("ok") and result.get("token_invalid"):
-        await _purge_invalid_token(user_key, token)
+    for token in tokens:
+        result = await asyncio.to_thread(
+            _dispatch_fcm_push,
+            token,
+            entry["title"],
+            entry["body"],
+            entry.get("data") or {},
+            entry["type"],
+            entry["id"],
+        )
+        if not result.get("ok") and result.get("token_invalid"):
+            await _purge_invalid_token(user_key, token)
 
 
 def push_notification(
@@ -262,15 +297,19 @@ def push_notification(
         return
 
     # No server loop (scripts/tests): only a RAM-cached token can be used safely
-    token = USER_FCM_TOKENS.get(user_key)
-    if token:
-        _dispatch_fcm_push(token, title, body, data, notif_type, entry["id"])
+    cached = USER_FCM_TOKENS.get(user_key, set())
+    tokens = {cached} if isinstance(cached, str) else cached
+    if tokens:
+        for token in tokens:
+            _dispatch_fcm_push(token, title, body, data, notif_type, entry["id"])
     else:
         _log(f"[FCM NO LOOP] user={user_key} type={notif_type} queued in-app only")
 
 
 class RegisterTokenRequest(BaseModel):
     fcm_token: str
+    platform: str = "unknown"
+    installation_id: Optional[str] = None
 
 
 @router.post("/register-token", status_code=status.HTTP_200_OK, summary="Register FCM Push Token")
@@ -284,21 +323,41 @@ async def register_device_token(
     if not token_val:
         raise HTTPException(status_code=400, detail="fcm_token cannot be empty.")
 
-    # Disassociate this token from any other users in RAM cache
-    for uid, tok in list(USER_FCM_TOKENS.items()):
-        if tok == token_val and uid != str(current_user.id):
-            del USER_FCM_TOKENS[uid]
+    platform = payload.platform.strip().lower()[:20] or "unknown"
+    installation_id = payload.installation_id.strip()[:128] if payload.installation_id else None
 
-    # Disassociate this token from any other user in PostgreSQL DB
-    from sqlalchemy import update
+    # A token can only belong to one account; remove stale ownership atomically.
+    for uid, tok in list(USER_FCM_TOKENS.items()):
+        if token_val in tok and uid != str(current_user.id):
+            tok.discard(token_val)
+
     await db.execute(
-        update(User)
-        .where(User.fcm_token == token_val, User.id != current_user.id)
-        .values(fcm_token=None)
+        update(DeviceFcmToken)
+        .where(DeviceFcmToken.token == token_val, DeviceFcmToken.user_id != current_user.id)
+        .values(active=False)
     )
 
+    existing = await db.execute(
+        select(DeviceFcmToken).where(DeviceFcmToken.user_id == current_user.id,
+                                      DeviceFcmToken.token == token_val)
+    )
+    device = existing.scalar_one_or_none()
+    if inspect.isawaitable(device):
+        device = await device
+    if device:
+        device.active = True
+        device.platform = platform
+        device.installation_id = installation_id
+        device.last_seen_at = datetime.utcnow()
+    else:
+        db.add(DeviceFcmToken(
+            user_id=current_user.id,
+            token=token_val,
+            platform=platform,
+            installation_id=installation_id,
+        ))
     current_user.fcm_token = token_val
-    USER_FCM_TOKENS[str(current_user.id)] = token_val
+    USER_FCM_TOKENS.setdefault(str(current_user.id), set()).add(token_val)
     await db.commit()
     logger.info("Registered FCM token for user %s: ...%s", current_user.id, token_val[-8:])
 
@@ -313,9 +372,29 @@ async def unregister_device_token(
 ):
     """Disassociates the FCM push token when user logs out."""
     user_key = str(current_user.id)
-    if user_key in USER_FCM_TOKENS:
-        del USER_FCM_TOKENS[user_key]
-    current_user.fcm_token = None
+    token_val = payload.fcm_token.strip() if payload and payload.fcm_token else None
+    if token_val:
+        cached = USER_FCM_TOKENS.get(user_key, set())
+        if isinstance(cached, str):
+            cached = {cached}
+            USER_FCM_TOKENS[user_key] = cached
+        cached.discard(token_val)
+        if not cached:
+            USER_FCM_TOKENS.pop(user_key, None)
+        await db.execute(
+            update(DeviceFcmToken)
+            .where(DeviceFcmToken.user_id == current_user.id, DeviceFcmToken.token == token_val)
+            .values(active=False)
+        )
+    else:
+        USER_FCM_TOKENS.pop(user_key, None)
+        await db.execute(
+            update(DeviceFcmToken)
+            .where(DeviceFcmToken.user_id == current_user.id)
+            .values(active=False)
+        )
+    if not token_val or token_val == current_user.fcm_token:
+        current_user.fcm_token = None
     await db.commit()
     logger.info("Unregistered FCM token for user %s", current_user.id)
     return {"status": "success", "message": "FCM device token unregistered successfully."}
@@ -388,12 +467,13 @@ def probe_fcm_authorization() -> Dict[str, Any]:
 async def push_health(current_user: User = Depends(get_current_user)):
     """Reports whether outside-the-app pushes can reach the calling user's device."""
     probe = await asyncio.to_thread(probe_fcm_authorization)
-    token = await _resolve_fcm_token(str(current_user.id))
+    tokens = await _resolve_fcm_tokens(str(current_user.id))
     return {
         "status": "success",
         **probe,
-        "token_registered": bool(token),
-        "token_suffix": token[-8:] if token else None,
+        "token_registered": bool(tokens),
+        "token_count": len(tokens),
+        "token_suffix": tokens[0][-8:] if tokens else None,
     }
 
 
@@ -401,9 +481,10 @@ async def push_health(current_user: User = Depends(get_current_user)):
 async def send_test_push(current_user: User = Depends(get_current_user)):
     """Sends a real FCM push to the caller's own registered device and returns the raw result."""
     user_key = str(current_user.id)
-    token = await _resolve_fcm_token(user_key)
-    if not token:
+    tokens = await _resolve_fcm_tokens(user_key)
+    if not tokens:
         raise HTTPException(status_code=404, detail="No FCM device token registered for this account.")
+    token = tokens[0]
     import uuid as _uuid
     notif_id = f"test_{_uuid.uuid4().hex[:10]}"
     result = await asyncio.to_thread(

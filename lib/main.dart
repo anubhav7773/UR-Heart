@@ -20,7 +20,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-  } catch (_) {}
+  } catch (error, stackTrace) {
+    debugPrint('[FCM BACKGROUND] Firebase initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    return;
+  }
 
   try {
     // If message already had an OS notification payload, Android system tray displays it natively.
@@ -45,8 +49,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         );
       }
     }
-  } catch (_) {}
-  debugPrint('[FCM BACKGROUND PUSH] ${message.messageId} title=${message.notification?.title}');
+  } catch (error, stackTrace) {
+    debugPrint('[FCM BACKGROUND] Notification handling failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+  debugPrint('[FCM BACKGROUND PUSH] message=${message.messageId ?? "unknown"}');
 }
 
 Future<void> main() async {

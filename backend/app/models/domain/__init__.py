@@ -1,4 +1,5 @@
 from app.models.domain.user import User
+from app.models.domain.device_fcm_token import DeviceFcmToken
 from app.models.domain.match import Match
 from app.models.domain.swipe import Swipe
 from app.models.domain.message import Message

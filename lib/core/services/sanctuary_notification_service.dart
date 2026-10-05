@@ -23,6 +23,8 @@ class SanctuaryNotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
+  static const String _pendingFcmRegistrationKey =
+      'ur_heart_fcm_registration_pending';
   final Set<String> _seenNotificationIds = {};
 
   /// Checks if notification was already presented on this device within the active session.
@@ -67,9 +69,6 @@ class SanctuaryNotificationService {
               AndroidFlutterLocalNotificationsPlugin>();
 
       if (androidPlatform != null) {
-        // Request POST_NOTIFICATIONS permission on Android 13+
-        await androidPlatform.requestNotificationsPermission();
-
         const dialogueChannel = AndroidNotificationChannel(
           dialogueChannelId,
           dialogueChannelName,
@@ -188,7 +187,10 @@ class SanctuaryNotificationService {
 
       if (authToken != null && authToken.isNotEmpty) {
         await _dispatchTokenToBackend(token, authToken);
+        await prefs.setBool(_pendingFcmRegistrationKey, false);
         debugPrint('[FCM REGISTER] Token registered with backend successfully.');
+      } else {
+        await prefs.setBool(_pendingFcmRegistrationKey, true);
       }
     } catch (e) {
       debugPrint('[FCM REGISTER NOTICE] $e');
@@ -232,6 +234,7 @@ class SanctuaryNotificationService {
 
         if (authToken != null && authToken.isNotEmpty) {
           await _dispatchTokenToBackend(token, authToken);
+          await prefs.setBool(_pendingFcmRegistrationKey, false);
         }
       } catch (e) {
         debugPrint('[FCM SYNC NOTICE] $e');
@@ -244,6 +247,11 @@ class SanctuaryNotificationService {
     try {
       if (kIsWeb) {
         await requestBrowserNotificationPermission();
+      } else {
+        final androidPlatform = _notificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+        await androidPlatform?.requestNotificationsPermission();
       }
 
       final fcm = FirebaseMessaging.instance;
@@ -285,7 +293,10 @@ class SanctuaryNotificationService {
         ));
         final resp = await dio.post<dynamic>(
           '/api/v1/notifications/register-token',
-          data: {'fcm_token': token},
+          data: {
+            'fcm_token': token,
+            'platform': kIsWeb ? 'web' : 'android',
+          },
         );
         if (resp.statusCode == 200) {
           debugPrint('[FCM DISPATCH] Successfully linked token to $base');
@@ -308,7 +319,10 @@ class SanctuaryNotificationService {
                 ));
                 final retryResp = await retryDio.post<dynamic>(
                   '/api/v1/notifications/register-token',
-                  data: {'fcm_token': token},
+                  data: {
+                    'fcm_token': token,
+                    'platform': kIsWeb ? 'web' : 'android',
+                  },
                 );
                 if (retryResp.statusCode == 200) {
                   debugPrint('[FCM DISPATCH] Successfully linked refreshed token to $base');
@@ -327,7 +341,18 @@ class SanctuaryNotificationService {
 
   void _handleNavigationData(Map<String, dynamic> data) {
     try {
-      final targetRoute = data['target_route'] as String? ?? '/main';
+      const allowedRoutes = {
+        '/main',
+        '/chat-dialogue',
+        '/resonances',
+        '/growth-hub',
+        '/streaks',
+      };
+      final requestedRoute = data['target_route'];
+      final targetRoute = requestedRoute is String &&
+              allowedRoutes.contains(requestedRoute)
+          ? requestedRoute
+          : '/main';
       if (targetRoute == '/chat-dialogue') {
         appNavigatorKey.currentState?.pushNamed(
           '/chat-dialogue',
@@ -480,7 +505,7 @@ class SanctuaryNotificationService {
     }
   }
 
-  /// 💬 Ultra-Premium Chat Message Notification
+  /// ðŸ’¬ Ultra-Premium Chat Message Notification
   Future<void> showDialogueMessageNotification({
     required String senderName,
     required String messageText,
@@ -496,7 +521,7 @@ class SanctuaryNotificationService {
 
     await showSystemNotification(
       id: matchId.hashCode,
-      title: '$senderName 💬',
+      title: '$senderName ðŸ’¬',
       body: messageText,
       subText: 'Sacred Dialogue',
       payload: payload,
@@ -507,7 +532,7 @@ class SanctuaryNotificationService {
     );
   }
 
-  /// ✨ Mutual Spark / Match Established Notification
+  /// âœ¨ Mutual Spark / Match Established Notification
   Future<void> showMutualSparkNotification({
     required String peerName,
     required String matchId,
@@ -522,7 +547,7 @@ class SanctuaryNotificationService {
 
     await showSystemNotification(
       id: ('spark_$matchId').hashCode,
-      title: 'Resonance Established ✨',
+      title: 'Resonance Established âœ¨',
       body: 'You and $peerName felt a mutual spark! Step inside to begin your dialogue.',
       subText: 'Mutual Spark',
       payload: payload,
@@ -533,7 +558,7 @@ class SanctuaryNotificationService {
     );
   }
 
-  /// 💌 Direct Sanctuary Letter Notification
+  /// ðŸ’Œ Direct Sanctuary Letter Notification
   Future<void> showDirectLetterNotification({
     required String senderName,
     required String messageSnippet,
@@ -549,7 +574,7 @@ class SanctuaryNotificationService {
 
     await showSystemNotification(
       id: ('direct_$matchId').hashCode,
-      title: 'Direct Sanctuary Letter from $senderName 💌',
+      title: 'Direct Sanctuary Letter from $senderName ðŸ’Œ',
       body: messageSnippet.isNotEmpty
           ? messageSnippet
           : 'A seeker has dispatched an intentional direct note to your soul.',
@@ -562,7 +587,7 @@ class SanctuaryNotificationService {
     );
   }
 
-  /// 🔥 24-Hour Streak Expiring Alert
+  /// ðŸ”¥ 24-Hour Streak Expiring Alert
   Future<void> showStreakAlertNotification({
     required int streakCount,
     required int hoursRemaining,
@@ -575,7 +600,7 @@ class SanctuaryNotificationService {
 
     await showSystemNotification(
       id: 9991,
-      title: title ?? 'Mindful Presence Expiring 🔥',
+      title: title ?? 'Mindful Presence Expiring ðŸ”¥',
       body: body ??
           'Your $streakCount-day flame will extinguish in $hoursRemaining hours. Take a gentle 10s reflection to preserve your sanctuary presence.',
       subText: 'Streak Defense',
@@ -587,7 +612,7 @@ class SanctuaryNotificationService {
     );
   }
 
-  /// 🌟 24-Hour Streak Claimed & Secured Celebration
+  /// ðŸŒŸ 24-Hour Streak Claimed & Secured Celebration
   Future<void> showStreakSecuredNotification({
     required int streakCount,
     String? title,
@@ -600,7 +625,7 @@ class SanctuaryNotificationService {
 
     await showSystemNotification(
       id: 9992,
-      title: title ?? '🔥 Day $streakCount Streak Secured!',
+      title: title ?? 'ðŸ”¥ Day $streakCount Streak Secured!',
       body: body ??
           'You earned +${boostPoints ?? 1} Boost Point! Your profile is prioritized at the top of the discovery deck for 24 hours.',
       subText: 'Mindful Sanctuary',
@@ -666,4 +691,3 @@ class SanctuaryNotificationService {
     }
   }
 }
-

@@ -36,7 +36,7 @@
 
 ```mermaid
 graph TD
-    subgraph Client ["Flutter Mobile Client (Android & iOS)"]
+    subgraph Client ["Flutter Client (Android + Web)"]
         UI["Dual-Theme UI (Pine Velvet & Gold)"]
         State["Provider / Riverpod Clean Architecture"]
         LocalCache["SharedPreferences + Encrypted Vault"]
@@ -94,6 +94,18 @@ graph TD
     WebStoreEngine --> Postgres
     AuthService --> ResendAPI
 ```
+
+### Background notification support
+
+FCM background delivery is currently supported and tested for **Android and Web**.
+Android uses authenticated per-device token registration, notification channels, and
+Firebase background handling. Web notification permission must be granted from the
+notification setting before a browser token is registered. Notification payloads are
+navigation hints only and private message text is not intended for public lock-screen
+visibility.
+
+Native iOS and Tauri notification targets are not included in this repository and are
+not supported release platforms until their native push integrations are added.
 
 ---
 

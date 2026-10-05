@@ -109,6 +109,15 @@ class SettingsController extends StateNotifier<SettingsState> {
   Future<void> toggleMasterResonance(bool value) async {
     final updated = await _repo.updateSettings(masterResonance: value);
     state = state.copyWith(settings: updated);
+    if (value) {
+      final granted = await SanctuaryNotificationService.instance
+          .requestWebNotificationPermission();
+      if (!granted) {
+        state = state.copyWith(
+          errorMessage: 'Notification permission was not granted.',
+        );
+      }
+    }
   }
 
   Future<void> toggleDiscreetMode(bool value) async {
@@ -322,4 +331,3 @@ final settingsControllerProvider =
   final repo = ref.watch(settingsRepositoryProvider);
   return SettingsController(repo, ref);
 });
-
