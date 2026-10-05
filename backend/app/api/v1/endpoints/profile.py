@@ -180,11 +180,15 @@ async def get_seeker_profile(
     cand_bio = target_user.bio.strip() if (target_user.bio and target_user.bio.strip()) else "Mindful seeker walking an intentional path in the Sanctuary."
     cand_intention = target_user.bio.strip() if (target_user.bio and target_user.bio.strip()) else "Seeking slow, thoughtful connection in the sanctuary."
 
+    # DPDP Act 2023 Sec 6(1) Data Minimization: Exact DOB is strictly private to the account owner
+    is_self = bool(current_user and current_user.id == target_user.id)
+    dob_value = (target_user.dob.isoformat() if target_user.dob else None) if is_self else None
+
     return {
         "id": str(target_user.id),
         "full_name": target_user.full_name,
         "age": _calculate_age(target_user.dob),
-        "dob": target_user.dob.isoformat() if target_user.dob else None,
+        "dob": dob_value,
         "gender": target_user.gender,
         "interested_in": target_user.interested_in,
         "bio": cand_bio,

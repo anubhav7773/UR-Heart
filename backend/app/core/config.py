@@ -50,6 +50,20 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     RESEND_FROM: str = "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
 
+    # SMTP Relay Engine (Google Gmail SMTP or Brevo)
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "UR-Heart Sanctuary <asiverticals@gmail.com>"
+
+    # Brevo Fallback Engine
+    BREVO_API_KEY: str = ""
+    BREVO_SMTP_HOST: str = "smtp-relay.brevo.com"
+    BREVO_SMTP_PORT: int = 587
+    BREVO_SMTP_USER: str = ""
+    BREVO_SMTP_PASSWORD: str = ""
+
     # Cloudflare R2 / S3 Fallback
     CLOUDFLARE_ACCOUNT_ID: str = ""
     R2_ACCESS_KEY_ID: str = ""
@@ -98,6 +112,9 @@ class Settings(BaseSettings):
                 missing.append("SUPABASE_SERVICE_ROLE_KEY")
             if not self.REVENUECAT_WEBHOOK_SECRET or not self.REVENUECAT_WEBHOOK_SECRET.strip():
                 missing.append("REVENUECAT_WEBHOOK_SECRET")
+            admin_key = self.SUPERADMIN_SECRET_KEY or os.getenv("SUPERADMIN_SECRET_KEY") or ""
+            if not admin_key or admin_key in {"asiverticals_sovereign_sanctuary_2026"}:
+                missing.append("SUPERADMIN_SECRET_KEY (must be custom high-entropy secret in production)")
 
             if missing:
                 raise ValueError(

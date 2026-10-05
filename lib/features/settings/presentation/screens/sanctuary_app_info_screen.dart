@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -11,13 +10,6 @@ class SanctuaryAppInfoScreen extends ConsumerWidget {
   static const String routeName = '/appinfo';
 
   const SanctuaryAppInfoScreen({super.key});
-
-  Future<void> _openStore(BuildContext context) async {
-    final uri = Uri.parse('https://urheart.asiverticals.me/store');
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -171,9 +163,9 @@ class SanctuaryAppInfoScreen extends ConsumerWidget {
               primary: primary,
               muted: muted,
               accentColor: const Color(0xFF4E9F76),
-              icon: Icons.shopping_bag_outlined,
-              title: 'Sovereign Web Store (+10% Bonus)',
-              desc: 'Direct web checkout at urheart.asiverticals.me/store with +10% bonus perks across all passes and micro-packs via UPI & Cards.',
+              icon: Icons.gavel_rounded,
+              title: 'Statutory Grievance & Trust Desk',
+              desc: 'Appointed Grievance Officer under India IT Rules 2021 & DPDP Act 2023. Fast-track human resolution within statutory SLAs at grievance@urheart.asiverticals.me.',
             ),
             const SizedBox(height: 28),
 
@@ -208,7 +200,7 @@ class SanctuaryAppInfoScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
 
-            // Secondary Web Store Action
+            // Secondary Statutory Legal Desk Action
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -220,14 +212,14 @@ class SanctuaryAppInfoScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed: () => _openStore(context),
+                onPressed: () => Navigator.of(context).pushNamed('/vault'),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.shopping_bag_outlined, size: 18),
+                    Icon(Icons.security_rounded, size: 18),
                     SizedBox(width: 8),
                     Text(
-                      'Official Web Store (UPI / Cards)',
+                      'Statutory Legal Vault & Grievance Desk',
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ],

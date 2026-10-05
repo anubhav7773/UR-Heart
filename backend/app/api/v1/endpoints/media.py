@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from app.core.config import get_settings
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user
 from app.models.domain.user import User
 
 logger = logging.getLogger("media_endpoints")
@@ -14,9 +14,9 @@ router = APIRouter(prefix="/media", tags=["Media & R2 Storage"])
 
 
 class PresignedUrlRequest(BaseModel):
-    user_id: str
     slot_number: int
     content_type: str = "image/webp"
+    user_id: Optional[str] = None
 
 
 class PresignedUrlResponse(BaseModel):
@@ -27,13 +27,18 @@ class PresignedUrlResponse(BaseModel):
 @router.post("/presigned-url", response_model=PresignedUrlResponse, status_code=status.HTTP_200_OK)
 async def generate_presigned_upload_url(
     payload: PresignedUrlRequest,
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: User = Depends(get_current_user)
 ):
     """
+    SEC-HIGH-04 Fix: Binds upload strictly to the authenticated user's ID.
     Generates Cloudflare R2 presigned PUT URL for zero-bandwidth direct client uploads.
     Gracefully falls back to sanctuary direct upload endpoint if R2 keys are not provisioned.
     """
-    file_key = f"users/{payload.user_id}/photos/slot_{payload.slot_number}.webp"
+    if payload.slot_number < 1 or payload.slot_number > 6:
+        raise HTTPException(status_code=400, detail="Invalid photo slot number (must be between 1 and 6).")
+
+    user_id = str(current_user.id)
+    file_key = f"users/{user_id}/photos/slot_{payload.slot_number}.webp"
 
     # 1. Cloudflare R2 / S3 Presigned URL Generation
     if settings.R2_ACCESS_KEY_ID and settings.R2_SECRET_ACCESS_KEY and settings.CLOUDFLARE_ACCOUNT_ID:
@@ -65,7 +70,7 @@ async def generate_presigned_upload_url(
             logger.warning("R2 presigned URL generation failed, falling back to direct upload: %s", str(e))
 
     # 2. Resilient Fallback: Direct Sanctuary Media Upload Route
-    direct_upload_url = f"{settings.BASE_WEB_URL}/api/v1/media/upload/{payload.user_id}/{payload.slot_number}"
+    direct_upload_url = f"{settings.BASE_WEB_URL}/api/v1/media/upload/{user_id}/{payload.slot_number}"
     return PresignedUrlResponse(
         upload_url=direct_upload_url,
         public_file_key=file_key
@@ -77,14 +82,27 @@ async def direct_media_upload(
     user_id: str,
     slot_number: int,
     request: Request,
+    current_user: User = Depends(get_current_user),
 ):
     """
     Direct binary upload endpoint for profile photo slots.
-    Accepts streamed binary bytes (PUT) and coordinates upload with Supabase or storage.
+    SEC-HIGH-04: Strictly enforces user identity match to prevent arbitrary account photo overwrite.
     """
+    if str(current_user.id) != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: You cannot upload or overwrite photos for another seeker's sanctuary."
+        )
+
+    if slot_number < 1 or slot_number > 6:
+        raise HTTPException(status_code=400, detail="Invalid photo slot number (must be 1-6).")
+
     body = await request.body()
     if not body:
         raise HTTPException(status_code=400, detail="Empty media body received.")
+
+    if len(body) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Payload too large: Max photo size is 15MB.")
 
     file_key = f"users/{user_id}/photos/slot_{slot_number}.webp"
 

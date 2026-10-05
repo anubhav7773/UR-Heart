@@ -125,9 +125,8 @@ async def admin_portal_login(
             detail="Access Denied: Email is not authorized for Sovereign Sanctuary privileges."
         )
 
-    # Gate 2: Master key verification (supports custom key deployed in Render env)
+    # Gate 2: Master key verification (strictly from environment secrets in production)
     valid_keys = {
-        "asiverticals_sovereign_sanctuary_2026",
         getattr(settings, "SUPERADMIN_SECRET_KEY", "").strip(),
         (os.getenv("SUPERADMIN_SECRET_KEY") or "").strip(),
         (os.getenv("ADMIN_SECRET_KEY") or "").strip(),
@@ -135,6 +134,10 @@ async def admin_portal_login(
         (os.getenv("ADMIN_ACCESS_KEY") or "").strip(),
         (os.getenv("SOVEREIGN_KEY") or "").strip(),
     }
+    # In development/test only, support dev bootstrap key
+    if getattr(settings, "ENVIRONMENT", "").lower() != "production":
+        valid_keys.add("asiverticals_sovereign_sanctuary_2026")
+
     valid_keys.discard("")
     if not payload.secret_key or payload.secret_key.strip() not in valid_keys:
         raise HTTPException(

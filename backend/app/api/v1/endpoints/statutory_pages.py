@@ -1,8 +1,9 @@
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
-from fastapi import APIRouter, Depends, Form, Request, status
+import secrets
+from datetime import datetime, timezone, timedelta
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, Depends, Form, Request, status, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.domain.user import User
 from app.services.data_incinerator_service import DataIncineratorService
+from app.services.email_service import EmailService
 
 settings = get_settings()
 router = APIRouter(tags=["Statutory Legal & Policy Portals"])
@@ -803,8 +805,8 @@ async def serve_data_deletion_page(request: Request):
         <strong>⚠️ Irrevocable Action Warning:</strong> Deleting your account will immediately and permanently erase your persona profile, moment photographs, 1:1 chat dialogue history, mutual matches, direct letters, and unused digital passes. <em>This action is permanent and cannot be reversed or recovered.</em>
       </div>
 
-      <div id="successBox" class="alert-box alert-success">
-        <strong>✓ Deletion Request Acknowledged:</strong> Your account incineration request has been logged. Associated records, profile photos, and message archives will be permanently purged within 24 hours.
+      <div id="successBox" class="alert-box alert-success" style="display:none;">
+        <strong>✓ Verification Link Dispatched:</strong> If an account exists for this email address, a confirmation email with a secure link has been sent. Please open the link in your inbox within 24 hours to confirm permanent incineration.
       </div>
 
       <form id="deletionForm" onsubmit="handleDeletionSubmit(event)">
@@ -819,7 +821,7 @@ async def serve_data_deletion_page(request: Request):
 
       <h2 style="margin-top:32px;">Comprehensive Data Deletion Schedule</h2>
       <ul>
-        <li><strong>Profile & Persona:</strong> Display name, bio reflections, preferences, and age records are deleted from active databases immediately.</li>
+        <li><strong>Profile & Persona:</strong> Display name, bio reflections, preferences, and age records are deleted from active databases immediately upon confirmation.</li>
         <li><strong>Media & Photographs:</strong> All moments uploaded to cloud storage buckets are permanently unlinked and purged.</li>
         <li><strong>Private Dialogues:</strong> All sent and received messages, attachments, and WebSocket records are wiped clean.</li>
         <li><strong>Biometric Liveness Frames:</strong> Liveness vectors were already incinerated ephemerally during KYC verification.</li>
@@ -859,6 +861,9 @@ async def serve_data_deletion_page(request: Request):
     return HTMLResponse(content=html, status_code=200)
 
 
+WEB_DELETION_TOKENS: Dict[str, Dict[str, Any]] = {}
+
+
 class WebDeletionRequest(BaseModel):
     email: str
     reason: Optional[str] = None
@@ -875,19 +880,98 @@ class WebDeletionRequest(BaseModel):
 @router.post("/api/v1/vault/request-web-deletion")
 async def process_web_deletion_request(payload: WebDeletionRequest, db: AsyncSession = Depends(get_db)):
     """
-    Processes web deletion request from Google Play public deletion page.
-    Irrevocably incinerates the user identity across Firebase Auth, Supabase Storage,
-    Supabase Auth, and the PostgreSQL database.
+    SEC-CRIT-01: Initiates 2-step verification for web account deletion.
+    Prevents unauthenticated third-party mass erasure by dispatching a single-use
+    cryptographic verification token to the registered email address.
     """
     clean_email = payload.email.strip().lower()
-    audit = await DataIncineratorService.incinerate_user(
-        email=clean_email,
-        db=db
-    )
-    print(f"[DATA INCINERATOR] Web erasure executed for: {clean_email} | Result: {audit}", flush=True)
+    stmt = select(User).where(User.email == clean_email)
+    user = (await db.execute(stmt)).scalar_one_or_none()
+
+    if user:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        WEB_DELETION_TOKENS[token] = {
+            "email": clean_email,
+            "user_id": str(user.id),
+            "auth_id": str(user.auth_id) if getattr(user, "auth_id", None) else None,
+            "expires_at": expires_at,
+            "reason": payload.reason or "Web Statutory Deletion Portal"
+        }
+
+        base_url = getattr(settings, "BASE_WEB_URL", "https://urheart.asiverticals.me")
+        confirm_url = f"{base_url}/confirm-web-deletion?token={token}"
+        await EmailService.dispatch_account_deletion_confirmation(clean_email, confirm_url)
+        print(f"[DATA INCINERATOR] Dispatched 2-step confirmation email to {clean_email}", flush=True)
 
     return {
-        "status": "success",
-        "message": f"Account deletion request for {clean_email} accepted. All associated records purged.",
-        "audit": audit
+        "status": "pending_verification",
+        "message": "If an account exists for this email address, a verification link has been dispatched to confirm permanent incineration."
     }
+
+
+@router.get("/confirm-web-deletion", response_class=HTMLResponse)
+async def confirm_web_deletion(token: str, db: AsyncSession = Depends(get_db)):
+    """
+    SEC-CRIT-01 Confirm: Validates single-use cryptographic deletion token and irrevocably incinerates account.
+    """
+    record = WEB_DELETION_TOKENS.pop(token, None)
+    if not record:
+        html = f"""<!DOCTYPE html>
+<html>
+<head><title>Invalid Link — UR-Heart</title><style>{COMMON_CSS}</style></head>
+<body>
+  <div class="container" style="max-width: 600px; text-align: center; padding-top: 60px;">
+    <div class="card">
+      <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+      <h1>Invalid or Expired Link</h1>
+      <p style="color: var(--coral);">This account deletion link is invalid or has already been used.</p>
+      <p>If you still wish to incinerate your account, please submit a new request at <a href="/delete-account" style="color: var(--gold);">Account Deletion</a>.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+        return HTMLResponse(content=html, status_code=400)
+
+    if datetime.now(timezone.utc) > record["expires_at"]:
+        html = f"""<!DOCTYPE html>
+<html>
+<head><title>Expired Link — UR-Heart</title><style>{COMMON_CSS}</style></head>
+<body>
+  <div class="container" style="max-width: 600px; text-align: center; padding-top: 60px;">
+    <div class="card">
+      <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+      <h1>Link Expired</h1>
+      <p style="color: var(--coral);">This deletion confirmation link expired after 24 hours.</p>
+      <p>Please submit a new request at <a href="/delete-account" style="color: var(--gold);">Account Deletion</a>.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+        return HTMLResponse(content=html, status_code=410)
+
+    clean_email = record["email"]
+    audit = await DataIncineratorService.incinerate_user(
+        email=clean_email,
+        user_id=record.get("user_id"),
+        auth_id=record.get("auth_id"),
+        db=db
+    )
+    print(f"[DATA INCINERATOR] Verified 2-step web erasure executed for: {clean_email} | Audit: {audit}", flush=True)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><title>Account Incinerated — UR-Heart</title><style>{COMMON_CSS}</style></head>
+<body>
+  <div class="container" style="max-width: 600px; text-align: center; padding-top: 60px;">
+    <div class="card">
+      <div style="font-size: 48px; margin-bottom: 16px;">🕊️</div>
+      <h1>Account Permanently Incinerated</h1>
+      <p style="color: var(--success); font-weight: 600;">DPDP Act 2023 Section 12 & Google Play Policy Compliance</p>
+      <p>All data, moment photographs, 1:1 chat messages, mutual matches, and identity credentials associated with <strong>{clean_email}</strong> have been permanently and irrevocably erased from UR-Heart systems.</p>
+      <p style="color: var(--text-muted); font-size: 13px; margin-top: 24px;">Thank you for walking an intentional path with us. You may close this window.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html, status_code=200)

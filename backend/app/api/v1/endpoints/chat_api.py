@@ -345,25 +345,40 @@ async def get_dialogue_messages(
     db: AsyncSession = Depends(get_db)
 ):
     """Returns chronologically ordered messages for match dialogue."""
-    messages = []
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+
     try:
         match_uuid = _clean_match_uuid(match_id)
-    except ValueError:
-        match_uuid = None
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid match_id UUID format.")
 
-    if match_uuid:
-        stmt = (
-            select(Message)
-            .where(Message.match_id == match_uuid)
-            .order_by(Message.created_at.asc())
+    # SEC-CRIT-02: Strictly verify current_user is an authentic participant in this match
+    match_stmt = select(Match).where(Match.id == match_uuid)
+    match_res = await db.execute(match_stmt)
+    match_obj = match_res.scalar_one_or_none()
+    if not match_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dialogue match not found.")
+
+    if current_user.id not in (match_obj.user1_id, match_obj.user2_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: You are not an authorized participant in this sacred dialogue."
         )
-        res = await db.execute(stmt)
-        rows = res.scalars().all()
 
-        for msg in rows:
-            is_me = (current_user and msg.sender_id == current_user.id)
-            decrypted = decrypt_message_storage(msg.encrypted_text, match_id)
-            messages.append({
+    messages = []
+    stmt = (
+        select(Message)
+        .where(Message.match_id == match_uuid)
+        .order_by(Message.created_at.asc())
+    )
+    res = await db.execute(stmt)
+    rows = res.scalars().all()
+
+    for msg in rows:
+        is_me = (current_user and msg.sender_id == current_user.id)
+        decrypted = decrypt_message_storage(msg.encrypted_text, match_id)
+        messages.append({
                 "id": str(msg.id),
                 "client_id": str(getattr(msg, "client_id", None) or msg.id),
                 "match_id": match_id,
