@@ -105,8 +105,8 @@ class _PushNotificationHealthCardState extends State<PushNotificationHealthCard>
     final mutedColor = widget.isDark
         ? DarkSanctuaryTokens.textMuted
         : LightSanctuaryTokens.textMuted;
-    final goldAccent = const Color(0xFFD4AF37);
-    final pineAccent = const Color(0xFF1B4332);
+    const goldAccent = Color(0xFFD4AF37);
+    const pineAccent = Color(0xFF1B4332);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -127,7 +127,7 @@ class _PushNotificationHealthCardState extends State<PushNotificationHealthCard>
                   color: goldAccent.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.notifications_active_outlined,
                   size: 20,
                   color: goldAccent,
