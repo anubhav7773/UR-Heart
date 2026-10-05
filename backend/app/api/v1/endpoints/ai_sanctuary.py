@@ -1,13 +1,17 @@
+import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import get_db
 from app.core.limiter import limiter
 from app.core.security import get_current_user, get_current_user_optional
 from app.models.domain.user import User
 from app.services.ai_orchestrator import AiOrchestrator
 
+logger = logging.getLogger("urheart.ai_sanctuary")
 router = APIRouter(prefix="/ai/eva", tags=["Eva AI Sanctuary"])
 
 
@@ -22,6 +26,9 @@ class EvaChatResponse(BaseModel):
     is_guarded: bool
     status: str = "success"
     model: Optional[str] = None
+    escalated: bool = False
+    ticket_id: Optional[str] = None
+    ticket_category: Optional[str] = None
 
 
 class WingmanSuggestion(BaseModel):
@@ -70,14 +77,19 @@ class GrievanceAssistRequest(BaseModel):
 async def chat_with_eva(
     request: Request,
     payload: EvaChatRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Conversational endpoint with Eva AI Sanctuary (Section 2 - OpenRouter Engine).
+    Conversational endpoint with Eva AI Sanctuary (Section 2 - 24/7 Sovereign Support Concierge).
     SEC-HIGH-03: Strictly bound to authenticated User session with 30 msgs/hour rate limit.
-    Enforces 100% domain boundary, Asiverticals attribution, and zero API platform leakage.
+    Enforces 90% autonomous resolution + 10% critical founder escalation under IT Rules 2021.
     """
+    from datetime import timedelta
     from app.services.eva_companion_engine import EvaCompanionEngine
+    from app.models.domain.legal import GrievanceDossier, generate_grievance_ref
+    from app.api.v1.endpoints.notifications import push_notification
+
     user_name = getattr(current_user, "full_name", "Seeker") or "Seeker"
     result = await EvaCompanionEngine.chat_companion(
         user_message=payload.message,
@@ -86,11 +98,57 @@ async def chat_with_eva(
         context=payload.context
     )
 
+    escalated = result.get("escalated", False)
+    ticket_ref = None
+    ticket_cat = None
+
+    if escalated:
+        esc_data = result.get("escalation_data", {})
+        ticket_cat = esc_data.get("category", "GENERAL_SUPPORT")
+        ticket_ref = generate_grievance_ref()
+
+        try:
+            dossier = GrievanceDossier(
+                dossier_reference_id=ticket_ref,
+                reporter_id=current_user.id,
+                reported_user_id=current_user.id,
+                violation_category=ticket_cat,
+                evidence_text=f"AI Support Escalation: {payload.message[:300]}",
+                status="under_review",
+                acknowledgment_sent_at=datetime.utcnow(),
+                statutory_resolution_due_at=datetime.utcnow() + timedelta(days=15)
+            )
+            db.add(dossier)
+            await db.commit()
+            await db.refresh(dossier)
+        except Exception as e:
+            logger.error("Failed to persist grievance dossier on escalation: %s", e)
+            await db.rollback()
+
+        # Instant high-priority push notification to Founder Anubhav Singh (asiverticals@gmail.com)
+        try:
+            push_notification(
+                user_id="asiverticals@gmail.com",
+                notif_type="system_test",
+                title=f"🚨 [UR-Heart Support Escalation] #{ticket_ref}",
+                body=f"User {user_name} ({ticket_cat}): {payload.message[:120]}",
+                data={"ticket_id": ticket_ref, "category": ticket_cat, "route": "/settings"}
+            )
+        except Exception as e:
+            logger.warning("Failed to dispatch founder escalation push: %s", e)
+
+        final_reply = f"{result['reply']}\n\n[Statutory Grievance Ticket #{ticket_ref} Registered · 24-48h Review Desk]"
+    else:
+        final_reply = result["reply"]
+
     return EvaChatResponse(
-        reply=result["reply"],
+        reply=final_reply,
         is_guarded=result.get("denied", False),
         status="success",
-        model=result.get("model")
+        model=result.get("model"),
+        escalated=escalated,
+        ticket_id=ticket_ref,
+        ticket_category=ticket_cat
     )
 
 

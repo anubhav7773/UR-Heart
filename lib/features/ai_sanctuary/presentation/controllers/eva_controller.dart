@@ -118,11 +118,17 @@ class EvaController extends StateNotifier<EvaState> {
     final replyText = result['reply']?.toString() ??
         'Main aapke connection ko samajh rahi hoon. Kripya thoda aur vistaar se batayein.';
     final isGuarded = result['is_guarded'] == true;
+    final isEscalated = result['escalated'] == true;
+    final ticketId = result['ticket_id']?.toString();
+    final ticketCategory = result['ticket_category']?.toString();
 
     final assistantMsg = EvaMessage(
       role: 'assistant',
       content: replyText,
       isGuarded: isGuarded,
+      isEscalated: isEscalated,
+      ticketId: ticketId,
+      ticketCategory: ticketCategory,
       timestamp: DateTime.now(),
     );
 

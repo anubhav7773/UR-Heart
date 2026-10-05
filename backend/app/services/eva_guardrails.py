@@ -203,3 +203,116 @@ class EvaGuardrails:
             cleaned = "".join(transliterated)
 
         return cleaned.strip()
+
+    # =========================================================================
+    # 5. SOVEREIGN 10% CRITICAL ESCALATION CLASSIFIER & LIABILITY SHIELD
+    # =========================================================================
+
+    _ESCALATION_KEYWORDS = {
+        "SAFETY_HARASSMENT": [
+            r"\b(harass|harassment|stalk|stalking|blackmail|threat|threaten|extort|extortion)\b",
+            r"\b(abuse|abusive|vulgar|obscene|forced|rape|violence|weapon)\b",
+            r"\b(suicide|kill\s+myself|end\s+my\s+life|self\s*harm|atmahatya|mar\s+jaunga|mar\s+jaungi)\b",
+            r"\b(underage|minor|child|pedo|posh)\b",
+            r"\b(preshan\s+kar\s+raha|gali\s+de\s+raha|dhamki\s+de\s+raha)\b",
+        ],
+        "LEGAL_STATUTORY": [
+            r"\b(police|fir|lawyer|advocate|court|legal\s+notice|cyber\s+cell|it\s+act|dpdp\s+violation)\b",
+            r"\b(lawsuit|sue\s+you|consumer\s+court|vakil|kanoon|kanooni\s+karwayi)\b",
+            r"\b(statutory\s+grievance|rule\s*3\(?2\)?|it\s*rules\s*2021)\b",
+        ],
+        "PAYMENT_DISPUTE": [
+            r"\b(refund|money\s+deducted|charged\s+twice|double\s+charge|charged\s+wrongly)\b",
+            r"\b(payment\s+failed|paise\s+kat\s+gaye|paise\s+cut\s+gaye|paise\s+wapas|rupaye\s+kat\s+gaye)\b",
+            r"\b(bank\s+debited|fraud\s+transaction|subscription\s+not\s+activated|pass\s+nahi\s+mila)\b",
+            r"\b(paisa\s+wapas\s+chahiye|refund\s+do|mera\s+paisa\s+kaha\s+hai)\b",
+        ],
+        "IDENTITY_DISPUTE": [
+            r"\b(account\s+banned|wrongly\s+banned|wrongly\s+suspended|unban\s+my\s+account)\b",
+            r"\b(fake\s+profile|impersonation|impersonating|someone\s+using\s+my\s+photo)\b",
+            r"\b(meri\s+photo\s+chura\s+li|fake\s+id\s+bana\s+li|stolen\s+identity)\b",
+        ],
+        "HUMAN_REQUEST": [
+            r"\b(talk\s+to\s+(a\s+)?human|real\s+person|human\s+support|agent\s+se\s+baat)\b",
+            r"\b(customer\s+care|customer\s+support\s+number|founder\s+se\s+baat|admin\s+se\s+baat)\b",
+            r"\b(call\s+me|speak\s+to\s+representative|insan\s+se\s+baat)\b",
+        ],
+    }
+
+    @classmethod
+    def detect_escalation_intent(cls, raw_user_text: str) -> Optional[dict]:
+        """
+        Classifies incoming user message against the 10% critical escalation matrix.
+        Returns a structured escalation descriptor if triggered, or None if it belongs
+        to the 90% autonomous resolution zone.
+        """
+        text = raw_user_text.strip().lower()
+
+        for category, patterns in cls._ESCALATION_KEYWORDS.items():
+            for pat in patterns:
+                if re.search(pat, text, re.IGNORECASE):
+                    # Check severity
+                    severity = "CRITICAL" if category in ("SAFETY_HARASSMENT", "LEGAL_STATUTORY") else "HIGH"
+                    
+                    # Canned calm statutory acknowledgment compliant with Safe Harbor (IT Act Sec 79)
+                    if category == "SAFETY_HARASSMENT":
+                        canned = (
+                            "Aapki suraksha hamari sarvochha prathmikta hai. "
+                            "Maine aapki complaint ko hamare Statutory Grievance Officer (Anubhav Singh) "
+                            "ke desk par Priority Escalation ke sath register kar diya hai. "
+                            "Accused profile ko turant audit isolation me daal diya gaya hai."
+                        )
+                    elif category == "LEGAL_STATUTORY":
+                        canned = (
+                            "Aapka legal communication record ho gaya hai. "
+                            "India ke IT Rules 2021 (Rule 3(2)) ke tahat hamare Statutory Grievance Officer "
+                            "(ANUBHAV SINGH, asiverticals@gmail.com) is statutory dossier ki direct samiksha kar rahe hain. "
+                            "Aapko formal statutory timeline ke tehat update provide kiya jayega."
+                        )
+                    elif category == "PAYMENT_DISPUTE":
+                        canned = (
+                            "Main samajh sakti hoon aapke transaction ko lekar pareshani hai. "
+                            "Maine transaction audit request hamare finance reconciliation desk ko bhej di hai. "
+                            "Payment gateway audit logs 24 hours ke andar verify karke aapka pass activate ya resolve kar diya jayega."
+                        )
+                    elif category == "IDENTITY_DISPUTE":
+                        canned = (
+                            "Identity verification aur profile safety ke liye hum zero tolerance maintain karte hain. "
+                            "Aapka dispute Sentinel verification team ko escalate kar diya gaya hai. "
+                            "Hamare reviewers 24-48 hours ke andar profile biometric hash audit karenge."
+                        )
+                    else:
+                        canned = (
+                            "Maine aapki request hamari core support & grievance team ko forward kar di hai. "
+                            "Hamare executive aapse directly connect karenge."
+                        )
+
+                    return {
+                        "should_escalate": True,
+                        "category": category,
+                        "severity": severity,
+                        "statutory_law": "Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021",
+                        "summary": text[:150],
+                        "canned_response": canned
+                    }
+
+        return None
+
+    @classmethod
+    def sanitize_liability(cls, text: str) -> str:
+        """
+        Removes any phrases where the AI admits legal wrongdoing or promises unauthorized refunds,
+        preserving the platform's Section 79 Safe Harbor defense.
+        """
+        # Block admission of corporate fault
+        fault_phrases = [
+            (r"\b(it\s+is\s+our\s+fault|our\s+mistake|we\s+are\s+at\s+fault)\b", "yeh review me hai"),
+            (r"\b(hamari\s+galti\s+hai|meri\s+galti\s+hai)\b", "hum iski jaanch kar rahe hain"),
+            (r"\b(we\s+are\s+legally\s+liable|company\s+is\s+responsible)\b", "UR-Heart ek intermediary platform hai"),
+            (r"\b(i\s+will\s+refund\s+your\s+money|hum\s+paise\s+wapas\s+kar\s+denge)\b", "hamari team payment verification complete karegi"),
+        ]
+        sanitized = text
+        for pat, replacement in fault_phrases:
+            sanitized = re.sub(pat, replacement, sanitized, flags=re.IGNORECASE)
+        return sanitized
+

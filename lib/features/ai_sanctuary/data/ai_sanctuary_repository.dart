@@ -10,12 +10,18 @@ class EvaMessage {
   final String role; // 'user' or 'assistant'
   final String content;
   final bool isGuarded;
+  final bool isEscalated;
+  final String? ticketId;
+  final String? ticketCategory;
   final DateTime timestamp;
 
   const EvaMessage({
     required this.role,
     required this.content,
     this.isGuarded = false,
+    this.isEscalated = false,
+    this.ticketId,
+    this.ticketCategory,
     required this.timestamp,
   });
 }

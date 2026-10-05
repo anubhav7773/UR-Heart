@@ -24,12 +24,13 @@ class _EvaSanctuaryScreenState extends ConsumerState<EvaSanctuaryScreen>
   late final AnimationController _orbAnimController;
 
   final List<String> _quickPrompts = [
+    'Daily swipes kaise replenish karein?',
+    'Slumber Mode kyu active hai?',
+    'KYC liveness verification kaise pass karein?',
+    'Mera ticket status track karo',
+    'Founder / Human Officer se connect karo',
+    'DPDP Data Dossier certificate kaise download karein?',
     'How should I reply to my match without sounding eager?',
-    'Maine jo report file kiya tha, uska status kya hai?',
-    'Main jisse baat kar raha hoon, unhe kya reply karoon?',
-    'Mujhe is app me ek kami lag rahi hai (Feedback)',
-    'UR-Heart ke unique features kya hain?',
-    'Tumhe kisne banaya hai?',
   ];
 
   @override
@@ -476,6 +477,37 @@ class _EvaSanctuaryScreenState extends ConsumerState<EvaSanctuaryScreen>
                           style: TextStyle(fontSize: 10, color: accentCoral),
                         ),
                       ],
+                    ),
+                  ],
+                  if (msg.isEscalated == true || msg.ticketId != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E281F) : const Color(0xFFF1F8F4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFFC5A059),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.verified_user_rounded, size: 14, color: Color(0xFFC5A059)),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Statutory Ticket ${msg.ticketId ?? "#GRV-REGISTERED"} · 24-48h Desk',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFC5A059),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
