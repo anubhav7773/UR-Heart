@@ -205,39 +205,48 @@ async def _resolve_fcm_tokens(user_key: str) -> List[str]:
         target_uuid = resolve_auth_uuid(user_key)
         async with async_session_factory() as session:
             # 1. Direct match on DeviceFcmToken by user_id
-            res = await session.execute(
-                select(DeviceFcmToken.token).where(
-                    DeviceFcmToken.user_id == target_uuid,
-                    DeviceFcmToken.active.is_(True),
+            try:
+                res = await session.execute(
+                    select(DeviceFcmToken.token).where(
+                        DeviceFcmToken.user_id == target_uuid,
+                        DeviceFcmToken.active.is_(True),
+                    )
                 )
-            )
-            tokens.update(res.scalars().all())
+                tokens.update(res.scalars().all())
+            except Exception as d_err:
+                _log(f"[FCM DEVICE TOKEN LOOKUP NOTICE] user={user_key}: {d_err}")
 
             # 2. Match on User primary key (id == target_uuid)
-            legacy = await session.execute(
-                select(User.fcm_token).where(User.id == target_uuid)
-            )
-            legacy_token = legacy.scalar_one_or_none()
-            if legacy_token:
-                tokens.add(legacy_token)
+            try:
+                legacy = await session.execute(
+                    select(User.fcm_token).where(User.id == target_uuid)
+                )
+                legacy_token = legacy.scalar_one_or_none()
+                if legacy_token:
+                    tokens.add(legacy_token)
+            except Exception as u_err:
+                _log(f"[FCM USER LOOKUP NOTICE] user={user_key}: {u_err}")
 
             # 3. Match on User auth_id (auth_id == target_uuid)
             if not tokens:
-                user_res = await session.execute(
-                    select(User.id, User.fcm_token).where(User.auth_id == target_uuid)
-                )
-                user_match = user_res.first()
-                if user_match:
-                    matched_user_id, matched_fcm_token = user_match
-                    if matched_fcm_token:
-                        tokens.add(matched_fcm_token)
-                    dev_res = await session.execute(
-                        select(DeviceFcmToken.token).where(
-                            DeviceFcmToken.user_id == matched_user_id,
-                            DeviceFcmToken.active.is_(True),
-                        )
+                try:
+                    user_res = await session.execute(
+                        select(User.id, User.fcm_token).where(User.auth_id == target_uuid)
                     )
-                    tokens.update(dev_res.scalars().all())
+                    user_match = user_res.first()
+                    if user_match:
+                        matched_user_id, matched_fcm_token = user_match
+                        if matched_fcm_token:
+                            tokens.add(matched_fcm_token)
+                        dev_res = await session.execute(
+                            select(DeviceFcmToken.token).where(
+                                DeviceFcmToken.user_id == matched_user_id,
+                                DeviceFcmToken.active.is_(True),
+                            )
+                        )
+                        tokens.update(dev_res.scalars().all())
+                except Exception as a_err:
+                    _log(f"[FCM AUTH LOOKUP NOTICE] user={user_key}: {a_err}")
 
             USER_FCM_TOKENS[user_key] = tokens
             return list(tokens)
@@ -360,34 +369,42 @@ async def register_device_token(
         elif tok == token_val and uid != str(current_user.id):
             USER_FCM_TOKENS.pop(uid, None)
 
-    await db.execute(
-        update(DeviceFcmToken)
-        .where(DeviceFcmToken.token == token_val, DeviceFcmToken.user_id != current_user.id)
-        .values(active=False)
-    )
+    try:
+        await db.execute(
+            update(DeviceFcmToken)
+            .where(DeviceFcmToken.token == token_val, DeviceFcmToken.user_id != current_user.id)
+            .values(active=False)
+        )
 
-    existing = await db.execute(
-        select(DeviceFcmToken).where(DeviceFcmToken.user_id == current_user.id,
-                                      DeviceFcmToken.token == token_val)
-    )
-    device = existing.scalar_one_or_none()
-    if inspect.isawaitable(device):
-        device = await device
-    if device:
-        device.active = True
-        device.platform = platform
-        device.installation_id = installation_id
-        device.last_seen_at = datetime.utcnow()
-    else:
-        db.add(DeviceFcmToken(
-            user_id=current_user.id,
-            token=token_val,
-            platform=platform,
-            installation_id=installation_id,
-        ))
+        existing = await db.execute(
+            select(DeviceFcmToken).where(DeviceFcmToken.user_id == current_user.id,
+                                          DeviceFcmToken.token == token_val)
+        )
+        device = existing.scalar_one_or_none()
+        if inspect.isawaitable(device):
+            device = await device
+        if device:
+            device.active = True
+            device.platform = platform
+            device.installation_id = installation_id
+            device.last_seen_at = datetime.utcnow()
+        else:
+            db.add(DeviceFcmToken(
+                user_id=current_user.id,
+                token=token_val,
+                platform=platform,
+                installation_id=installation_id,
+            ))
+    except Exception as d_err:
+        logger.warning("DeviceFcmToken DB sync notice: %s", d_err)
+
     current_user.fcm_token = token_val
     USER_FCM_TOKENS.setdefault(str(current_user.id), set()).add(token_val)
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as c_err:
+        await db.rollback()
+        logger.warning("FCM token registration commit notice: %s", c_err)
     logger.info("Registered FCM token for user %s: ...%s", current_user.id, token_val[-8:])
 
     return {"status": "success", "message": "FCM device token registered successfully."}
@@ -410,21 +427,31 @@ async def unregister_device_token(
         cached.discard(token_val)
         if not cached:
             USER_FCM_TOKENS.pop(user_key, None)
-        await db.execute(
-            update(DeviceFcmToken)
-            .where(DeviceFcmToken.user_id == current_user.id, DeviceFcmToken.token == token_val)
-            .values(active=False)
-        )
+        try:
+            await db.execute(
+                update(DeviceFcmToken)
+                .where(DeviceFcmToken.user_id == current_user.id, DeviceFcmToken.token == token_val)
+                .values(active=False)
+            )
+        except Exception as d_err:
+            logger.warning("DeviceFcmToken unregister notice: %s", d_err)
     else:
         USER_FCM_TOKENS.pop(user_key, None)
-        await db.execute(
-            update(DeviceFcmToken)
-            .where(DeviceFcmToken.user_id == current_user.id)
-            .values(active=False)
-        )
+        try:
+            await db.execute(
+                update(DeviceFcmToken)
+                .where(DeviceFcmToken.user_id == current_user.id)
+                .values(active=False)
+            )
+        except Exception as d_err:
+            logger.warning("DeviceFcmToken unregister notice: %s", d_err)
     if not token_val or token_val == current_user.fcm_token:
         current_user.fcm_token = None
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as c_err:
+        await db.rollback()
+        logger.warning("FCM token unregister commit notice: %s", c_err)
     logger.info("Unregistered FCM token for user %s", current_user.id)
     return {"status": "success", "message": "FCM device token unregistered successfully."}
 

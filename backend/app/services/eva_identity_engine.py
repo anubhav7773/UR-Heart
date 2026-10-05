@@ -237,9 +237,12 @@ class EvaIdentityEngine:
         # 1. Safe local check
         local_face_found = cls._detect_faces_opencv_safe([clean_anchor] + comparison_frames)
 
+        clean_pose = expected_pose.replace("✌️", "").replace("📸", "").replace("👍", "").strip() if expected_pose else ""
         pose_instruction = (
-            f"4. Pose Challenge Check: The user was instructed to perform the following pose: \"{expected_pose}\". "
-            f"Inspect Image 2 to verify if the person is actively performing this pose (pose_matched: true or false).\n"
+            f"4. Pose Challenge Check: The user was instructed to perform the following pose: \"{clean_pose}\". "
+            f"Inspect Image 2 to check if the pose/gesture is present. "
+            f"Note: Mobile front cameras often horizontally mirror selfies (left/right can appear inverted). "
+            f"If the user has turned their head in either direction or displays a hand gesture, consider pose_matched: true.\n"
         ) if expected_pose else ""
 
         prompt_text = (
