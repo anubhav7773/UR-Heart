@@ -460,7 +460,11 @@ def probe_fcm_authorization() -> Dict[str, Any]:
         messaging.send(probe, dry_run=True, app=app)
         return {"firebase_credentials": True, "fcm_authorized": True, "error": None}
     except Exception as e:
-        return {"firebase_credentials": True, "fcm_authorized": False, "error": f"{type(e).__name__}: {e}"}
+        return {
+            "firebase_credentials": FirebaseAuthService._has_credentials,
+            "fcm_authorized": False,
+            "error": f"{type(e).__name__}: {e}",
+        }
 
 
 @router.get("/push-health", status_code=status.HTTP_200_OK, summary="Background Push Delivery Health")

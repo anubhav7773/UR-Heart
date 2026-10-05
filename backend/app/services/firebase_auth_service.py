@@ -181,6 +181,34 @@ def _get_fallback_service_account() -> Optional[Dict[str, Any]]:
         return None
 
 
+def _decode_service_account_b64(raw_b64: str) -> Dict[str, Any]:
+    """Decode and validate the Render Firebase service-account secret."""
+    cleaned_b64 = re.sub(r"\s+", "", _clean_raw_text(raw_b64))
+    if not cleaned_b64:
+        raise ValueError("FIREBASE_SERVICE_ACCOUNT_B64 is empty")
+
+    try:
+        decoded = base64.b64decode(cleaned_b64, validate=True).decode("utf-8")
+        credential_data = json.loads(_clean_raw_text(decoded))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "FIREBASE_SERVICE_ACCOUNT_B64 must be strict base64 containing UTF-8 JSON"
+        ) from exc
+
+    if not isinstance(credential_data, dict):
+        raise ValueError("Firebase service-account JSON must be an object")
+    if credential_data.get("type") != "service_account":
+        raise ValueError("Firebase credential JSON type must be service_account")
+    if not credential_data.get("project_id"):
+        raise ValueError("Firebase credential JSON is missing project_id")
+    if not credential_data.get("client_email"):
+        raise ValueError("Firebase credential JSON is missing client_email")
+    if not credential_data.get("private_key"):
+        raise ValueError("Firebase credential JSON is missing private_key")
+
+    return _sanitize_credential_dict(credential_data)
+
+
 class FirebaseAuthService:
     """
     100% Production-Grade Firebase Authentication Service.
@@ -190,6 +218,7 @@ class FirebaseAuthService:
     """
 
     _has_credentials: bool = False
+    _credential_error: Optional[str] = None
 
     @classmethod
     def has_credentials(cls) -> bool:
@@ -248,15 +277,7 @@ class FirebaseAuthService:
             raw_b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64")
             if raw_b64 and raw_b64.strip():
                 try:
-                    cleaned_b64 = _clean_raw_text(raw_b64)
-                    missing_padding = len(cleaned_b64) % 4
-                    if missing_padding:
-                        cleaned_b64 += "=" * (4 - missing_padding)
-                    decoded = base64.b64decode(cleaned_b64).decode("utf-8")
-                    cleaned_json = _clean_raw_text(decoded)
-                    cred_dict = json.loads(cleaned_json)
-                    sanitized_dict = _sanitize_credential_dict(cred_dict)
-                    cred = credentials.Certificate(sanitized_dict)
+                    cred = credentials.Certificate(_decode_service_account_b64(raw_b64))
                     app = firebase_admin.initialize_app(cred, {
                         "projectId": project_id,
                         "storageBucket": storage_bucket
@@ -264,9 +285,15 @@ class FirebaseAuthService:
                     cls._has_credentials = True
                     return app
                 except Exception as e:
+                    cls._credential_error = (
+                        "FIREBASE_SERVICE_ACCOUNT_B64 is invalid; replace it with "
+                        "base64-encoded Firebase service-account JSON"
+                    )
                     logger.warning("FIREBASE_SERVICE_ACCOUNT_B64 parse error: %s", e)
+                    if (getattr(settings, "ENVIRONMENT", "") or "").lower() == "production":
+                        raise RuntimeError(cls._credential_error) from e
 
-            # 4. Self-healing fallback: Initialize with authentic verified project credentials
+            # 4. Optional local development fallback.
             # A) Try local file if available on disk
             try:
                 backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -285,22 +312,14 @@ class FirebaseAuthService:
             except Exception as e:
                 logger.warning("Local service account file init notice: %s", e)
 
-            # B) Authentic Embedded Credentials (Permanent Cloud Fail-Safe)
-            try:
-                fallback_dict = _get_fallback_service_account()
-                if fallback_dict:
-                    cred = credentials.Certificate(fallback_dict)
-                    app = firebase_admin.initialize_app(cred, {
-                        "projectId": project_id,
-                        "storageBucket": storage_bucket
-                    })
-                    cls._has_credentials = True
-                    logger.info("Firebase Admin successfully initialized via authentic embedded sanctuary credentials.")
-                    return app
-            except Exception as e:
-                logger.error("Embedded service account init error: %s", e)
+            # 5. Last-resort project-only initialization is allowed only outside production.
+            if (getattr(settings, "ENVIRONMENT", "") or "").lower() == "production":
+                cls._credential_error = (
+                    "Firebase Admin credentials are missing; configure "
+                    "FIREBASE_SERVICE_ACCOUNT_B64 or FIREBASE_SERVICE_ACCOUNT_JSON"
+                )
+                raise RuntimeError(cls._credential_error)
 
-            # 5. Last-resort fallback: Initialize with explicit Project ID options
             try:
                 cls._has_credentials = False
                 return firebase_admin.initialize_app(options={

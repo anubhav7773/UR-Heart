@@ -103,10 +103,20 @@ async def lifespan(app: FastAPI):
                 f"authorized={probe.get('fcm_authorized')} error={probe.get('error')}",
                 flush=True,
             )
+            if (
+                (getattr(settings, "ENVIRONMENT", "") or "").lower() == "production"
+                and not probe.get("fcm_authorized")
+            ):
+                raise RuntimeError(
+                    "Firebase Cloud Messaging is not authorized. "
+                    "Configure a valid Firebase service-account secret before starting production."
+                )
         except Exception as e:
             print(f"[FCM STARTUP] probe error: {e}", flush=True)
+            if (getattr(settings, "ENVIRONMENT", "") or "").lower() == "production":
+                raise
 
-    fcm_probe_task = asyncio.create_task(_fcm_startup_probe())
+    await _fcm_startup_probe()
 
     streak_worker_stop = asyncio.Event()
 
