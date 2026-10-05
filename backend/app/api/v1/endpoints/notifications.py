@@ -201,20 +201,44 @@ async def _resolve_fcm_tokens(user_key: str) -> List[str]:
     if tokens:
         return list(tokens)
     try:
+        from app.core.security import resolve_auth_uuid
+        target_uuid = resolve_auth_uuid(user_key)
         async with async_session_factory() as session:
+            # 1. Direct match on DeviceFcmToken by user_id
             res = await session.execute(
                 select(DeviceFcmToken.token).where(
-                    DeviceFcmToken.user_id == UUID(user_key),
+                    DeviceFcmToken.user_id == target_uuid,
                     DeviceFcmToken.active.is_(True),
                 )
             )
             tokens.update(res.scalars().all())
+
+            # 2. Match on User primary key (id == target_uuid)
             legacy = await session.execute(
-                select(User.fcm_token).where(User.id == UUID(user_key))
+                select(User.fcm_token).where(User.id == target_uuid)
             )
             legacy_token = legacy.scalar_one_or_none()
             if legacy_token:
                 tokens.add(legacy_token)
+
+            # 3. Match on User auth_id (auth_id == target_uuid)
+            if not tokens:
+                user_res = await session.execute(
+                    select(User.id, User.fcm_token).where(User.auth_id == target_uuid)
+                )
+                user_match = user_res.first()
+                if user_match:
+                    matched_user_id, matched_fcm_token = user_match
+                    if matched_fcm_token:
+                        tokens.add(matched_fcm_token)
+                    dev_res = await session.execute(
+                        select(DeviceFcmToken.token).where(
+                            DeviceFcmToken.user_id == matched_user_id,
+                            DeviceFcmToken.active.is_(True),
+                        )
+                    )
+                    tokens.update(dev_res.scalars().all())
+
             USER_FCM_TOKENS[user_key] = tokens
             return list(tokens)
     except Exception as e:

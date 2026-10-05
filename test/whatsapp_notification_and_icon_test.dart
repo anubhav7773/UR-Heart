@@ -138,5 +138,24 @@ void main() {
       expect(File('assets/icon/app_icon.png').existsSync(), isTrue);
       expect(File('assets/icon/app_icon_foreground.png').existsSync(), isTrue);
     });
+
+    test('keep.xml protects notification drawables and colors from R8 shrinking', () {
+      final keepFile = File('android/app/src/main/res/raw/keep.xml');
+      expect(keepFile.existsSync(), isTrue);
+      final content = keepFile.readAsStringSync();
+      expect(content.contains('@drawable/ic_stat_urheart'), isTrue);
+      expect(content.contains('@color/sacred_pine'), isTrue);
+    });
+
+    test('MainActivity.kt registers native notification channels with Android OS', () {
+      final mainActivity = File('android/app/src/main/kotlin/com/urheart/app/MainActivity.kt');
+      expect(mainActivity.existsSync(), isTrue);
+      final content = mainActivity.readAsStringSync();
+      expect(content.contains('createNotificationChannels()'), isTrue);
+      expect(content.contains('ur_heart_sacred_dialogue'), isTrue);
+      expect(content.contains('ur_heart_presence_channel'), isTrue);
+      expect(content.contains('NotificationManager.IMPORTANCE_HIGH'), isTrue);
+    });
   });
 }
+

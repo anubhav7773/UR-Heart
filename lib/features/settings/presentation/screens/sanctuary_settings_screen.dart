@@ -6,6 +6,7 @@ import '../../../../core/theme/theme_controller.dart';
 import '../controllers/settings_controller.dart';
 import '../widgets/atmosphere_theme_card.dart';
 import '../widgets/discovery_privacy_card.dart';
+import '../widgets/push_notification_health_card.dart';
 import '../widgets/irrevocable_erasure_modal.dart';
 import '../widgets/official_web_sanctuary_card.dart';
 import '../widgets/superadmin_sentinel_tile.dart';
@@ -105,6 +106,9 @@ class SanctuarySettingsScreen extends ConsumerWidget {
                 isRotatingKey: state.isRotatingKey,
                 onIncognitoChanged: notifier.toggleIncognito,
                 onRotateKey: notifier.rotateKey,
+              ),
+              PushNotificationHealthCard(
+                isDark: isDark,
               ),
               OfficialWebSanctuaryCard(
                 isDark: isDark,

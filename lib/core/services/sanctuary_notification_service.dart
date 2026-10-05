@@ -91,6 +91,9 @@ class SanctuaryNotificationService {
 
         await androidPlatform.createNotificationChannel(dialogueChannel);
         await androidPlatform.createNotificationChannel(presenceChannel);
+
+        // Explicitly request Android 13+ (API 33+) POST_NOTIFICATIONS runtime permission
+        await androidPlatform.requestNotificationsPermission();
       }
     } catch (e) {
       debugPrint('[NOTIFICATIONS] Local notifications plugin notice: $e');
@@ -690,4 +693,91 @@ class SanctuaryNotificationService {
       debugPrint('[NOTIFICATIONS] unregisterFcmToken notice: $e');
     }
   }
+
+  /// Checks server-side push authorization status and token registration status
+  Future<Map<String, dynamic>> checkPushHealth() async {
+    String? authToken;
+    try {
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null) {
+        authToken = await fbUser.getIdToken();
+      }
+    } catch (_) {}
+    if (authToken == null || authToken.isEmpty) {
+      authToken = await SecureSessionStorage.instance.getAuthToken();
+    }
+    if (authToken == null || authToken.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+    }
+    if (authToken == null || authToken.isEmpty) {
+      return {'status': 'unauthenticated', 'message': 'Please sign in first.'};
+    }
+
+    final candidateUrls = [
+      ApiEndpoints.defaultBaseUrl,
+      'https://urheart.asiverticals.me',
+      'https://ur-heart.onrender.com',
+    ];
+    for (final base in candidateUrls) {
+      try {
+        final dio = Dio(BaseOptions(
+          baseUrl: base,
+          connectTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 6),
+          headers: {'Authorization': 'Bearer $authToken'},
+        ));
+        final resp = await dio.get<dynamic>('/api/v1/notifications/push-health');
+        if (resp.statusCode == 200 && resp.data is Map) {
+          return Map<String, dynamic>.from(resp.data as Map);
+        }
+      } catch (_) {}
+    }
+    return {'status': 'error', 'message': 'Could not connect to sanctuary servers.'};
+  }
+
+  /// Sends a real test push notification from the server directly to this device
+  Future<Map<String, dynamic>> sendTestPush() async {
+    String? authToken;
+    try {
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null) {
+        authToken = await fbUser.getIdToken();
+      }
+    } catch (_) {}
+    if (authToken == null || authToken.isEmpty) {
+      authToken = await SecureSessionStorage.instance.getAuthToken();
+    }
+    if (authToken == null || authToken.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      authToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
+    }
+    if (authToken == null || authToken.isEmpty) {
+      return {'ok': false, 'error': 'Please sign in first.'};
+    }
+
+    final candidateUrls = [
+      ApiEndpoints.defaultBaseUrl,
+      'https://urheart.asiverticals.me',
+      'https://ur-heart.onrender.com',
+    ];
+    for (final base in candidateUrls) {
+      try {
+        final dio = Dio(BaseOptions(
+          baseUrl: base,
+          connectTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 8),
+          headers: {'Authorization': 'Bearer $authToken'},
+        ));
+        final resp = await dio.post<dynamic>('/api/v1/notifications/test-push');
+        if (resp.statusCode == 200 && resp.data is Map) {
+          return Map<String, dynamic>.from(resp.data as Map);
+        }
+      } catch (e) {
+        debugPrint('[NOTIFICATIONS] sendTestPush error on $base: $e');
+      }
+    }
+    return {'ok': false, 'error': 'Failed to dispatch test push notification.'};
+  }
 }
+
