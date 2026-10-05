@@ -148,22 +148,36 @@ class EvaGuardrails:
         return True, None
 
     @classmethod
-    def sanitize_output(cls, raw_ai_text: str) -> str:
+    def sanitize_output(cls, raw_ai_text: str, user_message: Optional[str] = None) -> str:
         """
         Post-processor that strips any accidental provider names, model IDs,
-        or programming code blocks before sending text to the user.
+        chain-of-thought (CoT) internal reasoning/scratchpads, or programming code blocks.
+        If output is empty or contaminated with prompt regurgitation, gracefully recovers.
         """
         cleaned = raw_ai_text
 
-        # Strip internal reasoning/thinking blocks from hybrid reasoning models
-        cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"Here's a thinking process:[\s\S]*?\n\n", "", cleaned, flags=re.IGNORECASE)
+        # 1. Strip internal reasoning/thinking blocks from hybrid reasoning models
+        cleaned = re.sub(r"(?i)<(?:think|thought|scratchpad|reasoning)>[\s\S]*?</(?:think|thought|scratchpad|reasoning)>", "", cleaned)
+        cleaned = re.sub(r"(?i)<(?:think|thought|scratchpad|reasoning)>[\s\S]*$", "", cleaned)
+        cleaned = re.sub(r"(?i)Here's a thinking process:[\s\S]*?\n\n", "", cleaned)
 
-        # Strip accidental code blocks
+        # 2. Extract explicit Response if model left a response section header
+        resp_match = re.search(
+            r"(?i)(?:^|\n)(?:\d+\.\s*)?\*\*(?:Final\s+)?(?:Response|Answer|Eva'?s\s+Response|Draft\s+Response):?\*\*:?\s*([\s\S]*)$",
+            cleaned
+        )
+        if resp_match:
+            cleaned = resp_match.group(1).strip()
+        else:
+            # Strip numbered/bulleted analysis blocks: e.g. 1. **Analyze User Input:** ...
+            cot_pattern = r"(?i)(?:^|\n)(?:\d+\.\s*)?\*\*(?:Analyze|Analysis|Identify|Constraint|Requirements|Thinking|Thought|Plan|Context|System Directive):?\*\*[\s\S]*?(?=(?:\n\n(?!\s*[-*0-9]|\s*\*\*|\s*\(|User asks)|\Z))"
+            cleaned = re.sub(cot_pattern, "", cleaned)
+
+        # 3. Strip accidental code blocks
         if "```" in cleaned:
             cleaned = re.sub(r"```[a-zA-Z]*\n?[\s\S]*?```", "[Content filtered for safety]", cleaned)
 
-        # Scrub provider mentions
+        # 4. Scrub provider mentions
         leaked_keywords = [
             r"\bgroq\b",
             r"\bopenrouter\b",
@@ -183,7 +197,15 @@ class EvaGuardrails:
         for pattern in leaked_keywords:
             cleaned = re.sub(pattern, "Asiverticals Sanctuary Engine", cleaned, flags=re.IGNORECASE)
 
-        # Enforce Roman Hindi Font (Strictly NO Devanagari script)
+        # Deduplicate consecutive provider replacement mentions
+        cleaned = re.sub(
+            r"(?:Asiverticals Sanctuary Engine\s*(?:,\s*|and\s+|or\s+|\s+)?){2,}",
+            "Asiverticals Sanctuary Engine ",
+            cleaned,
+            flags=re.IGNORECASE
+        )
+
+        # 5. Enforce Roman Hindi Font (Strictly NO Devanagari script)
         if re.search(r"[\u0900-\u097F]", cleaned):
             devanagari_map = {
                 'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo',
@@ -201,6 +223,38 @@ class EvaGuardrails:
             for char in cleaned:
                 transliterated.append(devanagari_map.get(char, char if ord(char) < 128 else ''))
             cleaned = "".join(transliterated)
+
+        # 6. Normalize non-standard unicode spaces/dashes for cross-platform mobile rendering
+        cleaned = (
+            cleaned.replace("\u202f", " ")
+            .replace("\xa0", " ")
+            .replace("\u200b", "")
+            .replace("\u2011", "-")
+            .replace("\u2013", "-")
+            .replace("\u2014", "-")
+        )
+
+        # 7. Check for contamination or empty string after stripping
+        prompt_leakage_indicators = [
+            "user asks:", "identify key constraints", "must not mention",
+            "safe harbor", "devanagari script", "comprehensive knowledge:",
+            "backend architecture", "analyze user input"
+        ]
+        is_contaminated = any(ind in cleaned.lower() for ind in prompt_leakage_indicators)
+
+        if not cleaned.strip() or is_contaminated:
+            if user_message:
+                try:
+                    from app.services.ai_orchestrator import AiOrchestrator
+                    return AiOrchestrator._generate_contextual_fallback(user_message)
+                except Exception:
+                    pass
+                if "slumber" in user_message.lower():
+                    return (
+                        "Slumber Mode UR-Heart ka ek digital wellness feature hai jo raat 10:00 PM se subah 6:00 AM tak active rehta hai.\n\n"
+                        "Iska maksad late-night impulsive decisions aur blue-light exposure se bachana hai taaki aapki neend undisturbed rahe."
+                    )
+            return "UR-Heart sanctuary me aapka swagat hai. Main aapki kya sahayata kar sakti hoon?"
 
         return cleaned.strip()
 

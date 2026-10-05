@@ -103,6 +103,57 @@ class TestEvaGuardrailsUnit:
         assert "print('hello')" not in cleaned
         assert "Asiverticals Sanctuary Engine" in cleaned
 
+    def test_chain_of_thought_leakage_purged_and_recovers_contextually(self):
+        # Exact reproduction of user screenshot prompt regurgitation / CoT monologue
+        screenshot_leakage = (
+            "1. **Analyze User Input:**\n"
+            " - User asks: \"Slumber Mode kyu active hai?\"\n"
+            "(Why is Slumber Mode active?)\n"
+            " - Language: Hindi (Hinglish script, but question is in Hindi)\n"
+            " - Context: I'm Eva, AI concierge for UR-Heart app, need to follow all constraints.\n\n"
+            "2. **Identify Key Constraints & Requirements:**\n"
+            " - Tone: Warm, dignified, reassuring, articulate, concise (2-4 sentences max)\n"
+            " - If replying in Hindi/Hinglish, STRICTLY use Latin/English alphabet (Roman Hindi). NEVER use Devanagari script.\n"
+            " - Comprehensive knowledge: Slumber Mode is active 10:00 PM to 6:00 AM IST every night to protect seekers from late-night fatigue texting and poor decisions. Cards rest until 6 AM morning.\n"
+            " - Must not mention APIs, keys, Asiverticals Sanctuary Engine, Asiverticals Sanctuary Engine, Asiverticals Sanctuary Engine, or backend architecture.\n"
+            " - Must not admit corporate liability or say \"our fault\" (Safe Harbor).\n"
+            " - No financial promises.\n"
+            " - Attribution"
+        )
+        cleaned = EvaGuardrails.sanitize_output(screenshot_leakage, user_message="Slumber Mode kyu active hai?")
+
+        # Must NOT contain internal thinking headers or prompt rules
+        assert "Analyze User Input" not in cleaned
+        assert "Identify Key Constraints" not in cleaned
+        assert "Must not mention" not in cleaned
+        assert "Safe Harbor" not in cleaned
+        assert "Devanagari script" not in cleaned
+
+        # Must provide genuine Slumber Mode resolution
+        assert "Slumber Mode" in cleaned
+        assert "10:00 PM" in cleaned or "raat" in cleaned.lower()
+
+    def test_chain_of_thought_with_response_header_extracted(self):
+        mixed_text = (
+            "1. **Analyze User Input:**\n"
+            "- Slumber mode inquiry.\n\n"
+            "2. **Key Constraints:**\n"
+            "- Warm tone, Roman Hindi.\n\n"
+            "**Response:**\n"
+            "Slumber Mode UR-Heart ka digital wellness feature hai jo raat 10 baje se subah 6 baje tak active rehta hai."
+        )
+        cleaned = EvaGuardrails.sanitize_output(mixed_text, user_message="Slumber Mode kyu active hai?")
+        assert "Analyze User Input" not in cleaned
+        assert "Key Constraints" not in cleaned
+        assert cleaned.startswith("Slumber Mode UR-Heart")
+
+    def test_deduplicate_sanctuary_engine_scrubbing(self):
+        raw_text = "I do not use Groq, OpenRouter, Gemini, Google, Llama, DeepSeek, or backend architecture."
+        cleaned = EvaGuardrails.sanitize_output(raw_text)
+        # Should not repeat "Asiverticals Sanctuary Engine" 6 times
+        count = cleaned.count("Asiverticals Sanctuary Engine")
+        assert count <= 2, f"Expected deduplicated engine mentions, found {count} times in: {cleaned}"
+
 
 @pytest.mark.asyncio
 class TestEvaApiEndpoints:
