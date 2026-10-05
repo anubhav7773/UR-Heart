@@ -181,3 +181,122 @@ class EmailService:
             "deep_link": deep_link,
             "message": "Verification link generated. Email providers temporarily rate-limited."
         }
+
+    @staticmethod
+    async def dispatch_escalation_alert(
+        ticket_id: str,
+        category: str,
+        user_name: str,
+        user_id: str,
+        user_message: str,
+        recipient_email: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Dispatches real-time statutory support escalation email to the Founder
+        (asiverticals@gmail.com) via Resend or SMTP.
+        """
+        settings = get_settings()
+        dest_email = (recipient_email or getattr(settings, "SUPERADMIN_EMAIL", "") or "asiverticals@gmail.com").strip().lower()
+        resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
+        from_sender = os.getenv("RESEND_FROM") or getattr(settings, "RESEND_FROM", "") or "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
+
+        html_body = f"""<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 24px; background-color: #0A0F0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E8EDE9;">
+  <div style="max-width: 560px; margin: 0 auto; background: #131F19; border: 1.5px solid #C5A059; border-radius: 16px; padding: 28px 24px;">
+    <div style="display: flex; align-items: center; margin-bottom: 16px;">
+      <span style="font-size: 26px; margin-right: 10px;">🚨</span>
+      <h2 style="color: #C5A059; font-size: 20px; font-weight: 700; margin: 0;">UR-Heart Critical Support Escalation</h2>
+    </div>
+    <p style="color: #9DB3A8; font-size: 13px; line-height: 1.5; margin: 0 0 18px 0;">
+      A seeker inquiry reached the 10% critical escalation threshold. A formal dossier has been recorded.
+    </p>
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
+      <tr>
+        <td style="padding: 6px 0; color: #61786D; width: 140px;">Ticket Reference:</td>
+        <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold;">{ticket_id}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Category:</td>
+        <td style="padding: 6px 0; color: #E57373; font-weight: bold;">{category}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Seeker Name:</td>
+        <td style="padding: 6px 0; color: #FFFFFF;">{user_name}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">User ID:</td>
+        <td style="padding: 6px 0; color: #9DB3A8; font-family: monospace;">{user_id}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Statutory SLA:</td>
+        <td style="padding: 6px 0; color: #4E9F76;">24-48h Expedited Review (IT Rules 2021)</td>
+      </tr>
+    </table>
+
+    <div style="background: #0A0F0D; border-left: 3px solid #C5A059; padding: 12px 16px; border-radius: 6px; margin-bottom: 24px;">
+      <p style="color: #61786D; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">User Inquiry / Evidence Summary</p>
+      <p style="color: #D1E7DD; font-size: 13.5px; line-height: 1.45; margin: 0;">{user_message}</p>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 16px;">
+      <a href="https://urheart.asiverticals.me/settings" style="display: inline-block; background: #C5A059; color: #0A0F0D; text-decoration: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; font-size: 13px;">Open Sovereign Sentinel Desk ➔</a>
+    </div>
+
+    <p style="color: #61786D; font-size: 11px; text-align: center; margin: 0;">
+      Automated dispatch by Eva Sovereign Support Engine · Asiverticals Pvt Ltd
+    </p>
+  </div>
+</body>
+</html>"""
+
+        # 1. Resend API
+        if resend_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(
+                        "https://api.resend.com/emails",
+                        headers={
+                            "Authorization": f"Bearer {resend_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "from": from_sender,
+                            "to": [dest_email],
+                            "subject": f"🚨 [UR-Heart Support Escalation] #{ticket_id} ({category})",
+                            "html": html_body
+                        }
+                    )
+                    if res.status_code in [200, 201]:
+                        print(f"[EMAIL SERVICE] Escalation alert emailed via Resend to {dest_email} (id={res.json().get('id')})", flush=True)
+                        return {"dispatched": True, "provider": "resend", "id": res.json().get("id")}
+                    else:
+                        print(f"[EMAIL SERVICE] Resend alert error ({res.status_code}): {res.text}", flush=True)
+            except Exception as e:
+                print(f"[EMAIL SERVICE] Resend alert exception: {e}", flush=True)
+
+        # 2. Custom SMTP fallback
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        if smtp_host and smtp_user and smtp_password:
+            try:
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = f"🚨 [UR-Heart Support Escalation] #{ticket_id} ({category})"
+                msg["From"] = f"UR-Heart Sanctuary <{from_sender}>"
+                msg["To"] = dest_email
+                msg.attach(MIMEText(html_body, "html"))
+
+                server = smtplib.SMTP(smtp_host, int(os.getenv("SMTP_PORT", "587")), timeout=10)
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(from_sender, [dest_email], msg.as_string())
+                server.quit()
+                print(f"[EMAIL SERVICE] Escalation alert emailed via SMTP to {dest_email}", flush=True)
+                return {"dispatched": True, "provider": "smtp"}
+            except Exception as e:
+                print(f"[EMAIL SERVICE] SMTP alert exception: {e}", flush=True)
+
+        return {"dispatched": False, "provider": "none"}
+

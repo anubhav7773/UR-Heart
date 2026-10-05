@@ -137,6 +137,23 @@ async def chat_with_eva(
         except Exception as e:
             logger.warning("Failed to dispatch founder escalation push: %s", e)
 
+        # Instant statutory email alert to Founder Anubhav Singh (asiverticals@gmail.com)
+        try:
+            import asyncio
+            from app.services.email_service import EmailService
+            asyncio.create_task(
+                EmailService.dispatch_escalation_alert(
+                    ticket_id=ticket_ref,
+                    category=ticket_cat,
+                    user_name=user_name,
+                    user_id=str(current_user.id),
+                    user_message=payload.message,
+                    recipient_email="asiverticals@gmail.com"
+                )
+            )
+        except Exception as e:
+            logger.warning("Failed to dispatch founder escalation email: %s", e)
+
         final_reply = f"{result['reply']}\n\n[Statutory Grievance Ticket #{ticket_ref} Registered · 24-48h Review Desk]"
     else:
         final_reply = result["reply"]
