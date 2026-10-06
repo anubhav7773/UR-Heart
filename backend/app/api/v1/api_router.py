@@ -97,6 +97,7 @@ api_router.include_router(notifications.router)
 
 # 18. Eva AI Mindful Sanctuary Suite (Strictly Restricted by Asiverticals)
 api_router.include_router(ai_sanctuary.router)
+api_router.include_router(ai_sanctuary.feedback_router)
 
 # 19. Web Sanctuary Store (10% Bonus Passes & Multi-Step Checkout)
 api_router.include_router(web_store.router)

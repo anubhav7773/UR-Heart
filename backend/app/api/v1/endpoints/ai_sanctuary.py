@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Request, status
@@ -270,9 +271,13 @@ async def assist_grievance_filing(
 
 
 class FeedbackRequest(BaseModel):
-    category: str = Field(default="ux_deficiency", max_length=50)
+    category: str = Field(default="ux_deficiency", max_length=50)  # bug_report | feature_suggestion | ux_improvement | general
     description: str = Field(..., max_length=2000)
     user_sentiment: Optional[str] = "neutral"
+    app_version: Optional[str] = "1.0.0+1"
+    platform_os: Optional[str] = None
+    device_model: Optional[str] = None
+    screen_route: Optional[str] = None
 
 
 FEEDBACK_VAULT: List[Dict[str, Any]] = []
@@ -285,19 +290,86 @@ async def record_user_feedback(
 ):
     """
     Records in-app user feedback, complaints, and missing features.
+    Dispatches telemetry to Sentry and notifies the founder via email.
     """
+    user_email = (current_user.email if current_user and current_user.email else "anonymous@urheart.app")
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "category": payload.category,
         "description": payload.description,
         "sentiment": payload.user_sentiment,
-        "user_id": str(current_user.id) if current_user else "anonymous"
+        "user_id": str(current_user.id) if current_user else "anonymous",
+        "user_email": user_email,
+        "app_version": payload.app_version or "1.0.0+1",
+        "platform_os": payload.platform_os or "Android",
+        "device_model": payload.device_model or "Mobile Device",
+        "screen_route": payload.screen_route or "SanctuarySettings",
     }
     FEEDBACK_VAULT.append(entry)
     AiOrchestrator._recorded_feedback.append(entry)
     print(f"[EVA FEEDBACK RECORDED] {entry}", flush=True)
+
+    # 1. Telemetry Capture: Send warning/info event to Sentry
+    try:
+        import sentry_sdk
+        level = "warning" if payload.category == "bug_report" else "info"
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag("feedback_category", payload.category)
+            scope.set_tag("platform_os", entry["platform_os"])
+            scope.set_extra("app_version", entry["app_version"])
+            scope.set_extra("screen_route", entry["screen_route"])
+            scope.set_extra("device_model", entry["device_model"])
+            scope.set_extra("user_email", user_email)
+            sentry_sdk.capture_message(f"[{payload.category.upper()}] {payload.description}", level=level)
+    except Exception as e:
+        print(f"[SENTRY FEEDBACK BYPASS] {e}", flush=True)
+
+    # 2. Immediate Founder Alert via EmailService
+    try:
+        from app.services.email_service import EmailService
+        founder_email = os.getenv("SMTP_USER") or os.getenv("SUPPORT_EMAIL") or "asiverticals@gmail.com"
+        subject = f"[UR-Heart Alert] 🐞 {payload.category.replace('_', ' ').title()}: {payload.description[:50]}"
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 24px;">
+            <div style="max-width: 600px; margin: auto; background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid #334155;">
+                <h2 style="color: #38bdf8; margin-top: 0;">New User Feedback Received</h2>
+                <p><strong>Category:</strong> <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">{payload.category}</span></p>
+                <p><strong>User:</strong> {user_email} (ID: {entry['user_id']})</p>
+                <p><strong>Environment:</strong> {entry['platform_os']} | Version: {entry['app_version']} | Screen: {entry['screen_route']}</p>
+                <hr style="border: 0; border-top: 1px solid #334155; margin: 16px 0;" />
+                <h3 style="color: #cbd5e1;">Description / Report:</h3>
+                <div style="background: #0f172a; padding: 16px; border-radius: 8px; border-left: 4px solid #38bdf8; font-size: 15px; line-height: 1.6;">
+                    {payload.description}
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">
+                    Timestamp: {entry['timestamp']} • UR-Heart Sentinel Dispatch
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            loop.run_in_executor(None, EmailService.send_smtp_payload, founder_email, subject, html_body)
+        except RuntimeError:
+            pass
+    except Exception as err:
+        print(f"[FEEDBACK EMAIL ALERT BYPASS] {err}", flush=True)
+
     return {
         "status": "success",
         "message": "Aapka feedback record kar liya gaya hai. Asiverticals team is par kaam kar rahi hai.",
         "entry": entry
     }
+
+
+feedback_router = APIRouter(tags=["Community Feedback"])
+feedback_router.add_api_route(
+    "/feedback",
+    record_user_feedback,
+    methods=["POST"],
+    status_code=status.HTTP_201_CREATED,
+    summary="Record User App Feedback & Bug Report (Alias)"
+)

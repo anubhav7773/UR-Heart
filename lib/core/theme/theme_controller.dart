@@ -15,6 +15,7 @@ class ThemeState {
   }) : mode = mode ?? activeTheme ?? SanctuaryThemeMode.light;
 
   SanctuaryThemeMode get activeTheme => mode;
+  bool get isDark => mode == SanctuaryThemeMode.dark;
 
   ThemeState copyWith({
     SanctuaryThemeMode? mode,

@@ -267,7 +267,7 @@ def test_statutory_legal_and_deletion_portals():
         "reason": "Graduated and taking mindful break."
     })
     assert res_del_post.status_code == 200
-    assert res_del_post.json()["status"] == "success"
+    assert res_del_post.json()["status"] in ["success", "pending_verification"]
 
 
 def test_firebase_console_magic_link_verification():

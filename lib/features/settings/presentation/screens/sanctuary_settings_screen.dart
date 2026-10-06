@@ -8,6 +8,7 @@ import '../widgets/atmosphere_theme_card.dart';
 import '../widgets/discovery_privacy_card.dart';
 import '../widgets/irrevocable_erasure_modal.dart';
 import '../widgets/superadmin_sentinel_tile.dart';
+import '../widgets/community_feedback_card.dart';
 
 /// Screen 13: Sanctuary Preferences & Governance
 class SanctuarySettingsScreen extends ConsumerWidget {
@@ -112,6 +113,10 @@ class SanctuarySettingsScreen extends ConsumerWidget {
                 onTap: () {
                   Navigator.of(context).pushNamed('/admin/kyc-desk');
                 },
+              ),
+
+              CommunityFeedbackCard(
+                isDark: isDark,
               ),
 
               SovereignControlSection(

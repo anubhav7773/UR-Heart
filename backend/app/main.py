@@ -28,6 +28,25 @@ from app.templates.admin_portal import get_admin_portal_html
 
 settings = get_settings()
 
+# Sentry Full-Stack Observability
+try:
+    import sentry_sdk
+    sentry_dsn = (
+        getattr(settings, "SENTRY_DSN", None)
+        or os.getenv("SENTRY_DSN")
+        or "https://6535a0577cdc513bca0276bec7ca55b6@o4511946639015936.ingest.us.sentry.io/4512159339642880"
+    )
+    if sentry_dsn:
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            traces_sample_rate=0.10,
+            send_default_pii=False,
+        )
+        print("[SENTRY] Backend observability initialized successfully.", flush=True)
+except Exception as e:
+    print(f"[SENTRY] Warning: Sentry SDK init bypassed: {e}", flush=True)
+
+
 
 def get_allowed_cors_origins() -> List[str]:
     canonical_origins = [

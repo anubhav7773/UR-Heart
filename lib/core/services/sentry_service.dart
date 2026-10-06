@@ -63,4 +63,26 @@ class SentryService {
       appRunner: appRunner,
     );
   }
+
+  /// Dispatches user-reported issues or suggestions to Sentry's issue tracker
+  static Future<void> captureUserFeedback({
+    required String category,
+    required String description,
+    Map<String, dynamic>? diagnostics,
+  }) async {
+    try {
+      await Sentry.captureMessage(
+        '[$category] $description',
+        level: category == 'bug_report' ? SentryLevel.warning : SentryLevel.info,
+        withScope: (scope) {
+          scope.setTag('feedback_category', category);
+          if (diagnostics != null) {
+            for (final entry in diagnostics.entries) {
+              scope.setExtra(entry.key, entry.value);
+            }
+          }
+        },
+      );
+    } catch (_) {}
+  }
 }

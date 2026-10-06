@@ -98,14 +98,24 @@ class AiSanctuaryRepository {
   Future<bool> submitFeedback({
     required String description,
     String category = 'ux_deficiency',
+    String? appVersion,
+    String? platformOs,
+    String? deviceModel,
+    String? screenRoute,
   }) async {
     try {
+      final payload = <String, dynamic>{
+        'category': category,
+        'description': description,
+      };
+      if (appVersion != null) payload['app_version'] = appVersion;
+      if (platformOs != null) payload['platform_os'] = platformOs;
+      if (deviceModel != null) payload['device_model'] = deviceModel;
+      if (screenRoute != null) payload['screen_route'] = screenRoute;
+
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
         '/api/v1/ai/eva/feedback',
-        data: {
-          'category': category,
-          'description': description,
-        },
+        data: payload,
       );
       return response.statusCode == 201 || response.statusCode == 200;
     } catch (_) {
