@@ -10,6 +10,7 @@ import '../../../chat/presentation/screens/chat_dialogue_screen.dart';
 import '../../../feed/presentation/widgets/ai_resonance_insight_box.dart';
 import '../../../feed/presentation/widgets/mindful_intent_card.dart';
 import '../../../feed/presentation/widgets/photo_carousel_with_dots.dart';
+import '../../../feed/presentation/widgets/voice_spark_pill.dart';
 import '../../../chat/presentation/services/window_security_service.dart';
 
 /// Arguments payload for [SeekerProfileDetailScreen]
@@ -33,6 +34,10 @@ class SeekerProfileDetailArgs {
   final String? matchId;
   final int streakCount;
   final bool hasSacredBridge;
+  final String? voiceSparkUrl;
+  final String? voiceSparkPrompt;
+  final double voiceSparkDuration;
+  final bool isVoiceVerified;
 
   const SeekerProfileDetailArgs({
     required this.userId,
@@ -54,6 +59,10 @@ class SeekerProfileDetailArgs {
     this.matchId,
     this.streakCount = 0,
     this.hasSacredBridge = false,
+    this.voiceSparkUrl,
+    this.voiceSparkPrompt,
+    this.voiceSparkDuration = 7.0,
+    this.isVoiceVerified = false,
   });
 
   SeekerProfileDetailArgs copyWith({
@@ -76,6 +85,10 @@ class SeekerProfileDetailArgs {
     String? matchId,
     int? streakCount,
     bool? hasSacredBridge,
+    String? voiceSparkUrl,
+    String? voiceSparkPrompt,
+    double? voiceSparkDuration,
+    bool? isVoiceVerified,
   }) {
     return SeekerProfileDetailArgs(
       userId: userId ?? this.userId,
@@ -97,6 +110,10 @@ class SeekerProfileDetailArgs {
       matchId: matchId ?? this.matchId,
       streakCount: streakCount ?? this.streakCount,
       hasSacredBridge: hasSacredBridge ?? this.hasSacredBridge,
+      voiceSparkUrl: voiceSparkUrl ?? this.voiceSparkUrl,
+      voiceSparkPrompt: voiceSparkPrompt ?? this.voiceSparkPrompt,
+      voiceSparkDuration: voiceSparkDuration ?? this.voiceSparkDuration,
+      isVoiceVerified: isVoiceVerified ?? this.isVoiceVerified,
     );
   }
 
@@ -190,6 +207,10 @@ class SeekerProfileDetailArgs {
       matchId: matchId,
       streakCount: peer['streak_count'] as int? ?? 0,
       hasSacredBridge: peer['has_sacred_bridge'] as bool? ?? false,
+      voiceSparkUrl: peer['voice_spark_url'] as String?,
+      voiceSparkPrompt: peer['voice_spark_prompt'] as String?,
+      voiceSparkDuration: (peer['voice_spark_duration'] as num?)?.toDouble() ?? 7.0,
+      isVoiceVerified: peer['is_voice_verified'] as bool? ?? false,
     );
   }
 }
@@ -278,6 +299,14 @@ class _SeekerProfileDetailScreenState extends ConsumerState<SeekerProfileDetailS
           gender: (data['gender'] as String?)?.isNotEmpty == true
               ? data['gender'] as String
               : _args!.gender,
+          voiceSparkUrl: (data['voice_spark_url'] as String?)?.isNotEmpty == true
+              ? data['voice_spark_url'] as String
+              : _args!.voiceSparkUrl,
+          voiceSparkPrompt: (data['voice_spark_prompt'] as String?)?.isNotEmpty == true
+              ? data['voice_spark_prompt'] as String
+              : _args!.voiceSparkPrompt,
+          voiceSparkDuration: (data['voice_spark_duration'] as num?)?.toDouble() ?? _args!.voiceSparkDuration,
+          isVoiceVerified: data['is_voice_verified'] as bool? ?? _args!.isVoiceVerified,
         );
       });
     } catch (e) {
@@ -791,6 +820,15 @@ class _SeekerProfileDetailScreenState extends ConsumerState<SeekerProfileDetailS
                                     ),
                                   ],
                                 ),
+                              ),
+                            ],
+                            if (args.voiceSparkUrl != null && args.voiceSparkUrl!.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              VoiceSparkPill(
+                                voiceUrl: args.voiceSparkUrl!,
+                                prompt: args.voiceSparkPrompt,
+                                duration: args.voiceSparkDuration,
+                                isDark: isDark,
                               ),
                             ],
                           ],

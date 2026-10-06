@@ -16,6 +16,10 @@ class CandidateProfile {
   final List<String> blurHashes;
   final bool isVerified;
   final bool isOnline;
+  final String? voiceSparkUrl;
+  final String? voiceSparkPrompt;
+  final double voiceSparkDuration;
+  final bool isVoiceVerified;
 
   const CandidateProfile({
     required this.id,
@@ -34,6 +38,10 @@ class CandidateProfile {
     required this.blurHashes,
     this.isVerified = false,
     this.isOnline = true,
+    this.voiceSparkUrl,
+    this.voiceSparkPrompt,
+    this.voiceSparkDuration = 7.0,
+    this.isVoiceVerified = false,
   });
 
   List<String> get photos => photoUrls;
@@ -73,6 +81,10 @@ class CandidateProfile {
       blurHashes: List<String>.from(json['blur_hashes'] as List? ?? ['L6PZfSi_.AyE_3t7t7R**0o#DgR4']),
       isVerified: json['is_verified'] as bool? ?? json['is_kyc_verified'] as bool? ?? json['kyc_status'] as bool? ?? false,
       isOnline: json['is_online'] as bool? ?? true,
+      voiceSparkUrl: json['voice_spark_url'] as String?,
+      voiceSparkPrompt: json['voice_spark_prompt'] as String?,
+      voiceSparkDuration: (json['voice_spark_duration'] as num?)?.toDouble() ?? 7.0,
+      isVoiceVerified: json['is_voice_verified'] as bool? ?? false,
     );
   }
 
@@ -93,6 +105,10 @@ class CandidateProfile {
     List<String>? blurHashes,
     bool? isVerified,
     bool? isOnline,
+    String? voiceSparkUrl,
+    String? voiceSparkPrompt,
+    double? voiceSparkDuration,
+    bool? isVoiceVerified,
   }) {
     return CandidateProfile(
       id: id ?? this.id,
@@ -111,6 +127,10 @@ class CandidateProfile {
       blurHashes: blurHashes ?? this.blurHashes,
       isVerified: isVerified ?? this.isVerified,
       isOnline: isOnline ?? this.isOnline,
+      voiceSparkUrl: voiceSparkUrl ?? this.voiceSparkUrl,
+      voiceSparkPrompt: voiceSparkPrompt ?? this.voiceSparkPrompt,
+      voiceSparkDuration: voiceSparkDuration ?? this.voiceSparkDuration,
+      isVoiceVerified: isVoiceVerified ?? this.isVoiceVerified,
     );
   }
 
@@ -138,6 +158,10 @@ class CandidateProfile {
     'kyc_status': isVerified,
     'is_verified': isVerified,
     'is_online': isOnline,
+    'voice_spark_url': voiceSparkUrl,
+    'voice_spark_prompt': voiceSparkPrompt,
+    'voice_spark_duration': voiceSparkDuration,
+    'is_voice_verified': isVoiceVerified,
   };
 
   static bool checkOrientationShield({

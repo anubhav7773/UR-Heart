@@ -75,6 +75,10 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=True, index=True)
     photos = Column(ARRAY(String), default=[])
     avatar_url = Column(String(500), nullable=True)
+    voice_spark_url = Column(String(500), nullable=True)
+    voice_spark_prompt = Column(String(120), nullable=True)
+    voice_spark_duration = Column(Numeric(4, 1), nullable=True, default=7.0)
+    is_voice_verified = Column(Boolean, nullable=False, default=False)
 
     @validates("latitude")
     def validate_latitude(self, key, value):

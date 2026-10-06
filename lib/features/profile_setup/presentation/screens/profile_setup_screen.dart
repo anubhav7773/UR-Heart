@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -10,6 +11,9 @@ import '../widgets/mindful_bio_editor.dart';
 import '../widgets/orientation_selector_pills.dart';
 import '../widgets/sacred_bridge_selector.dart';
 import '../../../chat/presentation/services/window_security_service.dart';
+import 'package:ur_heart/features/feed/presentation/widgets/voice_spark_pill.dart';
+import 'package:ur_heart/features/profile/data/voice_spark_service.dart';
+import 'package:ur_heart/features/profile/presentation/widgets/voice_spark_recording_modal.dart';
 
 /// Screen 4: Sanctuary Profile Setup & Identity Verification Scaffold
 /// 100% Production-Grade: Real Camera & Gallery photo uploads, EVA AI KYC & Bio Polish,
@@ -382,6 +386,130 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       },
                       child: Text(state.isKycVerified ? 'Verified ✓' : 'Verify ✨', style: const TextStyle(fontSize: 12.0, color: Colors.white)),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16.0),
+              // 7-Second Voice Spark Card (Optional Boost)
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFFD4AF37).withValues(alpha: 0.08)
+                      : const Color(0xFFD4AF37).withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('🎙️', style: TextStyle(fontSize: 26.0)),
+                        const SizedBox(width: 12.0),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Voice Spark (7 Seconds)',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13.5,
+                                      color: titleColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6.0),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(6.0),
+                                    ),
+                                    child: const Text(
+                                      '3x Matches',
+                                      style: TextStyle(
+                                        color: Color(0xFFD4AF37),
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2.0),
+                              Text(
+                                state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty
+                                    ? 'Voice spark recorded & ready to stream.'
+                                    : 'Awaaz jhooth nahi bolti. Let seekers hear your genuine voice.',
+                                style: AppTypography.caption.copyWith(color: mutedColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFD4AF37),
+                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+                          ),
+                          onPressed: () {
+                            showModalBottomSheet<void>(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (ctx) => VoiceSparkRecordingModal(
+                                onRecorded: (File audioFile, double durationSeconds, String prompt) async {
+                                  try {
+                                    final res = await VoiceSparkService.uploadVoiceSpark(
+                                      audioFile: audioFile,
+                                      durationSeconds: durationSeconds,
+                                      prompt: prompt,
+                                    );
+                                    final voiceUrl = res['voice_spark_url'] as String?;
+                                    if (voiceUrl != null && voiceUrl.isNotEmpty) {
+                                      notifier.setVoiceSpark(
+                                        url: voiceUrl,
+                                        prompt: prompt,
+                                        duration: durationSeconds,
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Failed to upload voice spark: $e'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            );
+                          },
+                          child: Text(
+                            state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty ? 'Recorded ✓' : 'Record 🎙️',
+                            style: const TextStyle(fontSize: 12.0, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 12.0),
+                      VoiceSparkPill(
+                        voiceUrl: state.voiceSparkUrl!,
+                        prompt: state.voiceSparkPrompt,
+                        duration: state.voiceSparkDuration,
+                        isDark: isDark,
+                      ),
+                    ],
                   ],
                 ),
               ),

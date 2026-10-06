@@ -15,6 +15,9 @@ import '../widgets/persona_tabs_header.dart';
 import '../widgets/photo_adjuster_dialog.dart';
 import '../widgets/preferences_slider_card.dart';
 import '../../../profile_setup/presentation/widgets/live_kyc_recording_modal.dart';
+import 'package:ur_heart/features/feed/presentation/widgets/voice_spark_pill.dart';
+import 'package:ur_heart/features/profile/data/voice_spark_service.dart';
+import 'package:ur_heart/features/profile/presentation/widgets/voice_spark_recording_modal.dart';
 
 /// Screen 11: My Persona View & Editor
 class MyPersonaScreen extends ConsumerWidget {
@@ -108,6 +111,7 @@ class MyPersonaScreen extends ConsumerWidget {
                   onReplaceSlot: (slot) =>
                       _showPhotoUploadModal(context, ref, isDark, slot, isAvatar: false),
                 ),
+                _buildVoiceSparkCard(context, ref, state, isDark),
                 LockedCredentialsCard(
                   profile: state.profile,
                   isDark: isDark,
@@ -618,6 +622,250 @@ class MyPersonaScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _openVoiceSparkRecordingModal(BuildContext context, WidgetRef ref, bool isDark) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => VoiceSparkRecordingModal(
+        onRecorded: (File audioFile, double durationSeconds, String prompt) async {
+          final notifier = ref.read(personaControllerProvider.notifier);
+          try {
+            final res = await VoiceSparkService.uploadVoiceSpark(
+              audioFile: audioFile,
+              durationSeconds: durationSeconds,
+              prompt: prompt,
+            );
+            final voiceUrl = res['voice_spark_url'] as String?;
+            if (voiceUrl != null && voiceUrl.isNotEmpty) {
+              await notifier.updateVoiceSpark(
+                voiceSparkUrl: voiceUrl,
+                voiceSparkPrompt: prompt,
+                voiceSparkDuration: durationSeconds,
+                isVoiceVerified: true,
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to save Voice Spark: $e'),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildVoiceSparkCard(
+    BuildContext context,
+    WidgetRef ref,
+    PersonaState state,
+    bool isDark,
+  ) {
+    final gold = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
+    final cardBg = isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard;
+    final cardBorder = isDark ? DarkSanctuaryTokens.surfaceCardBorder : LightSanctuaryTokens.surfaceCardBorder;
+    final textHeadline = isDark ? DarkSanctuaryTokens.textHeadline : LightSanctuaryTokens.textHeadline;
+    final textMuted = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
+    final hasVoice = state.profile.voiceSparkUrl != null && state.profile.voiceSparkUrl!.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasVoice ? gold.withValues(alpha: 0.35) : cardBorder,
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: gold.withValues(alpha: 0.15),
+                  border: Border.all(color: gold.withValues(alpha: 0.3)),
+                ),
+                child: const Center(
+                  child: Text('🎙️', style: TextStyle(fontSize: 18)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Voice Spark',
+                          style: AppTypography.titleH2.copyWith(
+                            fontSize: 16,
+                            color: textHeadline,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (hasVoice)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: const Text(
+                              'Verified Authentic',
+                              style: TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '7-Second Audio Note · Awaaz Jhooth Nahi Bolti',
+                      style: AppTypography.caption.copyWith(
+                        color: textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (hasVoice) ...[
+            VoiceSparkPill(
+              voiceUrl: state.profile.voiceSparkUrl!,
+              prompt: state.profile.voiceSparkPrompt,
+              duration: state.profile.voiceSparkDuration,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _openVoiceSparkRecordingModal(context, ref, isDark),
+                  icon: Icon(Icons.refresh_rounded, size: 16, color: gold),
+                  label: Text(
+                    'Re-record',
+                    style: TextStyle(
+                      color: gold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (dCtx) => AlertDialog(
+                        backgroundColor: cardBg,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        title: Text('Remove Voice Spark?', style: TextStyle(color: textHeadline)),
+                        content: Text(
+                          'Your profile will no longer feature the 7-second audio note.',
+                          style: TextStyle(color: textMuted),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dCtx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(dCtx).pop(true),
+                            child: const Text('Remove', style: TextStyle(color: Colors.redAccent)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await VoiceSparkService.deleteVoiceSpark();
+                      await ref.read(personaControllerProvider.notifier).deleteVoiceSpark();
+                    }
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                  label: const Text(
+                    'Remove',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Text(
+              'Profiles with an authentic 7-second voice spark get 3x more meaningful connections. Let your voice express what photos cannot capture.',
+              style: AppTypography.bodySmall.copyWith(
+                color: textMuted,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                onPressed: () => _openVoiceSparkRecordingModal(context, ref, isDark),
+                icon: const Icon(Icons.mic_rounded, color: Colors.white, size: 18),
+                label: const Text(
+                  'Record 7-Second Voice Spark',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? const Color(0xFF1E3A2F) : const Color(0xFF152A20),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(color: gold.withValues(alpha: 0.4), width: 1.2),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

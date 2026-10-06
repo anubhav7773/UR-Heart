@@ -149,6 +149,21 @@ async def lifespan(app: FastAPI):
 
     monitor_task = asyncio.create_task(_streak_monitor_loop())
 
+    async def _ensure_voice_spark_schema():
+        try:
+            from sqlalchemy import text
+            async with async_session_factory() as session:
+                await session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_spark_url VARCHAR(500) NULL;"))
+                await session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_spark_prompt VARCHAR(120) NULL;"))
+                await session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_spark_duration NUMERIC(4, 1) DEFAULT 7.0;"))
+                await session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_voice_verified BOOLEAN DEFAULT FALSE;"))
+                await session.commit()
+                print("[SCHEMA] Voice spark columns verified in PostgreSQL.", flush=True)
+        except Exception as e:
+            print(f"[SCHEMA NOTICE] Voice spark column check: {e}", flush=True)
+
+    asyncio.create_task(_ensure_voice_spark_schema())
+
     yield
     # SHUTDOWN: Gracefully close HTTP client & background tasks
     streak_worker_stop.set()

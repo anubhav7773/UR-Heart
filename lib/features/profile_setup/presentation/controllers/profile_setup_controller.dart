@@ -40,6 +40,9 @@ class ProfileSetupState {
   final String? gpsError;
   final bool isGpsServiceDisabled;
   final bool isGpsPermissionDeniedForever;
+  final String? voiceSparkUrl;
+  final String? voiceSparkPrompt;
+  final double voiceSparkDuration;
 
   const ProfileSetupState({
     this.photoSlots = const {},
@@ -68,6 +71,9 @@ class ProfileSetupState {
     this.gpsError,
     this.isGpsServiceDisabled = false,
     this.isGpsPermissionDeniedForever = false,
+    this.voiceSparkUrl,
+    this.voiceSparkPrompt,
+    this.voiceSparkDuration = 0.0,
   });
 
   bool get isBioPolishing => isPolishingBio;
@@ -102,6 +108,9 @@ class ProfileSetupState {
     String? gpsError,
     bool? isGpsServiceDisabled,
     bool? isGpsPermissionDeniedForever,
+    String? voiceSparkUrl,
+    String? voiceSparkPrompt,
+    double? voiceSparkDuration,
   }) {
     return ProfileSetupState(
       photoSlots: photoSlots ?? this.photoSlots,
@@ -132,6 +141,9 @@ class ProfileSetupState {
       isGpsServiceDisabled: isGpsServiceDisabled ?? this.isGpsServiceDisabled,
       isGpsPermissionDeniedForever:
           isGpsPermissionDeniedForever ?? this.isGpsPermissionDeniedForever,
+      voiceSparkUrl: voiceSparkUrl ?? this.voiceSparkUrl,
+      voiceSparkPrompt: voiceSparkPrompt ?? this.voiceSparkPrompt,
+      voiceSparkDuration: voiceSparkDuration ?? this.voiceSparkDuration,
     );
   }
 }
@@ -550,6 +562,22 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     return result;
   }
 
+  void setVoiceSpark({required String url, required String prompt, required double duration}) {
+    state = state.copyWith(
+      voiceSparkUrl: url,
+      voiceSparkPrompt: prompt,
+      voiceSparkDuration: duration,
+    );
+  }
+
+  void clearVoiceSpark() {
+    state = state.copyWith(
+      voiceSparkUrl: '',
+      voiceSparkPrompt: '',
+      voiceSparkDuration: 0.0,
+    );
+  }
+
   Future<bool> completeSetup() async {
     if (!state.canCompleteSetup) return false;
     state = state.copyWith(isSubmitting: true);
@@ -567,6 +595,11 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     await prefs.setString('profile_location', state.location);
     await prefs.setString('profile_contact_bridge_platform', state.contactBridgePlatform);
     await prefs.setString('profile_contact_bridge_handle', state.contactBridgeHandle);
+    if (state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty) {
+      await prefs.setString('profile_voice_spark_url', state.voiceSparkUrl!);
+      await prefs.setString('profile_voice_spark_prompt', state.voiceSparkPrompt ?? '');
+      await prefs.setDouble('profile_voice_spark_duration', state.voiceSparkDuration);
+    }
     await prefs.setBool('ur_heart_profile_setup_completed', true);
     main_profile.ProfileRepository.prewarmStatic(prefs);
 
@@ -583,6 +616,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         'is_kyc': state.isKycVerified,
         'location': state.location,
         'is_gps_verified': state.isGpsVerified,
+        'has_voice_spark': state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty,
       },
     );
 
@@ -611,6 +645,10 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'bridge_value': state.contactBridgeHandle,
       'is_kyc_verified': state.isKycVerified,
       'is_kyc': state.isKycVerified,
+      'voice_spark_url': state.voiceSparkUrl,
+      'voice_spark_prompt': state.voiceSparkPrompt,
+      'voice_spark_duration': state.voiceSparkDuration,
+      'is_voice_verified': state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty,
       'photo_slots_count': state.photoSlots.length,
       'photos': [
         state.photoSlots[2] ?? '',

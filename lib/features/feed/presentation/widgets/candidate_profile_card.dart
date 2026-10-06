@@ -5,6 +5,7 @@ import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import 'photo_carousel_with_dots.dart';
 import 'ai_resonance_insight_box.dart';
 import 'mindful_intent_card.dart';
+import 'voice_spark_pill.dart';
 
 class CandidateProfileCard extends StatefulWidget {
   final Map<String, dynamic> candidate;
@@ -144,6 +145,16 @@ class _CandidateProfileCardState extends State<CandidateProfileCard> {
                                   fontSize: 13,
                                 ),
                               ),
+                              if (widget.candidate['voice_spark_url'] != null &&
+                                  (widget.candidate['voice_spark_url'] as String).trim().isNotEmpty) ...[
+                                const SizedBox(height: 14),
+                                VoiceSparkPill(
+                                  voiceUrl: (widget.candidate['voice_spark_url'] as String).trim(),
+                                  prompt: widget.candidate['voice_spark_prompt'] as String?,
+                                  duration: (widget.candidate['voice_spark_duration'] as num?)?.toDouble() ?? 7.0,
+                                  isDark: widget.isDark,
+                                ),
+                              ],
                               const SizedBox(height: 16),
                               AiResonanceInsightBox(
                                 isDark: widget.isDark,

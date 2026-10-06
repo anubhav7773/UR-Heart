@@ -181,7 +181,11 @@ async def get_discovery_feed(
             "streak_count": u.streak_count or 0,
             "boost_points": u.boost_points or 0,
             "is_boosted": bool((u.boost_points or 0) > 0),
-            "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+            "blur_hash": "L6PZfSi_.AyE_3t7t7R**0o#DgR4",
+            "voice_spark_url": u.voice_spark_url,
+            "voice_spark_prompt": u.voice_spark_prompt,
+            "voice_spark_duration": float(u.voice_spark_duration) if u.voice_spark_duration else 7.0,
+            "is_voice_verified": bool(u.is_voice_verified),
         })
 
     print(f"[FEED DISCOVERY] Serving {len(cards)} live candidate cards from PostgreSQL to client", flush=True)

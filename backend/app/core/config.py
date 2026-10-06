@@ -132,3 +132,7 @@ def validate_production_env(settings: Optional[Settings] = None) -> None:
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()
+

@@ -343,6 +343,51 @@ class PersonaController extends StateNotifier<PersonaState> {
   Future<void> savePreferences([dynamic context]) async {
     await saveProfile();
   }
+
+  Future<void> updateVoiceSpark({
+    required String voiceSparkUrl,
+    required String voiceSparkPrompt,
+    required double voiceSparkDuration,
+    bool isVoiceVerified = true,
+  }) async {
+    final updatedProfile = state.profile.copyWith(
+      voiceSparkUrl: voiceSparkUrl,
+      voiceSparkPrompt: voiceSparkPrompt,
+      voiceSparkDuration: voiceSparkDuration,
+      isVoiceVerified: isVoiceVerified,
+    );
+    state = state.copyWith(
+      profile: updatedProfile,
+      successMessage: 'Voice Spark (7-second audio) saved! 🎙️✨',
+    );
+    try {
+      await _repo.updateProfile(updatedProfile);
+    } catch (e) {
+      debugPrint('[PersonaController] Voice Spark sync notice: $e');
+    }
+  }
+
+  Future<bool> deleteVoiceSpark() async {
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      final updatedProfile = state.profile.copyWith(
+        voiceSparkUrl: '',
+        voiceSparkPrompt: '',
+        voiceSparkDuration: 0.0,
+        isVoiceVerified: false,
+      );
+      state = state.copyWith(
+        profile: updatedProfile,
+        isSaving: false,
+        successMessage: 'Voice Spark removed 🗑️',
+      );
+      await _repo.updateProfile(updatedProfile);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isSaving: false, errorMessage: 'Failed to remove Voice Spark: $e');
+      return false;
+    }
+  }
 }
 
 final personaControllerProvider =

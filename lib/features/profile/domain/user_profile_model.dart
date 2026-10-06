@@ -29,6 +29,10 @@ class UserProfile {
   final int boostPoints;
   final int revealTokensCount;
   final int secondsRemaining;
+  final String? voiceSparkUrl;
+  final String? voiceSparkPrompt;
+  final double voiceSparkDuration;
+  final bool isVoiceVerified;
 
   const UserProfile({
     required this.id,
@@ -60,6 +64,10 @@ class UserProfile {
     this.boostPoints = 0,
     this.revealTokensCount = 0,
     this.secondsRemaining = 0,
+    this.voiceSparkUrl,
+    this.voiceSparkPrompt,
+    this.voiceSparkDuration = 7.0,
+    this.isVoiceVerified = false,
   });
 
   bool get isStreakActive => secondsRemaining > 0 && streakCount > 0;
@@ -95,6 +103,10 @@ class UserProfile {
     'boost_points': boostPoints,
     'reveal_tokens_count': revealTokensCount,
     'seconds_remaining': secondsRemaining,
+    'voice_spark_url': voiceSparkUrl,
+    'voice_spark_prompt': voiceSparkPrompt,
+    'voice_spark_duration': voiceSparkDuration,
+    'is_voice_verified': isVoiceVerified,
   };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -177,6 +189,10 @@ class UserProfile {
       secondsRemaining: (json['streak_info'] is Map && json['streak_info']['seconds_remaining'] != null)
           ? (json['streak_info']['seconds_remaining'] as int)
           : ((json['seconds_remaining'] ?? json['secondsRemaining']) as int? ?? 0),
+      voiceSparkUrl: json['voice_spark_url'] as String?,
+      voiceSparkPrompt: json['voice_spark_prompt'] as String?,
+      voiceSparkDuration: (json['voice_spark_duration'] as num?)?.toDouble() ?? 7.0,
+      isVoiceVerified: json['is_voice_verified'] as bool? ?? false,
     );
   }
 
@@ -206,6 +222,14 @@ class UserProfile {
     bool? nightSlumber,
     String? subscriptionTier,
     int? rewardBalance,
+    int? streakCount,
+    int? boostPoints,
+    int? revealTokensCount,
+    int? secondsRemaining,
+    String? voiceSparkUrl,
+    String? voiceSparkPrompt,
+    double? voiceSparkDuration,
+    bool? isVoiceVerified,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -233,6 +257,14 @@ class UserProfile {
       nightSlumber: nightSlumber ?? this.nightSlumber,
       subscriptionTier: subscriptionTier ?? this.subscriptionTier,
       rewardBalance: rewardBalance ?? this.rewardBalance,
+      streakCount: streakCount ?? this.streakCount,
+      boostPoints: boostPoints ?? this.boostPoints,
+      revealTokensCount: revealTokensCount ?? this.revealTokensCount,
+      secondsRemaining: secondsRemaining ?? this.secondsRemaining,
+      voiceSparkUrl: voiceSparkUrl ?? this.voiceSparkUrl,
+      voiceSparkPrompt: voiceSparkPrompt ?? this.voiceSparkPrompt,
+      voiceSparkDuration: voiceSparkDuration ?? this.voiceSparkDuration,
+      isVoiceVerified: isVoiceVerified ?? this.isVoiceVerified,
     );
   }
 

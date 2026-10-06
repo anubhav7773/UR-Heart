@@ -350,6 +350,10 @@ class ProfileRepository {
           'preferred_age_max': updated.maxAgePref.toInt(),
           'photos': updated.momentPhotos,
           'avatar_url': updated.avatarUrl,
+          'voice_spark_url': updated.voiceSparkUrl,
+          'voice_spark_prompt': updated.voiceSparkPrompt,
+          'voice_spark_duration': updated.voiceSparkDuration,
+          'is_voice_verified': updated.isVoiceVerified,
         },
       );
 

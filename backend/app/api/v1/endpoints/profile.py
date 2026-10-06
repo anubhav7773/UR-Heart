@@ -1,10 +1,12 @@
 from typing import Any, Dict, Optional, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.domain.user import User
@@ -51,6 +53,10 @@ class ProfileUpdateRequest(BaseModel):
     birth_date: Optional[str] = None
     age: Optional[int] = None
     email: Optional[str] = None
+    voice_spark_url: Optional[str] = None
+    voice_spark_prompt: Optional[str] = None
+    voice_spark_duration: Optional[float] = None
+    is_voice_verified: Optional[bool] = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -121,7 +127,11 @@ async def get_my_authenticated_profile(
         "preferred_age_min": current_user.preferred_age_min,
         "preferred_age_max": current_user.preferred_age_max,
         "contact_bridge_handle": current_user.contact_bridge_encrypted,
-        "role": current_user.role or ("superadmin" if (current_user.email or "").lower() == "asiverticals@gmail.com" else "user")
+        "role": current_user.role or ("superadmin" if (current_user.email or "").lower() == "asiverticals@gmail.com" else "user"),
+        "voice_spark_url": current_user.voice_spark_url,
+        "voice_spark_prompt": current_user.voice_spark_prompt,
+        "voice_spark_duration": float(current_user.voice_spark_duration) if current_user.voice_spark_duration else 7.0,
+        "is_voice_verified": bool(current_user.is_voice_verified),
     }
 
 
@@ -214,7 +224,11 @@ async def get_seeker_profile(
         "match_id": str(match.id) if (has_match and match and getattr(match, "id", None)) else None,
         "has_sacred_bridge": has_wa_key,
         "has_wa_key": has_wa_key,
-        "subscription_tier": target_user.subscription_tier or "free"
+        "subscription_tier": target_user.subscription_tier or "free",
+        "voice_spark_url": target_user.voice_spark_url,
+        "voice_spark_prompt": target_user.voice_spark_prompt,
+        "voice_spark_duration": float(target_user.voice_spark_duration) if target_user.voice_spark_duration else 7.0,
+        "is_voice_verified": bool(target_user.is_voice_verified),
     }
 
 
@@ -566,4 +580,105 @@ async def create_or_update_profile(
             "location_name": current_user.location_name,
             "is_kyc": current_user.kyc_status,
         }
+    }
+
+
+@router.post("/voice-spark", status_code=status.HTTP_200_OK)
+async def upload_voice_spark(
+    file: UploadFile = File(...),
+    prompt: str = Form("Mera favourite midnight snack / guilty pleasure..."),
+    duration: float = Form(7.0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Upload 7-second Voice Spark ("Awaaz Jhooth Nahi Bolti") directly to Supabase Storage.
+    Persists voice_spark_url, prompt, and duration on User record.
+    """
+    content_type = (file.content_type or "").lower()
+    filename = (file.filename or "").lower()
+    if not (content_type.startswith("audio/") or filename.endswith((".m4a", ".aac", ".mp3", ".wav", ".ogg", ".opus"))):
+        raise HTTPException(status_code=400, detail="Invalid audio file format. Please upload an audio recording.")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty audio recording received.")
+
+    if len(content) > 3 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Audio file too large. Maximum allowed size is 3MB.")
+
+    settings = get_settings()
+    file_key = f"users/{current_user.id}/voice/voice_spark.m4a"
+    public_url = None
+
+    # Upload to Supabase Storage if configured
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+        try:
+            upload_url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.SUPABASE_STORAGE_BUCKET}/{file_key}"
+            headers = {
+                "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+                "Content-Type": file.content_type or "audio/m4a",
+                "x-upsert": "true",
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(upload_url, headers=headers, content=content)
+                if resp.status_code in (200, 201):
+                    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{file_key}"
+        except Exception as e:
+            print(f"[VOICE SPARK STORAGE] Supabase upload note: {e}", flush=True)
+
+    if not public_url:
+        public_url = f"{settings.BASE_WEB_URL}/api/v1/media/voice/{current_user.id}/voice_spark.m4a"
+
+    validated_duration = min(max(float(duration), 1.0), 7.5)
+    clean_prompt = prompt.strip()[:120] if prompt else "My authentic voice & vibe"
+
+    await db.execute(
+        update(User)
+        .where(User.id == current_user.id)
+        .values(
+            voice_spark_url=public_url,
+            voice_spark_prompt=clean_prompt,
+            voice_spark_duration=validated_duration,
+            is_voice_verified=True
+        )
+    )
+    await db.commit()
+    try:
+        await db.refresh(current_user)
+    except Exception:
+        pass
+
+    return {
+        "status": "success",
+        "voice_spark_url": public_url,
+        "voice_spark_prompt": clean_prompt,
+        "voice_spark_duration": validated_duration,
+        "is_voice_verified": True,
+        "message": "Voice Spark successfully secured in sanctuary."
+    }
+
+
+@router.delete("/voice-spark", status_code=status.HTTP_200_OK)
+async def delete_voice_spark(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Deletes active Voice Spark from seeker profile."""
+    await db.execute(
+        update(User)
+        .where(User.id == current_user.id)
+        .values(
+            voice_spark_url=None,
+            voice_spark_prompt=None,
+            is_voice_verified=False
+        )
+    )
+    await db.commit()
+    return {
+        "status": "success",
+        "voice_spark_url": None,
+        "is_voice_verified": False,
+        "message": "Voice Spark removed successfully."
     }
