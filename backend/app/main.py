@@ -243,9 +243,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[SCHEMA NOTICE] Mindful closure schema check: {e}", flush=True)
 
-    asyncio.create_task(_ensure_voice_spark_schema())
-    asyncio.create_task(_ensure_blind_date_schema())
-    asyncio.create_task(_ensure_mindful_closure_schema())
+    try:
+        await asyncio.gather(
+            _ensure_voice_spark_schema(),
+            _ensure_blind_date_schema(),
+            _ensure_mindful_closure_schema(),
+            return_exceptions=True
+        )
+    except Exception as schema_err:
+        print(f"[SCHEMA STARTUP WARNING] {schema_err}", flush=True)
 
     yield
 
