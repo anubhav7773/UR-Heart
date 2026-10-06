@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.domain.blind_date import BlindDateMessage, BlindDateQueueEntry, BlindDateSession
 from app.models.domain.match import Match
 from app.models.domain.user import User
+from app.services.streak_engine import StreakEngine
 
 # Curated, soulful, introspective icebreaker prompts crafted for deep soul connection
 EVA_ICEBREAKER_PROMPTS = [
@@ -133,21 +134,118 @@ class BlindDateMatcherService:
         return result.scalars().first()
 
     @staticmethod
+    def check_eligibility(user: User) -> dict:
+        """
+        Determines seeker's Blind Date pass eligibility.
+        - Daily 1 free pass is granted ONLY to seekers who maintain their daily streak.
+        - Seekers can also use bonus passes unlocked via watching ads or purchasing.
+        """
+        today = date.today()
+        now = datetime.now(timezone.utc)
+        is_streak_active = bool(
+            user.streak_expires_at
+            and user.streak_expires_at > now
+            and (user.streak_count or 0) > 0
+        )
+        has_daily_streak_pass = is_streak_active and (user.last_blind_date_date != today)
+        bonus_passes = user.blind_date_passes or 0
+        can_enter = has_daily_streak_pass or (bonus_passes > 0)
+
+        reason = "ready"
+        if not can_enter:
+            if not is_streak_active:
+                reason = "streak_inactive"
+            else:
+                reason = "daily_pass_exhausted"
+
+        return {
+            "can_enter": can_enter,
+            "is_streak_active": is_streak_active,
+            "streak_count": user.streak_count or 0,
+            "has_daily_streak_pass": has_daily_streak_pass,
+            "bonus_passes": bonus_passes,
+            "reason": reason,
+            "last_blind_date_date": user.last_blind_date_date.isoformat() if user.last_blind_date_date else None,
+        }
+
+    @staticmethod
+    async def claim_ad_pass(db: AsyncSession, user: User) -> dict:
+        """
+        Grants +1 Blind Date Pass for watching a 30s rewarded ad.
+        If the seeker's streak was inactive or broken, watching this ad
+        also ignites/locks their daily streak via StreakEngine! (100% Value Parity)
+        """
+        now = datetime.now(timezone.utc)
+        user.blind_date_passes = (user.blind_date_passes or 0) + 1
+
+        is_streak_active = bool(
+            user.streak_expires_at
+            and user.streak_expires_at > now
+            and (user.streak_count or 0) > 0
+        )
+        if not is_streak_active:
+            await StreakEngine.claim_daily_streak_ad(user, db)
+        else:
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+
+        return BlindDateMatcherService.check_eligibility(user)
+
+    @staticmethod
+    async def extend_session(
+        db: AsyncSession,
+        session_id: uuid.UUID,
+        user_id: uuid.UUID
+    ) -> BlindDateSession:
+        """
+        In-Session +3 Minute Extension perk.
+        Unlocks +180 seconds for both seekers and posts an ephemeral announcement.
+        """
+        res = await db.execute(
+            select(BlindDateSession).where(BlindDateSession.id == session_id)
+        )
+        session = res.scalars().first()
+        if not session:
+            raise ValueError("Blind date session not found.")
+        if user_id not in (session.user1_id, session.user2_id):
+            raise ValueError("User is not a participant in this session.")
+        if session.status not in ("active", "revealed"):
+            raise ValueError("Cannot extend inactive session.")
+
+        session.expires_at = session.expires_at + timedelta(seconds=180)
+        session.extension_count = (session.extension_count or 0) + 1
+
+        announcement = BlindDateMessage(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            sender_id=user_id,
+            ciphertext="🌟 +3 Minutes of soulful dialogue unlocked!",
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(announcement)
+        await db.commit()
+        await db.refresh(session)
+        return session
+
+    @staticmethod
     async def join_or_match_queue(
         db: AsyncSession,
-        user: User
+        user: User,
+        is_fast_track: bool = False
     ) -> Tuple[Optional[BlindDateSession], BlindDateQueueEntry]:
         """
         Attempts to find a mutually compatible soul in the PostgreSQL queue.
-        If found, immediately creates a 5-minute Blind Date Session.
-        If not found, enqueues the user in 'waiting' status with ACID isolation.
+        - Enforces streak-gated daily pass or bonus pass check.
+        - Orders candidates by is_fast_track DESC, joined_at ASC (100% Equal VIP Priority).
+        - If matched, immediately instantiates a 5-minute Blind Date Session.
         """
+        today = date.today()
         now = datetime.now(timezone.utc)
 
         # 1. First verify if user already has an active session
         existing_session = await BlindDateMatcherService.get_active_session_for_user(db, user.id)
         if existing_session:
-            # Query or make stub queue entry
             q_res = await db.execute(
                 select(BlindDateQueueEntry).where(BlindDateQueueEntry.user_id == user.id)
             )
@@ -159,26 +257,51 @@ class BlindDateMatcherService:
                     interested_in=user.interested_in or "everyone",
                     age=calculate_user_age(user.dob),
                     status="paired",
+                    is_fast_track=is_fast_track,
                     paired_session_id=existing_session.id
                 )
             return existing_session, q_entry
 
-        # 2. Extract normalized demographics
+        # 2. Check Pass & Streak Eligibility
+        eligibility = BlindDateMatcherService.check_eligibility(user)
+        if not eligibility["can_enter"]:
+            if eligibility["reason"] == "streak_inactive":
+                raise ValueError(
+                    "Daily Blind Date passes are reserved for mindful seekers with an active streak! "
+                    "Watch a 30s ad to ignite your streak, or unlock for ₹29."
+                )
+            else:
+                raise ValueError(
+                    "Today's free streak pass has been used. "
+                    "Watch 1 ad for an extra pass or unlock for ₹29."
+                )
+
+        # 3. Consume pass
+        if eligibility["has_daily_streak_pass"]:
+            user.last_blind_date_date = today
+        else:
+            user.blind_date_passes = max(0, (user.blind_date_passes or 0) - 1)
+        db.add(user)
+
+        # 4. Extract normalized demographics
         gender_a = normalize_gender(user.gender)
         pref_a = normalize_preference(user.interested_in)
         age_a = calculate_user_age(user.dob)
         min_age_a = getattr(user, "preferred_age_min", 18) or 18
         max_age_a = getattr(user, "preferred_age_max", 45) or 45
 
-        # 3. Fetch waiting candidates from queue (excluding self)
-        # We query candidates ordered by joined_at for fair FIFO matchmaking
+        # 5. Fetch waiting candidates from queue (excluding self)
+        # 100% Equal Priority: Sorters prioritize is_fast_track first, then FIFO joined_at
         candidates_query = (
             select(BlindDateQueueEntry)
             .where(
                 BlindDateQueueEntry.status == "waiting",
                 BlindDateQueueEntry.user_id != user.id
             )
-            .order_by(BlindDateQueueEntry.joined_at.asc())
+            .order_by(
+                BlindDateQueueEntry.is_fast_track.desc(),
+                BlindDateQueueEntry.joined_at.asc()
+            )
         )
         candidates_res = await db.execute(candidates_query)
         candidates: List[BlindDateQueueEntry] = list(candidates_res.scalars().all())
@@ -216,7 +339,8 @@ class BlindDateMatcherService:
                 expires_at=expires_at,
                 user1_decision="pending",
                 user2_decision="pending",
-                icebreaker_prompt=icebreaker
+                icebreaker_prompt=icebreaker,
+                extension_count=0
             )
             db.add(session)
 
@@ -238,6 +362,7 @@ class BlindDateMatcherService:
                     preferred_age_min=min_age_a,
                     preferred_age_max=max_age_a,
                     status="paired",
+                    is_fast_track=is_fast_track,
                     paired_session_id=session_id
                 )
                 db.add(user_entry)
@@ -246,6 +371,7 @@ class BlindDateMatcherService:
                 user_entry.interested_in = user.interested_in or "everyone"
                 user_entry.age = age_a
                 user_entry.status = "paired"
+                user_entry.is_fast_track = is_fast_track
                 user_entry.paired_session_id = session_id
 
             await db.commit()
@@ -267,6 +393,7 @@ class BlindDateMatcherService:
                 preferred_age_min=min_age_a,
                 preferred_age_max=max_age_a,
                 status="waiting",
+                is_fast_track=is_fast_track,
                 joined_at=now,
                 paired_session_id=None
             )
@@ -278,6 +405,7 @@ class BlindDateMatcherService:
             user_entry.preferred_age_min = min_age_a
             user_entry.preferred_age_max = max_age_a
             user_entry.status = "waiting"
+            user_entry.is_fast_track = is_fast_track
             user_entry.joined_at = now
             user_entry.paired_session_id = None
 

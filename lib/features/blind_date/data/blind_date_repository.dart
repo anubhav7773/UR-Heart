@@ -12,9 +12,31 @@ class BlindDateRepository {
 
   BlindDateRepository(this._apiClient);
 
-  Future<Map<String, dynamic>> joinQueue() async {
+  Future<BlindDateEligibility> getEligibility() async {
+    final response = await _apiClient.dio.get<Map<String, dynamic>>(
+      '/api/v1/blind-date/eligibility',
+    );
+    return BlindDateEligibility.fromJson(response.data ?? {});
+  }
+
+  Future<BlindDateEligibility> claimAdPass() async {
+    final response = await _apiClient.dio.post<Map<String, dynamic>>(
+      '/api/v1/blind-date/claim-ad-pass',
+    );
+    return BlindDateEligibility.fromJson(response.data ?? {});
+  }
+
+  Future<Map<String, dynamic>> joinQueue({bool isFastTrack = false}) async {
     final response = await _apiClient.dio.post<Map<String, dynamic>>(
       '/api/v1/blind-date/queue/join',
+      data: {'is_fast_track': isFastTrack},
+    );
+    return response.data ?? {};
+  }
+
+  Future<Map<String, dynamic>> extendSession(String sessionId) async {
+    final response = await _apiClient.dio.post<Map<String, dynamic>>(
+      '/api/v1/blind-date/session/$sessionId/extend',
     );
     return response.data ?? {};
   }

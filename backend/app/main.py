@@ -202,9 +202,14 @@ async def lifespan(app: FastAPI):
                     CREATE INDEX IF NOT EXISTS idx_blind_date_queue_status ON public.blind_date_queue(status);
                     CREATE INDEX IF NOT EXISTS idx_blind_date_sessions_users ON public.blind_date_sessions(user1_id, user2_id);
                     CREATE INDEX IF NOT EXISTS idx_blind_date_messages_session ON public.blind_date_messages(session_id);
+
+                    ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_blind_date_date DATE NULL;
+                    ALTER TABLE public.users ADD COLUMN IF NOT EXISTS blind_date_passes INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE public.blind_date_queue ADD COLUMN IF NOT EXISTS is_fast_track BOOLEAN NOT NULL DEFAULT FALSE;
+                    ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS extension_count SMALLINT NOT NULL DEFAULT 0;
                 """))
                 await session.commit()
-                print("[SCHEMA] Blind date tables verified in PostgreSQL.", flush=True)
+                print("[SCHEMA] Blind date tables & equal perks columns verified in PostgreSQL.", flush=True)
         except Exception as e:
             print(f"[SCHEMA NOTICE] Blind date schema check: {e}", flush=True)
 

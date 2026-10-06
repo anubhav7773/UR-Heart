@@ -61,6 +61,8 @@ class BlindDateSession(Base):
         nullable=True
     )
 
+    extension_count = Column(SmallInteger, nullable=False, default=0)
+
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
@@ -112,5 +114,6 @@ class BlindDateQueueEntry(Base):
 
     # Status: 'waiting', 'paired', 'cancelled'
     status = Column(String(20), nullable=False, default="waiting", index=True)
+    is_fast_track = Column(Boolean, nullable=False, default=False)
     joined_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     paired_session_id = Column(UUID(as_uuid=True), nullable=True)

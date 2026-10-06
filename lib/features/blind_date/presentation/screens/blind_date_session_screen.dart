@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/ads/rewarded_ad_manager.dart';
 import '../../../../core/theme/sanctuary_colors.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../chat/presentation/screens/chat_dialogue_screen.dart';
 import '../../../chat/presentation/services/window_security_service.dart';
 import '../../../feed/presentation/widgets/voice_spark_pill.dart';
@@ -63,6 +65,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(blindDateControllerProvider);
     final controller = ref.read(blindDateControllerProvider.notifier);
+    final authState = ref.watch(authControllerProvider);
+    final currentUserId = authState.authenticatedUserId ?? '';
     final session = state.session;
     final partner = session?.partner;
 
@@ -95,8 +99,16 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
             Navigator.of(context).maybePop();
           },
         ),
-        title: _buildTimerBadge(state.remainingSeconds, isExpired),
+        title: _buildTimerBadge(
+          context,
+          state.remainingSeconds,
+          isExpired,
+          canChat,
+          controller,
+          currentUserId,
+        ),
         centerTitle: true,
+
         actions: [
           IconButton(
             icon: const Icon(Icons.shield_outlined,
@@ -176,6 +188,10 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                     ),
             ),
 
+            // In-Session +3 Minute Extension Prompt (when <= 60s remaining)
+            if (canChat && state.remainingSeconds <= 60 && (session?.extensionCount ?? 0) < 3)
+              _buildExtensionPrompt(context, state, controller, currentUserId),
+
             // Chat Input Bar (if session still active)
             if (canChat)
               Container(
@@ -236,12 +252,78 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     _scrollToBottom();
   }
 
-  Widget _buildTimerBadge(int seconds, bool isExpired) {
+  Widget _buildExtensionPrompt(
+    BuildContext context,
+    BlindDateState state,
+    BlindDateController controller,
+    String userId,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: SanctuaryColors.resonantGold.withAlpha(30),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SanctuaryColors.resonantGold.withAlpha(120)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hourglass_bottom_rounded, size: 18, color: SanctuaryColors.resonantGold),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Veil closing soon! Extend dialogue (+3 Mins)?',
+              style: TextStyle(
+                color: SanctuaryColors.crispIvory,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: state.isExtending
+                ? null
+                : () => _showExtensionDialog(context, controller, userId),
+            style: TextButton.styleFrom(
+              backgroundColor: SanctuaryColors.glowingTerracotta,
+              foregroundColor: SanctuaryColors.crispIvory,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: state.isExtending
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: SanctuaryColors.crispIvory,
+                    ),
+                  )
+                : const Text(
+                    '+3 Mins',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimerBadge(
+    BuildContext context,
+    int seconds,
+    bool isExpired,
+    bool canChat,
+    BlindDateController controller,
+    String userId,
+  ) {
     final mm = (seconds ~/ 60).toString().padLeft(2, '0');
     final ss = (seconds % 60).toString().padLeft(2, '0');
     final isLowTime = seconds <= 60 && !isExpired;
 
-    return Container(
+    final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isExpired
@@ -284,10 +366,32 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
               letterSpacing: 0.5,
             ),
           ),
+          if (isLowTime && canChat) ...[
+            const SizedBox(width: 6),
+            const Text(
+              '• +3m',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: SanctuaryColors.resonantGold,
+              ),
+            ),
+          ],
         ],
       ),
     );
+
+    if (isLowTime && canChat) {
+      return InkWell(
+        onTap: () => _showExtensionDialog(context, controller, userId),
+        borderRadius: BorderRadius.circular(20),
+        child: badge,
+      );
+    }
+
+    return badge;
   }
+
 
   Widget _buildVeiledPartnerCard(
       BlindDatePartner? partner, bool isRevealed) {
@@ -726,4 +830,176 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
       },
     );
   }
+
+  Future<void> _showExtensionDialog(
+    BuildContext context,
+    BlindDateController controller,
+    String userId,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SanctuaryColors.elevatedSlate,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: SanctuaryColors.mutedCharcoalBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: SanctuaryColors.resonantGold.withAlpha(40),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.hourglass_bottom_rounded,
+                      color: SanctuaryColors.resonantGold,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Extend Soul Dialogue (+3 Mins)',
+                          style: TextStyle(
+                            color: SanctuaryColors.crispIvory,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Equal Perks • Keep connection blossoming',
+                          style: TextStyle(
+                            color: SanctuaryColors.softGreySubtext,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: SanctuaryColors.midnightObsidian,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: SanctuaryColors.mutedCharcoalBorder),
+                ),
+                child: const Text(
+                  'Extending adds +180 seconds to this veiled sanctuary so you can continue your soulful exchange without rushing.',
+                  style: TextStyle(
+                    color: SanctuaryColors.softGreySubtext,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Option A: Watch 30s Ad (100% Free)
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  RewardedAdManager.instance.showRewardedAd(
+                    userId: userId,
+                    adType: 'session_extension',
+                    targetId: 'none',
+                    context: context,
+                    onRewardGranted: () async {
+                      final success = await controller.extendSession();
+                      if (context.mounted && success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('🌟 +3 Minutes of soulful dialogue unlocked!'),
+                            backgroundColor: SanctuaryColors.onlineEmerald,
+                          ),
+                        );
+                      }
+                    },
+                    onPlaybackFailed: (err) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Reflection paused: $err')),
+                        );
+                      }
+                    },
+                  );
+                },
+                icon: const Icon(Icons.play_circle_fill_rounded, size: 20),
+                label: const Text(
+                  'Watch 30s Reflection (+3 Mins Free)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: SanctuaryColors.glowingTerracotta,
+                  foregroundColor: SanctuaryColors.crispIvory,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Option B: Instant ₹29 Perk
+              OutlinedButton.icon(
+                onPressed: () async {
+                  Navigator.of(ctx).pop();
+                  final success = await controller.extendSession();
+                  if (context.mounted && success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('⚡ +3 Minutes unlocked via ₹29 perk!'),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.bolt_rounded, size: 20, color: SanctuaryColors.resonantGold),
+                label: const Text(
+                  'Unlock Instant +3 Mins (₹29)',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SanctuaryColors.crispIvory,
+                  side: const BorderSide(color: SanctuaryColors.mutedCharcoalBorder),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
+

@@ -23,8 +23,36 @@ class BlindDateMessageRequest(BaseModel):
     ciphertext: str = Field(..., min_length=1, max_length=2000)
 
 
+class JoinQueueRequest(BaseModel):
+    is_fast_track: bool = False
+
+
+@router.get("/eligibility", status_code=status.HTTP_200_OK, summary="Check Blind Date Pass Eligibility")
+async def check_blind_date_eligibility(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Checks if seeker has an active daily streak pass (1 pass/day) or stored bonus passes.
+    """
+    return BlindDateMatcherService.check_eligibility(current_user)
+
+
+@router.post("/claim-ad-pass", status_code=status.HTTP_200_OK, summary="Claim Blind Date Pass via Rewarded Ad")
+async def claim_blind_date_ad_pass(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unlocks +1 Blind Date pass by watching a 30-sec rewarded ad.
+    If the seeker's daily streak is inactive or broken, watching this ad also
+    ignites/locks their streak for the day (1:1 Value Parity, viral loop).
+    """
+    return await BlindDateMatcherService.claim_ad_pass(db, current_user)
+
+
 @router.post("/queue/join", status_code=status.HTTP_200_OK, summary="Join Blind Date Matchmaking Queue")
 async def join_blind_date_queue(
+    payload: Optional[JoinQueueRequest] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -33,7 +61,19 @@ async def join_blind_date_queue(
     If a compatible seeker is already waiting, immediately pairs them into a 5-minute timed session.
     Otherwise, enqueues the user in 'waiting' state.
     """
-    session, queue_entry = await BlindDateMatcherService.join_or_match_queue(db, current_user)
+    is_fast_track = payload.is_fast_track if payload else False
+    try:
+        session, queue_entry = await BlindDateMatcherService.join_or_match_queue(
+            db, current_user, is_fast_track=is_fast_track
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": str(e),
+                "eligibility": BlindDateMatcherService.check_eligibility(current_user)
+            }
+        )
 
     if session:
         # Determine partner user ID
@@ -70,9 +110,11 @@ async def join_blind_date_queue(
         "queue_entry": {
             "gender": queue_entry.gender,
             "interested_in": queue_entry.interested_in,
-            "joined_at": queue_entry.joined_at.isoformat() if queue_entry.joined_at else None
+            "joined_at": queue_entry.joined_at.isoformat() if queue_entry.joined_at else None,
+            "is_fast_track": queue_entry.is_fast_track
         }
     }
+
 
 
 @router.get("/queue/status", status_code=status.HTTP_200_OK, summary="Poll Queue Status")
@@ -305,3 +347,30 @@ async def submit_resonance_decision(
         "match_id": str(updated_session.match_id) if updated_session.match_id else None,
         "partner": partner_payload
     }
+
+
+@router.post("/session/{session_id}/extend", status_code=status.HTTP_200_OK, summary="Extend Blind Date Session (+3 Mins)")
+async def extend_blind_date_session(
+    session_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Equal Perks: Extends active blind date dialogue by +3 minutes (180 seconds).
+    Unlocked either via watching a 30s rewarded ad or via ₹29 perk (Zero class divide).
+    """
+    try:
+        session = await BlindDateMatcherService.extend_session(db, session_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    now = datetime.now(timezone.utc)
+    remaining_seconds = max(0, int((session.expires_at - now).total_seconds()))
+    return {
+        "status": session.status,
+        "expires_at": session.expires_at.isoformat(),
+        "remaining_seconds": remaining_seconds,
+        "extension_count": session.extension_count or 0,
+        "message": "Session extended by 3 minutes."
+    }
+

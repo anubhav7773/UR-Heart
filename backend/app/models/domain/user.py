@@ -79,6 +79,8 @@ class User(Base):
     voice_spark_prompt = Column(String(120), nullable=True)
     voice_spark_duration = Column(Numeric(4, 1), nullable=True, default=7.0)
     is_voice_verified = Column(Boolean, nullable=False, default=False)
+    last_blind_date_date = Column(Date, nullable=True)
+    blind_date_passes = Column(Integer, nullable=False, default=0)
 
     @validates("latitude")
     def validate_latitude(self, key, value):

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/ads/rewarded_ad_manager.dart';
 import '../../../../core/theme/sanctuary_colors.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../controllers/blind_date_controller.dart';
 import 'blind_date_session_screen.dart';
 
@@ -17,6 +19,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  bool _isModalShowing = false;
 
   @override
   void initState() {
@@ -30,6 +33,10 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
       parent: _pulseController,
       curve: Curves.easeInOut,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(blindDateControllerProvider.notifier).fetchEligibility();
+    });
   }
 
   @override
@@ -42,6 +49,8 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(blindDateControllerProvider);
     final controller = ref.read(blindDateControllerProvider.notifier);
+    final authState = ref.watch(authControllerProvider);
+    final currentUserId = authState.authenticatedUserId ?? '';
 
     // Auto-navigate when matched
     ref.listen<BlindDateState>(blindDateControllerProvider, (prev, next) {
@@ -50,6 +59,12 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
         Navigator.of(context).pushReplacementNamed(
           BlindDateSessionScreen.routeName,
         );
+      }
+      if (next.needsPassUnlock && !_isModalShowing) {
+        _isModalShowing = true;
+        _showEqualPerksDialog(context, currentUserId).whenComplete(() {
+          _isModalShowing = false;
+        });
       }
     });
 
@@ -86,7 +101,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               // Sunday Pulse & 24/7 Status Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -121,6 +136,11 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                   ],
                 ),
               ),
+
+              const SizedBox(height: 16),
+
+              // Equal Perks: Streak & Pass Status Card
+              _buildPerksStatusCard(context, state, controller, currentUserId),
 
               const SizedBox(height: 28),
 
@@ -367,4 +387,417 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
       ),
     );
   }
+
+  Widget _buildPerksStatusCard(
+    BuildContext context,
+    BlindDateState state,
+    BlindDateController controller,
+    String userId,
+  ) {
+    final eligibility = state.eligibility;
+    final isStreakActive = eligibility?.isStreakActive ?? false;
+    final streakCount = eligibility?.streakCount ?? 0;
+    final hasDailyPass = eligibility?.hasDailyStreakPass ?? false;
+    final bonusPasses = eligibility?.bonusPasses ?? 0;
+    final totalPasses = (hasDailyPass ? 1 : 0) + bonusPasses;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SanctuaryColors.elevatedSlate,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isStreakActive
+              ? SanctuaryColors.resonantGold.withAlpha(80)
+              : SanctuaryColors.mutedCharcoalBorder,
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isStreakActive
+                      ? SanctuaryColors.resonantGold.withAlpha(30)
+                      : SanctuaryColors.softGreySubtext.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isStreakActive
+                        ? SanctuaryColors.resonantGold.withAlpha(120)
+                        : SanctuaryColors.mutedCharcoalBorder,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.local_fire_department_rounded,
+                      size: 16,
+                      color: isStreakActive
+                          ? SanctuaryColors.resonantGold
+                          : SanctuaryColors.softGreySubtext,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isStreakActive ? '$streakCount Day Streak' : 'Streak Inactive',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isStreakActive
+                            ? SanctuaryColors.resonantGold
+                            : SanctuaryColors.softGreySubtext,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: totalPasses > 0
+                      ? SanctuaryColors.onlineEmerald.withAlpha(30)
+                      : SanctuaryColors.alertRed.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: totalPasses > 0
+                        ? SanctuaryColors.onlineEmerald.withAlpha(120)
+                        : SanctuaryColors.alertRed.withAlpha(80),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.confirmation_number_outlined,
+                      size: 15,
+                      color: totalPasses > 0
+                          ? SanctuaryColors.onlineEmerald
+                          : SanctuaryColors.alertRed,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$totalPasses Passes Ready',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: totalPasses > 0
+                            ? SanctuaryColors.onlineEmerald
+                            : SanctuaryColors.alertRed,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            isStreakActive
+                ? (hasDailyPass
+                    ? '✨ Today\'s Free Streak Pass is Active!'
+                    : '⚡ Today\'s free pass used. Stored bonus passes: $bonusPasses')
+                : '🔒 Daily 1 Free Pass is locked. Maintain streak or watch 1 ad to ignite!',
+            style: TextStyle(
+              color: SanctuaryColors.crispIvory.withAlpha(230),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(
+            color: SanctuaryColors.mutedCharcoalBorder,
+            height: 1,
+            thickness: 0.8,
+          ),
+          const SizedBox(height: 8),
+          // Fast-Track Radar Toggle
+          Row(
+            children: [
+              const Icon(
+                Icons.bolt_rounded,
+                size: 20,
+                color: SanctuaryColors.resonantGold,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Fast-Track Radar (Equal VIP)',
+                      style: TextStyle(
+                        color: SanctuaryColors.crispIvory,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Jump to top of matchmaking queue (Free for All)',
+                      style: TextStyle(
+                        color: SanctuaryColors.softGreySubtext,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: state.isFastTrack,
+                onChanged: (val) => controller.toggleFastTrack(val),
+                activeColor: SanctuaryColors.glowingTerracotta,
+              ),
+            ],
+          ),
+          if (totalPasses == 0) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: OutlinedButton.icon(
+                onPressed: () => _showEqualPerksDialog(context, userId),
+                icon: const Icon(Icons.stars_rounded, size: 16, color: SanctuaryColors.resonantGold),
+                label: const Text(
+                  'Unlock Passes / Ignite Streak',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SanctuaryColors.crispIvory,
+                  side: const BorderSide(color: SanctuaryColors.glowingTerracotta),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEqualPerksDialog(BuildContext context, String userId) async {
+    final controller = ref.read(blindDateControllerProvider.notifier);
+    final state = ref.read(blindDateControllerProvider);
+    final eligibility = state.eligibility;
+    final isStreakActive = eligibility?.isStreakActive ?? false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SanctuaryColors.elevatedSlate,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: SanctuaryColors.mutedCharcoalBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: SanctuaryColors.glowingTerracotta.withAlpha(40),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.stars_rounded,
+                      color: SanctuaryColors.glowingTerracotta,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Equal Perks System',
+                          style: TextStyle(
+                            color: SanctuaryColors.crispIvory,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Zero Class Discrimination • 1:1 Value Parity',
+                          style: TextStyle(
+                            color: SanctuaryColors.softGreySubtext,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: SanctuaryColors.midnightObsidian,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: SanctuaryColors.mutedCharcoalBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isStreakActive
+                              ? Icons.local_fire_department
+                              : Icons.warning_amber_rounded,
+                          size: 18,
+                          color: isStreakActive
+                              ? SanctuaryColors.resonantGold
+                              : SanctuaryColors.glowingTerracotta,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isStreakActive
+                              ? 'Daily 1 Free Pass Claimed'
+                              : 'Daily 1 Free Pass Locked (Streak Inactive)',
+                          style: const TextStyle(
+                            color: SanctuaryColors.crispIvory,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isStreakActive
+                          ? 'You have used today\'s free streak pass. Unlock another pass below!'
+                          : 'Daily 1 free pass is granted to seekers maintaining their streak. Watching an ad will restore your streak AND grant a pass!',
+                      style: TextStyle(
+                        color: SanctuaryColors.softGreySubtext.withAlpha(200),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Option A: Watch 30s Ad (100% Free)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  controller.setNeedsPassUnlock(false);
+                  RewardedAdManager.instance.showRewardedAd(
+                    userId: userId,
+                    adType: 'blind_date_pass',
+                    targetId: 'none',
+                    context: context,
+                    onRewardGranted: () async {
+                      final success = await controller.claimAdPass();
+                      if (context.mounted && success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('✨ Streak Active & +1 Blind Date Pass Unlocked!'),
+                            backgroundColor: SanctuaryColors.onlineEmerald,
+                          ),
+                        );
+                      }
+                    },
+                    onPlaybackFailed: (err) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Reflection paused: $err')),
+                        );
+                      }
+                    },
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: SanctuaryColors.glowingTerracotta,
+                  foregroundColor: SanctuaryColors.crispIvory,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.play_circle_fill_rounded, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      isStreakActive
+                          ? 'Watch 30s Reflection for +1 Pass (Free)'
+                          : 'Watch 30s Ad: Ignite Streak & Unlock Pass',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Option B: ₹29 Direct Pass (Equal Value)
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  controller.setNeedsPassUnlock(false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⚡ Instant ₹29 Pass credited to your Sanctuary account!'),
+                    ),
+                  );
+                  // Grant pass directly for instant IAP simulation/integration
+                  controller.claimAdPass();
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SanctuaryColors.crispIvory,
+                  side: const BorderSide(color: SanctuaryColors.mutedCharcoalBorder),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bolt_rounded, size: 20, color: SanctuaryColors.resonantGold),
+                    SizedBox(width: 8),
+                    Text(
+                      'Unlock Instant Pass (₹29)',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
+

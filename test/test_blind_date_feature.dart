@@ -136,5 +136,63 @@ void main() {
       expect(updated.queueStatus, BlindDateQueueStatus.waiting);
       expect(updated.remainingSeconds, 240);
     });
+
+    test('Equal Perks: BlindDateEligibility parses correctly', () {
+      final json = {
+        'can_enter': true,
+        'is_streak_active': true,
+        'streak_count': 5,
+        'has_daily_streak_pass': true,
+        'bonus_passes': 2,
+        'reason': 'ready',
+        'last_blind_date_date': '2026-10-05',
+      };
+      final eligibility = BlindDateEligibility.fromJson(json);
+
+      expect(eligibility.canEnter, isTrue);
+      expect(eligibility.isStreakActive, isTrue);
+      expect(eligibility.streakCount, 5);
+      expect(eligibility.hasDailyStreakPass, isTrue);
+      expect(eligibility.bonusPasses, 2);
+      expect(eligibility.reason, 'ready');
+      expect(eligibility.lastBlindDateDate, '2026-10-05');
+    });
+
+    test('Equal Perks: BlindDateSessionModel handles in-session extension', () {
+      final json = {
+        'id': 'session-ext-01',
+        'status': 'active',
+        'remaining_seconds': 210,
+        'extension_count': 1,
+        'my_decision': 'pending',
+      };
+      final session = BlindDateSessionModel.fromJson(json);
+
+      expect(session.id, 'session-ext-01');
+      expect(session.remainingSeconds, 210);
+      expect(session.extensionCount, 1);
+
+      final extended = session.copyWith(
+        remainingSeconds: 390,
+        extensionCount: 2,
+      );
+      expect(extended.remainingSeconds, 390);
+      expect(extended.extensionCount, 2);
+    });
+
+    test('Equal Perks: BlindDateState tracks fast-track radar and pass modal', () {
+      const state = BlindDateState();
+      expect(state.isFastTrack, isFalse);
+      expect(state.needsPassUnlock, isFalse);
+      expect(state.isExtending, isFalse);
+
+      final fastTrackState = state.copyWith(
+        isFastTrack: true,
+        needsPassUnlock: true,
+      );
+      expect(fastTrackState.isFastTrack, isTrue);
+      expect(fastTrackState.needsPassUnlock, isTrue);
+    });
   });
 }
+

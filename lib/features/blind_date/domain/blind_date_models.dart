@@ -55,12 +55,45 @@ class BlindDatePartner {
   }
 }
 
+class BlindDateEligibility {
+  final bool canEnter;
+  final bool isStreakActive;
+  final int streakCount;
+  final bool hasDailyStreakPass;
+  final int bonusPasses;
+  final String reason; // 'ready', 'streak_inactive', 'daily_pass_exhausted'
+  final String? lastBlindDateDate;
+
+  const BlindDateEligibility({
+    this.canEnter = false,
+    this.isStreakActive = false,
+    this.streakCount = 0,
+    this.hasDailyStreakPass = false,
+    this.bonusPasses = 0,
+    this.reason = 'ready',
+    this.lastBlindDateDate,
+  });
+
+  factory BlindDateEligibility.fromJson(Map<String, dynamic> json) {
+    return BlindDateEligibility(
+      canEnter: json['can_enter'] as bool? ?? false,
+      isStreakActive: json['is_streak_active'] as bool? ?? false,
+      streakCount: (json['streak_count'] as num?)?.toInt() ?? 0,
+      hasDailyStreakPass: json['has_daily_streak_pass'] as bool? ?? false,
+      bonusPasses: (json['bonus_passes'] as num?)?.toInt() ?? 0,
+      reason: json['reason'] as String? ?? 'ready',
+      lastBlindDateDate: json['last_blind_date_date'] as String?,
+    );
+  }
+}
+
 class BlindDateSessionModel {
   final String id;
   final String status; // active, revealed, passed, expired
   final DateTime? startedAt;
   final DateTime? expiresAt;
   final int remainingSeconds;
+  final int extensionCount;
   final String icebreakerPrompt;
   final String myDecision; // pending, resonate, pass
   final String partnerDecision;
@@ -73,6 +106,7 @@ class BlindDateSessionModel {
     this.startedAt,
     this.expiresAt,
     this.remainingSeconds = 300,
+    this.extensionCount = 0,
     this.icebreakerPrompt = 'What is a quiet dream you hold close to your heart?',
     this.myDecision = 'pending',
     this.partnerDecision = 'hidden',
@@ -91,6 +125,7 @@ class BlindDateSessionModel {
           ? DateTime.tryParse(json['expires_at'] as String)
           : null,
       remainingSeconds: (json['remaining_seconds'] as num?)?.toInt() ?? 300,
+      extensionCount: (json['extension_count'] as num?)?.toInt() ?? 0,
       icebreakerPrompt: json['icebreaker_prompt'] as String? ??
           'What is a quiet dream you hold close to your heart?',
       myDecision: json['my_decision'] as String? ?? 'pending',
@@ -105,6 +140,8 @@ class BlindDateSessionModel {
   BlindDateSessionModel copyWith({
     String? status,
     int? remainingSeconds,
+    int? extensionCount,
+    DateTime? expiresAt,
     String? myDecision,
     String? partnerDecision,
     String? matchId,
@@ -114,8 +151,9 @@ class BlindDateSessionModel {
       id: id,
       status: status ?? this.status,
       startedAt: startedAt,
-      expiresAt: expiresAt,
+      expiresAt: expiresAt ?? this.expiresAt,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
+      extensionCount: extensionCount ?? this.extensionCount,
       icebreakerPrompt: icebreakerPrompt,
       myDecision: myDecision ?? this.myDecision,
       partnerDecision: partnerDecision ?? this.partnerDecision,
