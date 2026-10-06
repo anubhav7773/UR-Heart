@@ -12,6 +12,7 @@ import 'core/app/ur_heart_app.dart';
 import 'core/services/activity_logger_service.dart';
 import 'core/services/sanctuary_notification_service.dart';
 import 'core/storage/secure_session_storage.dart';
+import 'features/chat/presentation/services/window_security_service.dart';
 import 'features/profile/data/profile_repository.dart';
 
 @pragma('vm:entry-point')
@@ -112,6 +113,10 @@ Future<void> main() async {
       resolvedInitialRoute = '/main';
     }
 
+    // Automatically bypass screenshot/recording protection app-wide if founder is authenticated
+    if (await WindowSecurityService.isBypassedUser()) {
+      await WindowSecurityService.disableSecureMode();
+    }
   } catch (_) {}
 
   // Stream app initialization event to Render Live Logs

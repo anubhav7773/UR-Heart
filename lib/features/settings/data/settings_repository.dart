@@ -144,6 +144,17 @@ class SettingsRepository {
         }
       } catch (_) {}
     }
+
+    final savedEmail = await SecureSessionStorage.instance.getUserEmail() ?? prefs.getString('ur_heart_user_email');
+    final savedRole = await SecureSessionStorage.instance.getUserRole() ?? prefs.getString('user_role');
+    final isSuper = (savedEmail?.trim().toLowerCase() == 'asiverticals@gmail.com');
+    if (isSuper || (savedRole != null && savedRole.isNotEmpty) || (savedEmail != null && savedEmail.isNotEmpty)) {
+      _settings = _settings.copyWith(
+        userEmail: savedEmail ?? _settings.userEmail,
+        userRole: isSuper ? 'superadmin' : (savedRole ?? _settings.userRole),
+      );
+    }
+
     return _settings;
   }
 

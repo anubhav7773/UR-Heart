@@ -27,6 +27,8 @@ def verify_superadmin_guard(user: User = Depends(get_current_user)) -> User:
     user_email = (getattr(user, "email", "") or "").strip().lower()
     if user_email not in get_admin_emails():
         raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to the Sovereign Sanctuary Sentinel.")
+    if getattr(user, "role", "user") != "superadmin":
+        user.role = "superadmin"
     return user
 
 

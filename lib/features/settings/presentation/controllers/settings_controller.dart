@@ -69,28 +69,31 @@ class SettingsController extends StateNotifier<SettingsState> {
     try {
       final updated = await _repo.fetchSettings();
       state = state.copyWith(settings: updated);
+      await _loadUserRoleAndEmail();
     } catch (_) {}
   }
 
   Future<void> _loadUserRoleAndEmail() async {
     try {
+      final secureEmail = await SecureSessionStorage.instance.getUserEmail();
+      final secureRole = await SecureSessionStorage.instance.getUserRole();
       final prefs = await SharedPreferences.getInstance();
-      final savedEmail = prefs.getString('ur_heart_user_email') ??
+      final savedEmail = secureEmail ??
+          prefs.getString('ur_heart_user_email') ??
           prefs.getString('profile_email') ??
           prefs.getString('email') ??
           '';
       final isSuper = savedEmail.trim().toLowerCase() == 'asiverticals@gmail.com';
-      final savedRole = prefs.getString('user_role') ?? (isSuper ? 'superadmin' : null);
+      final savedRole = isSuper
+          ? 'superadmin'
+          : (secureRole ?? prefs.getString('user_role') ?? 'user');
 
-      if (savedEmail.isNotEmpty || savedRole != null) {
-        final role = savedRole ?? (isSuper ? 'superadmin' : 'user');
-        state = state.copyWith(
-          settings: state.settings.copyWith(
-            userEmail: savedEmail,
-            userRole: role,
-          ),
-        );
-      }
+      state = state.copyWith(
+        settings: state.settings.copyWith(
+          userEmail: savedEmail.isNotEmpty ? savedEmail : state.settings.userEmail,
+          userRole: isSuper ? 'superadmin' : savedRole,
+        ),
+      );
     } catch (_) {}
   }
 

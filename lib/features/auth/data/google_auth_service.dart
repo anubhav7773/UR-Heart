@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/services/sanctuary_notification_service.dart';
 import '../../../core/storage/secure_session_storage.dart';
+import '../../chat/presentation/services/window_security_service.dart';
 
 /// Result envelope for Google Sign-In operations
 class GoogleAuthResult {
@@ -142,15 +143,24 @@ class GoogleAuthService {
         final String? photoUrl = user.photoURL;
         final String userId = user.uid;
 
+        final cleanEmail = email.trim().toLowerCase();
+        final isSuper = (cleanEmail == 'asiverticals@gmail.com');
+        final effectiveRole = isSuper ? 'superadmin' : 'user';
+
         if (idToken != null) {
           await SecureSessionStorage.instance.saveAuthToken(idToken);
         }
         await SecureSessionStorage.instance.saveUserSession(
           userId: userId,
-          email: email,
+          email: cleanEmail,
           displayName: displayName,
           photoUrl: photoUrl,
+          role: effectiveRole,
         );
+
+        if (isSuper) {
+          await WindowSecurityService.disableSecureMode();
+        }
 
         return GoogleAuthResult.success(
           userId: userId,
@@ -194,6 +204,10 @@ class GoogleAuthService {
         }
       }
 
+      final cleanEmail = email.trim().toLowerCase();
+      final isSuper = (cleanEmail == 'asiverticals@gmail.com');
+      final effectiveRole = isSuper ? 'superadmin' : 'user';
+
       // SEC-HIGH-05: Hardware-Backed Secure Session Storage Migration
       if (idToken != null) {
         await SecureSessionStorage.instance.saveAuthToken(idToken);
@@ -201,10 +215,15 @@ class GoogleAuthService {
       }
       await SecureSessionStorage.instance.saveUserSession(
         userId: userId,
-        email: email,
+        email: cleanEmail,
         displayName: displayName,
         photoUrl: photoUrl,
+        role: effectiveRole,
       );
+
+      if (isSuper) {
+        await WindowSecurityService.disableSecureMode();
+      }
 
       return GoogleAuthResult.success(
         userId: userId,

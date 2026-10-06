@@ -260,7 +260,8 @@ async def get_current_user_optional(
 
 
 async def require_superadmin(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """Strict authorization gate: Validates server-side role and immutable admin identity."""
     admin_whitelist = {
@@ -270,14 +271,22 @@ async def require_superadmin(
     }
     admin_whitelist.discard("")
     
-    # Check both verified email and database role claim
+    # Check verified email against superadmin whitelist
     user_email = (getattr(current_user, "email", "") or "").strip().lower()
-    user_role = getattr(current_user, "role", "user") or "user"
-    if (user_email not in admin_whitelist) or user_role != "superadmin":
+    if user_email not in admin_whitelist:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access strictly restricted to the Sovereign Sanctuary Sentinel."
         )
+    
+    # Auto-elevate role claim if not already superadmin
+    user_role = getattr(current_user, "role", "user") or "user"
+    if user_role != "superadmin":
+        current_user.role = "superadmin"
+        try:
+            await db.commit()
+        except Exception:
+            pass
     return current_user
 
 

@@ -7,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_session_storage.dart';
 import '../../../core/services/sanctuary_notification_service.dart';
 import '../../profile/data/profile_repository.dart';
+import '../../chat/presentation/services/window_security_service.dart';
 import 'google_auth_service.dart';
 
 /// Result wrapper for authentication operations
@@ -233,7 +234,8 @@ class AuthRepository {
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
         }
 
-        final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com');
+        final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com') ||
+            (data['role']?.toString().toLowerCase() == 'superadmin');
         await SecureSessionStorage.instance.saveUserSession(
           userId: userId,
           email: cleanEmail,
@@ -243,6 +245,10 @@ class AuthRepository {
 
         // Also persist to SharedPreferences for immediate app gateway resilience
         final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_role', isSuperadmin ? 'superadmin' : 'user');
+        if (isSuperadmin) {
+          await WindowSecurityService.disableSecureMode();
+        }
         if (tokenStr != null) {
           await prefs.setString('ur_heart_auth_token', tokenStr.toString());
           await prefs.setString('auth_token', tokenStr.toString());
@@ -334,7 +340,8 @@ class AuthRepository {
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
           final matchedEmail = data['email']?.toString() ?? cleanEmail;
-          final isSuperadmin = (matchedEmail?.toLowerCase().trim() == 'asiverticals@gmail.com');
+          final isSuperadmin = (matchedEmail?.toLowerCase().trim() == 'asiverticals@gmail.com') ||
+              (data['role']?.toString().toLowerCase() == 'superadmin');
           final isCompleted = data['is_profile_completed'] == true;
           await SecureSessionStorage.instance.saveUserSession(
             userId: data['user_id']?.toString() ?? data['id']?.toString(),
@@ -344,6 +351,10 @@ class AuthRepository {
           );
 
           final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_role', isSuperadmin ? 'superadmin' : 'user');
+          if (isSuperadmin) {
+            await WindowSecurityService.disableSecureMode();
+          }
           await prefs.setString('ur_heart_auth_token', tokenStr.toString());
           await prefs.setString('auth_token', tokenStr.toString());
           SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
@@ -399,7 +410,8 @@ class AuthRepository {
             // SEC-HIGH-05: Hardware-Backed Secure Session Storage
             await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
-            final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com');
+            final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com') ||
+                (data['role']?.toString().toLowerCase() == 'superadmin');
             final isCompleted = data['is_profile_completed'] == true;
             await SecureSessionStorage.instance.saveUserSession(
               userId: data['user_id']?.toString() ?? data['id']?.toString(),
@@ -409,6 +421,10 @@ class AuthRepository {
             );
 
             final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('user_role', isSuperadmin ? 'superadmin' : 'user');
+            if (isSuperadmin) {
+              await WindowSecurityService.disableSecureMode();
+            }
             await prefs.setString('ur_heart_auth_token', tokenStr.toString());
             await prefs.setString('auth_token', tokenStr.toString());
             SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
