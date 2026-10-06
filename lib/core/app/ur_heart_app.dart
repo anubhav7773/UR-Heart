@@ -20,6 +20,8 @@ import '../../features/rewards/presentation/screens/growth_hub_screen.dart';
 import '../../features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
 import '../../features/ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
 import '../../features/profile/presentation/screens/seeker_profile_detail_screen.dart';
+import '../../features/blind_date/presentation/screens/blind_date_hub_screen.dart';
+import '../../features/blind_date/presentation/screens/blind_date_session_screen.dart';
 import '../../features/chat/presentation/services/window_security_service.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
@@ -78,6 +80,8 @@ class URHeartApp extends ConsumerWidget {
         EvaSanctuaryScreen.routeName: (context) => const EvaSanctuaryScreen(),
         SanctuaryAppInfoScreen.routeName: (context) => const SanctuaryAppInfoScreen(),
         SeekerProfileDetailScreen.routeName: (context) => const SeekerProfileDetailScreen(),
+        BlindDateHubScreen.routeName: (context) => const BlindDateHubScreen(),
+        BlindDateSessionScreen.routeName: (context) => const BlindDateSessionScreen(),
       },
       onGenerateRoute: (settings) {
         final routeName = settings.name ?? '';

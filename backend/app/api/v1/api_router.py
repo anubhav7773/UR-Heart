@@ -25,6 +25,7 @@ from app.api.v1.endpoints import (
     ai_sanctuary,
     web_store,
     media,
+    blind_date,
 )
 
 api_router = APIRouter()
@@ -104,5 +105,8 @@ api_router.include_router(web_store.router)
 
 # 20. Cloudflare R2 & Sanctuary Direct Media Pipeline
 api_router.include_router(media.router)
+
+# 21. Sanctuary Blind Date Engine (3-Gender Bidirectional Fair Pairing)
+api_router.include_router(blind_date.router)
 
 

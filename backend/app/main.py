@@ -162,7 +162,54 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[SCHEMA NOTICE] Voice spark column check: {e}", flush=True)
 
+    async def _ensure_blind_date_schema():
+        try:
+            from sqlalchemy import text
+            async with async_session_factory() as session:
+                await session.execute(text("""
+                    CREATE TABLE IF NOT EXISTS public.blind_date_sessions (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        user1_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                        user2_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                        status VARCHAR(20) NOT NULL DEFAULT 'active',
+                        started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        expires_at TIMESTAMPTZ NOT NULL,
+                        user1_decision VARCHAR(15) NOT NULL DEFAULT 'pending',
+                        user2_decision VARCHAR(15) NOT NULL DEFAULT 'pending',
+                        icebreaker_prompt TEXT NOT NULL DEFAULT 'What is a quiet dream you hold close to your heart?',
+                        match_id UUID REFERENCES public.matches(id) ON DELETE SET NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    );
+                    CREATE TABLE IF NOT EXISTS public.blind_date_messages (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        session_id UUID NOT NULL REFERENCES public.blind_date_sessions(id) ON DELETE CASCADE,
+                        sender_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                        ciphertext TEXT NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    );
+                    CREATE TABLE IF NOT EXISTS public.blind_date_queue (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+                        gender VARCHAR(20) NOT NULL,
+                        interested_in VARCHAR(20) NOT NULL,
+                        age SMALLINT NOT NULL DEFAULT 24,
+                        preferred_age_min SMALLINT NOT NULL DEFAULT 18,
+                        preferred_age_max SMALLINT NOT NULL DEFAULT 45,
+                        status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+                        joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        paired_session_id UUID NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_blind_date_queue_status ON public.blind_date_queue(status);
+                    CREATE INDEX IF NOT EXISTS idx_blind_date_sessions_users ON public.blind_date_sessions(user1_id, user2_id);
+                    CREATE INDEX IF NOT EXISTS idx_blind_date_messages_session ON public.blind_date_messages(session_id);
+                """))
+                await session.commit()
+                print("[SCHEMA] Blind date tables verified in PostgreSQL.", flush=True)
+        except Exception as e:
+            print(f"[SCHEMA NOTICE] Blind date schema check: {e}", flush=True)
+
     asyncio.create_task(_ensure_voice_spark_schema())
+    asyncio.create_task(_ensure_blind_date_schema())
 
     yield
     # SHUTDOWN: Gracefully close HTTP client & background tasks

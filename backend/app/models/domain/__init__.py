@@ -16,6 +16,11 @@ from app.models.domain.legal import (
     ConsentAuditLog,
 )
 from app.models.domain.audit_log import AdminAuditLog
+from app.models.domain.blind_date import (
+    BlindDateSession,
+    BlindDateMessage,
+    BlindDateQueueEntry,
+)
 
 __all__ = [
     "User",
@@ -33,4 +38,7 @@ __all__ = [
     "UnderageQuarantineRegistry",
     "ConsentAuditLog",
     "AdminAuditLog",
+    "BlindDateSession",
+    "BlindDateMessage",
+    "BlindDateQueueEntry",
 ]

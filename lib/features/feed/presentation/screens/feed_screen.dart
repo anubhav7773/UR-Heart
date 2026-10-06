@@ -115,6 +115,67 @@ class FeedScreen extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
+            // Sanctuary Blind Date Entry Banner
+            GestureDetector(
+              onTap: () => Navigator.of(context).pushNamed('/blind-date'),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF181B20) : const Color(0xFFF0EAE1),
+                  borderRadius: BorderRadius.circular(14.0),
+                  border: Border.all(
+                    color: const Color(0xFFD97746).withValues(alpha: 0.35),
+                    width: 1.0,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD97746).withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.masks_outlined,
+                        color: Color(0xFFD97746),
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Sanctuary Blind Date',
+                            style: TextStyle(
+                              color: primaryText,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '5-min veiled soul dialogue • Sunday 8 PM Pulse',
+                            style: TextStyle(
+                              color: subText,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 12,
+                      color: Color(0xFFD97746),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             Expanded(
               child: feedState.isLoading
                   ? Center(child: CircularProgressIndicator(color: pine))

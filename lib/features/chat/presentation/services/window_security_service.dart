@@ -35,6 +35,8 @@ class WindowSecurityService {
     '/profile-setup',
     '/ignored',
     '/ignored-profiles',
+    '/blind-date',
+    '/blind-date-session',
   };
 
   /// Public and growth routes where screenshots are safe and permitted

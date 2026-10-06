@@ -72,7 +72,12 @@ class ChatsListScreen extends ConsumerWidget {
               _buildFilterMenuItem('mutual', 'Mutual Sparks (${state.mutualCount})', Icons.favorite_border_rounded, state.activeFilter == 'mutual', titleColor, accentColor),
             ],
           ),
-          const SizedBox(width: 6),
+          IconButton(
+            icon: Icon(Icons.masks_outlined, color: accentColor, size: 22),
+            tooltip: 'Sanctuary Blind Date',
+            onPressed: () => Navigator.of(context).pushNamed('/blind-date'),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
