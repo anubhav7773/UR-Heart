@@ -797,7 +797,7 @@ def get_sanctuary_overview_html() -> str:
         <a href="#journey">Seeker Journey</a>
         <a href="#economics">Sovereign Store</a>
         <a href="#governance">DPDP Legal Desk</a>
-        <a href="/store" class="nav-cta">Web Store (+10% Bonus) 🛒</a>
+        <a href="#economics" class="nav-cta">Sanctuary Economy ⚖️</a>
       </nav>
     </header>
 
@@ -814,7 +814,7 @@ def get_sanctuary_overview_html() -> str:
 
       <div class="hero-actions">
         <a class="btn btn-primary" href="urheart://open">🚀 Open UR-Heart App</a>
-        <a class="btn btn-gold" href="/store">🛒 Sanctuary Web Store (+10% Perks)</a>
+        <a class="btn btn-gold" href="#economics">⚖️ Transparent Economy</a>
         <a class="btn btn-secondary" href="/privacy">🛡️ DPDP Privacy Policy</a>
         <a class="btn btn-secondary" href="/terms">⚖️ Community EULA</a>
         <a class="btn btn-secondary" href="/delete-account">🗑️ Account Deletion</a>
@@ -1029,20 +1029,19 @@ def get_sanctuary_overview_html() -> str:
             </div>
           </div>
           <p class="feature-text">
-            Transparent zero-paywall dual economy across Google Play, Apple App Store, and the Sanctuary Web Store (<code>urheart.asiverticals.me/store</code>).
+            Transparent zero-paywall dual economy across official mobile platforms and the Sanctuary Web Store.
             <br><strong>Dual-Path Philosophy:</strong> Seekers can access all perks 100% free through mindful sponsor reflections (10s = +10 swipes, 20s = 1 direct letter, 30s = bridge reveal token step) OR instantly ascend via Sovereign Passes.
-            <br>• <strong>Weekly Pass</strong>: ₹49 (100 Swipes) / $4.99 (200 Swipes) · <em>Web Store: 110 Swipes (+10% Bonus)</em>
-            <br>• <strong>Monthly Pass</strong>: ₹149 (500 Swipes) / $14.99 (1,000 Swipes) + 5 Direct Letters · <em>Web Store: 550 Swipes + 6 Letters</em>
-            <br>• <strong>1-Year Sovereign Pass</strong>: ₹1,499 / $59.99 · 365 Days Unlimited Swipes + 10 Direct Letters · <em>Web Store: 11 Letters (+10% Bonus)</em>
-            <br>• <strong>24h Global Passport</strong>: ₹99 / $1.99 standalone city teleportation (24h) · <em>Web: +10 Bonus Swipes</em>
-            <br>• <strong>Direct Letters Pack</strong>: ₹49 / $1.99 (3 Notes · <em>Web: 4 Notes</em>)
+            <br>• <strong>Weekly Pass</strong>: ₹49 (100 Swipes) / $4.99 (200 Swipes)
+            <br>• <strong>Monthly Pass</strong>: ₹149 (500 Swipes) / $14.99 (1,000 Swipes) + 5 Direct Letters
+            <br>• <strong>1-Year Sovereign Pass</strong>: ₹1,499 / $59.99 · 365 Days Unlimited Swipes + 10 Direct Letters
+            <br>• <strong>24h Global Passport</strong>: ₹99 / $1.99 standalone city teleportation (24h)
+            <br>• <strong>Direct Letters Pack</strong>: ₹49 / $1.99 (3 Notes)
             <br>• <strong>Instant Contact Key</strong>: ₹29 / $1.49 (Requires mutual consent)
           </p>
         </div>
         <div class="feature-chips">
-          <span class="chip">+10% Web Store Bonus</span>
+          <span class="chip">Sanctuary Web Store</span>
           <span class="chip">Dual-Path Free Ads or Pass</span>
-          <span class="chip">Instant UPI / NetBanking / Cards</span>
           <span class="chip">Zero Subscription Traps</span>
           <span class="chip">Cryptographic Ledger</span>
         </div>
@@ -1207,7 +1206,7 @@ def get_sanctuary_overview_html() -> str:
         <a href="/privacy">Privacy Policy</a> • 
         <a href="/terms">Terms & Community EULA</a> • 
         <a href="/delete-account">Account Deletion</a> • 
-        <a href="/store">Sanctuary Store</a> • 
+        <a href="#economics">Sanctuary Economy</a> • 
         <a href="/health">System Status</a>
       </p>
       <p style="margin-top:8px; font-size:11.5px; color:#5D756C;">

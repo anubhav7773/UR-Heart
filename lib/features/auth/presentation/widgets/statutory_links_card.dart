@@ -165,8 +165,9 @@ class StatutoryLinksCard extends StatelessWidget {
             icon: Icons.language_rounded,
             iconColor: const Color(0xFF4E9F76),
             title: 'Official Web Sanctuary',
-            subtitle: 'urheart.asiverticals.me',
+            subtitle: ApiEndpoints.officialDomain,
             url: ApiEndpoints.webSanctuaryUrl,
+            onInternalTap: () => Navigator.of(context).pushNamed('/appinfo'),
             headlineColor: headlineColor,
             mutedColor: mutedColor,
             goldAccent: goldAccent,
@@ -186,12 +187,13 @@ class StatutoryLinksCard extends StatelessWidget {
     required Color headlineColor,
     required Color mutedColor,
     required Color goldAccent,
+    VoidCallback? onInternalTap,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(12.0),
-        onTap: () => _openExternalUrl(context, url, title),
+        onTap: onInternalTap ?? () => _openExternalUrl(context, url, title),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
           decoration: BoxDecoration(
@@ -227,7 +229,7 @@ class StatutoryLinksCard extends StatelessWidget {
               ),
               const SizedBox(width: 8.0),
               Icon(
-                Icons.open_in_new_rounded,
+                onInternalTap != null ? Icons.arrow_forward_rounded : Icons.open_in_new_rounded,
                 size: 16.0,
                 color: goldAccent.withOpacity(0.85),
               ),

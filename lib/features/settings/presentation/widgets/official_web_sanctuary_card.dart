@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
+import '../screens/sanctuary_app_info_screen.dart';
 
-/// Official Web Sanctuary card connecting user directly to urheart.asiverticals.me
+/// Official Web Sanctuary card connecting user directly to in-app Sanctuary Architecture Overview (`/appinfo`)
 class OfficialWebSanctuaryCard extends StatelessWidget {
   final bool isDark;
 
@@ -14,28 +14,8 @@ class OfficialWebSanctuaryCard extends StatelessWidget {
     required this.isDark,
   });
 
-  Future<void> _launchWebSanctuary(BuildContext context) async {
-    final uri = Uri.parse(ApiEndpoints.webSanctuaryUrl);
-    try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not open https://urheart.asiverticals.me in browser.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error opening browser: $e'),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
+  void _openSanctuaryOverview(BuildContext context) {
+    Navigator.of(context).pushNamed(SanctuaryAppInfoScreen.routeName);
   }
 
   @override
@@ -135,7 +115,7 @@ class OfficialWebSanctuaryCard extends StatelessWidget {
           const SizedBox(height: 14),
           InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => _launchWebSanctuary(context),
+            onTap: () => _openSanctuaryOverview(context),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
@@ -147,13 +127,13 @@ class OfficialWebSanctuaryCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.open_in_browser_rounded,
+                    Icons.auto_stories_rounded,
                     size: 18,
                     color: headlineColor,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Visit ${ApiEndpoints.officialDomain}',
+                    'Explore Sanctuary Architecture',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

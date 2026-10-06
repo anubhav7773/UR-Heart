@@ -221,11 +221,11 @@ void main() {
 
       expect(find.text('Official Web Sanctuary'), findsOneWidget);
       expect(find.text('urheart.asiverticals.me'), findsOneWidget);
-      expect(find.text('Visit urheart.asiverticals.me'), findsOneWidget);
-      expect(find.byIcon(Icons.open_in_browser_rounded), findsOneWidget);
+      expect(find.text('Explore Sanctuary Architecture'), findsOneWidget);
+      expect(find.byIcon(Icons.auto_stories_rounded), findsOneWidget);
     });
 
-    testWidgets('SovereignStoreTabView opens Sovereign Access Gateway modal with Web Store option', (tester) async {
+    testWidgets('SovereignStoreTabView renders Google Play Billing compliant passes and restore link', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2.0;
       addTearDown(() {
@@ -244,20 +244,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verify store banner and passes rendered
-      expect(find.text('Sanctuary Web Store (10% Extra Passes)'), findsOneWidget);
+      // Verify Google Play Billing banner and passes rendered
+      expect(find.text('Sovereign Verified Sanctuary'), findsOneWidget);
+      expect(find.text('Official Google Play In-App Billing · Instant activation & encrypted pass sync.'), findsOneWidget);
       expect(find.text('1-Month Sovereign Pass'), findsOneWidget);
-
-      // Tap first Unlock button
-      final unlockBtn = find.text('Unlock').first;
-      await tester.tap(unlockBtn);
-      await tester.pumpAndSettle();
-
-      // Verify Sovereign Access Gateway modal bottom sheet rendered
-      expect(find.text('Sovereign Access Gateway'), findsOneWidget);
-      expect(find.text('Web Sanctuary Store'), findsOneWidget);
-      expect(find.text('+10% BONUS'), findsOneWidget);
-      expect(find.text('Google Play In-App Billing'), findsOneWidget);
+      expect(find.text('Restore Purchases (Google Play)'), findsOneWidget);
     });
   });
 }
