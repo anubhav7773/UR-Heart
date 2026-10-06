@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../chat/presentation/services/window_security_service.dart';
 import '../controllers/eva_controller.dart';
 
 class EvaSanctuaryScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,7 @@ class _EvaSanctuaryScreenState extends ConsumerState<EvaSanctuaryScreen>
   @override
   void initState() {
     super.initState();
+    WindowSecurityService.enableSecureMode();
     _orbAnimController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),

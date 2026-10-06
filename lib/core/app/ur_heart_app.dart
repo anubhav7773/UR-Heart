@@ -20,6 +20,7 @@ import '../../features/rewards/presentation/screens/growth_hub_screen.dart';
 import '../../features/navigation/presentation/screens/sanctuary_navigation_shell.dart';
 import '../../features/ai_sanctuary/presentation/screens/eva_sanctuary_screen.dart';
 import '../../features/profile/presentation/screens/seeker_profile_detail_screen.dart';
+import '../../features/chat/presentation/services/window_security_service.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
 import '../theme/theme_controller.dart';
@@ -43,6 +44,7 @@ class URHeartApp extends ConsumerWidget {
     return MaterialApp(
       title: 'UR-Heart',
       navigatorKey: appNavigatorKey,
+      navigatorObservers: [SanctuaryRouteSecurityObserver()],
       debugShowCheckedModeBanner: false,
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       theme: _buildLightTheme(),

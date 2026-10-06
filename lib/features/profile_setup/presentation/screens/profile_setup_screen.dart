@@ -9,6 +9,7 @@ import '../widgets/live_kyc_recording_modal.dart';
 import '../widgets/mindful_bio_editor.dart';
 import '../widgets/orientation_selector_pills.dart';
 import '../widgets/sacred_bridge_selector.dart';
+import '../../../chat/presentation/services/window_security_service.dart';
 
 /// Screen 4: Sanctuary Profile Setup & Identity Verification Scaffold
 /// 100% Production-Grade: Real Camera & Gallery photo uploads, EVA AI KYC & Bio Polish,
@@ -28,6 +29,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   @override
   void initState() {
     super.initState();
+    WindowSecurityService.enableSecureMode();
     final initialName = ref.read(profileSetupControllerProvider).fullName;
     _nameController = TextEditingController(text: initialName);
 

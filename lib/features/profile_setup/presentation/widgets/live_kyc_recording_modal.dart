@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../chat/presentation/services/window_security_service.dart';
 import '../controllers/profile_setup_controller.dart';
 
 class KycPoseInstruction {
@@ -77,6 +78,7 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
   @override
   void initState() {
     super.initState();
+    WindowSecurityService.enableSecureMode();
     _currentPose = _kycSanctuaryPoses[Random().nextInt(_kycSanctuaryPoses.length)];
     _initializeFrontCamera();
   }

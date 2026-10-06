@@ -136,9 +136,6 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    try {
-      WindowSecurityService.disableSecureMode();
-    } catch (_) {}
     _scrollController.dispose();
     _chatInputController.dispose();
     super.dispose();

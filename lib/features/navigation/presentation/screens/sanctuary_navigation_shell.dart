@@ -18,6 +18,7 @@ import '../../../../core/services/sanctuary_notification_service.dart';
 import '../../../../core/storage/secure_session_storage.dart';
 import '../../../resonances/presentation/controllers/resonances_controller.dart';
 import '../../../profile/presentation/controllers/persona_controller.dart';
+import '../../../chat/presentation/services/window_security_service.dart';
 import '../widgets/ios_pwa_install_banner.dart';
 
 /// Global Navigation Index State Provider for Tab Switching
@@ -57,6 +58,14 @@ class _SanctuaryNavigationShellState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.initialIndex != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(navigationIndexProvider.notifier).state = widget.initialIndex;
+        }
+      });
+    }
+    WindowSecurityService.applyPolicyForTab(widget.initialIndex);
     _initializeSeenAndStartPoller();
     _listenToRealtimeWebSocket();
   }
@@ -357,6 +366,10 @@ class _SanctuaryNavigationShellState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(navigationIndexProvider, (prev, next) {
+      WindowSecurityService.applyPolicyForTab(next);
+    });
+
     final currentIndex = ref.watch(navigationIndexProvider);
     final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
 

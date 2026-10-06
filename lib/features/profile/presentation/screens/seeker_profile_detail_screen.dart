@@ -10,6 +10,7 @@ import '../../../chat/presentation/screens/chat_dialogue_screen.dart';
 import '../../../feed/presentation/widgets/ai_resonance_insight_box.dart';
 import '../../../feed/presentation/widgets/mindful_intent_card.dart';
 import '../../../feed/presentation/widgets/photo_carousel_with_dots.dart';
+import '../../../chat/presentation/services/window_security_service.dart';
 
 /// Arguments payload for [SeekerProfileDetailScreen]
 class SeekerProfileDetailArgs {
@@ -209,6 +210,12 @@ class _SeekerProfileDetailScreenState extends ConsumerState<SeekerProfileDetailS
   SeekerProfileDetailArgs? _args;
   bool _isInitialized = false;
   bool _isLoadingLive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WindowSecurityService.enableSecureMode();
+  }
 
   @override
   void didChangeDependencies() {
