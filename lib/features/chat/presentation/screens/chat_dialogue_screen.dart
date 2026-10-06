@@ -432,7 +432,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                   isDark: isDark,
                   notifier: notifier,
                   templates: dialogueState.closureTemplates,
-                  recipientName: fallbackName,
+                  recipientName: fallbackName.toString(),
                 );
               }
             },
@@ -588,7 +588,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                       isDark: isDark,
                       notifier: notifier,
                       templates: dialogueState.closureTemplates,
-                      recipientName: fallbackName,
+                      recipientName: fallbackName.toString(),
                     ),
                   ),
                 if (dialogueState.isClosed)

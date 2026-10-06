@@ -65,6 +65,7 @@ class ChatsListScreen extends ConsumerWidget {
                 color: isDark ? DarkSanctuaryTokens.surfaceCardBorder : LightSanctuaryTokens.surfaceCardBorder,
               ),
             ),
+            itemBuilder: (context) => [
               _buildFilterMenuItem('all', 'All Conversations', Icons.all_inbox_rounded, state.activeFilter == 'all', titleColor, accentColor),
               _buildFilterMenuItem('unread', 'Unread Only (${state.unreadTotalCount})', Icons.mark_chat_unread_outlined, state.activeFilter == 'unread', titleColor, accentColor),
               _buildFilterMenuItem('direct', 'Direct Letters (${state.directCount})', Icons.mail_outline_rounded, state.activeFilter == 'direct', titleColor, accentColor),
