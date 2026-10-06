@@ -11,7 +11,6 @@ import 'package:ur_heart/features/chat/presentation/screens/chat_dialogue_screen
 import 'package:ur_heart/features/rewards/presentation/widgets/sacred_kinship_card.dart';
 import 'package:ur_heart/features/auth/presentation/widgets/magic_link_passage_card.dart';
 import 'package:ur_heart/core/constants/api_endpoints.dart';
-import 'package:ur_heart/features/settings/presentation/widgets/official_web_sanctuary_card.dart';
 import 'package:ur_heart/features/rewards/presentation/widgets/sovereign_store_tab_view.dart';
 
 void main() {
@@ -207,22 +206,6 @@ void main() {
       expect(ApiEndpoints.officialDomain, 'urheart.asiverticals.me');
       expect(ApiEndpoints.defaultBaseUrl, 'https://urheart.asiverticals.me');
       expect(ApiEndpoints.webSanctuaryUrl, 'https://urheart.asiverticals.me/appinfo');
-    });
-
-    testWidgets('OfficialWebSanctuaryCard renders official domain and launch button', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: OfficialWebSanctuaryCard(isDark: true),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Official Web Sanctuary'), findsOneWidget);
-      expect(find.text('urheart.asiverticals.me'), findsOneWidget);
-      expect(find.text('Explore Sanctuary Architecture'), findsOneWidget);
-      expect(find.byIcon(Icons.auto_stories_rounded), findsOneWidget);
     });
 
     testWidgets('SovereignStoreTabView renders Google Play Billing compliant passes and restore link', (tester) async {

@@ -11,7 +11,6 @@ import '../widgets/unbundled_checkbox_group.dart';
 import '../widgets/statutory_links_card.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../settings/presentation/screens/sanctuary_app_info_screen.dart';
 
 /// Screen 1: Mindful Consent & Statutory Legal Gateway
 /// Features bilingual DPDP Act 2023 unbundled consent and permanent theme locking
@@ -202,14 +201,6 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
                   _buildFooterLink(context, 'Terms & EULA', ApiEndpoints.termsOfServiceUrl, cornerTextColor),
                   Text('•', style: TextStyle(color: cornerTextColor, fontSize: 11)),
                   _buildFooterLink(context, 'Delete Account', ApiEndpoints.deleteAccountUrl, cornerTextColor),
-                  Text('•', style: TextStyle(color: cornerTextColor, fontSize: 11)),
-                  _buildFooterLink(
-                    context,
-                    'App Overview',
-                    ApiEndpoints.webSanctuaryUrl,
-                    cornerTextColor,
-                    onInternalTap: () => Navigator.of(context).pushNamed(SanctuaryAppInfoScreen.routeName),
-                  ),
                 ],
               ),
               const SizedBox(height: 20.0),
@@ -224,17 +215,15 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
     BuildContext context,
     String title,
     String url,
-    Color color, {
-    VoidCallback? onInternalTap,
-  }) {
+    Color color,
+  ) {
     return InkWell(
-      onTap: onInternalTap ??
-          () async {
-            final uri = Uri.parse(url);
-            try {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            } catch (_) {}
-          },
+      onTap: () async {
+        final uri = Uri.parse(url);
+        try {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (_) {}
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 2.0),
         child: Text(

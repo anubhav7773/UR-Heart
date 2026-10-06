@@ -15,7 +15,7 @@ void main() {
       expect(ApiEndpoints.deleteAccountUrl, 'https://urheart.asiverticals.me/delete-account');
     });
 
-    testWidgets('Check 2: StatutoryLinksCard displays all 4 statutory portals including Web Sanctuary', (tester) async {
+    testWidgets('Check 2: StatutoryLinksCard displays all 3 core statutory portals (Privacy, Terms, Account Deletion)', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -32,8 +32,7 @@ void main() {
       expect(find.text('Privacy Policy'), findsOneWidget);
       expect(find.text('Terms of Service & EULA'), findsOneWidget);
       expect(find.text('Account & Data Deletion'), findsOneWidget);
-      expect(find.text('Official Web Sanctuary'), findsOneWidget);
-      expect(find.text('urheart.asiverticals.me'), findsOneWidget);
+      expect(find.text('Official Web Sanctuary'), findsNothing);
     });
   });
 }
