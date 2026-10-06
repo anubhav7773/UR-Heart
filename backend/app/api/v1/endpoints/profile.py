@@ -607,6 +607,19 @@ async def upload_voice_spark(
     if len(content) > 3 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Audio file too large. Maximum allowed size is 3MB.")
 
+    # 0. AI Speech-To-Text Whisper Moderation Gate (Revenue Leak & Social Handle Protection)
+    from app.services.voice_moderator import VoiceModeratorService
+    is_safe, transcript, reason = await VoiceModeratorService.inspect_voice_spark(
+        content=content,
+        filename=filename or "voice_spark.m4a",
+        content_type=content_type
+    )
+    if not is_safe:
+        raise HTTPException(
+            status_code=getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
+            detail=reason
+        )
+
     settings = get_settings()
     file_key = f"users/{current_user.id}/voice/voice_spark.m4a"
     public_url = None

@@ -181,15 +181,25 @@ class VoiceSparkService {
       'duration': duration,
     });
 
-    final response = await _apiClient.dio.post<dynamic>(
-      '/api/v1/profile/voice-spark',
-      data: formData,
-    );
+    try {
+      final response = await _apiClient.dio.post<dynamic>(
+        '/api/v1/profile/voice-spark',
+        data: formData,
+      );
 
-    if (response.data is Map<String, dynamic>) {
-      return response.data as Map<String, dynamic>;
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'status': 'success'};
+    } on DioException catch (e) {
+      final detail = e.response?.data is Map
+          ? (e.response?.data['detail']?.toString())
+          : null;
+      if (detail != null && detail.isNotEmpty) {
+        throw Exception(detail);
+      }
+      rethrow;
     }
-    return {'status': 'success'};
   }
 
   /// Deletes active Voice Spark from profile

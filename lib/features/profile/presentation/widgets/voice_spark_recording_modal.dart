@@ -189,10 +189,17 @@ class _VoiceSparkRecordingModalState
     } catch (e) {
       if (!mounted) return;
       setState(() => _phase = _RecordPhase.preview);
+      final rawMsg = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Upload failed: $e'),
-          backgroundColor: Colors.redAccent,
+          content: Text(
+            rawMsg.contains('Voice Spark mein')
+                ? rawMsg
+                : 'Upload failed: $rawMsg',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: const Color(0xFFC85A32),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
