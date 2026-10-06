@@ -8,7 +8,7 @@ from jose import jwt, JWTError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from app.core.database import get_db
 from app.models.domain.user import User
@@ -180,7 +180,10 @@ async def get_current_user(
     # 1. Safely resolve auth_id to valid deterministic UUID
     auth_uuid = resolve_auth_uuid(auth_uid)
 
-    stmt = select(User).where(User.auth_id == auth_uuid, User.deleted_at.is_(None))
+    stmt = select(User).where(
+        or_(User.id == auth_uuid, User.auth_id == auth_uuid),
+        User.deleted_at.is_(None)
+    )
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 

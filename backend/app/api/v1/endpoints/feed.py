@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, not_, or_
@@ -34,6 +34,7 @@ def _calculate_age(dob: Optional[date]) -> int:
 @router.get("/feed", status_code=status.HTTP_200_OK, summary="Get Sanctuary Discovery Feed")
 @router.get("/discovery/feed", status_code=status.HTTP_200_OK, summary="Get Sanctuary Discovery Feed Alias")
 async def get_discovery_feed(
+    request: Request,
     limit: int = Query(default=10, ge=1, le=50),
     cursor: Optional[str] = None,
     current_user: Optional[User] = Depends(get_current_user_optional),
@@ -44,18 +45,40 @@ async def get_discovery_feed(
     with reciprocal orientation matching, excluding already swiped profiles,
     direct-letter senders, active matches, and incognito (Ghost Cloak) users.
     """
+    # 0. Deterministically resolve caller identity for strict self-exclusion
+    caller_id = current_user.id if current_user else None
+    caller_email = (current_user.email.strip().lower() if (current_user and current_user.email) else None)
+    caller_auth_id = current_user.auth_id if current_user else None
+
+    # Fallback to request headers for client-side defense-in-depth
+    hdr_uid = request.headers.get("X-User-Id", "").strip()
+    hdr_email = request.headers.get("X-User-Email", "").strip().lower()
+
+    if not caller_id and hdr_uid:
+        try:
+            caller_id = UUID(hdr_uid)
+        except Exception:
+            pass
+    if not caller_email and hdr_email:
+        caller_email = hdr_email
+
     stmt = select(User).where(
         User.deleted_at.is_(None),
         User.is_profile_completed == True,
         or_(User.is_incognito.is_(False), User.is_incognito.is_(None))
     )
 
+    # 1. Strict Self-Exclusion Shield (Caller can NEVER see their own profile)
+    if caller_id:
+        stmt = stmt.where(User.id != caller_id)
+    if caller_email:
+        stmt = stmt.where(User.email != caller_email)
+    if caller_auth_id:
+        stmt = stmt.where(User.auth_id != caller_auth_id)
+
     if current_user:
         # Evaluate user's 24h streak decay and penalty before serving feed
         await StreakEngine.evaluate_and_decay_streak(current_user, db)
-
-        # Exclude current logged in user
-        stmt = stmt.where(User.id != current_user.id)
 
         # Exclude candidates already swiped by current user
         swiped_subq = select(Swipe.target_id).where(Swipe.actor_id == current_user.id)
@@ -110,6 +133,13 @@ async def get_discovery_feed(
 
     cards = []
     for u in users:
+        # Defense-in-depth safety: skip caller if somehow returned
+        if caller_id and (u.id == caller_id or str(u.id) == str(caller_id)):
+            continue
+        if caller_email and u.email and u.email.strip().lower() == caller_email:
+            continue
+        if caller_auth_id and u.auth_id and (u.auth_id == caller_auth_id or str(u.auth_id) == str(caller_auth_id)):
+            continue
         clean_photos = [p for p in (u.photos or []) if p and str(p).strip()]
         if u.avatar_url and u.avatar_url.strip() and u.avatar_url.strip() not in clean_photos:
             clean_photos.insert(0, u.avatar_url.strip())

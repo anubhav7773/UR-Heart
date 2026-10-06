@@ -305,6 +305,7 @@ class SettingsController extends StateNotifier<SettingsState> {
         _ref!.invalidate(resonancesControllerProvider);
       } catch (_) {}
       try {
+        _ref!.read(feedControllerProvider.notifier).reset();
         _ref!.invalidate(feedControllerProvider);
       } catch (_) {}
       try {

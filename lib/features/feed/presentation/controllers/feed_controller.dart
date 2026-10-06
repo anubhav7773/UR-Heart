@@ -74,10 +74,22 @@ class FeedController extends StateNotifier<FeedState> {
         await prefs.setInt('ur_heart_direct_letters', resolvedLetters);
       }
 
-      // Client-side defense-in-depth orientation filter
+      // Client-side defense-in-depth: Orientation Shield and Strict Self-Exclusion
       final userGender = prefs.getString('profile_gender') ?? '';
       final userInterestedIn = prefs.getString('profile_interested_in') ?? 'Everyone';
+      final myUserId = prefs.getString('ur_heart_user_id') ?? prefs.getString('profile_user_id') ?? '';
+      final myEmail = (prefs.getString('ur_heart_user_email') ?? '').trim().toLowerCase();
+
       final filtered = deck.candidates.where((c) {
+        // 1. Strict Self-Exclusion Shield: Caller must NEVER see their own card
+        if (myUserId.isNotEmpty && (c.id == myUserId || c.id.toLowerCase().contains(myUserId.toLowerCase()))) {
+          return false;
+        }
+        if (myEmail.isNotEmpty && c.id.toLowerCase() == myEmail) {
+          return false;
+        }
+
+        // 2. Orientation Shield
         return CandidateProfile.checkOrientationShield(
           userGender: userGender,
           userInterestedIn: userInterestedIn,
@@ -279,6 +291,10 @@ class FeedController extends StateNotifier<FeedState> {
 
   void dismissAdModal() {
     state = state.copyWith(isOutOfSwipesModalVisible: false);
+  }
+
+  void reset() {
+    state = const FeedState();
   }
 }
 
