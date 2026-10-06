@@ -346,6 +346,81 @@ class ChatRepository {
     return [];
   }
 
+  /// Fetches pre-crafted mindful closure templates
+  Future<List<MindfulClosureTemplate>> fetchClosureTemplates() async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/chat/closure-templates');
+      final list = (response.data as Map<String, dynamic>?)?['templates'] as List<dynamic>?;
+      if (list != null) {
+        return list
+            .map((item) => MindfulClosureTemplate.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (_) {}
+    return const [
+      MindfulClosureTemplate(
+        key: 'wavelength',
+        title: 'Different Wavelengths',
+        icon: '🌊',
+        message: 'Thank you for sharing your time and thoughts with me. I feel our rhythms flow in different directions, so I wish you profound peace and the right connection on your journey.',
+      ),
+      MindfulClosureTemplate(
+        key: 'self_focus',
+        title: 'Focusing Inward',
+        icon: '🌱',
+        message: 'I have appreciated our exchange, but I need to step back and turn inward right now. May warmth and genuine resonance accompany your next chapter.',
+      ),
+      MindfulClosureTemplate(
+        key: 'different_resonance',
+        title: 'Different Resonance',
+        icon: '✨',
+        message: 'It was meaningful to cross paths here. I do not feel the spark evolving naturally, and out of deep respect for both our journeys, I bid you a gentle farewell.',
+      ),
+      MindfulClosureTemplate(
+        key: 'silent_bow',
+        title: 'Gentle Farewell',
+        icon: '🍃',
+        message: 'I bow gratefully to the quiet moment we shared and gently release our connection. Wishing you stillness, joy, and bright horizons ahead.',
+      ),
+    ];
+  }
+
+  /// Fetches mindful closure status for a match
+  Future<Map<String, dynamic>> fetchClosureStatus(String matchId) async {
+    try {
+      final response = await _dio.get<dynamic>('/api/v1/chat/threads/$matchId/closure');
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  /// Sends a compassionate mindful closure farewell note
+  Future<Map<String, dynamic>> sendMindfulClosure(
+    String matchId,
+    String templateKey, {
+    String? customNote,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/api/v1/chat/threads/$matchId/closure',
+        data: {
+          'template_key': templateKey,
+          if (customNote != null && customNote.trim().isNotEmpty)
+            'custom_note': customNote.trim(),
+        },
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'status': 'closed_with_grace'};
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
   void _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
       throw const NetworkUnavailableException();

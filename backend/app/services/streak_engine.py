@@ -87,7 +87,15 @@ class StreakEngine:
         except Exception as e:
             print(f"[STREAK BACKGROUND CHECK ERROR] {e}", flush=True)
 
+        # 3. Anti-Ghosting: Mindful closure stale conversation evaluation pass
+        try:
+            from app.services.mindful_closure import MindfulClosureService
+            await MindfulClosureService.evaluate_stale_conversations(db)
+        except Exception as e:
+            print(f"[MINDFUL CLOSURE STALE CHECK ERROR] {e}", flush=True)
+
         return count
+
 
     @staticmethod
     async def evaluate_and_decay_streak(user: User, db: AsyncSession) -> bool:

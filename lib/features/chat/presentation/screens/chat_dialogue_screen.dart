@@ -426,6 +426,14 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                     if (context.mounted) Navigator.of(context).pop();
                   },
                 );
+              } else if (val == 'closure') {
+                _showMindfulClosureModal(
+                  context: context,
+                  isDark: isDark,
+                  notifier: notifier,
+                  templates: dialogueState.closureTemplates,
+                  recipientName: fallbackName,
+                );
               }
             },
             itemBuilder: (ctx) => [
@@ -442,6 +450,27 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                     Text(
                       'Seeker Profile Info',
                       style: TextStyle(color: primaryText, fontSize: 13.5),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'closure',
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.spa_outlined,
+                      size: 20,
+                      color: Color(0xFF4E9F76),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Mindful Closure (Pass with Grace) 🍃',
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFF80E0A7) : const Color(0xFF2E7D32),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -547,19 +576,42 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                     },
                     onDismiss: () => notifier.dismissBondingSparks(),
                   ),
-                TextOnlyChatInputBar(
-                  isDark: isDark,
-                  controller: _chatInputController,
-                  onSendMessage: (cleanText) => notifier.sendMessage(cleanText),
-                  onViolation: (violation) => notifier.setViolationAlert(violation),
-                  onWingmanPressed: () => _openWingmanCoach(
-                    context,
-                    isDark,
-                    args,
-                    peer,
-                    dialogueState,
+                if (dialogueState.isStagnant && !dialogueState.isClosed)
+                  _buildMindfulStagnationBanner(
+                    context: context,
+                    isDark: isDark,
+                    pine: pine,
+                    primaryText: primaryText,
+                    subText: subText,
+                    onPassWithGrace: () => _showMindfulClosureModal(
+                      context: context,
+                      isDark: isDark,
+                      notifier: notifier,
+                      templates: dialogueState.closureTemplates,
+                      recipientName: fallbackName,
+                    ),
                   ),
-                ),
+                if (dialogueState.isClosed)
+                  _buildClosedDialogueCard(
+                    isDark: isDark,
+                    subText: subText,
+                    primaryText: primaryText,
+                    closureNote: dialogueState.closureNote,
+                  )
+                else
+                  TextOnlyChatInputBar(
+                    isDark: isDark,
+                    controller: _chatInputController,
+                    onSendMessage: (cleanText) => notifier.sendMessage(cleanText),
+                    onViolation: (violation) => notifier.setViolationAlert(violation),
+                    onWingmanPressed: () => _openWingmanCoach(
+                      context,
+                      isDark,
+                      args,
+                      peer,
+                      dialogueState,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1006,6 +1058,392 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMindfulStagnationBanner({
+    required BuildContext context,
+    required bool isDark,
+    required Color pine,
+    required Color primaryText,
+    required Color subText,
+    required VoidCallback onPassWithGrace,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF132A22) : const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A5946) : const Color(0xFFA5D6A7),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.spa_rounded, size: 18, color: Color(0xFF4CAF50)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Eva AI Mindful Intercession',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Conversations have natural tides. If you wish to close this dialogue with grace, tap below.',
+            style: TextStyle(fontSize: 12, color: subText, height: 1.35),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onPassWithGrace,
+              style: TextButton.styleFrom(
+                backgroundColor: pine.withValues(alpha: 0.15),
+                foregroundColor: pine,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+              label: const Text('Pass with Grace 🍃', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClosedDialogueCard({
+    required bool isDark,
+    required Color subText,
+    required Color primaryText,
+    String? closureNote,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? DarkSanctuaryTokens.surfaceCardBorder : LightSanctuaryTokens.surfaceCardBorder,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('🍃', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+              Text(
+                'Dialogue Concluded with Grace',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32),
+                ),
+              ),
+            ],
+          ),
+          if (closureNote != null && closureNote.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '“${closureNote.trim()}”',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: primaryText,
+                height: 1.35,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            'This conversation is peacefully archived in Past Reflections.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: subText),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMindfulClosureModal({
+    required BuildContext context,
+    required bool isDark,
+    required ChatDialogueController notifier,
+    required List<MindfulClosureTemplate> templates,
+    required String recipientName,
+  }) {
+    final effectiveTemplates = templates.isNotEmpty
+        ? templates
+        : const [
+            MindfulClosureTemplate(
+              key: 'wavelength',
+              title: 'Different Wavelengths',
+              icon: '🌊',
+              message:
+                  'Thank you for sharing your time and thoughts with me. I feel our rhythms flow in different directions, so I wish you profound peace and the right connection on your journey.',
+            ),
+            MindfulClosureTemplate(
+              key: 'self_focus',
+              title: 'Focusing Inward',
+              icon: '🌱',
+              message:
+                  'I have appreciated our exchange, but I need to step back and turn inward right now. May warmth and genuine resonance accompany your next chapter.',
+            ),
+            MindfulClosureTemplate(
+              key: 'different_resonance',
+              title: 'Different Resonance',
+              icon: '✨',
+              message:
+                  'It was meaningful to cross paths here. I do not feel the spark evolving naturally, and out of deep respect for both our journeys, I bid you a gentle farewell.',
+            ),
+            MindfulClosureTemplate(
+              key: 'silent_bow',
+              title: 'Gentle Farewell',
+              icon: '🍃',
+              message:
+                  'I bow gratefully to the quiet moment we shared and gently release our connection. Wishing you stillness, joy, and bright horizons ahead.',
+            ),
+          ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        String selectedKey = effectiveTemplates.first.key;
+        final noteController = TextEditingController(text: effectiveTemplates.first.message);
+        bool isSubmitting = false;
+
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final cardBg = isDark ? DarkSanctuaryTokens.surfaceCard : LightSanctuaryTokens.surfaceCard;
+            final cardBorder = isDark ? DarkSanctuaryTokens.surfaceCardBorder : LightSanctuaryTokens.surfaceCardBorder;
+            final primaryText = isDark ? DarkSanctuaryTokens.textHeadline : LightSanctuaryTokens.textHeadline;
+            final subText = isDark ? DarkSanctuaryTokens.textMuted : LightSanctuaryTokens.textMuted;
+            final pine = isDark ? DarkSanctuaryTokens.sanctuaryPine : LightSanctuaryTokens.sanctuaryPine;
+
+            return Container(
+              margin: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border.all(color: cardBorder, width: 1),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: subText.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Text('🍃', style: TextStyle(fontSize: 20)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Mindful Closure (Pass with Grace)',
+                            style: TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.bold,
+                              color: primaryText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Leaving a dialogue with clarity brings peace to both hearts. Choose a compassionate note or personalize below:',
+                      style: TextStyle(fontSize: 12.5, color: subText, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    ...effectiveTemplates.map((tmpl) {
+                      final isSelected = selectedKey == tmpl.key;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: InkWell(
+                          onTap: () {
+                            setModalState(() {
+                              selectedKey = tmpl.key;
+                              noteController.text = tmpl.message;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? pine.withValues(alpha: 0.12)
+                                  : (isDark ? DarkSanctuaryTokens.inputBackground : LightSanctuaryTokens.chipBackground),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? pine : cardBorder,
+                                width: isSelected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(tmpl.icon, style: const TextStyle(fontSize: 18)),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    tmpl.title,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                      color: isSelected ? pine : primaryText,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(Icons.check_circle_rounded, size: 18, color: pine),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Farewell Note Preview & Personalization',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: subText,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: noteController,
+                      maxLines: 3,
+                      style: TextStyle(fontSize: 13, color: primaryText),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: isDark ? DarkSanctuaryTokens.inputBackground : LightSanctuaryTokens.inputBackground,
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: cardBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: cardBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: pine, width: 1.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: subText,
+                              side: BorderSide(color: cardBorder),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    setModalState(() => isSubmitting = true);
+                                    final success = await notifier.sendMindfulClosure(
+                                      selectedKey,
+                                      customNote: noteController.text,
+                                    );
+                                    if (ctx.mounted) {
+                                      Navigator.of(ctx).pop();
+                                    }
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            success
+                                                ? 'Farewell sent with grace 🍃. Dialogue peacefully archived.'
+                                                : 'Failed to complete closure. Please try again.',
+                                          ),
+                                          backgroundColor: success
+                                              ? const Color(0xFF2E7D32)
+                                              : (isDark ? DarkSanctuaryTokens.primaryCoral : LightSanctuaryTokens.terracottaAccent),
+                                        ),
+                                      );
+                                    }
+                                  },
+                            icon: isSubmitting
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.spa_rounded, size: 16),
+                            label: Text(
+                              isSubmitting ? 'Concluding...' : 'Pass with Grace 🍃',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: pine,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );

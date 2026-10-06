@@ -216,10 +216,17 @@ async def get_dialogue_threads(
                     "category_tag": category_tag,
                     "is_direct_letter": is_direct,
                     "shared_context_quote": "Direct Sanctuary Letter" if is_direct else "Mutual Resonance Ignited",
+                    "closure_status": getattr(m, "closure_status", None),
+                    "closed_by_user_id": str(m.closed_by_user_id) if getattr(m, "closed_by_user_id", None) else None,
+                    "closed_at": m.closed_at.isoformat() if getattr(m, "closed_at", None) else None,
+                    "closure_note": getattr(m, "closure_note", None),
+                    "is_closed": getattr(m, "closure_status", None) == "closed_with_grace",
+                    "is_stagnant": getattr(m, "closure_status", None) == "stagnant",
                 })
 
     print(f"[CHAT THREADS] Serving {len(threads)} live conversation threads from PostgreSQL", flush=True)
     return {"threads": threads, "data": threads}
+
 
 
 @router.get("/threads/{match_id}/peer", status_code=status.HTTP_200_OK, summary="Get Peer Seeker Profile")
@@ -488,6 +495,12 @@ async def send_chat_message(
     if not m:
         raise HTTPException(status_code=404, detail="Match dialogue not found.")
 
+    if getattr(m, "closure_status", None) == "closed_with_grace":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This sacred dialogue concluded with mindful closure. No further messages can be sent."
+        )
+
     recipient_id = m.user2_id if m.user1_id == current_user.id else m.user1_id
 
     # Pre-Storage Moderation Shield (IT Rules 2021 & IT Act 67/67A Intermediary Protection)
@@ -542,16 +555,24 @@ async def send_chat_message(
     # Encrypt before persisting in PostgreSQL messages table (E2EE at rest)
     storage_encrypted = encrypt_message_storage(text_content.strip(), str(match_uuid))
 
+    now = datetime.now(timezone.utc)
+    m.last_message_at = now
+    if getattr(m, "closure_status", None) == "stagnant":
+        m.closure_status = None
+    db.add(m)
+
     msg = Message(
         match_id=match_uuid,
         sender_id=current_user.id,
         encrypted_text=storage_encrypted,
         status="delivered",
         client_id=raw_client_id if raw_client_id else None,
+        created_at=now,
     )
     db.add(msg)
     await db.commit()
     await db.refresh(msg)
+
 
     # Instant WebSocket Direct Message Delivery & Background Push Notification
     try:
@@ -946,3 +967,60 @@ async def respond_to_bridge_consent(
         }
     else:
         raise HTTPException(status_code=400, detail="Invalid action. Use 'accept' or 'decline'.")
+
+
+class MindfulClosureRequest(BaseModel):
+    template_key: str = Field(..., description="Key of chosen mindful template ('wavelength', 'self_focus', 'different_resonance', 'silent_bow')")
+    custom_note: Optional[str] = Field(None, max_length=500)
+
+
+@router.get("/closure-templates", status_code=status.HTTP_200_OK, summary="Get Mindful Closure Compassionate Templates")
+async def get_mindful_closure_templates():
+    from app.services.mindful_closure import MindfulClosureService
+    return {"templates": MindfulClosureService.get_templates()}
+
+
+@router.get("/threads/{match_id}/closure", status_code=status.HTTP_200_OK, summary="Get Thread Mindful Closure Status")
+async def get_thread_closure_status(
+    match_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        match_uuid = _clean_match_uuid(match_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid match_id UUID format.")
+
+    from app.services.mindful_closure import MindfulClosureService
+    try:
+        status_data = await MindfulClosureService.get_closure_status(db, match_uuid, current_user.id)
+        return status_data
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/threads/{match_id}/closure", status_code=status.HTTP_200_OK, summary="Send Mindful Closure (Pass with Grace)")
+async def send_thread_mindful_closure(
+    match_id: str,
+    payload: MindfulClosureRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        match_uuid = _clean_match_uuid(match_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid match_id UUID format.")
+
+    from app.services.mindful_closure import MindfulClosureService
+    try:
+        result = await MindfulClosureService.send_mindful_closure(
+            db=db,
+            match_id=match_uuid,
+            user_id=current_user.id,
+            template_key=payload.template_key,
+            custom_note=payload.custom_note
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+

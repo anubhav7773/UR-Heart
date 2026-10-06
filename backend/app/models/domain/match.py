@@ -5,6 +5,8 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    String,
+    Text,
     UniqueConstraint,
     func
 )
@@ -34,3 +36,14 @@ class Match(Base):
     )
     is_active = Column(Boolean, nullable=False, default=True)
     matched_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_message_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
+    closure_status = Column(String(30), nullable=True)  # None, 'stagnant', 'closed_with_grace'
+    closed_by_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="SET NULL"),
+        nullable=True
+    )
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+    closure_template_key = Column(String(50), nullable=True)
+    closure_note = Column(Text, nullable=True)
+

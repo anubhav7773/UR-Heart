@@ -23,6 +23,15 @@ class ChatDialogueState {
   final String currentUserId;
   final List<String> bondingSparks;
   final bool sparksDismissed;
+  final String? closureStatus;
+  final String? closedByUserId;
+  final DateTime? closedAt;
+  final String? closureNote;
+  final bool isStagnant;
+  final int stagnantHours;
+  final List<MindfulClosureTemplate> closureTemplates;
+
+  bool get isClosed => closureStatus == 'closed_with_grace';
 
   const ChatDialogueState({
     required this.matchId,
@@ -55,6 +64,13 @@ class ChatDialogueState {
     this.currentUserId = 'user-me',
     this.bondingSparks = const [],
     this.sparksDismissed = false,
+    this.closureStatus,
+    this.closedByUserId,
+    this.closedAt,
+    this.closureNote,
+    this.isStagnant = false,
+    this.stagnantHours = 0,
+    this.closureTemplates = const [],
   });
 
   ChatDialogueState copyWith({
@@ -73,6 +89,13 @@ class ChatDialogueState {
     String? currentUserId,
     List<String>? bondingSparks,
     bool? sparksDismissed,
+    String? closureStatus,
+    String? closedByUserId,
+    DateTime? closedAt,
+    String? closureNote,
+    bool? isStagnant,
+    int? stagnantHours,
+    List<MindfulClosureTemplate>? closureTemplates,
   }) {
     return ChatDialogueState(
       matchId: matchId ?? this.matchId,
@@ -89,6 +112,13 @@ class ChatDialogueState {
       currentUserId: currentUserId ?? this.currentUserId,
       bondingSparks: bondingSparks ?? this.bondingSparks,
       sparksDismissed: sparksDismissed ?? this.sparksDismissed,
+      closureStatus: closureStatus ?? this.closureStatus,
+      closedByUserId: closedByUserId ?? this.closedByUserId,
+      closedAt: closedAt ?? this.closedAt,
+      closureNote: closureNote ?? this.closureNote,
+      isStagnant: isStagnant ?? this.isStagnant,
+      stagnantHours: stagnantHours ?? this.stagnantHours,
+      closureTemplates: closureTemplates ?? this.closureTemplates,
     );
   }
 }
@@ -165,6 +195,26 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       state = state.copyWith(isLoading: false);
     }
 
+    // 1.1 Fetch Mindful Closure status & templates
+    try {
+      final closureData = await _chatRepository.fetchClosureStatus(state.matchId);
+      final templates = await _chatRepository.fetchClosureTemplates();
+      final rawStatus = closureData['closure_status'] as String?;
+      final isStagnantBool = closureData['is_stagnant'] as bool? ?? (rawStatus == 'stagnant');
+      final isClosedBool = closureData['is_closed'] as bool? ?? (rawStatus == 'closed_with_grace');
+      final hours = closureData['hours_since_last_message'] as int? ?? 0;
+
+      state = state.copyWith(
+        closureStatus: rawStatus,
+        closedByUserId: closureData['closed_by_user_id'] as String?,
+        closedAt: closureData['closed_at'] != null ? DateTime.tryParse(closureData['closed_at'].toString()) : null,
+        closureNote: closureData['closure_note'] as String?,
+        isStagnant: isStagnantBool && !isClosedBool,
+        stagnantHours: hours,
+        closureTemplates: templates,
+      );
+    } catch (_) {}
+
     // 2. Listen to incoming E2EE WebSocket events
     _wsService.messageStream.listen((event) async {
       final type = event['type'] as String?;
@@ -174,6 +224,16 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
       if (type == 'dialogue_message' && isTargetMatch) {
         await _handleIncomingEncryptedMessage(event);
+      } else if (type == 'mindful_closure' && isTargetMatch) {
+        final closingNote = event['farewell_note'] as String? ?? event['closure_note'] as String? ?? '';
+        final closerId = event['closed_by_user_id'] as String? ?? '';
+        state = state.copyWith(
+          closureStatus: 'closed_with_grace',
+          closedByUserId: closerId,
+          closedAt: DateTime.now(),
+          closureNote: closingNote,
+          isStagnant: false,
+        );
       } else if ((type == 'bridge_unlocked' || type == 'bridge_reveal_request' || type == 'bridge_declined') && isTargetMatch) {
         try {
           final bridge = await _chatRepository.fetchContactBridgeStatus(state.matchId);
@@ -537,6 +597,35 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
 
   Future<void> markAsRead() async {
     await _chatRepository.markMessagesAsRead(state.matchId);
+  }
+
+  /// Closes the conversation with grace using an empathetic farewell template
+  Future<bool> sendMindfulClosure(String templateKey, {String? customNote}) async {
+    try {
+      final res = await _chatRepository.sendMindfulClosure(
+        state.matchId,
+        templateKey,
+        customNote: customNote,
+      );
+      final closingNote = res['farewell_note'] as String? ??
+          res['closure_note'] as String? ??
+          customNote ??
+          '';
+      state = state.copyWith(
+        closureStatus: 'closed_with_grace',
+        closedByUserId: _currentUserId,
+        closedAt: DateTime.now(),
+        closureNote: closingNote,
+        isStagnant: false,
+      );
+      final freshMessages = await _chatRepository.fetchThreadMessages(state.matchId);
+      if (mounted) {
+        state = state.copyWith(messages: freshMessages);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

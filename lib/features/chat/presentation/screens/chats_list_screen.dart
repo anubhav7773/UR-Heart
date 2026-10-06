@@ -65,11 +65,11 @@ class ChatsListScreen extends ConsumerWidget {
                 color: isDark ? DarkSanctuaryTokens.surfaceCardBorder : LightSanctuaryTokens.surfaceCardBorder,
               ),
             ),
-            itemBuilder: (context) => [
               _buildFilterMenuItem('all', 'All Conversations', Icons.all_inbox_rounded, state.activeFilter == 'all', titleColor, accentColor),
               _buildFilterMenuItem('unread', 'Unread Only (${state.unreadTotalCount})', Icons.mark_chat_unread_outlined, state.activeFilter == 'unread', titleColor, accentColor),
               _buildFilterMenuItem('direct', 'Direct Letters (${state.directCount})', Icons.mail_outline_rounded, state.activeFilter == 'direct', titleColor, accentColor),
               _buildFilterMenuItem('mutual', 'Mutual Sparks (${state.mutualCount})', Icons.favorite_border_rounded, state.activeFilter == 'mutual', titleColor, accentColor),
+              _buildFilterMenuItem('past', 'Past Reflections (${state.pastCount}) 🍃', Icons.spa_outlined, state.activeFilter == 'past', titleColor, accentColor),
             ],
           ),
           IconButton(
@@ -271,6 +271,7 @@ class ChatsListScreen extends ConsumerWidget {
               _buildSheetOption(sheetContext, 'unread', 'Unread Only', Icons.mark_chat_unread_outlined, currentFilter == 'unread', notifier, accentColor, titleColor),
               _buildSheetOption(sheetContext, 'direct', 'Direct Letters', Icons.mail_outline_rounded, currentFilter == 'direct', notifier, accentColor, titleColor),
               _buildSheetOption(sheetContext, 'mutual', 'Mutual Sparks', Icons.favorite_border_rounded, currentFilter == 'mutual', notifier, accentColor, titleColor),
+              _buildSheetOption(sheetContext, 'past', 'Past Reflections 🍃', Icons.spa_outlined, currentFilter == 'past', notifier, accentColor, titleColor),
             ],
           ),
         ),

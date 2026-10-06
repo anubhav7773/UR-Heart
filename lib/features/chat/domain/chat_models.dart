@@ -103,10 +103,18 @@ class ChatConversation {
   final String bio;
   final String location;
   final String gender;
-  final List<String> interests;
+  List<String> interests;
   final String intentions;
+  final String? closureStatus;
+  final String? closedByUserId;
+  final DateTime? closedAt;
+  final String? closureTemplateKey;
+  final String? closureNote;
 
-  const ChatConversation({
+  bool get isClosed => closureStatus == 'closed_with_grace';
+  bool get isStagnant => closureStatus == 'stagnant';
+
+  ChatConversation({
     required this.matchId,
     required this.recipientId,
     required this.recipientName,
@@ -126,6 +134,11 @@ class ChatConversation {
     this.gender = '',
     this.interests = const [],
     this.intentions = '',
+    this.closureStatus,
+    this.closedByUserId,
+    this.closedAt,
+    this.closureTemplateKey,
+    this.closureNote,
   });
 
   factory ChatConversation.fromJson(Map<String, dynamic> json) {
@@ -171,6 +184,11 @@ class ChatConversation {
       unreadCount: json['unread_count'] as int? ?? 0,
       categoryTag: json['category_tag'] as String? ?? 'Mutual Spark',
       sharedContextQuote: json['shared_context_quote'] as String? ?? '',
+      closureStatus: json['closure_status'] as String?,
+      closedByUserId: json['closed_by_user_id'] as String?,
+      closedAt: json['closed_at'] != null ? DateTime.tryParse(json['closed_at'].toString()) : null,
+      closureTemplateKey: json['closure_template_key'] as String?,
+      closureNote: json['closure_note'] as String?,
     );
   }
 
@@ -194,6 +212,11 @@ class ChatConversation {
     String? gender,
     List<String>? interests,
     String? intentions,
+    String? closureStatus,
+    String? closedByUserId,
+    DateTime? closedAt,
+    String? closureTemplateKey,
+    String? closureNote,
   }) {
     return ChatConversation(
       matchId: matchId ?? this.matchId,
@@ -215,6 +238,35 @@ class ChatConversation {
       gender: gender ?? this.gender,
       interests: interests ?? this.interests,
       intentions: intentions ?? this.intentions,
+      closureStatus: closureStatus ?? this.closureStatus,
+      closedByUserId: closedByUserId ?? this.closedByUserId,
+      closedAt: closedAt ?? this.closedAt,
+      closureTemplateKey: closureTemplateKey ?? this.closureTemplateKey,
+      closureNote: closureNote ?? this.closureNote,
+    );
+  }
+}
+
+/// Compassionate closure template for Anti-Ghosting "Pass with Grace"
+class MindfulClosureTemplate {
+  final String key;
+  final String title;
+  final String icon;
+  final String message;
+
+  const MindfulClosureTemplate({
+    required this.key,
+    required this.title,
+    required this.icon,
+    required this.message,
+  });
+
+  factory MindfulClosureTemplate.fromJson(Map<String, dynamic> json) {
+    return MindfulClosureTemplate(
+      key: json['key'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      icon: json['icon'] as String? ?? '🍃',
+      message: json['message'] as String? ?? '',
     );
   }
 }

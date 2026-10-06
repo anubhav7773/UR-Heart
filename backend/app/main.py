@@ -165,58 +165,90 @@ async def lifespan(app: FastAPI):
     async def _ensure_blind_date_schema():
         try:
             from sqlalchemy import text
+            statements = [
+                """CREATE TABLE IF NOT EXISTS public.blind_date_sessions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user1_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    user2_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    status VARCHAR(20) NOT NULL DEFAULT 'active',
+                    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    user1_decision VARCHAR(15) NOT NULL DEFAULT 'pending',
+                    user2_decision VARCHAR(15) NOT NULL DEFAULT 'pending',
+                    icebreaker_prompt TEXT NOT NULL DEFAULT 'What is a quiet dream you hold close to your heart?',
+                    match_id UUID REFERENCES public.matches(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );""",
+                """CREATE TABLE IF NOT EXISTS public.blind_date_messages (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    session_id UUID NOT NULL REFERENCES public.blind_date_sessions(id) ON DELETE CASCADE,
+                    sender_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    ciphertext TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );""",
+                """CREATE TABLE IF NOT EXISTS public.blind_date_queue (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+                    gender VARCHAR(20) NOT NULL,
+                    interested_in VARCHAR(20) NOT NULL,
+                    age SMALLINT NOT NULL DEFAULT 24,
+                    preferred_age_min SMALLINT NOT NULL DEFAULT 18,
+                    preferred_age_max SMALLINT NOT NULL DEFAULT 45,
+                    status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+                    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    paired_session_id UUID NULL
+                );""",
+                "CREATE INDEX IF NOT EXISTS idx_blind_date_queue_status ON public.blind_date_queue(status);",
+                "CREATE INDEX IF NOT EXISTS idx_blind_date_sessions_users ON public.blind_date_sessions(user1_id, user2_id);",
+                "CREATE INDEX IF NOT EXISTS idx_blind_date_messages_session ON public.blind_date_messages(session_id);",
+                "ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_blind_date_date DATE NULL;",
+                "ALTER TABLE public.users ADD COLUMN IF NOT EXISTS blind_date_passes INTEGER NOT NULL DEFAULT 0;",
+                "ALTER TABLE public.blind_date_queue ADD COLUMN IF NOT EXISTS is_fast_track BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS extension_count SMALLINT NOT NULL DEFAULT 0;"
+            ]
             async with async_session_factory() as session:
-                await session.execute(text("""
-                    CREATE TABLE IF NOT EXISTS public.blind_date_sessions (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        user1_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-                        user2_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-                        status VARCHAR(20) NOT NULL DEFAULT 'active',
-                        started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                        expires_at TIMESTAMPTZ NOT NULL,
-                        user1_decision VARCHAR(15) NOT NULL DEFAULT 'pending',
-                        user2_decision VARCHAR(15) NOT NULL DEFAULT 'pending',
-                        icebreaker_prompt TEXT NOT NULL DEFAULT 'What is a quiet dream you hold close to your heart?',
-                        match_id UUID REFERENCES public.matches(id) ON DELETE SET NULL,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                    );
-                    CREATE TABLE IF NOT EXISTS public.blind_date_messages (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        session_id UUID NOT NULL REFERENCES public.blind_date_sessions(id) ON DELETE CASCADE,
-                        sender_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-                        ciphertext TEXT NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                    );
-                    CREATE TABLE IF NOT EXISTS public.blind_date_queue (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
-                        gender VARCHAR(20) NOT NULL,
-                        interested_in VARCHAR(20) NOT NULL,
-                        age SMALLINT NOT NULL DEFAULT 24,
-                        preferred_age_min SMALLINT NOT NULL DEFAULT 18,
-                        preferred_age_max SMALLINT NOT NULL DEFAULT 45,
-                        status VARCHAR(20) NOT NULL DEFAULT 'waiting',
-                        joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                        paired_session_id UUID NULL
-                    );
-                    CREATE INDEX IF NOT EXISTS idx_blind_date_queue_status ON public.blind_date_queue(status);
-                    CREATE INDEX IF NOT EXISTS idx_blind_date_sessions_users ON public.blind_date_sessions(user1_id, user2_id);
-                    CREATE INDEX IF NOT EXISTS idx_blind_date_messages_session ON public.blind_date_messages(session_id);
-
-                    ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_blind_date_date DATE NULL;
-                    ALTER TABLE public.users ADD COLUMN IF NOT EXISTS blind_date_passes INTEGER NOT NULL DEFAULT 0;
-                    ALTER TABLE public.blind_date_queue ADD COLUMN IF NOT EXISTS is_fast_track BOOLEAN NOT NULL DEFAULT FALSE;
-                    ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS extension_count SMALLINT NOT NULL DEFAULT 0;
-                """))
-                await session.commit()
+                for stmt in statements:
+                    try:
+                        await session.execute(text(stmt))
+                        await session.commit()
+                    except Exception as inner_e:
+                        await session.rollback()
+                        logger.warning(f"Schema migration statement warning: {inner_e}")
                 print("[SCHEMA] Blind date tables & equal perks columns verified in PostgreSQL.", flush=True)
         except Exception as e:
             print(f"[SCHEMA NOTICE] Blind date schema check: {e}", flush=True)
 
+    async def _ensure_mindful_closure_schema():
+        try:
+            from sqlalchemy import text
+            statements = [
+                "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMPTZ NULL DEFAULT now();",
+                "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS closure_status VARCHAR(30) NULL;",
+                "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS closed_by_user_id UUID NULL REFERENCES public.users(id) ON DELETE SET NULL;",
+                "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ NULL;",
+                "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS closure_template_key VARCHAR(50) NULL;",
+                "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS closure_note TEXT NULL;",
+                "CREATE INDEX IF NOT EXISTS idx_matches_closure_status ON public.matches(closure_status);",
+                "CREATE INDEX IF NOT EXISTS idx_matches_last_message_at ON public.matches(last_message_at);"
+            ]
+            async with async_session_factory() as session:
+                for stmt in statements:
+                    try:
+                        await session.execute(text(stmt))
+                        await session.commit()
+                    except Exception as inner_e:
+                        await session.rollback()
+                        logger.warning(f"Schema migration statement warning: {inner_e}")
+                print("[SCHEMA] Mindful closure columns verified in PostgreSQL matches table.", flush=True)
+        except Exception as e:
+            print(f"[SCHEMA NOTICE] Mindful closure schema check: {e}", flush=True)
+
     asyncio.create_task(_ensure_voice_spark_schema())
     asyncio.create_task(_ensure_blind_date_schema())
+    asyncio.create_task(_ensure_mindful_closure_schema())
 
     yield
+
     # SHUTDOWN: Gracefully close HTTP client & background tasks
     streak_worker_stop.set()
     monitor_task.cancel()

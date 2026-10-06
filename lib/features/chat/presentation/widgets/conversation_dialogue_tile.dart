@@ -64,22 +64,52 @@ class ConversationDialogueTile extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4.0),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                      decoration: BoxDecoration(
-                        color: isMutual
-                            ? pine.withValues(alpha: 0.15)
-                            : (isDark ? DarkSanctuaryTokens.inputBackground : LightSanctuaryTokens.chipBackground),
-                        borderRadius: BorderRadius.circular(6.0),
-                      ),
-                      child: Text(
-                        conversation.categoryTag,
-                        style: TextStyle(
-                          color: isMutual ? pine : subText,
-                          fontSize: 10.0,
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                          decoration: BoxDecoration(
+                            color: conversation.isClosed
+                                ? (isDark ? Colors.teal.withValues(alpha: 0.2) : Colors.teal.shade50)
+                                : isMutual
+                                    ? pine.withValues(alpha: 0.15)
+                                    : (isDark ? DarkSanctuaryTokens.inputBackground : LightSanctuaryTokens.chipBackground),
+                            borderRadius: BorderRadius.circular(6.0),
+                          ),
+                          child: Text(
+                            conversation.isClosed
+                                ? 'Past Reflection 🍃'
+                                : conversation.categoryTag,
+                            style: TextStyle(
+                              color: conversation.isClosed
+                                  ? (isDark ? Colors.tealAccent : Colors.teal.shade700)
+                                  : isMutual
+                                      ? pine
+                                      : subText,
+                              fontSize: 10.0,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (conversation.isStagnant && !conversation.isClosed) ...[
+                          const SizedBox(width: 6.0),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.amber.withValues(alpha: 0.15) : Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(6.0),
+                            ),
+                            child: Text(
+                              'Quiet Tide ⏳',
+                              style: TextStyle(
+                                color: isDark ? Colors.amberAccent : Colors.amber.shade800,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 5.0),
                     Row(

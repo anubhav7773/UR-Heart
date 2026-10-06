@@ -33,6 +33,10 @@ class ChatsListState {
       .where((c) => c.unreadCount > 0)
       .length;
 
+  int get pastCount => allConversations
+      .where((c) => c.isClosed)
+      .length;
+
   ChatsListState copyWith({
     List<ChatConversation>? allConversations,
     List<ChatConversation>? filteredConversations,
@@ -112,11 +116,13 @@ class ChatsListController extends StateNotifier<ChatsListState> {
 
     // Apply category / status filter
     if (filter == 'unread') {
-      result = result.where((c) => c.unreadCount > 0).toList();
+      result = result.where((c) => c.unreadCount > 0 && !c.isClosed).toList();
     } else if (filter == 'direct') {
-      result = result.where((c) => c.categoryTag.toLowerCase().contains('direct')).toList();
+      result = result.where((c) => c.categoryTag.toLowerCase().contains('direct') && !c.isClosed).toList();
     } else if (filter == 'mutual') {
-      result = result.where((c) => c.categoryTag.toLowerCase().contains('mutual')).toList();
+      result = result.where((c) => c.categoryTag.toLowerCase().contains('mutual') && !c.isClosed).toList();
+    } else if (filter == 'past' || filter == 'reflections') {
+      result = result.where((c) => c.isClosed).toList();
     }
 
     // Apply text search filter
