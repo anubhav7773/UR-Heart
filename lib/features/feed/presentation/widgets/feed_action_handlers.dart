@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../data/feed_repository.dart';
 import '../controllers/feed_controller.dart';
 import '../../../legal_vault/presentation/widgets/grievance_dossier_modal.dart';
@@ -20,6 +22,26 @@ class FeedActionHandlers {
       targetId: 'none',
       context: context,
       onRewardGranted: () async {
+        try {
+          final res = await DioClient().dio.post<Map<String, dynamic>>(
+            '/api/v1/ads/claim-reward',
+            data: {
+              'ad_type': 'quick_reflection',
+              'target_id': 'none',
+              'user_id': userId,
+              'duration_seconds': 10,
+              'network': 'admob',
+            },
+          );
+          if (res.data != null && res.data!['swipes_remaining'] != null) {
+            final newSwipes = res.data!['swipes_remaining'] as int;
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setInt('ur_heart_swipes_remaining', newSwipes);
+          }
+        } catch (e) {
+          debugPrint('[FeedActionHandlers] Direct claim fallback notice: $e');
+        }
+
         // Refresh live feed state to read server-credited swipes
         await ref.read(feedControllerProvider.notifier).loadFeed();
         if (context.mounted) {

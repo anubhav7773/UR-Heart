@@ -109,13 +109,34 @@ class SovereignStoreTabView extends ConsumerWidget {
           _buildMicroPackRow(context, ref, '24h Global Passport', 'Teleport to any global city for 24h', '₹99 / \$1.99', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
           const SizedBox(height: 18.0),
 
-          // Google Play Policy Restore Purchases Link
-          Center(
-            child: TextButton(
-              onPressed: () => ref.read(growthHubControllerProvider.notifier).restorePurchases(context),
-              child: Text('Restore Purchases (Google Play)',
-                  style: TextStyle(color: subText, fontSize: 12.0, decoration: TextDecoration.underline)),
-            ),
+          // Google Play Policy Restore Purchases & Web Store Sync Links
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: () => ref.read(growthHubControllerProvider.notifier).restorePurchases(context),
+                icon: Icon(Icons.restore_rounded, size: 14.0, color: subText),
+                label: Text('Restore Purchases',
+                    style: TextStyle(color: subText, fontSize: 12.0, decoration: TextDecoration.underline)),
+              ),
+              const SizedBox(width: 16.0),
+              TextButton.icon(
+                onPressed: () async {
+                  await ref.read(growthHubControllerProvider.notifier).syncUserData();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✨ Sovereign entitlement synchronized with Sanctuary server.'),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                },
+                icon: Icon(Icons.sync_rounded, size: 14.0, color: gold),
+                label: Text('Sync Sovereign Status',
+                    style: TextStyle(color: gold, fontSize: 12.0, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+              ),
+            ],
           ),
           const SizedBox(height: 20.0),
         ],

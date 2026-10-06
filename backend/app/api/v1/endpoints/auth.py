@@ -213,16 +213,26 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
             is_completed = False
 
     effective_role = "superadmin" if clean_email == "asiverticals@gmail.com" else "user"
+    from app.core.security import create_access_token
+    from datetime import timedelta
+    target_uid = str(user_row.id) if user_row is not None else (str(new_user.id) if 'new_user' in locals() else str(payload.user_id or ""))
+    session_token = create_access_token(
+        {"sub": target_uid, "user_id": target_uid, "email": clean_email, "role": effective_role},
+        expires_delta=timedelta(days=30)
+    )
+
     print(
-        f"[AUTH GOOGLE SYNC] Session Synced: user_id={payload.user_id} email={payload.email} "
+        f"[AUTH GOOGLE SYNC] Session Synced: user_id={target_uid} email={payload.email} "
         f"role={effective_role} name={payload.display_name} is_profile_completed={is_completed}",
         flush=True
     )
     return {
         "status": "synchronized",
-        "user_id": payload.user_id,
+        "user_id": target_uid,
         "email": payload.email,
         "role": effective_role,
+        "access_token": session_token,
+        "token": session_token,
         "is_profile_completed": is_completed,
         "message": "Google authentication session verified and synchronized."
     }

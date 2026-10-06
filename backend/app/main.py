@@ -204,7 +204,10 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_blind_date_date DATE NULL;",
                 "ALTER TABLE public.users ADD COLUMN IF NOT EXISTS blind_date_passes INTEGER NOT NULL DEFAULT 0;",
                 "ALTER TABLE public.blind_date_queue ADD COLUMN IF NOT EXISTS is_fast_track BOOLEAN NOT NULL DEFAULT FALSE;",
-                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS extension_count SMALLINT NOT NULL DEFAULT 0;"
+                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS extension_count SMALLINT NOT NULL DEFAULT 0;",
+                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS user1_decision VARCHAR(15) NOT NULL DEFAULT 'pending';",
+                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS user2_decision VARCHAR(15) NOT NULL DEFAULT 'pending';",
+                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS icebreaker_prompt TEXT NOT NULL DEFAULT 'What is a quiet dream you hold close to your heart?';"
             ]
             async with async_session_factory() as session:
                 for stmt in statements:
@@ -217,6 +220,35 @@ async def lifespan(app: FastAPI):
                 print("[SCHEMA] Blind date tables & equal perks columns verified in PostgreSQL.", flush=True)
         except Exception as e:
             print(f"[SCHEMA NOTICE] Blind date schema check: {e}", flush=True)
+
+    async def _ensure_admin_schema():
+        try:
+            from sqlalchemy import text
+            statements = [
+                """CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
+                    id BIGSERIAL PRIMARY KEY,
+                    admin_email VARCHAR(120) NOT NULL,
+                    action VARCHAR(100) NOT NULL,
+                    target_type VARCHAR(50) NULL,
+                    target_id VARCHAR(100) NULL,
+                    details TEXT NULL,
+                    ip_address VARCHAR(50) NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );""",
+                "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_email ON public.admin_audit_logs(admin_email);",
+                "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON public.admin_audit_logs(action);"
+            ]
+            async with async_session_factory() as session:
+                for stmt in statements:
+                    try:
+                        await session.execute(text(stmt))
+                        await session.commit()
+                    except Exception as inner_e:
+                        await session.rollback()
+                        logger.warning(f"Schema migration statement warning: {inner_e}")
+                print("[SCHEMA] Admin audit logs table verified in PostgreSQL.", flush=True)
+        except Exception as e:
+            print(f"[SCHEMA NOTICE] Admin schema check: {e}", flush=True)
 
     async def _ensure_mindful_closure_schema():
         try:
@@ -247,6 +279,7 @@ async def lifespan(app: FastAPI):
         await asyncio.gather(
             _ensure_voice_spark_schema(),
             _ensure_blind_date_schema(),
+            _ensure_admin_schema(),
             _ensure_mindful_closure_schema(),
             return_exceptions=True
         )

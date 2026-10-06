@@ -141,6 +141,25 @@ class AuthRepository {
       if (response.data != null) {
         syncSuccessful = true;
         isProfileCompleted = response.data!['is_profile_completed'] == true;
+        final tokenStr = response.data!['access_token'] ?? response.data!['token'] ?? result.idToken;
+        final serverUid = response.data!['user_id']?.toString() ?? result.userId;
+        final roleStr = response.data!['role']?.toString() ?? 'user';
+        final isSuperadmin = (result.email?.toLowerCase() == 'asiverticals@gmail.com') || (roleStr.toLowerCase() == 'superadmin');
+
+        if (tokenStr != null && tokenStr.toString().isNotEmpty) {
+          await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
+          await prefs.setString('auth_token', tokenStr.toString());
+        }
+
+        await SecureSessionStorage.instance.saveUserSession(
+          userId: serverUid,
+          email: result.email,
+          role: isSuperadmin ? 'superadmin' : 'user',
+          isProfileCompleted: isProfileCompleted,
+        );
+
         if (!isProfileCompleted) {
           try {
             final prefs = await SharedPreferences.getInstance();
@@ -157,6 +176,9 @@ class AuthRepository {
       }
     } catch (_) {
       // Offline/local tolerance - proceed with verified Google identity
+      if (result.idToken != null && result.idToken!.isNotEmpty) {
+        await SecureSessionStorage.instance.saveAuthToken(result.idToken!);
+      }
     }
 
     // Only check local SharedPreferences as a fallback if network sync failed
