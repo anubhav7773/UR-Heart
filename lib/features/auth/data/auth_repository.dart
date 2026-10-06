@@ -285,9 +285,12 @@ class AuthRepository {
 
   /// Signs user out of Google and Firebase with atomic hardware session flush
   Future<void> signOut() async {
+    _activePollToken = null;
     await _googleAuthService.signOut();
     await SecureSessionStorage.instance.clearAllSessionData();
   }
+
+  String? _activePollToken;
 
   /// Sends magic link or triggers passwordless verification
   Future<Map<String, dynamic>?> sendMagicLink(String email) async {
@@ -297,6 +300,10 @@ class AuthRepository {
         data: {'email': email.trim().toLowerCase()},
       );
       if (response.statusCode == 200 && response.data != null) {
+        final pollToken = response.data!['poll_token']?.toString();
+        if (pollToken != null && pollToken.isNotEmpty) {
+          _activePollToken = pollToken;
+        }
         return response.data;
       }
       return null;
@@ -385,12 +392,19 @@ class AuthRepository {
   }
 
   /// Polls backend to detect instant tap on verification link in email client
-  Future<Map<String, dynamic>?> checkVerificationStatus(String email) async {
+  Future<Map<String, dynamic>?> checkVerificationStatus(String email, {String? pollToken}) async {
     try {
       final cleanEmail = email.trim().toLowerCase();
+      final effectivePollToken = pollToken ?? _activePollToken;
+      final queryParams = <String, dynamic>{
+        'email': cleanEmail,
+      };
+      if (effectivePollToken != null && effectivePollToken.isNotEmpty) {
+        queryParams['poll_token'] = effectivePollToken;
+      }
       final response = await _apiClient.dio.get<Map<String, dynamic>>(
         '/api/v1/auth/verification-status',
-        queryParameters: {'email': cleanEmail},
+        queryParameters: queryParams,
       );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data!;

@@ -1,3 +1,4 @@
+import os
 import json
 from datetime import date
 from typing import Optional, Dict, Any, List
@@ -127,6 +128,35 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
     is_completed = False
     clean_email = payload.email.strip().lower() if payload.email else ""
     if clean_email:
+        # Cryptographic Identity Verification (SEC-HIGH-04):
+        from app.core.config import get_settings
+        _settings = get_settings()
+        _is_prod = getattr(_settings, "ENVIRONMENT", "").lower() == "production"
+
+        if payload.id_token:
+            from app.core.security import verify_firebase_jwt
+            try:
+                verified_claims = await verify_firebase_jwt(payload.id_token)
+                token_email = (verified_claims.get("email") or "").strip().lower()
+                if token_email and token_email != clean_email:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Google ID token email does not match requested synchronization email."
+                    )
+            except HTTPException:
+                raise
+            except Exception as tok_err:
+                if _is_prod:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail=f"Google ID token signature verification failed: {tok_err}"
+                    )
+        elif _is_prod:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Production Security Gate: Google ID token (id_token) is strictly required."
+            )
+
         res = await db.execute(select(User).where(User.email == clean_email))
         user_row = res.scalar_one_or_none()
         from app.core.security import resolve_auth_uuid
@@ -262,10 +292,11 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
         except Exception as fb_ex:
             print(f"[AUTH LOGIN] Firebase verification exception: {fb_ex}", flush=True)
 
-    # 3. Non-production / automated test fallback
-    if not is_authenticated:
+    # 3. Non-production / automated test fallback (strictly isolated from production)
+    is_test_runner = getattr(settings, "ENVIRONMENT", "").lower() in ("development", "test", "testing", "local") or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    if not is_authenticated and is_test_runner:
         if provided_password in ("dev_test_password_2026", "SanctuaryDevPassword#2026", "secure_password_123"):
-            if getattr(settings, "ENVIRONMENT", "").lower() != "production" or "example.com" in clean_email or "test" in clean_email or clean_email == "asiverticals@gmail.com":
+            if "example.com" in clean_email or "test" in clean_email:
                 is_authenticated = True
 
     if not is_authenticated:
@@ -398,16 +429,19 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
     """
     clean_email = payload.email.strip().lower()
     token = secrets.token_urlsafe(32)
+    poll_token = secrets.token_urlsafe(24)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     MAGIC_LINK_VAULT[token] = {
         "email": clean_email,
+        "poll_token": poll_token,
         "expires_at": expires_at,
         "used": False
     }
 
     EMAIL_VERIFICATION_STATUS[clean_email] = {
         "token": token,
+        "poll_token": poll_token,
         "is_verified": False,
         "access_token": None,
         "expires_at": expires_at
@@ -450,6 +484,8 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
         "status": "sent",
         "email": clean_email,
         "masked_email": masked_email,
+        "poll_token": poll_token,
+        "polling_ticket": poll_token,
         "firebase_dispatched": dispatch_res.get("dispatched", False),
         "supabase_dispatched": False,
         "rate_limited": dispatch_res.get("rate_limited", False),
@@ -467,14 +503,40 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
 
 
 @router.get("/verification-status", status_code=status.HTTP_200_OK, summary="Live Polling Status for Magic Link")
-async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)):
+async def get_verification_status(
+    email: str,
+    poll_token: Optional[str] = None,
+    polling_ticket: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
     """
     Polled every 2 seconds by Flutter MagicLinkScreen to detect instant tap-to-verify.
+    SEC-CRIT-02: Requires proof-of-possession poll_token challenge to eliminate unauthorized session harvesting.
     """
     clean_email = email.strip().lower()
+    challenge = poll_token or polling_ticket
     status_entry = EMAIL_VERIFICATION_STATUS.get(clean_email)
+
+    from app.core.config import get_settings
+    _settings = get_settings()
+    _is_prod = getattr(_settings, "ENVIRONMENT", "").lower() == "production"
+
+    # Enforce challenge validation against registered dispatch
+    expected_challenge = status_entry.get("poll_token") if status_entry else None
+    if expected_challenge:
+        if not challenge or not secrets.compare_digest(challenge.strip(), expected_challenge.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Verification challenge required: Missing or invalid poll_token."
+            )
+    elif _is_prod:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No pending verification request active for this email address."
+        )
+
     if status_entry and status_entry.get("is_verified"):
-        return {
+        resp = {
             "status": "success",
             "is_verified": True,
             "email": clean_email,
@@ -485,6 +547,10 @@ async def get_verification_status(email: str, db: AsyncSession = Depends(get_db)
             "is_profile_completed": status_entry.get("is_profile_completed", False),
             "message": "Sacred email verified via Firebase. Proceeding to sanctuary."
         }
+        # Consume the session token atomically to prevent token replay
+        status_entry["access_token"] = None
+        status_entry["is_verified"] = False
+        return resp
 
     # 1. Live Check directly with Supabase Auth (auth.users table)
     # Catches the exact moment user taps "Confirm email address" in Supabase Auth email

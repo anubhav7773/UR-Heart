@@ -274,7 +274,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_cors_origins(),
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|(.*\.)?asiverticals\.me|urheart\.vercel\.app|(.*\.)?urheart\.(app|in))(:\d+)?$",
+    allow_origin_regex=r"^(https://(localhost|127\.0\.0\.1|(.*\.)?asiverticals\.me|urheart\.vercel\.app|(.*\.)?urheart\.(app|in))(:\d+)?|http://(localhost|127\.0\.0\.1)(:\d+)?)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

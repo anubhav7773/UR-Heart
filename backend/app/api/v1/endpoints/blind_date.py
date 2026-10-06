@@ -37,8 +37,13 @@ async def check_blind_date_eligibility(
     return BlindDateMatcherService.check_eligibility(current_user)
 
 
+from app.core.limiter import limiter
+from fastapi import Request
+
 @router.post("/claim-ad-pass", status_code=status.HTTP_200_OK, summary="Claim Blind Date Pass via Rewarded Ad")
+@limiter.limit("5/minute")
 async def claim_blind_date_ad_pass(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -47,7 +52,13 @@ async def claim_blind_date_ad_pass(
     If the seeker's daily streak is inactive or broken, watching this ad also
     ignites/locks their streak for the day (1:1 Value Parity, viral loop).
     """
-    return await BlindDateMatcherService.claim_ad_pass(db, current_user)
+    try:
+        return await BlindDateMatcherService.claim_ad_pass(db, current_user)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e)
+        )
 
 
 @router.post("/queue/join", status_code=status.HTTP_200_OK, summary="Join Blind Date Matchmaking Queue")

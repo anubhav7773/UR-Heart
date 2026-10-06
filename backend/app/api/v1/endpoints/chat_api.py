@@ -50,7 +50,10 @@ def encrypt_message_storage(plain_text: str, match_id: str) -> str:
             clean_id = str(_clean_match_uuid(match_id))
         except Exception:
             clean_id = str(match_id)
-        secret = os.getenv("JWT_SECRET_KEY", "urheart_default_super_secret_sanctuary_2026")
+        from app.core.security import JWT_SECRET_KEY
+        secret = (JWT_SECRET_KEY or "").strip()
+        if not secret or len(secret) < 16:
+            raise RuntimeError("FATAL SECURITY ERROR: JWT_SECRET_KEY is missing or invalid. Refusing storage encryption.")
         key_material = hashlib.sha256(f"{secret}:{clean_id}".encode()).digest()
         aesgcm = AESGCM(key_material)
         nonce = os.urandom(12)
@@ -75,7 +78,10 @@ def decrypt_message_storage(stored_text: str, match_id: str) -> str:
         raw = base64.b64decode(stored_text[7:])
         nonce = raw[:12]
         ct = raw[12:]
-        secret = os.getenv("JWT_SECRET_KEY", "urheart_default_super_secret_sanctuary_2026")
+        from app.core.security import JWT_SECRET_KEY
+        secret = (JWT_SECRET_KEY or "").strip()
+        if not secret or len(secret) < 16:
+            raise RuntimeError("FATAL SECURITY ERROR: JWT_SECRET_KEY is missing or invalid. Refusing storage decryption.")
         key_material = hashlib.sha256(f"{secret}:{clean_id}".encode()).digest()
         aesgcm = AESGCM(key_material)
         decrypted_bytes = aesgcm.decrypt(nonce, ct, None)
@@ -665,7 +671,8 @@ async def get_match_bridge_status(
     is_unlocked = bool(token_rec and (token_rec.is_unlocked or (my_consent and peer_consent)))
 
     partner_platform = partner.contact_bridge_type or "whatsapp"
-    partner_handle = partner.contact_bridge_encrypted if is_unlocked else ""
+    from app.core.encryption import decrypt_contact_bridge
+    partner_handle = decrypt_contact_bridge(partner.contact_bridge_encrypted, str(partner.id)) if is_unlocked else ""
 
     return {
         "match_id": match_id,
@@ -741,7 +748,7 @@ async def redeem_bridge_reveal_token(
             "is_unlocked": True,
             "has_wa_key": True,
             "platform": partner.contact_bridge_type or "whatsapp",
-            "handle": partner.contact_bridge_encrypted or "",
+            "handle": __import__("app.core.encryption", fromlist=["decrypt_contact_bridge"]).decrypt_contact_bridge(partner.contact_bridge_encrypted, str(partner.id)) if partner.contact_bridge_encrypted else "",
             "remaining_reveal_tokens": current_user.reveal_tokens_count,
             "reveal_tokens_count": current_user.reveal_tokens_count,
         }
@@ -790,7 +797,7 @@ async def redeem_bridge_reveal_token(
             "is_unlocked": True,
             "has_wa_key": True,
             "platform": partner.contact_bridge_type or "whatsapp",
-            "handle": partner.contact_bridge_encrypted or "",
+            "handle": __import__("app.core.encryption", fromlist=["decrypt_contact_bridge"]).decrypt_contact_bridge(partner.contact_bridge_encrypted, str(partner.id)) if partner.contact_bridge_encrypted else "",
             "user_step": 3,
             "peer_step": 3,
             "pending_peer_consent": False,
@@ -925,7 +932,11 @@ async def respond_to_bridge_consent(
             "is_unlocked": token_rec.is_unlocked,
             "has_wa_key": token_rec.is_unlocked,
             "platform": partner.contact_bridge_type or "whatsapp",
-            "handle": partner.contact_bridge_encrypted if token_rec.is_unlocked else "",
+            "handle": (
+                __import__("app.core.encryption", fromlist=["decrypt_contact_bridge"]).decrypt_contact_bridge(partner.contact_bridge_encrypted, str(partner.id))
+                if (token_rec.is_unlocked and partner.contact_bridge_encrypted)
+                else ""
+            ),
             "message": "Sacred Contact Bridge unsealed!" if token_rec.is_unlocked else "Consent recorded.",
         }
 

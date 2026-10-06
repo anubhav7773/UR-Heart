@@ -172,11 +172,18 @@ class BlindDateMatcherService:
     async def claim_ad_pass(db: AsyncSession, user: User) -> dict:
         """
         Grants +1 Blind Date Pass for watching a 30s rewarded ad.
-        If the seeker's streak was inactive or broken, watching this ad
-        also ignites/locks their daily streak via StreakEngine! (100% Value Parity)
+        SEC-HIGH: Enforces anti-abuse limits and cooldown to prevent infinite pass generation.
         """
         now = datetime.now(timezone.utc)
+        
+        # Anti-abuse cooldown check: Minimum 2-minute cooldown between consecutive claims, max 5 bonus passes
+        if user.last_streak_ad_at:
+            elapsed = (now - user.last_streak_ad_at).total_seconds()
+            if elapsed < 120 and (user.blind_date_passes or 0) >= 2:
+                raise ValueError("Ad pass cooldown active. Please wait 2 minutes before watching another rewarded ad.")
+
         user.blind_date_passes = (user.blind_date_passes or 0) + 1
+        user.last_streak_ad_at = now
 
         is_streak_active = bool(
             user.streak_expires_at

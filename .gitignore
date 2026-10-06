@@ -63,3 +63,4 @@ graphify-out/
 .vercel
 .env*
 scratch/
+.audit_output/

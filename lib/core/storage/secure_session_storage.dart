@@ -30,6 +30,8 @@ class SecureSessionStorage {
   static const String keyUserPhoto = 'ur_heart_user_photo';
   static const String keyUserRole = 'user_role';
   static const String keyProfileCompleted = 'ur_heart_profile_setup_completed';
+  static const String keyCachedProfileActive = 'cached_profile_json_active';
+  static const String keyCachedProfilePrefix = 'cached_profile_json_';
 
   /// Saves the primary authentication token in hardware-backed secure storage.
   Future<void> saveAuthToken(String token) async {
@@ -197,6 +199,55 @@ class SecureSessionStorage {
     return false;
   }
 
+  /// Persists full user profile JSON securely to hardware-backed Keystore (URH-CLIENT-CACHE-010)
+  Future<void> saveCachedProfileJson(String jsonStr, {String? userId}) async {
+    try {
+      await _secureStorage.write(key: keyCachedProfileActive, value: jsonStr);
+      if (userId != null && userId.isNotEmpty) {
+        await _secureStorage.write(key: '$keyCachedProfilePrefix$userId', value: jsonStr);
+      }
+      // Clean up plaintext copies from SharedPreferences to avoid device-level leakage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(keyCachedProfileActive);
+      if (userId != null && userId.isNotEmpty) {
+        await prefs.remove('$keyCachedProfilePrefix$userId');
+      }
+    } catch (e) {
+      debugPrint('[SecureSessionStorage] Error saving cached profile JSON: $e');
+    }
+  }
+
+  /// Retrieves cached profile JSON from hardware-backed Keystore with transparent SharedPreferences migration
+  Future<String?> getCachedProfileJson({String? userId}) async {
+    try {
+      if (userId != null && userId.isNotEmpty) {
+        final secUserJson = await _secureStorage.read(key: '$keyCachedProfilePrefix$userId');
+        if (secUserJson != null && secUserJson.isNotEmpty) return secUserJson;
+      }
+
+      final secActiveJson = await _secureStorage.read(key: keyCachedProfileActive);
+      if (secActiveJson != null && secActiveJson.isNotEmpty) return secActiveJson;
+
+      // Transparent legacy migration check from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      if (userId != null && userId.isNotEmpty) {
+        final legUserJson = prefs.getString('$keyCachedProfilePrefix$userId');
+        if (legUserJson != null && legUserJson.isNotEmpty) {
+          await saveCachedProfileJson(legUserJson, userId: userId);
+          return legUserJson;
+        }
+      }
+      final legActiveJson = prefs.getString(keyCachedProfileActive);
+      if (legActiveJson != null && legActiveJson.isNotEmpty) {
+        await saveCachedProfileJson(legActiveJson, userId: userId);
+        return legActiveJson;
+      }
+    } catch (e) {
+      debugPrint('[SecureSessionStorage] Error reading cached profile JSON: $e');
+    }
+    return null;
+  }
+
   /// Atomic Session Flushing Pipeline.
   /// Irrevocably purges all hardware keystore items and residual SharedPreferences tokens.
   Future<void> clearAllSessionData() async {
@@ -204,10 +255,11 @@ class SecureSessionStorage {
       // 1. Purge all hardware-backed secure storage keys
       await _secureStorage.deleteAll();
 
-      // 2. Clear any lingering auth tokens in SharedPreferences
+      // 2. Clear any lingering auth tokens and profile caches in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(keyAuthToken);
       await prefs.remove(keyLegacyAuthToken);
+      final currentUserId = prefs.getString(keyUserId);
       await prefs.remove(keyUserId);
       await prefs.remove(keyUserEmail);
       await prefs.remove(keyLegacyProfileEmail);
@@ -215,6 +267,10 @@ class SecureSessionStorage {
       await prefs.remove(keyUserPhoto);
       await prefs.remove(keyUserRole);
       await prefs.remove(keyProfileCompleted);
+      await prefs.remove(keyCachedProfileActive);
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        await prefs.remove('$keyCachedProfilePrefix$currentUserId');
+      }
       debugPrint('[SecureSessionStorage] Atomic session flush completed successfully.');
     } catch (e) {
       debugPrint('[SecureSessionStorage] Error during atomic session flush: $e');

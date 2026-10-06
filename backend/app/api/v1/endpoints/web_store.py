@@ -306,12 +306,12 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
             )
         dup_stmt = select(InAppPurchase).where(
             InAppPurchase.transaction_reference == utr,
-            InAppPurchase.status == "completed"
+            InAppPurchase.status.in_(["pending_verification", "completed"])
         )
         if (await db.execute(dup_stmt)).scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"UTR transaction reference '{utr}' has already been credited."
+                detail=f"UTR transaction reference '{utr}' has already been submitted or credited."
             )
         SUBMITTED_UTRS.add(utr)
 

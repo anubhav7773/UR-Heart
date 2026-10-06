@@ -27,22 +27,25 @@ async def test_google_sync_superadmin_elevation():
 
     app.dependency_overrides[get_db] = lambda: mock_db
 
-    try:
-        response = client.post(
-            "/api/v1/auth/google-sync",
-            json={
-                "email": "asiverticals@gmail.com",
-                "user_id": str(uuid.uuid4()),
-                "display_name": "Sanctuary Founder"
-            }
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "synchronized"
-        assert data["email"] == "asiverticals@gmail.com"
-        assert data["role"] == "superadmin"
-    finally:
-        app.dependency_overrides.pop(get_db, None)
+    from unittest.mock import patch
+    with patch("app.core.security.verify_firebase_jwt", AsyncMock(return_value={"email": "asiverticals@gmail.com"})):
+        try:
+            response = client.post(
+                "/api/v1/auth/google-sync",
+                json={
+                    "email": "asiverticals@gmail.com",
+                    "user_id": str(uuid.uuid4()),
+                    "display_name": "Sanctuary Founder",
+                    "id_token": "mock_google_id_token_superadmin"
+                }
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "synchronized"
+            assert data["email"] == "asiverticals@gmail.com"
+            assert data["role"] == "superadmin"
+        finally:
+            app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.asyncio

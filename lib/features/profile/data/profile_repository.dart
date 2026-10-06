@@ -143,9 +143,10 @@ class ProfileRepository {
       final prefs = await SharedPreferences.getInstance();
       if (profile.id.isNotEmpty) {
         await prefs.setString('profile_user_id', profile.id);
-        await prefs.setString('cached_profile_json_${profile.id}', jsonEncode(profile.toJson()));
+        await SecureSessionStorage.instance.saveCachedProfileJson(jsonEncode(profile.toJson()), userId: profile.id);
+      } else {
+        await SecureSessionStorage.instance.saveCachedProfileJson(jsonEncode(profile.toJson()));
       }
-      await prefs.setString('cached_profile_json_active', jsonEncode(profile.toJson()));
       if (profile.referralCode.isNotEmpty) {
         await prefs.setString('profile_referral_code', profile.referralCode);
         await prefs.setString('ur_heart_user_referral_code', profile.referralCode);
@@ -194,19 +195,17 @@ class ProfileRepository {
       final currentUserId = secureUserId ?? prefs.getString('ur_heart_user_id');
       final storedProfileUserId = prefs.getString('profile_user_id');
 
-      // 1. Prioritize user-specific JSON cache for currentUserId
-      if (currentUserId != null && currentUserId.isNotEmpty) {
-        final userCacheStr = prefs.getString('cached_profile_json_$currentUserId');
-        if (userCacheStr != null && userCacheStr.isNotEmpty) {
-          try {
-            final profile = UserProfile.fromJson(jsonDecode(userCacheStr) as Map<String, dynamic>);
-            if (profile.isLoaded) {
-              _currentProfile = profile;
-              _staticPrewarmedProfile = profile;
-              return _currentProfile;
-            }
-          } catch (_) {}
-        }
+      // 1. Prioritize user-specific JSON cache from hardware-backed keystore
+      final secureProfileJson = await SecureSessionStorage.instance.getCachedProfileJson(userId: currentUserId);
+      if (secureProfileJson != null && secureProfileJson.isNotEmpty) {
+        try {
+          final profile = UserProfile.fromJson(jsonDecode(secureProfileJson) as Map<String, dynamic>);
+          if (profile.isLoaded) {
+            _currentProfile = profile;
+            _staticPrewarmedProfile = profile;
+            return _currentProfile;
+          }
+        } catch (_) {}
       }
 
       final bool isSameUser = (currentUserId != null &&
@@ -214,21 +213,6 @@ class ProfileRepository {
           storedProfileUserId != null &&
           storedProfileUserId.isNotEmpty &&
           storedProfileUserId == currentUserId);
-
-      // 2. Check active JSON cache if user IDs match or no previous mismatch
-      if (isSameUser || storedProfileUserId == null || storedProfileUserId.isEmpty) {
-        final activeCacheStr = prefs.getString('cached_profile_json_active');
-        if (activeCacheStr != null && activeCacheStr.isNotEmpty) {
-          try {
-            final profile = UserProfile.fromJson(jsonDecode(activeCacheStr) as Map<String, dynamic>);
-            if (profile.isLoaded) {
-              _currentProfile = profile;
-              _staticPrewarmedProfile = profile;
-              return _currentProfile;
-            }
-          } catch (_) {}
-        }
-      }
 
       // If switching accounts or account mismatch, return empty profile only if no cache exists
       if (!isSameUser && (storedProfileUserId != null || currentUserId == null)) {
@@ -311,10 +295,10 @@ class ProfileRepository {
 
       if (_currentProfile.isLoaded) {
         _staticPrewarmedProfile = _currentProfile;
-        await prefs.setString('cached_profile_json_active', jsonEncode(_currentProfile.toJson()));
-        if (_currentProfile.id.isNotEmpty) {
-          await prefs.setString('cached_profile_json_${_currentProfile.id}', jsonEncode(_currentProfile.toJson()));
-        }
+        await SecureSessionStorage.instance.saveCachedProfileJson(
+          jsonEncode(_currentProfile.toJson()),
+          userId: _currentProfile.id.isNotEmpty ? _currentProfile.id : null,
+        );
       }
     } catch (e) {
       debugPrint('[ProfileRepository] Error loading storage: $e');
@@ -332,10 +316,10 @@ class ProfileRepository {
       await prefs.setString('profile_profession', updated.profession);
       await prefs.setString('profile_education', updated.education);
       await prefs.setString('profile_location', updated.location);
-      await prefs.setString('cached_profile_json_active', jsonEncode(updated.toJson()));
-      if (updated.id.isNotEmpty) {
-        await prefs.setString('cached_profile_json_${updated.id}', jsonEncode(updated.toJson()));
-      }
+      await SecureSessionStorage.instance.saveCachedProfileJson(
+        jsonEncode(updated.toJson()),
+        userId: updated.id.isNotEmpty ? updated.id : null,
+      );
 
       final response = await dio.put<dynamic>(
         '/api/v1/profile/me',

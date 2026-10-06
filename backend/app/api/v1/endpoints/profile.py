@@ -114,7 +114,13 @@ async def get_my_authenticated_profile(
         "discreet_mode": current_user.discreet_mode,
         "contact_bridge_type": current_user.contact_bridge_type,
         "contact_bridge_masked": (
-            current_user.contact_bridge_encrypted[:4] + "****"
+            (
+                lambda b: (b[:4] + "****" if len(b) >= 4 else b)
+            )(
+                __import__("app.core.encryption", fromlist=["decrypt_contact_bridge"]).decrypt_contact_bridge(
+                    current_user.contact_bridge_encrypted, str(current_user.id)
+                )
+            )
             if current_user.contact_bridge_encrypted
             else ""
         ),
@@ -126,7 +132,9 @@ async def get_my_authenticated_profile(
         "avatar_url": current_user.avatar_url or "",
         "preferred_age_min": current_user.preferred_age_min,
         "preferred_age_max": current_user.preferred_age_max,
-        "contact_bridge_handle": current_user.contact_bridge_encrypted,
+        "contact_bridge_handle": __import__("app.core.encryption", fromlist=["decrypt_contact_bridge"]).decrypt_contact_bridge(
+            current_user.contact_bridge_encrypted, str(current_user.id)
+        ),
         "role": current_user.role or ("superadmin" if (current_user.email or "").lower() == "asiverticals@gmail.com" else "user"),
         "voice_spark_url": current_user.voice_spark_url,
         "voice_spark_prompt": current_user.voice_spark_prompt,
@@ -321,7 +329,8 @@ async def update_my_profile(
     if "contact_bridge_handle" in update_data:
         handle = update_data.pop("contact_bridge_handle")
         if handle:
-            update_data["contact_bridge_encrypted"] = str(handle)
+            from app.core.encryption import encrypt_contact_bridge
+            update_data["contact_bridge_encrypted"] = encrypt_contact_bridge(str(handle), str(current_user.id))
 
     # Defense-in-depth: Disallow client manipulation of KYC status
     update_data.pop("is_kyc_verified", None)
@@ -527,7 +536,8 @@ async def create_or_update_profile(
 
     bridge_value_val = payload.bridge_value or payload.contact_bridge_handle
     if bridge_value_val:
-        up_vals["contact_bridge_encrypted"] = bridge_value_val
+        from app.core.encryption import encrypt_contact_bridge
+        up_vals["contact_bridge_encrypted"] = encrypt_contact_bridge(str(bridge_value_val), str(current_user.id))
 
     if payload.photos:
         clean_photos = [p for p in payload.photos if p and str(p).strip()]

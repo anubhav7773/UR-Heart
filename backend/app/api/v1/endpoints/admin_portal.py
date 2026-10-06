@@ -139,7 +139,10 @@ async def admin_portal_login(
         valid_keys.add("asiverticals_sovereign_sanctuary_2026")
 
     valid_keys.discard("")
-    if not payload.secret_key or payload.secret_key.strip() not in valid_keys:
+    import secrets
+    provided_key = payload.secret_key.strip() if payload.secret_key else ""
+    is_valid = bool(provided_key and any(secrets.compare_digest(provided_key, vk) for vk in valid_keys if vk))
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Sovereign Secret Key."
