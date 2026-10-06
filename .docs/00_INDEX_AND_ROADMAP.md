@@ -280,6 +280,10 @@ UR-Heart replaces single-platform phone sharing with the **Multi-Platform Sacred
 * **Anti-Ghosting Mindful Closure**: Automated compassionate Eva intercession after 48h of inactivity, eliminating ghosting anxiety.
 * *Detailed Specification*: See [`19_VIRAL_COMPETITOR_BEATING_FEATURES_BLUEPRINT.md`](file:///c:/Project/UR-Heart/.docs/19_VIRAL_COMPETITOR_BEATING_FEATURES_BLUEPRINT.md)
 
+#### Phase 10: Play Store Launch & Account Blueprint (Guide 20)
+* Complete form-filling manual, reviewer test credentials, and Data Safety declarations for Google Play Console.
+* *Detailed Guide*: See [`20_GOOGLE_PLAY_CONSOLE_MASTER_LAUNCH_GUIDE.md`](file:///c:/Project/UR-Heart/.docs/20_GOOGLE_PLAY_CONSOLE_MASTER_LAUNCH_GUIDE.md)
+
 ---
 
 ## 8. MASTER NON-NEGOTIABLE ARCHITECTURAL INVARIANTS
