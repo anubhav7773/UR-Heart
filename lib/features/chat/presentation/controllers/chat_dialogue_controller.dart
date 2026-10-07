@@ -202,7 +202,7 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       final rawStatus = closureData['closure_status'] as String?;
       final isStagnantBool = closureData['is_stagnant'] as bool? ?? (rawStatus == 'stagnant');
       final isClosedBool = closureData['is_closed'] as bool? ?? (rawStatus == 'closed_with_grace');
-      final hours = closureData['hours_since_last_message'] as int? ?? 0;
+      final hours = (closureData['hours_since_last_message'] as num?)?.toInt() ?? 0;
 
       state = state.copyWith(
         closureStatus: rawStatus,
@@ -225,8 +225,13 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
       if (type == 'dialogue_message' && isTargetMatch) {
         await _handleIncomingEncryptedMessage(event);
       } else if (type == 'mindful_closure' && isTargetMatch) {
-        final closingNote = event['farewell_note'] as String? ?? event['closure_note'] as String? ?? '';
-        final closerId = event['closed_by_user_id'] as String? ?? '';
+        final closingNote = event['closure_note'] as String? ??
+            event['farewell_note'] as String? ??
+            event['note'] as String? ??
+            '';
+        final closerId = event['closed_by_user_id'] as String? ??
+            event['closed_by'] as String? ??
+            '';
         state = state.copyWith(
           closureStatus: 'closed_with_grace',
           closedByUserId: closerId,
@@ -295,6 +300,16 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
               // Genuinely new message from peer
               updatedMessages.add(fresh);
               hasChanges = true;
+            }
+
+            // Detect closure farewell message arrived via REST polling
+            if (fresh.text.startsWith('🍃 Mindful Closure:') && !state.isClosed) {
+              final note = fresh.text.replaceFirst('🍃 Mindful Closure:', '').trim();
+              state = state.copyWith(
+                closureStatus: 'closed_with_grace',
+                closureNote: note,
+                isStagnant: false,
+              );
             }
           }
 

@@ -14,35 +14,45 @@ from app.services.chat_manager import manager
 MINDFUL_CLOSURE_TEMPLATES = [
     {
         "id": "wavelength",
+        "key": "wavelength",
         "title": "Gentle Wavelengths",
         "description": "Honor the connection while acknowledging differing paths",
         "text": "It was truly wonderful crossing paths, but I feel our wavelengths didn't quite align. Wishing you warmth and light on your journey! 🌸",
+        "message": "It was truly wonderful crossing paths, but I feel our wavelengths didn't quite align. Wishing you warmth and light on your journey! 🌸",
         "icon": "spa",
     },
     {
         "id": "self_focus",
+        "key": "self_focus",
         "title": "Self-Reflection & Space",
         "description": "Taking a mindful step back to focus inward",
         "text": "Stepping back to focus on myself and my own space right now. Thank you deeply for the mindful dialogue! ✨",
+        "message": "Stepping back to focus on myself and my own space right now. Thank you deeply for the mindful dialogue! ✨",
         "icon": "self_improvement",
     },
     {
         "id": "different_resonance",
+        "key": "different_resonance",
         "title": "Seeking Different Resonance",
         "description": "Honest and gentle clarity without pretense",
         "text": "I deeply appreciated our conversations, though I'm seeking a different resonance right now. Wishing you the very best! 🙏",
+        "message": "I deeply appreciated our conversations, though I'm seeking a different resonance right now. Wishing you the very best! 🙏",
         "icon": "favorite_border",
     },
     {
         "id": "silent_bow",
+        "key": "silent_bow",
         "title": "Silent Mindful Bow",
         "description": "Softly concluding without lingering unsaid words",
         "text": "A respectful silent bow. Softly concluding this dialogue without lingering unsaid words. 🍃",
+        "message": "A respectful silent bow. Softly concluding this dialogue without lingering unsaid words. 🍃",
         "icon": "energy_savings_leaf",
     },
 ]
 
 TEMPLATE_MAP = {t["id"]: t for t in MINDFUL_CLOSURE_TEMPLATES}
+for t in MINDFUL_CLOSURE_TEMPLATES:
+    TEMPLATE_MAP[t["key"]] = t
 
 
 class MindfulClosureService:
@@ -154,7 +164,8 @@ class MindfulClosureService:
             data={
                 "match_id": str(match_id),
                 "action": "open_chat",
-                "type": "mindful_closure"
+                "type": "mindful_closure",
+                "route": "/chat-dialogue"
             }
         )
 
@@ -164,8 +175,11 @@ class MindfulClosureService:
                 "type": "mindful_closure",
                 "match_id": str(match_id),
                 "closed_by": str(user_id),
+                "closed_by_user_id": str(user_id),
                 "closure_status": "closed_with_grace",
                 "note": closure_text,
+                "closure_note": closure_text,
+                "farewell_note": closure_text,
                 "closed_at": now.isoformat()
             })
         except Exception as e:

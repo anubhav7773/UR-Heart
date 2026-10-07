@@ -238,6 +238,8 @@ class ChatsListScreen extends ConsumerWidget {
         return 'Direct Letters';
       case 'mutual':
         return 'Mutual Sparks';
+      case 'past':
+        return 'Past Reflections 🍃';
       default:
         return 'All';
     }

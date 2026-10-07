@@ -263,10 +263,10 @@ class MindfulClosureTemplate {
 
   factory MindfulClosureTemplate.fromJson(Map<String, dynamic> json) {
     return MindfulClosureTemplate(
-      key: json['key'] as String? ?? '',
+      key: json['key'] as String? ?? json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
       icon: json['icon'] as String? ?? '🍃',
-      message: json['message'] as String? ?? '',
+      message: json['message'] as String? ?? json['text'] as String? ?? '',
     );
   }
 }

@@ -454,27 +454,28 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                   ],
                 ),
               ),
-              PopupMenuItem<String>(
-                value: 'closure',
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.spa_outlined,
-                      size: 20,
-                      color: Color(0xFF4E9F76),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Mindful Closure (Pass with Grace) 🍃',
-                      style: TextStyle(
-                        color: isDark ? const Color(0xFF80E0A7) : const Color(0xFF2E7D32),
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
+              if (!dialogueState.isClosed)
+                PopupMenuItem<String>(
+                  value: 'closure',
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.spa_outlined,
+                        size: 20,
+                        color: Color(0xFF4E9F76),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 10),
+                      Text(
+                        'Mindful Closure (Pass with Grace) 🍃',
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFF80E0A7) : const Color(0xFF2E7D32),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               PopupMenuItem<String>(
                 value: 'report',
                 child: Row(
@@ -564,7 +565,7 @@ class _ChatDialogueScreenState extends ConsumerState<ChatDialogueScreen> with Wi
                           },
                         ),
                 ),
-                if (dialogueState.bondingSparks.isNotEmpty && !dialogueState.sparksDismissed)
+                if (dialogueState.bondingSparks.isNotEmpty && !dialogueState.sparksDismissed && !dialogueState.isClosed)
                   EvaBondingSparkBar(
                     isDark: isDark,
                     sparks: dialogueState.bondingSparks,

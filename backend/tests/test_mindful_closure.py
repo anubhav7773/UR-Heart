@@ -193,3 +193,70 @@ async def test_get_closure_status():
     assert res["is_closed"] is False
     assert res["hours_since_last_message"] >= 49.0
     assert len(res["templates"]) == 4
+
+
+def test_mindful_closure_template_contract_symmetry():
+    """Ensures each template has both id/key and text/message for 100% frontend resilience."""
+    templates = MindfulClosureService.get_templates()
+    for t in templates:
+        assert "id" in t and "key" in t
+        assert t["id"] == t["key"]
+        assert "text" in t and "message" in t
+        assert t["text"] == t["message"]
+        assert len(t["key"]) > 0
+        assert len(t["message"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_send_mindful_closure_payload_symmetry():
+    """Ensures WSS event and FCM push contain all alias keys expected by Flutter client."""
+    user1_id = uuid.uuid4()
+    user2_id = uuid.uuid4()
+    match_id = uuid.uuid4()
+
+    match = Match(
+        id=match_id,
+        user1_id=user1_id,
+        user2_id=user2_id,
+        is_active=True,
+        closure_status="stagnant"
+    )
+
+    user1 = User(id=user1_id, full_name="Aarav Sen")
+    mock_db = AsyncMock()
+
+    async def fake_execute(stmt):
+        mock_r = MagicMock()
+        stmt_str = str(stmt).lower()
+        if "from public.matches" in stmt_str or "matches" in stmt_str:
+            mock_r.scalar_one_or_none.return_value = match
+        else:
+            mock_r.scalar_one_or_none.return_value = user1
+        return mock_r
+
+    mock_db.execute.side_effect = fake_execute
+
+    with patch("app.services.mindful_closure.push_notification") as mock_push, \
+         patch("app.services.chat_manager.manager.send_direct_message", new_callable=AsyncMock) as mock_wss:
+
+        res = await MindfulClosureService.send_mindful_closure(
+            db=mock_db,
+            match_id=match_id,
+            user_id=user1_id,
+            template_key="wavelength"
+        )
+
+        assert res["status"] == "closed_with_grace"
+
+        # Verify WebSocket payload has both key variants
+        wss_call_args = mock_wss.call_args[0][1]
+        assert wss_call_args["closed_by"] == str(user1_id)
+        assert wss_call_args["closed_by_user_id"] == str(user1_id)
+        assert "closure_note" in wss_call_args
+        assert "note" in wss_call_args
+        assert "farewell_note" in wss_call_args
+
+        # Verify FCM Push has route
+        push_call_kwargs = mock_push.call_args[1]
+        assert push_call_kwargs["data"]["route"] == "/chat-dialogue"
+

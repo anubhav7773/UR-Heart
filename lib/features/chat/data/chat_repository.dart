@@ -411,10 +411,20 @@ class ChatRepository {
             'custom_note': customNote.trim(),
         },
       );
-      if (response.data is Map<String, dynamic>) {
-        return response.data as Map<String, dynamic>;
+      final resMap = (response.data is Map<String, dynamic>)
+          ? (response.data as Map<String, dynamic>)
+          : <String, dynamic>{'status': 'closed_with_grace'};
+
+      // Reconcile in-memory cached conversation for instant inbox transition
+      final convIdx = _conversations.indexWhere((c) => c.matchId == matchId);
+      if (convIdx != -1) {
+        _conversations[convIdx] = _conversations[convIdx].copyWith(
+          closureStatus: 'closed_with_grace',
+          closureNote: resMap['closure_note'] as String? ?? customNote,
+        );
       }
-      return {'status': 'closed_with_grace'};
+
+      return resMap;
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
