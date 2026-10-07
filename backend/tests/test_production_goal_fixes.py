@@ -58,7 +58,8 @@ def test_magic_link_intent_and_dispatch():
     assert "masked_email" in data
 
     # 3. Check Initial Live Polling Status (Should be pending)
-    res_poll_init = client.get(f"/api/v1/auth/verification-status?email={test_email}")
+    poll_token = data.get("poll_token", "")
+    res_poll_init = client.get(f"/api/v1/auth/verification-status?email={test_email}&poll_token={poll_token}")
     assert res_poll_init.status_code == 200
     assert res_poll_init.json()["is_verified"] is False
     assert res_poll_init.json()["status"] == "pending"
@@ -72,7 +73,7 @@ def test_magic_link_intent_and_dispatch():
     assert "Sanctuary Verified" in res_tap.text
 
     # 5. Check Live Polling Status After Tap (Instantly verified)
-    res_poll_after = client.get(f"/api/v1/auth/verification-status?email={test_email}")
+    res_poll_after = client.get(f"/api/v1/auth/verification-status?email={test_email}&poll_token={poll_token}")
     assert res_poll_after.status_code == 200
     assert res_poll_after.json()["is_verified"] is True
     assert res_poll_after.json()["token"] is not None

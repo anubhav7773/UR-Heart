@@ -788,14 +788,15 @@ async def handle_browser_magic_link_tap(
     effective_role = "superadmin" if is_super else (getattr(user_row, "role", "user") or "user")
     session_token = create_access_token({"sub": user_uuid, "email": clean_email, "role": effective_role})
 
-    # Mark verified in global live polling state
+    existing_status = EMAIL_VERIFICATION_STATUS.get(clean_email, {})
     EMAIL_VERIFICATION_STATUS[clean_email] = {
         "is_verified": True,
         "access_token": session_token,
         "role": effective_role,
         "firebase_token": custom_token,
         "firebase_uid": fb_user.uid if fb_user else None,
-        "is_profile_completed": is_completed
+        "is_profile_completed": is_completed,
+        "poll_token": existing_status.get("poll_token")
     }
 
     resolved_token = token or session_token

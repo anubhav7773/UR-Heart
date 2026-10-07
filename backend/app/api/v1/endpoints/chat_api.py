@@ -2,7 +2,7 @@ import os
 import asyncio
 import base64
 import hashlib
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, status, HTTPException, BackgroundTasks
