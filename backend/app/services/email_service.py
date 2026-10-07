@@ -13,6 +13,53 @@ def _parse_email_address(full_from: str) -> str:
 
 class EmailService:
     @staticmethod
+    def _send_resend_http_sync(to_email: str, subject: str, html_body: str, settings: Any) -> bool:
+        resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
+        if not resend_key:
+            return False
+        from_sender = os.getenv("RESEND_FROM") or getattr(settings, "RESEND_FROM", "") or "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                res = client.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                    json={"from": from_sender, "to": [to_email], "subject": subject, "html": html_body}
+                )
+                if res.status_code in (200, 201):
+                    print(f"[EMAIL SERVICE] Sent via synchronous Resend HTTP to {to_email} (id={res.json().get('id')})", flush=True)
+                    return True
+                print(f"[EMAIL SERVICE] Resend HTTP notice ({res.status_code}): {res.text}", flush=True)
+        except Exception as e:
+            print(f"[EMAIL SERVICE] Resend HTTP sync error: {e}", flush=True)
+        return False
+
+    @staticmethod
+    def _send_brevo_http_sync(to_email: str, subject: str, html_body: str, settings: Any) -> bool:
+        brevo_key = os.getenv("BREVO_API_KEY") or getattr(settings, "BREVO_API_KEY", "")
+        if not brevo_key:
+            return False
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                payload = {
+                    "sender": {"name": "UR-Heart Sanctuary", "email": "asiverticals@gmail.com"},
+                    "to": [{"email": to_email, "name": "Seeker"}],
+                    "subject": subject,
+                    "htmlContent": html_body
+                }
+                res = client.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": brevo_key, "Content-Type": "application/json", "Accept": "application/json"},
+                    json=payload
+                )
+                if res.status_code in (200, 201):
+                    print(f"[EMAIL SERVICE] Sent via synchronous Brevo HTTP v3 to {to_email}", flush=True)
+                    return True
+                print(f"[EMAIL SERVICE] Brevo HTTP notice ({res.status_code}): {res.text}", flush=True)
+        except Exception as e:
+            print(f"[EMAIL SERVICE] Brevo HTTP sync error: {e}", flush=True)
+        return False
+
+    @staticmethod
     def send_smtp_payload(
         to_email: str,
         subject: str,
@@ -21,7 +68,8 @@ class EmailService:
     ) -> bool:
         """
         Dispatches email via Google Gmail SMTP Relay (or configured SMTP_HOST),
-        with automatic failover to Brevo SMTP Relay if configured.
+        with automatic failover to Brevo SMTP Relay, and synchronous HTTPS failover
+        via Resend & Brevo REST APIs (Ports 443) when running on Render/Cloud hosts.
         """
         settings = get_settings()
         clean_to = to_email.strip().lower()
@@ -42,6 +90,15 @@ class EmailService:
             print(f"[EMAIL SERVICE TEST MOCK] Suppressed outbound SMTP for test address {clean_to}", flush=True)
             return True
 
+        # Render & Cloud Container Optimization:
+        # Render blocks ports 25, 465, and 587 by default. If on Render, prioritize HTTPS REST APIs first
+        is_cloud_restricted = bool(os.getenv("RENDER") or os.getenv("PORT") and not os.getenv("ALLOW_RAW_SMTP"))
+        if is_cloud_restricted:
+            if EmailService._send_resend_http_sync(clean_to, subject, html_body, settings):
+                return True
+            if EmailService._send_brevo_http_sync(clean_to, subject, html_body, settings):
+                return True
+
         if smtp_host and smtp_user and smtp_password:
             try:
                 msg = MIMEMultipart("alternative")
@@ -52,7 +109,7 @@ class EmailService:
                     msg.attach(MIMEText(text_body, "plain"))
                 msg.attach(MIMEText(html_body, "html"))
 
-                server = smtplib.SMTP(smtp_host, smtp_port, timeout=12)
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=4)
                 server.starttls()
                 server.login(smtp_user, smtp_password)
                 server.sendmail(envelope_from, [clean_to], msg.as_string())
@@ -76,7 +133,7 @@ class EmailService:
                     msg.attach(MIMEText(text_body, "plain"))
                 msg.attach(MIMEText(html_body, "html"))
 
-                server = smtplib.SMTP(brevo_host, int(os.getenv("BREVO_SMTP_PORT", "587")), timeout=12)
+                server = smtplib.SMTP(brevo_host, int(os.getenv("BREVO_SMTP_PORT", "587")), timeout=4)
                 server.starttls()
                 server.login(brevo_user, brevo_pass)
                 server.sendmail(brevo_user, [clean_to], msg.as_string())
@@ -85,6 +142,12 @@ class EmailService:
                 return True
             except Exception as be:
                 print(f"[EMAIL SERVICE] Brevo SMTP fallback error: {be}", flush=True)
+
+        # Ultimate Cloud HTTPS Failover (Resend & Brevo REST APIs via port 443)
+        if EmailService._send_resend_http_sync(clean_to, subject, html_body, settings):
+            return True
+        if EmailService._send_brevo_http_sync(clean_to, subject, html_body, settings):
+            return True
 
         return False
 
@@ -204,23 +267,7 @@ class EmailService:
 </body>
 </html>"""
 
-        # 1. Google Gmail SMTP Relay / Dedicated SMTP
-        smtp_success = EmailService.send_smtp_payload(
-            to_email=clean_email,
-            subject=subject_line,
-            html_body=html_unified,
-            text_body=text_content
-        )
-        if smtp_success:
-            return {
-                "dispatched": True,
-                "provider": "gmail_smtp",
-                "rate_limited": False,
-                "magic_link": magic_link,
-                "message": "Sacred verification & welcome email delivered via Gmail SMTP."
-            }
-
-        # 2. Resend API Dispatch (Production-grade transactional delivery)
+        # 1. Resend REST API Dispatch (Primary Cloud HTTPS Engine - Port 443)
         resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
         if resend_key:
             from_sender = os.getenv("RESEND_FROM") or getattr(settings, "RESEND_FROM", "") or "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
@@ -253,6 +300,57 @@ class EmailService:
                         print(f"[EMAIL SERVICE] Resend notice ({res.status_code}): {res.text}", flush=True)
             except Exception as e:
                 print(f"[EMAIL SERVICE] Resend dispatch error: {e}", flush=True)
+
+        # 2. Brevo REST API v3 Dispatch (Secondary Cloud HTTPS Engine - Port 443)
+        brevo_key = os.getenv("BREVO_API_KEY") or getattr(settings, "BREVO_API_KEY", "")
+        if brevo_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    brevo_payload = {
+                        "sender": {"name": "UR-Heart Sanctuary", "email": "asiverticals@gmail.com"},
+                        "to": [{"email": clean_email, "name": "Sanctuary Seeker"}],
+                        "subject": subject_line,
+                        "htmlContent": html_unified
+                    }
+                    res = await client.post(
+                        "https://api.brevo.com/v3/smtp/email",
+                        headers={
+                            "api-key": brevo_key,
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        json=brevo_payload
+                    )
+                    if res.status_code in [200, 201]:
+                        print(f"[EMAIL SERVICE] Successfully sent magic link via Brevo API v3 to {clean_email}", flush=True)
+                        return {
+                            "dispatched": True,
+                            "provider": "brevo_api",
+                            "rate_limited": False,
+                            "magic_link": magic_link,
+                            "deep_link": deep_link,
+                            "message": "Sacred verification email delivered via Brevo API."
+                        }
+                    else:
+                        print(f"[EMAIL SERVICE] Brevo API magic link notice ({res.status_code}): {res.text}", flush=True)
+            except Exception as be:
+                print(f"[EMAIL SERVICE] Brevo API magic link error: {be}", flush=True)
+
+        # 3. Google Gmail SMTP Relay / Dedicated SMTP (Port 587 Fallback for Local Dev)
+        smtp_success = EmailService.send_smtp_payload(
+            to_email=clean_email,
+            subject=subject_line,
+            html_body=html_unified,
+            text_body=text_content
+        )
+        if smtp_success:
+            return {
+                "dispatched": True,
+                "provider": "gmail_smtp",
+                "rate_limited": False,
+                "magic_link": magic_link,
+                "message": "Sacred verification & welcome email delivered via Gmail SMTP."
+            }
 
         base_web = getattr(settings, "BASE_WEB_URL", "https://urheart.asiverticals.me")
 
@@ -407,7 +505,29 @@ class EmailService:
             except Exception as e:
                 print(f"[EMAIL SERVICE] Resend alert exception: {e}", flush=True)
 
-        # 2. SMTP fallback (Google Gmail SMTP or Brevo SMTP)
+        # 2. Brevo API (Secondary HTTPS Engine - Port 443)
+        brevo_key = os.getenv("BREVO_API_KEY") or getattr(settings, "BREVO_API_KEY", "")
+        if brevo_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    brevo_payload = {
+                        "sender": {"name": "UR-Heart Sentinel", "email": "asiverticals@gmail.com"},
+                        "to": [{"email": dest_email, "name": "Founder"}],
+                        "subject": f"🚨 [UR-Heart Support Escalation] #{ticket_id} ({category})",
+                        "htmlContent": html_body
+                    }
+                    res = await client.post(
+                        "https://api.brevo.com/v3/smtp/email",
+                        headers={"api-key": brevo_key, "Content-Type": "application/json", "Accept": "application/json"},
+                        json=brevo_payload
+                    )
+                    if res.status_code in [200, 201]:
+                        print(f"[EMAIL SERVICE] Escalation alert emailed via Brevo API to {dest_email}", flush=True)
+                        return {"dispatched": True, "provider": "brevo_api"}
+            except Exception as be:
+                print(f"[EMAIL SERVICE] Brevo escalation alert notice: {be}", flush=True)
+
+        # 3. SMTP fallback (Google Gmail SMTP or Brevo SMTP)
         smtp_success = EmailService.send_smtp_payload(
             to_email=dest_email,
             subject=f"🚨 [UR-Heart Support Escalation] #{ticket_id} ({category})",
@@ -478,7 +598,29 @@ class EmailService:
             except Exception as e:
                 print(f"[EMAIL SERVICE] Resend deletion notice error: {e}", flush=True)
 
-        # 2. SMTP Fallback (Google Gmail SMTP or Brevo SMTP)
+        # 2. Brevo API Dispatch
+        brevo_key = os.getenv("BREVO_API_KEY") or getattr(settings, "BREVO_API_KEY", "")
+        if brevo_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    brevo_payload = {
+                        "sender": {"name": "UR-Heart Sanctuary", "email": "asiverticals@gmail.com"},
+                        "to": [{"email": clean_email, "name": "Seeker"}],
+                        "subject": "⚠️ Confirm Permanent Account Deletion — UR-Heart",
+                        "htmlContent": html_body
+                    }
+                    res = await client.post(
+                        "https://api.brevo.com/v3/smtp/email",
+                        headers={"api-key": brevo_key, "Content-Type": "application/json", "Accept": "application/json"},
+                        json=brevo_payload
+                    )
+                    if res.status_code in [200, 201]:
+                        print(f"[EMAIL SERVICE] Deletion confirmation emailed via Brevo API to {clean_email}", flush=True)
+                        return {"dispatched": True, "provider": "brevo_api"}
+            except Exception as be:
+                print(f"[EMAIL SERVICE] Brevo deletion notice error: {be}", flush=True)
+
+        # 3. SMTP Fallback (Google Gmail SMTP or Brevo SMTP)
         smtp_success = EmailService.send_smtp_payload(
             to_email=clean_email,
             subject="⚠️ Confirm Permanent Account Deletion — UR-Heart",
@@ -498,7 +640,7 @@ class EmailService:
         Dispatches luxury Welcome to UR-Heart email to newly registered seekers.
         Educates the user on 10 free daily swipes, KYC verification, and showcases
         the Sovereign Web Store passes with +10% bonus perks and zero Google commission.
-        Implements dual-provider cascade: Resend API -> Brevo SMTP.
+        Implements HTTPS-first dual-provider cascade: Resend API -> Brevo API v3 -> SMTP Relay.
         """
         clean_email = email.strip().lower()
         if (
@@ -594,7 +736,7 @@ class EmailService:
 </body>
 </html>"""
 
-        # 1. Primary Dispatch: Resend REST API
+        # 1. Primary Dispatch: Resend REST API (HTTPS port 443)
         resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
         if resend_key:
             from_sender = os.getenv("RESEND_FROM") or getattr(settings, "RESEND_FROM", "") or "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
@@ -621,17 +763,8 @@ class EmailService:
             except Exception as e:
                 print(f"[EMAIL SERVICE] Resend welcome email exception: {e}", flush=True)
 
-        # 2. Secondary Dispatch: Google Gmail SMTP Relay (or Brevo SMTP fallback)
-        smtp_success = EmailService.send_smtp_payload(
-            to_email=clean_email,
-            subject="✨ Welcome to UR-Heart Sanctuary (+10% Bonus Web Passes)",
-            html_body=html_body
-        )
-        if smtp_success:
-            return {"dispatched": True, "provider": "gmail_smtp"}
-
-        # 3. Tertiary Dispatch: Brevo REST API v3
-        brevo_key = os.getenv("BREVO_API_KEY")
+        # 2. Secondary Dispatch: Brevo REST API v3 (HTTPS port 443)
+        brevo_key = os.getenv("BREVO_API_KEY") or getattr(settings, "BREVO_API_KEY", "")
         if brevo_key:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -658,6 +791,216 @@ class EmailService:
             except Exception as e:
                 print(f"[EMAIL SERVICE] Brevo API welcome exception: {e}", flush=True)
 
+        # 3. Tertiary Dispatch: Google Gmail SMTP Relay (or Brevo SMTP fallback)
+        smtp_success = EmailService.send_smtp_payload(
+            to_email=clean_email,
+            subject="✨ Welcome to UR-Heart Sanctuary (+10% Bonus Web Passes)",
+            html_body=html_body
+        )
+        if smtp_success:
+            return {"dispatched": True, "provider": "gmail_smtp"}
+
         return {"dispatched": False, "provider": "none"}
+
+    @staticmethod
+    async def dispatch_feedback_alert(
+        feedback_data: Dict[str, Any],
+        entry: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Dispatches community feedback alerts to Founder (asiverticals@gmail.com)
+        and sends a gratitude acknowledgement email to the submitting seeker.
+        Cascades via Resend REST API (HTTPS) -> Brevo REST API v3 (HTTPS) -> SMTP Relay.
+        """
+        settings = get_settings()
+        clean_user_email = (entry.get("user_email") or "").strip().lower()
+        user_id = entry.get("user_id") or "anonymous"
+        category = feedback_data.get("category", "general")
+        description = feedback_data.get("description", "")
+        sentiment = entry.get("sentiment") or "neutral"
+        platform_os = entry.get("platform_os") or "Android"
+        app_version = entry.get("app_version") or "1.0.0+1"
+        screen_route = entry.get("screen_route") or "SanctuarySettings"
+        device_model = entry.get("device_model") or "Mobile Device"
+        timestamp = entry.get("timestamp") or ""
+
+        founder_email = (
+            os.getenv("SUPERADMIN_EMAIL")
+            or getattr(settings, "SUPERADMIN_EMAIL", "")
+            or "asiverticals@gmail.com"
+        ).strip().lower()
+
+        # Automated test isolation
+        if (
+            os.getenv("PYTEST_CURRENT_TEST")
+            or clean_user_email.endswith("@example.com")
+            or clean_user_email.endswith("@test.com")
+            or "chall_" in clean_user_email
+        ):
+            print(f"[EMAIL SERVICE TEST MOCK] Suppressed feedback alert outbound dispatch for test run", flush=True)
+            return {"dispatched": True, "provider": "test_mock"}
+
+        # 1. Founder Alert Dossier
+        founder_subject = f"[UR-Heart Alert] 🐞 {category.replace('_', ' ').title()}: {description[:50]}"
+        founder_html = f"""<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 24px; background-color: #0A0F0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E8EDE9;">
+  <div style="max-width: 580px; margin: 0 auto; background: #131F19; border: 1.5px solid #38BDF8; border-radius: 18px; padding: 28px 24px;">
+    <div style="display: flex; align-items: center; margin-bottom: 16px;">
+      <span style="font-size: 28px; margin-right: 12px;">💬</span>
+      <div>
+        <h2 style="color: #38BDF8; font-size: 20px; font-weight: 700; margin: 0;">New Seeker Feedback Recorded</h2>
+        <span style="color: #9DB3A8; font-size: 12px;">UR-Heart Sentinel Community Pulse</span>
+      </div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
+      <tr>
+        <td style="padding: 6px 0; color: #61786D; width: 140px;">Category:</td>
+        <td style="padding: 6px 0;"><span style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; padding: 3px 10px; border-radius: 6px; font-weight: bold; text-transform: uppercase; font-size: 11px;">{category}</span></td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Seeker Email:</td>
+        <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold;">{clean_user_email or 'Anonymous'}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Seeker ID:</td>
+        <td style="padding: 6px 0; color: #9DB3A8; font-family: monospace;">{user_id}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Sentiment:</td>
+        <td style="padding: 6px 0; color: #A3E4D1; text-transform: capitalize;">{sentiment}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Environment:</td>
+        <td style="padding: 6px 0; color: #D1E7DD;">{platform_os} • {device_model} (v{app_version})</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #61786D;">Origin Route:</td>
+        <td style="padding: 6px 0; color: #D4AF37;">{screen_route}</td>
+      </tr>
+    </table>
+
+    <div style="background: #0A0F0D; border-left: 4px solid #38BDF8; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+      <p style="color: #61786D; font-size: 11px; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.5px;">Seeker's Words / Report</p>
+      <p style="color: #FFFFFF; font-size: 14.5px; line-height: 1.55; margin: 0; white-space: pre-wrap;">{description}</p>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 16px;">
+      <a href="https://urheart.asiverticals.me/settings" style="display: inline-block; background: #38BDF8; color: #0A0F0D; text-decoration: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; font-size: 13px;">Open Sentinel Desk ➔</a>
+    </div>
+
+    <p style="color: #61786D; font-size: 11px; text-align: center; margin: 0;">
+      Logged at {timestamp} • Automated dispatch via UR-Heart Eva Feedback Engine
+    </p>
+  </div>
+</body>
+</html>"""
+
+        resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
+        from_sender = os.getenv("RESEND_FROM") or getattr(settings, "RESEND_FROM", "") or "UR-Heart Sanctuary <verify@urheart.asiverticals.me>"
+        brevo_key = os.getenv("BREVO_API_KEY") or getattr(settings, "BREVO_API_KEY", "")
+
+        founder_sent = False
+
+        # 1. Resend API to Founder
+        if resend_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    r = await client.post(
+                        "https://api.resend.com/emails",
+                        headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                        json={"from": from_sender, "to": [founder_email], "subject": founder_subject, "html": founder_html}
+                    )
+                    if r.status_code in (200, 201):
+                        founder_sent = True
+                        print(f"[EMAIL SERVICE] Founder feedback alert sent via Resend to {founder_email}", flush=True)
+            except Exception as e:
+                print(f"[EMAIL SERVICE] Resend founder alert notice: {e}", flush=True)
+
+        # 2. Brevo API to Founder (if Resend failed or wasn't configured)
+        if not founder_sent and brevo_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    r = await client.post(
+                        "https://api.brevo.com/v3/smtp/email",
+                        headers={"api-key": brevo_key, "Content-Type": "application/json", "Accept": "application/json"},
+                        json={
+                            "sender": {"name": "UR-Heart Sanctuary", "email": "asiverticals@gmail.com"},
+                            "to": [{"email": founder_email, "name": "Founder"}],
+                            "subject": founder_subject,
+                            "htmlContent": founder_html
+                        }
+                    )
+                    if r.status_code in (200, 201):
+                        founder_sent = True
+                        print(f"[EMAIL SERVICE] Founder feedback alert sent via Brevo to {founder_email}", flush=True)
+            except Exception as e:
+                print(f"[EMAIL SERVICE] Brevo founder alert notice: {e}", flush=True)
+
+        # 3. SMTP fallback to Founder
+        if not founder_sent:
+            founder_sent = EmailService.send_smtp_payload(founder_email, founder_subject, founder_html)
+
+        # 2. Seeker Gratitude Confirmation (if user email is valid)
+        if clean_user_email and "@" in clean_user_email and not clean_user_email.endswith("@example.com") and not clean_user_email.endswith("@test.com"):
+            user_subject = "✨ UR-Heart Sanctuary: We received your thoughts"
+            user_html = f"""<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 24px; background-color: #0A0F0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E8EDE9;">
+  <div style="max-width: 520px; margin: 0 auto; background: #131F19; border: 1px solid #22362C; border-radius: 20px; padding: 32px 24px; text-align: center;">
+    <div style="font-size: 38px; margin-bottom: 12px;">🌿</div>
+    <h1 style="color: #FFFFFF; font-size: 22px; font-weight: 700; margin: 0 0 8px 0;">Thank You for Your Voice</h1>
+    <p style="color: #4E9F76; font-style: italic; font-size: 14.5px; margin: 0 0 20px 0;">Aapka feedback hum tak pahunch gaya hai.</p>
+
+    <p style="color: #9DB3A8; font-size: 13.5px; line-height: 1.6; margin: 0 0 20px 0; text-align: left;">
+      Your feedback helps shape UR-Heart into a more genuine, serene space for every seeker. Our founder and core team review every thoughtful message.
+    </p>
+
+    <div style="background: rgba(46, 111, 94, 0.15); border: 1px solid rgba(46, 111, 94, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 24px; text-align: left;">
+      <div style="color: #A3E4D1; font-weight: bold; font-size: 12px; margin-bottom: 6px; text-transform: uppercase;">You Shared:</div>
+      <div style="color: #FFFFFF; font-size: 13.5px; font-style: italic; line-height: 1.5;">"{description}"</div>
+    </div>
+
+    <p style="color: #61786D; font-size: 12px; margin: 0 0 20px 0;">
+      If your note required support or escalation, our team will review it within our 24-48 hour statutory window.
+    </p>
+
+    <div style="border-top: 1px solid #1F2E26; padding-top: 16px; font-size: 11px; color: #50665B;">
+      With warmth & gratitude,<br>
+      <strong>Anubhav Singh & The UR-Heart Sanctuary Team</strong><br>
+      Saket, Ayodhya, Uttar Pradesh, India
+    </div>
+  </div>
+</body>
+</html>"""
+            # Dispatch to user via Resend or Brevo
+            if resend_key:
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        await client.post(
+                            "https://api.resend.com/emails",
+                            headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                            json={"from": from_sender, "to": [clean_user_email], "subject": user_subject, "html": user_html}
+                        )
+                except Exception:
+                    pass
+            elif brevo_key:
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        await client.post(
+                            "https://api.brevo.com/v3/smtp/email",
+                            headers={"api-key": brevo_key, "Content-Type": "application/json", "Accept": "application/json"},
+                            json={
+                                "sender": {"name": "UR-Heart Sanctuary", "email": "asiverticals@gmail.com"},
+                                "to": [{"email": clean_user_email, "name": "Seeker"}],
+                                "subject": user_subject,
+                                "htmlContent": user_html
+                            }
+                        )
+                except Exception:
+                    pass
+
+        return {"dispatched": founder_sent, "provider": "resend_brevo_cascade"}
 
 

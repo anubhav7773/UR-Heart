@@ -324,37 +324,16 @@ async def record_user_feedback(
     except Exception as e:
         print(f"[SENTRY FEEDBACK BYPASS] {e}", flush=True)
 
-    # 2. Immediate Founder Alert via EmailService
+    # 2. Immediate Founder Alert & Seeker Gratitude Confirmation via EmailService
     try:
         from app.services.email_service import EmailService
-        founder_email = os.getenv("SMTP_USER") or os.getenv("SUPPORT_EMAIL") or "asiverticals@gmail.com"
-        subject = f"[UR-Heart Alert] 🐞 {payload.category.replace('_', ' ').title()}: {payload.description[:50]}"
-        html_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 24px;">
-            <div style="max-width: 600px; margin: auto; background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid #334155;">
-                <h2 style="color: #38bdf8; margin-top: 0;">New User Feedback Received</h2>
-                <p><strong>Category:</strong> <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">{payload.category}</span></p>
-                <p><strong>User:</strong> {user_email} (ID: {entry['user_id']})</p>
-                <p><strong>Environment:</strong> {entry['platform_os']} | Version: {entry['app_version']} | Screen: {entry['screen_route']}</p>
-                <hr style="border: 0; border-top: 1px solid #334155; margin: 16px 0;" />
-                <h3 style="color: #cbd5e1;">Description / Report:</h3>
-                <div style="background: #0f172a; padding: 16px; border-radius: 8px; border-left: 4px solid #38bdf8; font-size: 15px; line-height: 1.6;">
-                    {payload.description}
-                </div>
-                <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">
-                    Timestamp: {entry['timestamp']} • UR-Heart Sentinel Dispatch
-                </p>
-            </div>
-        </body>
-        </html>
-        """
         import asyncio
-        try:
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(None, EmailService.send_smtp_payload, founder_email, subject, html_body)
-        except RuntimeError:
-            pass
+        asyncio.create_task(
+            EmailService.dispatch_feedback_alert(
+                feedback_data=payload.model_dump(),
+                entry=entry
+            )
+        )
     except Exception as err:
         print(f"[FEEDBACK EMAIL ALERT BYPASS] {err}", flush=True)
 
