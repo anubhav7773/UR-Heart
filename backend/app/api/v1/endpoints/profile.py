@@ -422,18 +422,18 @@ async def update_my_profile(
     if payload.full_name:
         COMPLETED_PROFILES.add(payload.full_name.strip().lower())
 
-    # Dispatch welcome email on initial profile setup completion
+    # Dispatch welcome email on initial profile setup completion if not already delivered
     if not was_previously_completed:
         target_email = getattr(current_user, "email", None) or email_val
         if target_email:
-            from app.services.email_service import EmailService
-            import asyncio
-            asyncio.create_task(
-                EmailService.dispatch_welcome_sanctuary_email(
-                    email=target_email.strip().lower(),
-                    full_name=payload.full_name or current_user.full_name or "Seeker"
+            clean_target = target_email.strip().lower()
+            if not getattr(current_user, "welcome_email_sent", False):
+                from app.services.email_service import EmailService
+                EmailService.schedule_delayed_welcome_email(
+                    email=clean_target,
+                    full_name=payload.full_name or current_user.full_name or "Seeker",
+                    delay_seconds=3.0
                 )
-            )
 
     return {"status": "success", "message": "Profile updated and persisted successfully."}
 

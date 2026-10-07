@@ -58,6 +58,7 @@ class User(Base):
     discreet_mode = Column(Boolean, nullable=False, default=False)
     night_slumber = Column(Boolean, nullable=False, default=False)
     is_profile_completed = Column(Boolean, nullable=False, default=False)
+    welcome_email_sent = Column(Boolean, nullable=False, default=False)
     public_encryption_key = Column(String(64), nullable=True, default=None)
     push_notifications_enabled = Column(Boolean, nullable=False, default=True)
     fcm_token = Column(String(512), nullable=True)

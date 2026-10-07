@@ -174,7 +174,8 @@ class AuthRepository {
           } catch (_) {}
         }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AUTH REPOSITORY] Google Sync backend notice: $e');
       // Offline/local tolerance - proceed with verified Google identity
       if (result.idToken != null && result.idToken!.isNotEmpty) {
         await SecureSessionStorage.instance.saveAuthToken(result.idToken!);

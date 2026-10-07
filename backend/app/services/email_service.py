@@ -1,8 +1,9 @@
 import os
 import smtplib
+import asyncio
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set
 import httpx
 from app.core.config import get_settings
 
@@ -12,6 +13,8 @@ def _parse_email_address(full_from: str) -> str:
     return full_from.strip()
 
 class EmailService:
+    _active_welcome_tasks: Set[asyncio.Task] = set()
+    _in_flight_welcome_emails: Set[str] = set()
     @staticmethod
     def _send_resend_http_sync(to_email: str, subject: str, html_body: str, settings: Any) -> bool:
         resend_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", "")
@@ -757,6 +760,7 @@ class EmailService:
                     )
                     if res.status_code in [200, 201]:
                         print(f"[EMAIL SERVICE] Welcome email sent via Resend to {clean_email}", flush=True)
+                        await EmailService._mark_welcome_email_sent_in_db(clean_email)
                         return {"dispatched": True, "provider": "resend"}
                     else:
                         print(f"[EMAIL SERVICE] Resend welcome email error ({res.status_code}): {res.text}", flush=True)
@@ -785,6 +789,7 @@ class EmailService:
                     )
                     if res.status_code in [200, 201]:
                         print(f"[EMAIL SERVICE] Welcome email sent via Brevo API v3 to {clean_email}", flush=True)
+                        await EmailService._mark_welcome_email_sent_in_db(clean_email)
                         return {"dispatched": True, "provider": "brevo_api"}
                     else:
                         print(f"[EMAIL SERVICE] Brevo API welcome notice ({res.status_code}): {res.text}", flush=True)
@@ -798,9 +803,88 @@ class EmailService:
             html_body=html_body
         )
         if smtp_success:
+            await EmailService._mark_welcome_email_sent_in_db(clean_email)
             return {"dispatched": True, "provider": "gmail_smtp"}
 
         return {"dispatched": False, "provider": "none"}
+
+    @staticmethod
+    async def _mark_welcome_email_sent_in_db(email_to_mark: str):
+        """Authoritatively marks welcome_email_sent = True in PostgreSQL."""
+        try:
+            from app.core.database import async_session_factory
+            from app.models.domain.user import User
+            from sqlalchemy import update
+            async with async_session_factory() as session:
+                await session.execute(
+                    update(User)
+                    .where(User.email == email_to_mark)
+                    .values(welcome_email_sent=True)
+                )
+                await session.commit()
+                print(f"[EMAIL SERVICE] Marked welcome_email_sent=True in DB for {email_to_mark}", flush=True)
+        except Exception as db_err:
+            print(f"[EMAIL SERVICE] Notice updating welcome_email_sent: {db_err}", flush=True)
+
+    @classmethod
+    def schedule_delayed_welcome_email(
+        cls,
+        email: str,
+        full_name: Optional[str] = None,
+        delay_seconds: float = 14.0
+    ) -> Optional[asyncio.Task]:
+        """
+        Schedules a welcome email dispatch after a deliberate 10-15s grace delay (default 14.0s).
+        This guarantees the seeker has navigated past onboarding and Google sheets,
+        ensuring optimal attention when the notification ping arrives.
+        Guarded against asyncio task garbage collection and duplicate in-flight dispatch.
+        """
+        clean_email = (email or "").strip().lower()
+        if not clean_email or "@" not in clean_email:
+            return None
+
+        if clean_email in cls._in_flight_welcome_emails:
+            print(f"[EMAIL SERVICE DELAYED] Welcome email already scheduled/in-flight for {clean_email}, skipping duplicate.", flush=True)
+            return None
+
+        cls._in_flight_welcome_emails.add(clean_email)
+
+        async def _delayed_runner():
+            try:
+                print(f"[EMAIL SERVICE DELAYED] Grace timer started ({delay_seconds}s) for {clean_email}...", flush=True)
+                await asyncio.sleep(delay_seconds)
+
+                # Check DB whether user was deleted or already marked sent
+                try:
+                    from app.core.database import async_session_factory
+                    from app.models.domain.user import User
+                    from sqlalchemy import select
+                    async with async_session_factory() as session:
+                        res = await session.execute(select(User.welcome_email_sent).where(User.email == clean_email))
+                        already_sent = res.scalar_one_or_none()
+                        if already_sent is True:
+                            print(f"[EMAIL SERVICE DELAYED] User {clean_email} already has welcome_email_sent=True in DB. Suppressing duplicate.", flush=True)
+                            return
+                except Exception as check_err:
+                    print(f"[EMAIL SERVICE DELAYED] DB pre-check notice: {check_err}", flush=True)
+
+                print(f"[EMAIL SERVICE DELAYED] Grace timer ({delay_seconds}s) elapsed. Dispatching welcome email to {clean_email}...", flush=True)
+                res = await cls.dispatch_welcome_sanctuary_email(
+                    email=clean_email,
+                    full_name=full_name
+                )
+                print(f"[EMAIL SERVICE DELAYED] Welcome email dispatch finished for {clean_email}: {res}", flush=True)
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                print(f"[EMAIL SERVICE DELAYED] Unexpected error dispatching delayed welcome email: {e}", flush=True)
+            finally:
+                cls._in_flight_welcome_emails.discard(clean_email)
+
+        task = asyncio.create_task(_delayed_runner())
+        cls._active_welcome_tasks.add(task)
+        task.add_done_callback(cls._active_welcome_tasks.discard)
+        return task
 
     @staticmethod
     async def dispatch_feedback_alert(

@@ -177,6 +177,15 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
                     await db.commit()
                 except Exception:
                     await db.rollback()
+
+            # If seeker previously registered without welcome email & profile incomplete, schedule delayed welcome notice
+            if not getattr(user_row, "welcome_email_sent", False) and not is_completed:
+                from app.services.email_service import EmailService
+                EmailService.schedule_delayed_welcome_email(
+                    email=clean_email,
+                    full_name=payload.display_name or user_row.full_name or "Sanctuary Seeker",
+                    delay_seconds=14.0
+                )
         else:
             # Auto-provision user shell in Supabase
             auth_uuid = desired_auth_id or _uuid.uuid4()
@@ -194,18 +203,17 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
                 location_name="Saket, Ayodhya",
                 referral_code=f"UR-{_uuid.uuid4().hex[:6].upper()}",
                 is_profile_completed=False,
+                welcome_email_sent=False,
             )
             db.add(new_user)
             try:
                 await db.commit()
-                # Dispatch Welcome Email for new Google One-Tap seekers
+                # Dispatch Welcome Email for new Google One-Tap seekers after 10-15s grace delay (14s)
                 from app.services.email_service import EmailService
-                import asyncio
-                asyncio.create_task(
-                    EmailService.dispatch_welcome_sanctuary_email(
-                        email=clean_email,
-                        full_name=payload.display_name or "Sanctuary Seeker"
-                    )
+                EmailService.schedule_delayed_welcome_email(
+                    email=clean_email,
+                    full_name=payload.display_name or "Sanctuary Seeker",
+                    delay_seconds=14.0
                 )
             except Exception as e:
                 await db.rollback()

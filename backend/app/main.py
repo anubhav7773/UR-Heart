@@ -276,12 +276,32 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[SCHEMA NOTICE] Mindful closure schema check: {e}", flush=True)
 
+    async def _ensure_welcome_email_schema():
+        try:
+            from sqlalchemy import text
+            statements = [
+                "ALTER TABLE public.users ADD COLUMN IF NOT EXISTS welcome_email_sent BOOLEAN NOT NULL DEFAULT FALSE;",
+                "CREATE INDEX IF NOT EXISTS idx_users_welcome_email_sent ON public.users(welcome_email_sent);"
+            ]
+            async with async_session_factory() as session:
+                for stmt in statements:
+                    try:
+                        await session.execute(text(stmt))
+                        await session.commit()
+                    except Exception as inner_e:
+                        await session.rollback()
+                        logger.warning(f"Schema migration statement warning: {inner_e}")
+                print("[SCHEMA] Welcome email tracking verified in PostgreSQL users table.", flush=True)
+        except Exception as e:
+            print(f"[SCHEMA NOTICE] Welcome email schema check: {e}", flush=True)
+
     try:
         await asyncio.gather(
             _ensure_voice_spark_schema(),
             _ensure_blind_date_schema(),
             _ensure_admin_schema(),
             _ensure_mindful_closure_schema(),
+            _ensure_welcome_email_schema(),
             return_exceptions=True
         )
     except Exception as schema_err:

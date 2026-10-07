@@ -178,7 +178,8 @@ class GoogleAuthService {
       final GoogleSignInAccount account =
           await GoogleSignIn.instance.authenticate();
 
-      final String? idToken = account.authentication.idToken;
+      final String? rawGoogleIdToken = account.authentication.idToken;
+      String? idToken = rawGoogleIdToken;
       final String email = account.email;
       final String? displayName = account.displayName;
       final String? photoUrl = account.photoUrl;
@@ -196,6 +197,10 @@ class GoogleAuthService {
                 await auth.signInWithCredential(credential);
             if (userCredential.user?.uid != null) {
               userId = userCredential.user!.uid;
+            }
+            final firebaseIdToken = await userCredential.user?.getIdToken();
+            if (firebaseIdToken != null && firebaseIdToken.isNotEmpty) {
+              idToken = firebaseIdToken;
             }
           } catch (firebaseErr) {
             debugPrint(
