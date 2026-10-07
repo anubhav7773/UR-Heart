@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +30,8 @@ class _VoiceSparkPillState extends State<VoiceSparkPill>
     with SingleTickerProviderStateMixin {
   late final AudioPlayer _player;
   late final AnimationController _waveAnimController;
+  StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<void>? _completeSub;
   bool _isPlaying = false;
   bool _isLoading = false;
 
@@ -41,55 +44,118 @@ class _VoiceSparkPillState extends State<VoiceSparkPill>
       duration: const Duration(milliseconds: 700),
     );
 
-    _player.onPlayerStateChanged.listen((state) {
-      if (!mounted) return;
-      if (state == PlayerState.playing) {
-        setState(() {
-          _isPlaying = true;
-          _isLoading = false;
-        });
-        _waveAnimController.repeat(reverse: true);
-      } else {
+    _initAudioPlayer();
+  }
+
+  void _initAudioPlayer() {
+    _stateSub = _player.onPlayerStateChanged.listen(
+      (state) {
+        if (!mounted) return;
+        if (state == PlayerState.playing) {
+          setState(() {
+            _isPlaying = true;
+            _isLoading = false;
+          });
+          _waveAnimController.repeat(reverse: true);
+        } else {
+          setState(() {
+            _isPlaying = false;
+            _isLoading = false;
+          });
+          _waveAnimController.stop();
+        }
+      },
+      onError: (Object error, StackTrace stack) {
+        debugPrint('[VoiceSparkPill] Player state stream error: $error');
+        if (!mounted) return;
         setState(() {
           _isPlaying = false;
           _isLoading = false;
         });
         _waveAnimController.stop();
-      }
-    });
+      },
+    );
 
-    _player.onPlayerComplete.listen((_) {
-      if (!mounted) return;
-      setState(() {
-        _isPlaying = false;
-        _isLoading = false;
-      });
-      _waveAnimController.stop();
-    });
+    _completeSub = _player.onPlayerComplete.listen(
+      (_) {
+        if (!mounted) return;
+        setState(() {
+          _isPlaying = false;
+          _isLoading = false;
+        });
+        _waveAnimController.stop();
+      },
+      onError: (Object error, StackTrace stack) {
+        debugPrint('[VoiceSparkPill] Player complete stream error: $error');
+        if (!mounted) return;
+        setState(() {
+          _isPlaying = false;
+          _isLoading = false;
+        });
+        _waveAnimController.stop();
+      },
+    );
   }
 
   @override
   void dispose() {
+    _stateSub?.cancel();
+    _completeSub?.cancel();
     _waveAnimController.dispose();
+    try {
+      _player.stop();
+    } catch (_) {}
     _player.dispose();
     super.dispose();
   }
 
   Future<void> _toggleAudio() async {
+    final cleanUrl = widget.voiceUrl.trim();
+    if (cleanUrl.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No voice snippet available for this profile.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    final uri = Uri.tryParse(cleanUrl);
+    if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid voice snippet audio link.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     HapticFeedback.selectionClick();
     if (_isPlaying) {
-      await _player.pause();
+      try {
+        await _player.pause();
+      } catch (e) {
+        debugPrint('[VoiceSparkPill] Error pausing audio: $e');
+      }
     } else {
       setState(() => _isLoading = true);
       try {
         await _player.stop();
-        await _player.play(UrlSource(widget.voiceUrl));
-      } catch (e) {
+        await _player.play(UrlSource(cleanUrl));
+      } catch (e, stack) {
+        debugPrint('[VoiceSparkPill] Audio play error: $e\n$stack');
         if (mounted) {
           setState(() {
             _isPlaying = false;
             _isLoading = false;
           });
+          _waveAnimController.stop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Could not play voice snippet. Please try again.'),

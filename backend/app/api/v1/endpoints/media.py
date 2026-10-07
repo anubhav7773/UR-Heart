@@ -130,3 +130,74 @@ async def direct_media_upload(
         "bytes_received": len(body),
         "message": f"Photo slot {slot_number} successfully secured."
     }
+
+
+from pathlib import Path
+from fastapi.responses import FileResponse, Response
+import httpx
+
+VOICE_UPLOADS_DIR = Path("uploads/voice")
+VOICE_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.get("/voice/{user_id}/{filename}", status_code=status.HTTP_200_OK, summary="Serve Voice Spark Audio Stream")
+async def serve_voice_spark(user_id: str, filename: str):
+    """
+    Serves voice spark audio snippets (.m4a / .mp4 / .wav).
+    Supports local persistent disk cache with seamless Supabase Storage fallback.
+    Returns audio with Accept-Ranges: bytes for smooth native Android/iOS streaming.
+    """
+    clean_user_id = user_id.strip()
+    clean_filename = Path(filename).name  # Prevent path traversal
+    local_file = VOICE_UPLOADS_DIR / clean_user_id / clean_filename
+
+    # 1. Check local disk cache
+    if local_file.exists() and local_file.is_file() and local_file.stat().st_size > 0:
+        return FileResponse(
+            path=local_file,
+            media_type="audio/mp4",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=86400",
+            }
+        )
+
+    # 2. Check Supabase Storage
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+        file_key = f"users/{clean_user_id}/voice/{clean_filename}"
+        supabase_obj_url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.SUPABASE_STORAGE_BUCKET}/{file_key}"
+        headers = {
+            "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.get(supabase_obj_url, headers=headers)
+                if res.status_code == 200 and len(res.content) > 50:
+                    local_file.parent.mkdir(parents=True, exist_ok=True)
+                    local_file.write_bytes(res.content)
+                    return Response(
+                        content=res.content,
+                        media_type="audio/mp4",
+                        headers={
+                            "Accept-Ranges": "bytes",
+                            "Cache-Control": "public, max-age=86400",
+                        }
+                    )
+        except Exception as e:
+            logger.warning(f"Supabase voice fetch failed: {e}")
+
+    # 3. Fallback: Check if generic placeholder chime exists for graceful degrade
+    default_chime = VOICE_UPLOADS_DIR / "default_sanctuary_chime.m4a"
+    if default_chime.exists() and default_chime.is_file() and default_chime.stat().st_size > 0:
+        return FileResponse(
+            path=default_chime,
+            media_type="audio/mp4",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=86400",
+            }
+        )
+
+    raise HTTPException(status_code=404, detail="Voice spark audio not found.")
+

@@ -50,6 +50,7 @@ class _VoiceSparkRecordingModalState
   String? _recordedFilePath;
   bool _isPlayingPreview = false;
   late final AudioPlayer _previewPlayer;
+  StreamSubscription<void>? _previewCompleteSub;
   late final AnimationController _pulseController;
 
   @override
@@ -62,15 +63,25 @@ class _VoiceSparkRecordingModalState
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
 
-    _previewPlayer.onPlayerComplete.listen((_) {
-      if (mounted) setState(() => _isPlayingPreview = false);
-    });
+    _previewCompleteSub = _previewPlayer.onPlayerComplete.listen(
+      (_) {
+        if (mounted) setState(() => _isPlayingPreview = false);
+      },
+      onError: (Object error) {
+        debugPrint('[VoiceSparkModal] Preview error: $error');
+        if (mounted) setState(() => _isPlayingPreview = false);
+      },
+    );
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
     _ampSub?.cancel();
+    _previewCompleteSub?.cancel();
+    try {
+      _previewPlayer.stop();
+    } catch (_) {}
     _previewPlayer.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -133,11 +144,20 @@ class _VoiceSparkRecordingModalState
     HapticFeedback.selectionClick();
 
     if (_isPlayingPreview) {
-      await _previewPlayer.pause();
+      try {
+        await _previewPlayer.pause();
+      } catch (_) {}
       setState(() => _isPlayingPreview = false);
     } else {
-      await _previewPlayer.play(DeviceFileSource(_recordedFilePath!));
-      setState(() => _isPlayingPreview = true);
+      try {
+        await _previewPlayer.play(DeviceFileSource(_recordedFilePath!));
+        setState(() => _isPlayingPreview = true);
+      } catch (e) {
+        debugPrint('[VoiceSparkModal] Preview play error: $e');
+        if (mounted) {
+          setState(() => _isPlayingPreview = false);
+        }
+      }
     }
   }
 

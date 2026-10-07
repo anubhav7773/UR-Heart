@@ -64,3 +64,4 @@ graphify-out/
 .env*
 scratch/
 .audit_output/
+backend/uploads/voice/*/

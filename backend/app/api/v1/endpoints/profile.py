@@ -406,6 +406,8 @@ async def update_my_profile(
     valid_cols = {c.name for c in User.__table__.columns}
     sanitized_values = {k: v for k, v in update_data.items() if k in valid_cols}
 
+    was_previously_completed = bool(current_user.is_profile_completed)
+
     await db.execute(
         update(User)
         .where(User.id == current_user.id)
@@ -419,6 +421,19 @@ async def update_my_profile(
         COMPLETED_PROFILES.add(email_val.strip().lower())
     if payload.full_name:
         COMPLETED_PROFILES.add(payload.full_name.strip().lower())
+
+    # Dispatch welcome email on initial profile setup completion
+    if not was_previously_completed:
+        target_email = getattr(current_user, "email", None) or email_val
+        if target_email:
+            from app.services.email_service import EmailService
+            import asyncio
+            asyncio.create_task(
+                EmailService.dispatch_welcome_sanctuary_email(
+                    email=target_email.strip().lower(),
+                    full_name=payload.full_name or current_user.full_name or "Seeker"
+                )
+            )
 
     return {"status": "success", "message": "Profile updated and persisted successfully."}
 
@@ -632,9 +647,18 @@ async def upload_voice_spark(
 
     settings = get_settings()
     file_key = f"users/{current_user.id}/voice/voice_spark.m4a"
-    public_url = None
 
-    # Upload to Supabase Storage if configured
+    # 1. Dual Persistence: Save audio bytes to local persistent disk cache
+    try:
+        from pathlib import Path
+        voice_dir = Path("uploads/voice") / str(current_user.id)
+        voice_dir.mkdir(parents=True, exist_ok=True)
+        local_voice_file = voice_dir / "voice_spark.m4a"
+        local_voice_file.write_bytes(content)
+    except Exception as fs_err:
+        print(f"[VOICE SPARK LOCAL SAVE] Notice: {fs_err}", flush=True)
+
+    # 2. Cloud Backup: Upload to Supabase Storage if configured
     if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
         try:
             upload_url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.SUPABASE_STORAGE_BUCKET}/{file_key}"
@@ -647,12 +671,11 @@ async def upload_voice_spark(
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(upload_url, headers=headers, content=content)
                 if resp.status_code in (200, 201):
-                    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{file_key}"
+                    print(f"[VOICE SPARK STORAGE] Uploaded to Supabase: {file_key}", flush=True)
         except Exception as e:
             print(f"[VOICE SPARK STORAGE] Supabase upload note: {e}", flush=True)
 
-    if not public_url:
-        public_url = f"{settings.BASE_WEB_URL}/api/v1/media/voice/{current_user.id}/voice_spark.m4a"
+    public_url = f"{settings.BASE_WEB_URL}/api/v1/media/voice/{current_user.id}/voice_spark.m4a"
 
     validated_duration = min(max(float(duration), 1.0), 7.5)
     clean_prompt = prompt.strip()[:120] if prompt else "My authentic voice & vibe"

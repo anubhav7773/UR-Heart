@@ -755,6 +755,14 @@ async def handle_browser_magic_link_tap(
         try:
             await db.commit()
             user_uuid = str(new_uuid)
+            from app.services.email_service import EmailService
+            import asyncio
+            asyncio.create_task(
+                EmailService.dispatch_welcome_sanctuary_email(
+                    email=clean_email,
+                    full_name=user_row.full_name or "Sanctuary Seeker"
+                )
+            )
         except Exception:
             await db.rollback()
             user_uuid = str(new_uuid)
@@ -951,6 +959,14 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
         try:
             await db.commit()
             user_uuid = str(new_uuid)
+            from app.services.email_service import EmailService
+            import asyncio
+            asyncio.create_task(
+                EmailService.dispatch_welcome_sanctuary_email(
+                    email=matched_email,
+                    full_name=new_user.full_name or "Sanctuary Seeker"
+                )
+            )
         except Exception:
             await db.rollback()
             user_uuid = str(new_uuid)
