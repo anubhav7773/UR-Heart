@@ -4,6 +4,7 @@ import re
 import html
 import random
 import logging
+import base64
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime, timezone
@@ -22,6 +23,8 @@ OPENROUTER_ENDPOINT = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api
 class KycAiEvaluation(BaseModel):
     is_live_human: bool = Field(default=False)
     face_match_score: int = Field(default=0, ge=0, le=100)
+    is_identity_match: bool = Field(default=True, description="True ONLY if the person in the live selfie is conclusively verified to be the exact same individual as in the uploaded profile photos")
+    gallery_consistent: bool = Field(default=True, description="True if all uploaded profile photos belong to the same individual")
     pose_matched: bool = Field(default=True)
     estimated_age_bracket: str = Field(default="unknown")
     is_underage: bool = Field(default=True)
@@ -157,7 +160,7 @@ class GroqAiService:
 
         result_frames: List[str] = []
         for item in input_b64_list:
-            if not item or len(item) < 40:
+            if not item or len(item) < 16:
                 continue
             try:
                 # Strip data URL prefix if present
@@ -202,32 +205,66 @@ class GroqAiService:
                         if os.path.exists(tmp_path):
                             os.remove(tmp_path)
                 else:
-                    result_frames.append(clean_b64)
+                    if len(clean_b64) >= 16:
+                        result_frames.append(clean_b64)
             except Exception as e:
                 logger.warning("Frame extraction notice: %s", e)
-                result_frames.append(item)
+                if len(item) >= 16:
+                    result_frames.append(item)
 
         return result_frames if result_frames else input_b64_list
+
+    @classmethod
+    async def resolve_images_to_b64(cls, items: List[str]) -> List[str]:
+        """
+        Safely resolves a list of image identifiers (base64 strings, data URIs, or remote URLs)
+        into cleaned base64 image strings.
+        """
+        resolved: List[str] = []
+        for raw in items:
+            if not raw or not isinstance(raw, str):
+                continue
+            item = raw.strip()
+            if not item:
+                continue
+            if item.startswith("data:image"):
+                clean = item.split(",")[-1]
+                if len(clean) >= 16:
+                    resolved.append(clean)
+            elif item.startswith("http://") or item.startswith("https://"):
+                try:
+                    async with httpx.AsyncClient(timeout=6.0) as client:
+                        resp = await client.get(item)
+                        if resp.status_code == 200 and len(resp.content) >= 16:
+                            b64 = base64.b64encode(resp.content).decode("utf-8")
+                            resolved.append(b64)
+                except Exception as e:
+                    logger.warning("Failed to fetch image from URL %s: %s", item[:80], e)
+            elif len(item) >= 16:
+                resolved.append(item)
+        return resolved
 
     @classmethod
     async def verify_kyc_liveness_secure(
         cls,
         user_id: UUID,
-        anchor_b64: str,
-        frames_b64: List[str],
+        anchor_b64: str = "",
+        frames_b64: Optional[List[str]] = None,
         expected_pose: Optional[str] = None,
+        profile_photos_b64: Optional[List[str]] = None,
         db_session: Any = None
     ) -> KycAiEvaluation:
         """
         Evaluates video KYC using Eva Section 1 (Identity & Persona Engine).
-        Provides safe OpenCV attribute checking and resilient multi-model vision failover.
+        Provides safe OpenCV attribute checking, multi-photo cross-matching, and resilient multi-model vision failover.
         """
         from app.services.eva_identity_engine import EvaIdentityEngine
         eval_result = await EvaIdentityEngine.verify_kyc_liveness(
             user_id=user_id,
             anchor_b64=anchor_b64,
-            frames_b64=frames_b64,
+            frames_b64=frames_b64 or [],
             expected_pose=expected_pose,
+            profile_photos_b64=profile_photos_b64,
             db_session=db_session
         )
 
@@ -246,6 +283,8 @@ class GroqAiService:
         return KycAiEvaluation(
             is_live_human=eval_result.is_live_human,
             face_match_score=eval_result.face_match_score,
+            is_identity_match=getattr(eval_result, "is_identity_match", True if (eval_result.status == "approved" and eval_result.face_match_score >= 70) else False),
+            gallery_consistent=getattr(eval_result, "gallery_consistent", True),
             pose_matched=eval_result.pose_matched,
             estimated_age_bracket=eval_result.estimated_age_bracket,
             is_underage=eval_result.is_underage,

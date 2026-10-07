@@ -382,6 +382,15 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
                       ),
                       onPressed: () {
+                        if (!state.hasPrimaryAnchorPhoto) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please upload your primary profile photo first before verifying.'),
+                              backgroundColor: Colors.orangeAccent,
+                            ),
+                          );
+                          return;
+                        }
                         showDialog<void>(context: context, builder: (ctx) => const LiveKycRecordingModal());
                       },
                       child: Text(state.isKycVerified ? 'Verified ✓' : 'Verify ✨', style: const TextStyle(fontSize: 12.0, color: Colors.white)),

@@ -54,11 +54,15 @@ const List<KycPoseInstruction> _kycSanctuaryPoses = [
 /// and strict fail-closed Sentinel review integration.
 class LiveKycRecordingModal extends ConsumerStatefulWidget {
   final String anchorPhotoBase64;
+  final List<String> profilePhotosBase64;
+  final List<String> profilePhotoUrls;
   final void Function(bool isVerified, String message)? onKycCompleted;
 
   const LiveKycRecordingModal({
     super.key,
     this.anchorPhotoBase64 = '',
+    this.profilePhotosBase64 = const [],
+    this.profilePhotoUrls = const [],
     this.onKycCompleted,
   });
 
@@ -432,26 +436,48 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
     try {
       final String selfieB64 = base64Encode(_capturedImageBytes!);
 
-      // Resolve anchor photo from state or widget
+      // Resolve all available profile photos from widget or state (Slots 1 to 5)
+      final List<String> profileB64List = List<String>.from(widget.profilePhotosBase64);
+      final List<String> profileUrlList = List<String>.from(widget.profilePhotoUrls);
       String anchor = widget.anchorPhotoBase64;
-      if (anchor.isEmpty) {
-        final profileState = ref.read(profileSetupControllerProvider);
-        final slot1 = profileState.photoSlots[1];
-        if (slot1 != null && slot1.isNotEmpty) {
-          if (slot1.startsWith('data:') && slot1.contains(',')) {
-            anchor = slot1.split(',').last;
-          } else if (slot1.length > 200 && !slot1.startsWith('http') && !slot1.startsWith('/') && !slot1.startsWith('blob:')) {
-            anchor = slot1;
-          } else {
-            try {
-              final xFile = XFile(slot1);
-              final bytes = await xFile.readAsBytes();
-              anchor = base64Encode(bytes);
-            } catch (_) {
-              anchor = '';
-            }
+
+      final profileState = ref.read(profileSetupControllerProvider);
+      for (int slot = 1; slot <= 5; slot++) {
+        final val = profileState.photoSlots[slot];
+        if (val == null || val.trim().isEmpty) continue;
+        final cleanVal = val.trim();
+        if (cleanVal.startsWith('http://') || cleanVal.startsWith('https://')) {
+          if (!profileUrlList.contains(cleanVal)) {
+            profileUrlList.add(cleanVal);
           }
+        } else if (cleanVal.startsWith('data:image') && cleanVal.contains(',')) {
+          final b64 = cleanVal.split(',').last;
+          if (!profileB64List.contains(b64)) {
+            profileB64List.add(b64);
+          }
+          if (slot == 1 && anchor.isEmpty) anchor = b64;
+        } else if (cleanVal.length > 200 && !cleanVal.startsWith('/') && !cleanVal.startsWith('blob:')) {
+          if (!profileB64List.contains(cleanVal)) {
+            profileB64List.add(cleanVal);
+          }
+          if (slot == 1 && anchor.isEmpty) anchor = cleanVal;
+        } else {
+          try {
+            final xFile = XFile(cleanVal);
+            final bytes = await xFile.readAsBytes();
+            if (bytes.isNotEmpty) {
+              final b64 = base64Encode(bytes);
+              if (!profileB64List.contains(b64)) {
+                profileB64List.add(b64);
+              }
+              if (slot == 1 && anchor.isEmpty) anchor = b64;
+            }
+          } catch (_) {}
         }
+      }
+
+      if (anchor.isEmpty && profileB64List.isNotEmpty) {
+        anchor = profileB64List.first;
       }
 
       // Single-flight verified KYC verification via controller & repository
@@ -460,6 +486,8 @@ class _LiveKycRecordingModalState extends ConsumerState<LiveKycRecordingModal> {
           .executeSelfieKyc(
             selfieBase64: selfieB64,
             anchorPhotoB64: anchor,
+            profilePhotosB64: profileB64List,
+            profilePhotoUrls: profileUrlList,
             expectedPose: _currentPose.title,
           );
 

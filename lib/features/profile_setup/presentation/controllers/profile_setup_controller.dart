@@ -542,6 +542,8 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
   Future<KycVerificationResult> executeSelfieKyc({
     required String selfieBase64,
     String? anchorPhotoB64,
+    List<String>? profilePhotosB64,
+    List<String>? profilePhotoUrls,
     String? expectedPose,
     String userId = 'me',
   }) async {
@@ -549,6 +551,8 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       userId: userId,
       selfieBase64: selfieBase64,
       anchorPhotoB64: anchorPhotoB64,
+      profilePhotosB64: profilePhotosB64,
+      profilePhotoUrls: profilePhotoUrls,
       expectedPose: expectedPose,
     );
     state = state.copyWith(

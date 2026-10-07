@@ -373,12 +373,34 @@ class MyPersonaScreen extends ConsumerWidget {
   }
 
   void _openLivePhotoKycModal(BuildContext context, WidgetRef ref) {
+    final persona = ref.read(personaControllerProvider).profile;
+    final List<String> profileUrls = [];
+    if (persona.avatarUrl.trim().isNotEmpty) {
+      profileUrls.add(persona.avatarUrl.trim());
+    }
+    for (final m in persona.momentPhotos) {
+      if (m.trim().isNotEmpty && !profileUrls.contains(m.trim())) {
+        profileUrls.add(m.trim());
+      }
+    }
+
+    if (profileUrls.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload your profile photos first before verifying KYC.'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => LiveKycRecordingModal(
         anchorPhotoBase64: '',
+        profilePhotoUrls: profileUrls,
         onKycCompleted: (bool isVerified, String message) {
           if (isVerified) {
             ref.read(personaControllerProvider.notifier).onKycVerified();

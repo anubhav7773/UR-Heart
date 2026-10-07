@@ -233,3 +233,157 @@ async def test_client_cannot_spoof_kyc_status_via_profile_endpoints(mock_user, m
         assert params.get("full_name") == "Tampered Name"
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_kyc_rejected_when_profile_photos_missing(mock_user, mock_db):
+    """
+    Anti-Catfish Rule 1:
+    If a user attempts to submit a KYC selfie without uploading profile photos,
+    the system must strictly reject it with status='rejected'.
+    Self-matching is completely prohibited.
+    """
+    mock_user.kyc_status = False
+    mock_user.avatar_url = None
+    mock_user.photos = []
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    valid_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.post(
+            "/api/v1/kyc/verify-live",
+            json={
+                "selfie_b64": valid_png_b64,
+                "anchor_b64": "",
+                "profile_photos_b64": [],
+                "expected_pose": "Peace Sign ✌️"
+            }
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "rejected"
+        assert data["is_live_human"] is False
+        assert data["face_match_score"] == 0
+        assert "Profile photos missing" in data["rejection_reason"]
+        assert mock_user.kyc_status is False
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_kyc_rejected_when_impersonator_faces_mismatch(mock_user, mock_db):
+    """
+    Anti-Catfish Rule 2:
+    If an impersonator uploads someone else's pictures in their profile slots (1 to 5)
+    and submits their own selfie for KYC, Eva AI returns is_identity_match=False and low score.
+    The endpoint must strictly reject and leave kyc_status=False.
+    """
+    mock_user.kyc_status = False
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    valid_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+    catfish_eval = KycAiEvaluation(
+        is_live_human=True,
+        face_match_score=22,
+        is_identity_match=False,
+        gallery_consistent=True,
+        pose_matched=True,
+        is_underage=False,
+        status="rejected",
+        rejection_reason="Identity mismatch: Live selfie does not match the person in the profile photos."
+    )
+
+    with patch("app.services.groq_service.GroqAiService.verify_kyc_liveness_secure", return_value=catfish_eval):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/v1/kyc/verify-live",
+                json={
+                    "anchor_b64": valid_png_b64,
+                    "profile_photos_b64": [valid_png_b64, valid_png_b64],
+                    "selfie_b64": valid_png_b64,
+                    "expected_pose": "Peace Sign ✌️"
+                }
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "rejected"
+            assert data["is_identity_match"] is False
+            assert data["face_match_score"] == 22
+            assert "Identity mismatch" in data["rejection_reason"]
+            assert mock_user.kyc_status is False
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_kyc_rejected_when_gallery_is_inconsistent(mock_user, mock_db):
+    """
+    Anti-Catfish Rule 3:
+    If profile photos depict multiple different individuals (inconsistent gallery),
+    the endpoint must reject verification.
+    """
+    mock_user.kyc_status = False
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    valid_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+    inconsistent_eval = KycAiEvaluation(
+        is_live_human=True,
+        face_match_score=45,
+        is_identity_match=True,
+        gallery_consistent=False,
+        pose_matched=True,
+        is_underage=False,
+        status="rejected",
+        rejection_reason="Inconsistent profile photos: Uploaded profile photos must depict the same person."
+    )
+
+    with patch("app.services.groq_service.GroqAiService.verify_kyc_liveness_secure", return_value=inconsistent_eval):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/v1/kyc/verify-live",
+                json={
+                    "anchor_b64": valid_png_b64,
+                    "profile_photos_b64": [valid_png_b64, valid_png_b64],
+                    "selfie_b64": valid_png_b64,
+                }
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "rejected"
+            assert data["gallery_consistent"] is False
+            assert mock_user.kyc_status is False
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_synthetic_self_comparison_fallback_is_eliminated():
+    """
+    Anti-Catfish Rule 4:
+    Verify that when calling EvaIdentityEngine directly with missing/empty anchor
+    and empty profile photos, it NEVER synthesizes the anchor from the live selfie.
+    It must fail closed with rejection.
+    """
+    valid_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+    evaluation = await EvaIdentityEngine.verify_kyc_liveness(
+        user_id=uuid.uuid4(),
+        anchor_b64="",
+        frames_b64=[valid_png_b64],
+        profile_photos_b64=[],
+        expected_pose="Peace Sign ✌️"
+    )
+
+    assert evaluation.status == "rejected"
+    assert evaluation.is_identity_match is False
+    assert evaluation.face_match_score == 0
+    assert "Profile photos missing" in evaluation.rejection_reason

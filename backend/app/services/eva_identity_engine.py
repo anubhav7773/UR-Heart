@@ -31,6 +31,8 @@ OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 class KycAiEvaluation(BaseModel):
     is_live_human: bool = False
     face_match_score: int = 0
+    is_identity_match: bool = True
+    gallery_consistent: bool = True
     pose_matched: bool = True
     estimated_age_bracket: str = "unknown"
     is_underage: bool = False
@@ -113,7 +115,7 @@ class EvaIdentityEngine:
     @classmethod
     def _is_valid_image(cls, b64_str: str) -> bool:
         """Checks if base64 string decodes to a valid image format."""
-        if not b64_str or len(b64_str) < 50:
+        if not b64_str or len(b64_str) < 16:
             return False
         try:
             clean = b64_str.split(",")[-1] if "," in b64_str else b64_str
@@ -140,7 +142,7 @@ class EvaIdentityEngine:
 
         result_frames: List[str] = []
         for item in input_b64_list:
-            if not item or len(item) < 40:
+            if not item or len(item) < 16:
                 continue
             try:
                 clean_b64 = item.split(",")[-1] if "," in item else item
@@ -187,11 +189,11 @@ class EvaIdentityEngine:
                             except Exception:
                                 pass
                 else:
-                    if len(clean_b64) > 100:
+                    if len(clean_b64) >= 16:
                         result_frames.append(clean_b64)
             except Exception as e:
                 logger.warning("Frame extraction notice: %s", e)
-                if len(item) > 100:
+                if len(item) >= 16:
                     result_frames.append(item)
 
         return result_frames
@@ -200,79 +202,131 @@ class EvaIdentityEngine:
     async def verify_kyc_liveness(
         cls,
         user_id: UUID,
-        anchor_b64: str,
-        frames_b64: List[str],
+        anchor_b64: str = "",
+        frames_b64: Optional[List[str]] = None,
         expected_pose: Optional[str] = None,
+        profile_photos_b64: Optional[List[str]] = None,
         db_session: Any = None
     ) -> KycAiEvaluation:
         """
-        Evaluates Photo/Video KYC liveness with multi-model failover:
+        Evaluates Photo/Video KYC liveness with multi-model failover and strict anti-catfish cross-matching:
         1. Safe local OpenCV heuristic (if available)
         2. Production Groq Vision (`qwen/qwen3.8-27b`)
         3. OpenRouter Free Multimodal Vision fallback (qwen/qwen3.8-27b:free, google/gemma-4-31b-it:free)
         4. Strict Fail-Closed Policy: If all models rate-limited/failed, strictly returns status=pending_manual_review.
         """
-        extracted_frames = cls.extract_image_frames(frames_b64)
-        clean_anchor = anchor_b64.split(",")[-1] if "," in anchor_b64 else anchor_b64
+        # Collect and validate all available profile photos (up to 5 slots)
+        candidate_photos: List[str] = []
+        if profile_photos_b64:
+            for p in profile_photos_b64:
+                if p and isinstance(p, str):
+                    c = p.split(",")[-1] if "," in p else p
+                    if cls._is_valid_image(c) and c not in candidate_photos:
+                        candidate_photos.append(c)
 
-        # Fail closed immediately if neither valid anchor nor video frames exist
-        anchor_valid = cls._is_valid_image(clean_anchor)
-        if not anchor_valid and not extracted_frames:
+        clean_anchor = anchor_b64.split(",")[-1] if "," in anchor_b64 else anchor_b64
+        if cls._is_valid_image(clean_anchor) and clean_anchor not in candidate_photos:
+            candidate_photos.insert(0, clean_anchor)
+
+        extracted_frames = cls.extract_image_frames(frames_b64 or [])
+
+        # STRICT FAIL-CLOSED GATE 1: If neither valid profile photos nor frames exist (SEC-11 Corrupted input)
+        if not candidate_photos and not extracted_frames:
             logger.warning("[KYC FAIL-CLOSED] User %s: Corrupted or missing anchor/frames.", user_id)
             return KycAiEvaluation(
                 is_live_human=False,
                 face_match_score=0,
+                is_identity_match=False,
+                gallery_consistent=False,
                 pose_matched=False,
                 rejection_reason="Corrupted or invalid image frames received.",
-                status="pending_manual_review"
+                status="pending_manual_review",
+                analysis_summary="Corrupted or missing anchor/frames."
             )
 
-        # If anchor was omitted or is invalid, synthesize anchor from frame 0
-        if (not anchor_valid or len(clean_anchor) < 500) and extracted_frames:
-            clean_anchor = extracted_frames[0]
-            comparison_frames = extracted_frames[1:] if len(extracted_frames) > 1 else extracted_frames
-        else:
-            comparison_frames = extracted_frames
+        # STRICT FAIL-CLOSED GATE 2: Live selfie frame is mandatory
+        if not extracted_frames:
+            logger.warning("[KYC FAIL-CLOSED] User %s: Missing live selfie frames.", user_id)
+            return KycAiEvaluation(
+                is_live_human=False,
+                face_match_score=0,
+                is_identity_match=False,
+                gallery_consistent=False,
+                pose_matched=False,
+                rejection_reason="No live selfie captured. Please provide a clear camera selfie.",
+                status="rejected",
+                analysis_summary="No live selfie frames received."
+            )
 
-        # 1. Safe local check
-        local_face_found = cls._detect_faces_opencv_safe([clean_anchor] + comparison_frames)
+        # STRICT FAIL-CLOSED GATE 3: Profile photo(s) are mandatory. Self-matching is strictly prohibited.
+        if not candidate_photos:
+            logger.warning("[KYC FAIL-CLOSED] User %s: No profile photos found for cross-matching.", user_id)
+            return KycAiEvaluation(
+                is_live_human=False,
+                face_match_score=0,
+                is_identity_match=False,
+                gallery_consistent=False,
+                pose_matched=False,
+                rejection_reason="Profile photos missing: Upload your profile photos first before verifying KYC.",
+                status="rejected",
+                analysis_summary="Profile photos missing. Self-matching is strictly prohibited."
+            )
+
+        profile_photos = candidate_photos[:5]
+        num_profile_photos = len(profile_photos)
+        live_selfie = extracted_frames[0]
+        selfie_img_num = num_profile_photos + 1
+
+        # 1. Safe local check on all involved images
+        local_face_found = cls._detect_faces_opencv_safe(profile_photos + [live_selfie])
 
         clean_pose = expected_pose.replace("✌️", "").replace("📸", "").replace("👍", "").strip() if expected_pose else ""
         pose_instruction = (
-            f"4. Pose Challenge Check: The user was instructed to perform the following pose: \"{clean_pose}\". "
-            f"Inspect Image 2 to check if the pose/gesture is present. "
+            f"4. Pose Challenge Check: The user was instructed to perform this challenge pose: \"{clean_pose}\". "
+            f"Inspect Image {selfie_img_num} (live selfie) to check if the pose/gesture is present. "
             f"Note: Mobile front cameras often horizontally mirror selfies (left/right can appear inverted). "
             f"If the user has turned their head in either direction or displays a hand gesture, consider pose_matched: true.\n"
-        ) if expected_pose else ""
+        ) if clean_pose else ""
+
+        if num_profile_photos == 1:
+            profile_desc = "Image 1 is the user's uploaded profile portrait."
+        else:
+            profile_desc = f"Images 1 to {num_profile_photos} are the user's uploaded profile gallery photos (up to 5 photos: primary portrait and gallery photos)."
 
         prompt_text = (
-            "You are the Sanctuary Identity Sentinel. Image 1 is the user's primary profile portrait (Slot 1). "
-            "Image 2 is a live verification selfie captured by the user right now.\n"
-            "Perform strict biometric analysis:\n"
-            "1. Biometric Match: Compare eye spacing, nose bridge, jawline, and facial structure between Image 1 and Image 2. Face match score MUST be an integer between 0 and 100 based strictly on facial similarity.\n"
-            "2. Liveness Check: Verify Image 2 is a genuine 3D living person, not a photo of a screen, printed paper photo, AI avatar, deepfake, or spoof replay.\n"
-            "3. Age Check: Verify user appears to be an adult (age 18+).\n"
+            "You are the Sanctuary Identity & Anti-Catfish Sentinel.\n"
+            f"{profile_desc}\n"
+            f"Image {selfie_img_num} is a live verification selfie captured by the user right now via mobile camera.\n\n"
+            "PERFORM STRICT BIOMETRIC CROSS-MATCHING & ANTI-CATFISH ANALYSIS:\n"
+            f"1. Biometric Match & Impersonation Prevention: Compare the facial geometry (eye spacing, nose bridge/tip, jawline, lips, and facial proportions) in Image {selfie_img_num} (Live Selfie) with the person depicted in the Profile Photos (Images 1 to {num_profile_photos}).\n"
+            f"   - QUESTION: Is the person in Image {selfie_img_num} the EXACT SAME INDIVIDUAL as the person in the profile photos?\n"
+            f"   - CRITICAL: If the person in Image {selfie_img_num} is a DIFFERENT person (e.g., someone created a profile with someone else's pictures, celebrity/model photos, or another person's face, but captured their own selfie for KYC), this is a FRAUDULENT IMPERSONATION / CATFISH attempt! In this case, is_identity_match MUST be false, face_match_score MUST be an integer between 0 and 30, and status MUST be \"rejected\".\n"
+            f"2. Gallery Consistency: Verify that all profile photos (Images 1 to {num_profile_photos}) depict the same individual. If the profile contains photos of multiple completely different people, set gallery_consistent: false and status: \"rejected\".\n"
+            f"3. Liveness Check: Verify Image {selfie_img_num} is a genuine 3D living person, not a photo of a screen, printed paper photo, AI avatar, deepfake, or spoof replay.\n"
             f"{pose_instruction}"
+            f"5. Age Check: Verify the person appears to be an adult (age 18+).\n\n"
             "CRITICAL INSTRUCTIONS:\n"
             "- You MUST visually inspect the actual image pixels.\n"
             "- If images are missing, corrupt, blank, or not showing a human face, face_match_score MUST be 0 and is_live_human MUST be false.\n"
-            "- Do NOT copy sample values.\n"
+            "- Do NOT auto-approve if the faces in profile photos and live selfie do not match.\n"
             "Return ONLY a valid raw JSON object with this exact schema:\n"
             "{\n"
             '  "is_live_human": <true or false>,\n'
+            '  "is_identity_match": <true or false>,\n'
+            '  "gallery_consistent": <true or false>,\n'
             '  "face_match_score": <integer from 0 to 100>,\n'
             '  "pose_matched": <true or false>,\n'
             '  "estimated_age_bracket": "<age bracket string like 20-25>",\n'
             '  "is_underage": <true or false>,\n'
-            '  "rejection_reason": "<empty string if passed, or specific reason if rejected/failed>",\n'
-            '  "analysis_summary": "<brief description of face, eyes, and pose seen in images>"\n'
+            '  "rejection_reason": "<empty string if passed, or specific reason like \'Identity mismatch: Live selfie does not match profile photos\' if failed>",\n'
+            '  "analysis_summary": "<brief description of face comparison and why it matched or mismatched>"\n'
             "}"
         )
 
         content_payload: List[Dict[str, Any]] = [{"type": "text", "text": prompt_text}]
-        content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{clean_anchor}"}})
-        for frame in comparison_frames[:2]:
-            content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame}"}})
+        for p in profile_photos:
+            content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{p}"}})
+        content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{live_selfie}"}})
 
         # 2. Primary: Groq Vision
         groq_models = [
@@ -356,6 +410,8 @@ class EvaIdentityEngine:
         return KycAiEvaluation(
             is_live_human=False,
             face_match_score=0,
+            is_identity_match=False,
+            gallery_consistent=True,
             pose_matched=False,
             estimated_age_bracket="unknown",
             is_underage=False,
@@ -379,6 +435,14 @@ class EvaIdentityEngine:
                 data = json.loads(match.group(0))
                 score = int(data.get("face_match_score", 0))
                 is_live = bool(data.get("is_live_human", False))
+
+                # Anti-Catfish Check: If explicitly provided, use it; otherwise deduce from match score
+                if "is_identity_match" in data:
+                    is_identity_match = bool(data.get("is_identity_match", False))
+                else:
+                    is_identity_match = (score >= 70)
+
+                gallery_consistent = bool(data.get("gallery_consistent", True))
                 pose_matched = bool(data.get("pose_matched", True)) if expected_pose else True
                 is_underage = bool(data.get("is_underage", False))
                 reason = data.get("rejection_reason", "") or ""
@@ -391,6 +455,8 @@ class EvaIdentityEngine:
                     return KycAiEvaluation(
                         is_live_human=False,
                         face_match_score=0,
+                        is_identity_match=False,
+                        gallery_consistent=False,
                         pose_matched=False,
                         estimated_age_bracket="unknown",
                         is_underage=False,
@@ -403,6 +469,8 @@ class EvaIdentityEngine:
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
+                        is_identity_match=is_identity_match,
+                        gallery_consistent=gallery_consistent,
                         pose_matched=pose_matched,
                         estimated_age_bracket=data.get("estimated_age_bracket", "under_18"),
                         is_underage=True,
@@ -411,10 +479,41 @@ class EvaIdentityEngine:
                         analysis_summary=summary
                     )
 
+                # STRICT ANTI-CATFISH / IMPERSONATION CHECK
+                if not is_identity_match:
+                    return KycAiEvaluation(
+                        is_live_human=is_live,
+                        face_match_score=score,
+                        is_identity_match=False,
+                        gallery_consistent=gallery_consistent,
+                        pose_matched=pose_matched,
+                        estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
+                        is_underage=False,
+                        rejection_reason=reason or "Identity mismatch: Live selfie does not match the person in the profile photos.",
+                        status="rejected",
+                        analysis_summary=summary
+                    )
+
+                if not gallery_consistent:
+                    return KycAiEvaluation(
+                        is_live_human=is_live,
+                        face_match_score=score,
+                        is_identity_match=is_identity_match,
+                        gallery_consistent=False,
+                        pose_matched=pose_matched,
+                        estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
+                        is_underage=False,
+                        rejection_reason=reason or "Inconsistent profile photos: Uploaded profile photos must depict the same person.",
+                        status="rejected",
+                        analysis_summary=summary
+                    )
+
                 if expected_pose and not pose_matched:
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
+                        is_identity_match=is_identity_match,
+                        gallery_consistent=gallery_consistent,
                         pose_matched=False,
                         estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
                         is_underage=False,
@@ -423,10 +522,12 @@ class EvaIdentityEngine:
                         analysis_summary=summary
                     )
 
-                if is_live and score >= 75 and pose_matched and not is_underage:
+                if is_live and is_identity_match and gallery_consistent and score >= 75 and pose_matched and not is_underage:
                     return KycAiEvaluation(
                         is_live_human=True,
                         face_match_score=score,
+                        is_identity_match=True,
+                        gallery_consistent=True,
                         pose_matched=True,
                         estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
                         is_underage=False,
@@ -438,6 +539,8 @@ class EvaIdentityEngine:
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
+                        is_identity_match=is_identity_match,
+                        gallery_consistent=gallery_consistent,
                         pose_matched=pose_matched,
                         estimated_age_bracket=data.get("estimated_age_bracket", "unknown"),
                         is_underage=False,
@@ -450,6 +553,8 @@ class EvaIdentityEngine:
                     return KycAiEvaluation(
                         is_live_human=is_live,
                         face_match_score=score,
+                        is_identity_match=is_identity_match,
+                        gallery_consistent=gallery_consistent,
                         pose_matched=pose_matched,
                         estimated_age_bracket=data.get("estimated_age_bracket", "22-28"),
                         is_underage=False,

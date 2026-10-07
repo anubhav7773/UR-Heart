@@ -206,6 +206,8 @@ class ProfileRepository {
     required String userId,
     required String selfieBase64,
     String? anchorPhotoB64,
+    List<String>? profilePhotosB64,
+    List<String>? profilePhotoUrls,
     String? expectedPose,
   }) async {
     try {
@@ -213,6 +215,10 @@ class ProfileRepository {
         '/api/v1/kyc/verify-live',
         data: {
           'anchor_b64': anchorPhotoB64 ?? '',
+          if (profilePhotosB64 != null && profilePhotosB64.isNotEmpty)
+            'profile_photos_b64': profilePhotosB64,
+          if (profilePhotoUrls != null && profilePhotoUrls.isNotEmpty)
+            'profile_photo_urls': profilePhotoUrls,
           'selfie_b64': selfieBase64,
           if (expectedPose != null && expectedPose.isNotEmpty) 'expected_pose': expectedPose,
         },
