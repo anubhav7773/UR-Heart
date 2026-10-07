@@ -111,6 +111,7 @@ async def join_blind_date_queue(
                 "remaining_seconds": remaining_seconds,
                 "icebreaker_prompt": session.icebreaker_prompt,
                 "my_decision": session.user1_decision if session.user1_id == current_user.id else session.user2_decision,
+                "extension_count": session.extension_count or 0,
                 "partner": partner_payload
             }
         }
@@ -162,6 +163,7 @@ async def check_queue_status(
                 "remaining_seconds": remaining_seconds,
                 "icebreaker_prompt": session.icebreaker_prompt,
                 "my_decision": session.user1_decision if session.user1_id == current_user.id else session.user2_decision,
+                "extension_count": session.extension_count or 0,
                 "partner": partner_payload
             }
         }
@@ -230,6 +232,7 @@ async def get_blind_date_session(
         "my_decision": my_decision,
         "partner_decision": partner_decision if session.status == "revealed" else "hidden",
         "match_id": str(session.match_id) if session.match_id else None,
+        "extension_count": session.extension_count or 0,
         "partner": partner_payload
     }
 
@@ -356,6 +359,7 @@ async def submit_resonance_decision(
         "my_decision": my_decision,
         "is_revealed": updated_session.status == "revealed",
         "match_id": str(updated_session.match_id) if updated_session.match_id else None,
+        "extension_count": updated_session.extension_count or 0,
         "partner": partner_payload
     }
 

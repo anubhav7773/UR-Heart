@@ -623,9 +623,20 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
         color: SanctuaryColors.elevatedSlate,
         child: ElevatedButton.icon(
           onPressed: () {
+            final p = session?.partner;
             Navigator.of(context).pushReplacementNamed(
               ChatDialogueScreen.routeName,
-              arguments: {'partner_id': session?.partner?.id},
+              arguments: ChatDialogueArguments(
+                matchId: session?.matchId ?? '',
+                recipientId: p?.id ?? '',
+                recipientName: p?.name ?? 'Soul Seeker',
+                recipientAge: p?.age ?? 24,
+                recipientAvatarUrl: p?.avatarUrl ??
+                    (p?.photos.isNotEmpty == true ? p!.photos.first : ''),
+                bio: p?.bio ?? '',
+                location: p?.location ?? 'Sanctuary',
+                gender: p?.gender ?? '',
+              ),
             );
           },
           icon: const Icon(Icons.favorite, color: Colors.white),
@@ -809,7 +820,19 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                       Navigator.of(ctx).pop();
                       Navigator.of(context).pushReplacementNamed(
                         ChatDialogueScreen.routeName,
-                        arguments: {'partner_id': partner?.id},
+                        arguments: ChatDialogueArguments(
+                          matchId: matchId ?? '',
+                          recipientId: partner?.id ?? '',
+                          recipientName: partner?.name ?? 'Soul Seeker',
+                          recipientAge: partner?.age ?? 24,
+                          recipientAvatarUrl: partner?.avatarUrl ??
+                              (partner?.photos.isNotEmpty == true
+                                  ? partner!.photos.first
+                                  : ''),
+                          bio: partner?.bio ?? '',
+                          location: partner?.location ?? 'Sanctuary',
+                          gender: partner?.gender ?? '',
+                        ),
                       );
                     },
                     style: ElevatedButton.styleFrom(

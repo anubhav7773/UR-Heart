@@ -135,3 +135,78 @@ async def test_extend_session_duration_and_count():
     assert updated.extension_count == 1
     assert (updated.expires_at - original_expiry).total_seconds() == 180
     assert mock_db.commit.called
+
+
+@pytest.mark.asyncio
+async def test_cancel_queue_refunds_daily_pass():
+    """Cancelling while unmatched in waiting status restores daily streak pass."""
+    user_id = uuid.uuid4()
+    today = date.today()
+    user = User(
+        id=user_id,
+        last_blind_date_date=today,
+        blind_date_passes=0,
+    )
+    from app.models.domain.blind_date import BlindDateQueueEntry
+    queue_entry = BlindDateQueueEntry(
+        user_id=user_id,
+        gender="man",
+        interested_in="everyone",
+        age=25,
+        status="waiting",
+        joined_at=datetime.now(timezone.utc),
+    )
+
+    from unittest.mock import MagicMock
+    mock_db = AsyncMock()
+    mock_q_res = MagicMock()
+    mock_q_res.scalars.return_value.first.return_value = queue_entry
+    mock_u_res = MagicMock()
+    mock_u_res.scalars.return_value.first.return_value = user
+
+    mock_db.execute.side_effect = [mock_q_res, mock_u_res]
+
+    result = await BlindDateMatcherService.cancel_queue_entry(mock_db, user_id)
+
+    assert result is True
+    assert user.last_blind_date_date is None
+    assert mock_db.delete.called
+    assert mock_db.commit.called
+
+
+@pytest.mark.asyncio
+async def test_cancel_queue_refunds_bonus_pass():
+    """Cancelling while unmatched restores bonus pass if streak pass was not used today."""
+    user_id = uuid.uuid4()
+    yesterday = date.today() - timedelta(days=1)
+    user = User(
+        id=user_id,
+        last_blind_date_date=yesterday,
+        blind_date_passes=1,
+    )
+    from app.models.domain.blind_date import BlindDateQueueEntry
+    queue_entry = BlindDateQueueEntry(
+        user_id=user_id,
+        gender="woman",
+        interested_in="men",
+        age=24,
+        status="waiting",
+        joined_at=datetime.now(timezone.utc),
+    )
+
+    from unittest.mock import MagicMock
+    mock_db = AsyncMock()
+    mock_q_res = MagicMock()
+    mock_q_res.scalars.return_value.first.return_value = queue_entry
+    mock_u_res = MagicMock()
+    mock_u_res.scalars.return_value.first.return_value = user
+
+    mock_db.execute.side_effect = [mock_q_res, mock_u_res]
+
+    result = await BlindDateMatcherService.cancel_queue_entry(mock_db, user_id)
+
+    assert result is True
+    assert user.blind_date_passes == 2
+    assert mock_db.delete.called
+    assert mock_db.commit.called
+

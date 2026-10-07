@@ -297,13 +297,24 @@ class BlindDateMatcherService:
         min_age_a = getattr(user, "preferred_age_min", 18) or 18
         max_age_a = getattr(user, "preferred_age_max", 45) or 45
 
-        # 5. Fetch waiting candidates from queue (excluding self)
+        # 5. Fetch waiting candidates from queue (excluding self and stale ghost entries)
         # 100% Equal Priority: Sorters prioritize is_fast_track first, then FIFO joined_at
+        staleness_cutoff = now - timedelta(minutes=7)
+
+        # Purge dead ghost queue entries older than 15 minutes
+        await db.execute(
+            delete(BlindDateQueueEntry).where(
+                BlindDateQueueEntry.status == "waiting",
+                BlindDateQueueEntry.joined_at < now - timedelta(minutes=15)
+            )
+        )
+
         candidates_query = (
             select(BlindDateQueueEntry)
             .where(
                 BlindDateQueueEntry.status == "waiting",
-                BlindDateQueueEntry.user_id != user.id
+                BlindDateQueueEntry.user_id != user.id,
+                BlindDateQueueEntry.joined_at >= staleness_cutoff
             )
             .order_by(
                 BlindDateQueueEntry.is_fast_track.desc(),
@@ -384,6 +395,24 @@ class BlindDateMatcherService:
             await db.commit()
             await db.refresh(session)
             await db.refresh(user_entry)
+
+            # Notify the waiting candidate that a soul match was found
+            try:
+                from app.api.v1.endpoints.notifications import push_notification
+                push_notification(
+                    user_id=str(compatible_candidate.user_id),
+                    notif_type="blind_date_match",
+                    title="✨ Soul Matched!",
+                    body="Your 5-minute Sanctuary Blind Date has begun. Enter now!",
+                    data={
+                        "session_id": str(session_id),
+                        "action": "open_blind_date",
+                        "type": "blind_date_match"
+                    }
+                )
+            except Exception:
+                pass
+
             return session, user_entry
 
         # NO COMPATIBLE CANDIDATE FOUND YET: Enqueue in waiting state
@@ -440,16 +469,38 @@ class BlindDateMatcherService:
             session = s_res.scalars().first()
             return session, user_entry
 
+        if user_entry.status == "waiting":
+            # Live Heartbeat: keep joined_at fresh so active seeker stays eligible
+            user_entry.joined_at = datetime.now(timezone.utc)
+            await db.commit()
+
         return None, user_entry
 
     @staticmethod
     async def cancel_queue_entry(db: AsyncSession, user_id: uuid.UUID) -> bool:
-        """Removes or cancels user from blind date queue."""
-        res = await db.execute(
-            delete(BlindDateQueueEntry).where(BlindDateQueueEntry.user_id == user_id)
+        """Removes user from blind date queue and refunds consumed pass if unmatched."""
+        q_res = await db.execute(
+            select(BlindDateQueueEntry).where(BlindDateQueueEntry.user_id == user_id)
         )
+        user_entry = q_res.scalars().first()
+        if not user_entry:
+            return False
+
+        # If user was waiting and unmatched, refund their consumed pass
+        if user_entry.status == "waiting":
+            u_res = await db.execute(select(User).where(User.id == user_id))
+            user = u_res.scalars().first()
+            if user:
+                today = date.today()
+                if user.last_blind_date_date == today:
+                    user.last_blind_date_date = None
+                else:
+                    user.blind_date_passes = (user.blind_date_passes or 0) + 1
+                db.add(user)
+
+        await db.delete(user_entry)
         await db.commit()
-        return res.rowcount > 0
+        return True
 
     @staticmethod
     async def submit_decision(

@@ -107,7 +107,7 @@ class BlindDateQueueEntry(Base):
 
     # Cached attributes for fast candidate filtering
     gender = Column(String(20), nullable=False)
-    interested_in = Column(String(20), nullable=False)
+    interested_in = Column(String(100), nullable=False)
     age = Column(SmallInteger, nullable=False, default=24)
     preferred_age_min = Column(SmallInteger, nullable=False, default=18)
     preferred_age_max = Column(SmallInteger, nullable=False, default=45)

@@ -199,3 +199,68 @@ def test_dpdp_privacy_shield_revealed_session():
     assert unmasked["name"] == "Pooja Sharma"
     assert unmasked["is_revealed"] is True
     assert unmasked["blur_radius"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_submit_decision_mutual_resonate_creates_match():
+    """When both users submit 'resonate', status becomes 'revealed' and match is created."""
+    user1_id = uuid.uuid4()
+    user2_id = uuid.uuid4()
+    session_id = uuid.uuid4()
+    session = BlindDateSession(
+        id=session_id,
+        user1_id=user1_id,
+        user2_id=user2_id,
+        status="active",
+        user1_decision="resonate",
+        user2_decision="pending",
+        match_id=None
+    )
+
+    from unittest.mock import AsyncMock, MagicMock
+    mock_db = AsyncMock()
+    mock_session_res = MagicMock()
+    mock_session_res.scalars.return_value.first.return_value = session
+    mock_match_res = MagicMock()
+    mock_match_res.scalars.return_value.first.return_value = None  # No prior match
+    mock_db.execute.side_effect = [mock_session_res, mock_match_res]
+
+    updated = await BlindDateMatcherService.submit_decision(
+        mock_db, session_id, user2_id, "resonate"
+    )
+
+    assert updated.status == "revealed"
+    assert updated.user2_decision == "resonate"
+    assert updated.match_id is not None
+    assert mock_db.commit.called
+
+
+@pytest.mark.asyncio
+async def test_submit_decision_pass_sets_status_passed():
+    """When either user submits 'pass', status becomes 'passed'."""
+    user1_id = uuid.uuid4()
+    user2_id = uuid.uuid4()
+    session_id = uuid.uuid4()
+    session = BlindDateSession(
+        id=session_id,
+        user1_id=user1_id,
+        user2_id=user2_id,
+        status="active",
+        user1_decision="pending",
+        user2_decision="pending",
+    )
+
+    from unittest.mock import AsyncMock, MagicMock
+    mock_db = AsyncMock()
+    mock_session_res = MagicMock()
+    mock_session_res.scalars.return_value.first.return_value = session
+    mock_db.execute.return_value = mock_session_res
+
+    updated = await BlindDateMatcherService.submit_decision(
+        mock_db, session_id, user1_id, "pass"
+    )
+
+    assert updated.status == "passed"
+    assert updated.user1_decision == "pass"
+    assert mock_db.commit.called
+

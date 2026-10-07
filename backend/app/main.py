@@ -207,7 +207,8 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS extension_count SMALLINT NOT NULL DEFAULT 0;",
                 "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS user1_decision VARCHAR(15) NOT NULL DEFAULT 'pending';",
                 "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS user2_decision VARCHAR(15) NOT NULL DEFAULT 'pending';",
-                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS icebreaker_prompt TEXT NOT NULL DEFAULT 'What is a quiet dream you hold close to your heart?';"
+                "ALTER TABLE public.blind_date_sessions ADD COLUMN IF NOT EXISTS icebreaker_prompt TEXT NOT NULL DEFAULT 'What is a quiet dream you hold close to your heart?';",
+                "ALTER TABLE public.blind_date_queue ALTER COLUMN interested_in TYPE VARCHAR(100);"
             ]
             async with async_session_factory() as session:
                 for stmt in statements:

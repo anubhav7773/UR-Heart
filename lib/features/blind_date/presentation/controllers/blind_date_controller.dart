@@ -242,12 +242,45 @@ class BlindDateController extends StateNotifier<BlindDateState> {
       }
     });
 
-    // Start messages polling every 2.5 seconds
+    // Start messages and session status polling every 2.5 seconds
     fetchMessages(sessionId);
+    refreshSession(sessionId);
     _messagesPollTimer?.cancel();
     _messagesPollTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
       fetchMessages(sessionId);
+      refreshSession(sessionId);
     });
+  }
+
+  Future<void> refreshSession(String sessionId) async {
+    try {
+      final updated = await _repository.getSession(sessionId);
+      final currentSession = state.session;
+
+      // Realtime synchronization of session extension / remaining time
+      int remaining = state.remainingSeconds;
+      if (updated.extensionCount > (currentSession?.extensionCount ?? 0) ||
+          (updated.remainingSeconds - remaining).abs() > 3) {
+        remaining = updated.remainingSeconds;
+      }
+
+      state = state.copyWith(
+        remainingSeconds: remaining,
+        session: currentSession != null
+            ? currentSession.copyWith(
+                status: updated.status,
+                remainingSeconds: remaining,
+                extensionCount: updated.extensionCount,
+                expiresAt: updated.expiresAt,
+                partnerDecision: updated.partnerDecision,
+                matchId: updated.matchId ?? currentSession.matchId,
+                partner: updated.partner ?? currentSession.partner,
+              )
+            : updated,
+      );
+    } catch (e) {
+      debugPrint('[SESSION REFRESH ERROR] $e');
+    }
   }
 
   Future<void> fetchMessages(String sessionId) async {
@@ -289,6 +322,7 @@ class BlindDateController extends StateNotifier<BlindDateState> {
           partner: updated.partner ?? state.session?.partner,
         ),
       );
+      await refreshSession(sessionId);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -328,6 +362,7 @@ class BlindDateController extends StateNotifier<BlindDateState> {
       debugPrint('[CANCEL QUEUE ERROR] $e');
     }
     state = const BlindDateState();
+    await fetchEligibility();
   }
 
   void resetSession() {
