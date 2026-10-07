@@ -2,7 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
+import '../../../../core/theme/dark_sanctuary_tokens.dart';
+import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/sanctuary_colors.dart';
+import '../../../../core/theme/theme_controller.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../chat/presentation/screens/chat_dialogue_screen.dart';
 import '../../../chat/presentation/services/window_security_service.dart';
@@ -70,13 +73,31 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     final session = state.session;
     final partner = session?.partner;
 
+    final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
+    final bgColor = isDark ? DarkSanctuaryTokens.background : LightSanctuaryTokens.background;
+    final surfaceColor = isDark ? DarkSanctuaryTokens.surface : LightSanctuaryTokens.surface;
+    final surfaceMutedColor = isDark ? DarkSanctuaryTokens.surfaceMuted : LightSanctuaryTokens.surfaceMuted;
+    final primaryTextColor = isDark ? DarkSanctuaryTokens.primaryText : LightSanctuaryTokens.primaryText;
+    final secondaryTextColor = isDark ? DarkSanctuaryTokens.secondaryText : LightSanctuaryTokens.secondaryText;
+    final accentColor = isDark ? DarkSanctuaryTokens.accentTerracotta : LightSanctuaryTokens.accentTerracotta;
+    final goldColor = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
+
     // Trigger celebration dialog on mutual resonance
     if (session != null &&
         session.status == 'revealed' &&
         !_hasPromptedCelebration) {
       _hasPromptedCelebration = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showMutualResonanceDialog(context, partner, session.matchId);
+        _showMutualResonanceDialog(
+          context,
+          partner,
+          session.matchId,
+          isDark: isDark,
+          surfaceColor: surfaceColor,
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
+          accentColor: accentColor,
+        );
       });
     }
 
@@ -87,13 +108,12 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     final canChat = !isExpired && !isPassed;
 
     return Scaffold(
-      backgroundColor: SanctuaryColors.midnightObsidian,
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              color: SanctuaryColors.crispIvory),
+          icon: Icon(Icons.arrow_back_ios_new, color: primaryTextColor),
           onPressed: () {
             controller.resetSession();
             Navigator.of(context).maybePop();
@@ -106,9 +126,15 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
           canChat,
           controller,
           currentUserId,
+          isDark: isDark,
+          surfaceColor: surfaceColor,
+          surfaceMutedColor: surfaceMutedColor,
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
+          accentColor: accentColor,
+          goldColor: goldColor,
         ),
         centerTitle: true,
-
         actions: [
           IconButton(
             icon: const Icon(Icons.shield_outlined,
@@ -133,7 +159,16 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
             // Top Section: Masked Seeker Profile & Eva Icebreaker
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: _buildVeiledPartnerCard(partner, isRevealed),
+              child: _buildVeiledPartnerCard(
+                partner,
+                isRevealed,
+                isDark: isDark,
+                surfaceColor: surfaceColor,
+                surfaceMutedColor: surfaceMutedColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
+              ),
             ),
 
             if (session?.icebreakerPrompt != null &&
@@ -141,11 +176,15 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: _buildEvaIcebreakerBanner(session.icebreakerPrompt),
+                child: _buildEvaIcebreakerBanner(
+                  session.icebreakerPrompt,
+                  isDark: isDark,
+                  goldColor: goldColor,
+                ),
               ),
 
-            const Divider(
-              color: SanctuaryColors.mutedCharcoalBorder,
+            Divider(
+              color: surfaceMutedColor,
               height: 16,
               thickness: 1,
             ),
@@ -160,15 +199,13 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                           Icon(
                             Icons.chat_bubble_outline_rounded,
                             size: 40,
-                            color:
-                                SanctuaryColors.softGreySubtext.withAlpha(120),
+                            color: secondaryTextColor.withAlpha(120),
                           ),
                           const SizedBox(height: 12),
                           Text(
                             'Begin your 5-minute blind dialogue...',
                             style: TextStyle(
-                              color: SanctuaryColors.softGreySubtext
-                                  .withAlpha(160),
+                              color: secondaryTextColor.withAlpha(160),
                               fontSize: 13,
                               fontStyle: FontStyle.italic,
                             ),
@@ -183,24 +220,45 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                       itemCount: state.messages.length,
                       itemBuilder: (context, index) {
                         final msg = state.messages[index];
-                        return _buildChatBubble(msg);
+                        return _buildChatBubble(
+                          msg,
+                          isDark: isDark,
+                          surfaceColor: surfaceColor,
+                          surfaceMutedColor: surfaceMutedColor,
+                          primaryTextColor: primaryTextColor,
+                          accentColor: accentColor,
+                        );
                       },
                     ),
             ),
 
             // In-Session +3 Minute Extension Prompt (when <= 60s remaining)
             if (canChat && state.remainingSeconds <= 60 && (session?.extensionCount ?? 0) < 3)
-              _buildExtensionPrompt(context, state, controller, currentUserId),
+              _buildExtensionPrompt(
+                context,
+                state,
+                controller,
+                currentUserId,
+                isDark: isDark,
+                surfaceColor: surfaceColor,
+                surfaceMutedColor: surfaceMutedColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
+                goldColor: goldColor,
+              ),
 
             // Chat Input Bar (if session still active)
             if (canChat)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: const BoxDecoration(
-                  color: SanctuaryColors.elevatedSlate,
+                decoration: BoxDecoration(
+                  color: surfaceColor,
                   border: Border(
                     top: BorderSide(
-                        color: SanctuaryColors.mutedCharcoalBorder, width: 1),
+                      color: surfaceMutedColor,
+                      width: 1,
+                    ),
                   ),
                 ),
                 child: Row(
@@ -208,14 +266,12 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                     Expanded(
                       child: TextField(
                         controller: _messageController,
-                        style:
-                            const TextStyle(color: SanctuaryColors.crispIvory),
+                        style: TextStyle(color: primaryTextColor),
                         textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
                           hintText: 'Share a gentle thought...',
                           hintStyle: TextStyle(
-                            color:
-                                SanctuaryColors.softGreySubtext.withAlpha(160),
+                            color: secondaryTextColor.withAlpha(160),
                             fontSize: 14,
                           ),
                           border: InputBorder.none,
@@ -226,9 +282,9 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.send_rounded,
-                        color: SanctuaryColors.glowingTerracotta,
+                        color: accentColor,
                       ),
                       onPressed: () => _sendMessage(controller),
                     ),
@@ -237,7 +293,18 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
               ),
 
             // Bottom Resonance Gate
-            _buildResonanceGateBar(context, state, controller),
+            _buildResonanceGateBar(
+              context,
+              state,
+              controller,
+              isDark: isDark,
+              surfaceColor: surfaceColor,
+              surfaceMutedColor: surfaceMutedColor,
+              primaryTextColor: primaryTextColor,
+              secondaryTextColor: secondaryTextColor,
+              accentColor: accentColor,
+              goldColor: goldColor,
+            ),
           ],
         ),
       ),
@@ -256,25 +323,32 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     BuildContext context,
     BlindDateState state,
     BlindDateController controller,
-    String userId,
-  ) {
+    String userId, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+    required Color goldColor,
+  }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: SanctuaryColors.resonantGold.withAlpha(30),
+        color: goldColor.withAlpha(isDark ? 30 : 25),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SanctuaryColors.resonantGold.withAlpha(120)),
+        border: Border.all(color: goldColor.withAlpha(isDark ? 120 : 160)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.hourglass_bottom_rounded, size: 18, color: SanctuaryColors.resonantGold),
+          Icon(Icons.hourglass_bottom_rounded, size: 18, color: goldColor),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               'Veil closing soon! Extend dialogue (+3 Mins)?',
               style: TextStyle(
-                color: SanctuaryColors.crispIvory,
+                color: primaryTextColor,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -283,10 +357,21 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
           TextButton(
             onPressed: state.isExtending
                 ? null
-                : () => _showExtensionDialog(context, controller, userId),
+                : () => _showExtensionDialog(
+                      context,
+                      controller,
+                      userId,
+                      isDark: isDark,
+                      surfaceColor: surfaceColor,
+                      surfaceMutedColor: surfaceMutedColor,
+                      primaryTextColor: primaryTextColor,
+                      secondaryTextColor: secondaryTextColor,
+                      accentColor: accentColor,
+                      goldColor: goldColor,
+                    ),
             style: TextButton.styleFrom(
-              backgroundColor: SanctuaryColors.glowingTerracotta,
-              foregroundColor: SanctuaryColors.crispIvory,
+              backgroundColor: accentColor,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -298,7 +383,7 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                     height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: SanctuaryColors.crispIvory,
+                      color: Colors.white,
                     ),
                   )
                 : const Text(
@@ -317,28 +402,43 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     bool isExpired,
     bool canChat,
     BlindDateController controller,
-    String userId,
-  ) {
+    String userId, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+    required Color goldColor,
+  }) {
     final mm = (seconds ~/ 60).toString().padLeft(2, '0');
     final ss = (seconds % 60).toString().padLeft(2, '0');
     final isLowTime = seconds <= 60 && !isExpired;
 
+    final badgeColor = isExpired
+        ? SanctuaryColors.alertRed.withAlpha(isDark ? 30 : 25)
+        : isLowTime
+            ? goldColor.withAlpha(isDark ? 40 : 25)
+            : surfaceColor;
+
+    final badgeBorderColor = isExpired
+        ? SanctuaryColors.alertRed
+        : isLowTime
+            ? goldColor
+            : surfaceMutedColor;
+
+    final badgeTextColor = isExpired
+        ? SanctuaryColors.alertRed
+        : isLowTime
+            ? goldColor
+            : primaryTextColor;
+
     final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isExpired
-            ? SanctuaryColors.alertRed.withAlpha(30)
-            : isLowTime
-                ? SanctuaryColors.resonantGold.withAlpha(40)
-                : SanctuaryColors.elevatedSlate,
+        color: badgeColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isExpired
-              ? SanctuaryColors.alertRed
-              : isLowTime
-                  ? SanctuaryColors.resonantGold
-                  : SanctuaryColors.mutedCharcoalBorder,
-        ),
+        border: Border.all(color: badgeBorderColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -346,11 +446,7 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
           Icon(
             isExpired ? Icons.timer_off_outlined : Icons.timer_outlined,
             size: 16,
-            color: isExpired
-                ? SanctuaryColors.alertRed
-                : isLowTime
-                    ? SanctuaryColors.resonantGold
-                    : SanctuaryColors.crispIvory,
+            color: badgeTextColor,
           ),
           const SizedBox(width: 6),
           Text(
@@ -358,22 +454,18 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: isExpired
-                  ? SanctuaryColors.alertRed
-                  : isLowTime
-                      ? SanctuaryColors.resonantGold
-                      : SanctuaryColors.crispIvory,
+              color: badgeTextColor,
               letterSpacing: 0.5,
             ),
           ),
           if (isLowTime && canChat) ...[
             const SizedBox(width: 6),
-            const Text(
+            Text(
               '• +3m',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: SanctuaryColors.resonantGold,
+                color: goldColor,
               ),
             ),
           ],
@@ -383,7 +475,18 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
 
     if (isLowTime && canChat) {
       return InkWell(
-        onTap: () => _showExtensionDialog(context, controller, userId),
+        onTap: () => _showExtensionDialog(
+          context,
+          controller,
+          userId,
+          isDark: isDark,
+          surfaceColor: surfaceColor,
+          surfaceMutedColor: surfaceMutedColor,
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
+          accentColor: accentColor,
+          goldColor: goldColor,
+        ),
         borderRadius: BorderRadius.circular(20),
         child: badge,
       );
@@ -392,24 +495,35 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     return badge;
   }
 
-
   Widget _buildVeiledPartnerCard(
-      BlindDatePartner? partner, bool isRevealed) {
+    BlindDatePartner? partner,
+    bool isRevealed, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+  }) {
     final name = partner?.name ?? 'Soul Seeker';
     final age = partner?.age ?? 24;
     final location = partner?.location ?? 'Sanctuary';
     final hasVoice = partner?.voiceSparkUrl != null &&
         partner!.voiceSparkUrl!.trim().isNotEmpty;
 
+    final fallbackPlaceholderBg = isDark
+        ? DarkSanctuaryTokens.background
+        : const Color(0xFFECE6DC);
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: SanctuaryColors.elevatedSlate,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isRevealed
-              ? SanctuaryColors.glowingTerracotta
-              : SanctuaryColors.mutedCharcoalBorder,
+              ? accentColor
+              : surfaceMutedColor,
           width: isRevealed ? 1.5 : 1.0,
         ),
       ),
@@ -432,21 +546,21 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                           partner!.photos.first,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) =>
-                              Container(color: SanctuaryColors.midnightObsidian),
+                              Container(color: fallbackPlaceholderBg),
                         )
                       else ...[
                         Container(
-                          color: SanctuaryColors.midnightObsidian,
-                          child: const Icon(
+                          color: fallbackPlaceholderBg,
+                          child: Icon(
                             Icons.person,
                             size: 34,
-                            color: SanctuaryColors.softGreySubtext,
+                            color: secondaryTextColor,
                           ),
                         ),
                         BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 35, sigmaY: 35),
                           child: Container(
-                            color: Colors.black.withAlpha(50),
+                            color: Colors.black.withAlpha(isDark ? 50 : 25),
                           ),
                         ),
                       ],
@@ -463,8 +577,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                       children: [
                         Text(
                           '$name, $age',
-                          style: const TextStyle(
-                            color: SanctuaryColors.crispIvory,
+                          style: TextStyle(
+                            color: primaryTextColor,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -482,16 +596,16 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.location_on_outlined,
                           size: 13,
-                          color: SanctuaryColors.softGreySubtext,
+                          color: secondaryTextColor,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           location,
-                          style: const TextStyle(
-                            color: SanctuaryColors.softGreySubtext,
+                          style: TextStyle(
+                            color: secondaryTextColor,
                             fontSize: 12,
                           ),
                         ),
@@ -505,13 +619,13 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: SanctuaryColors.glowingTerracotta.withAlpha(30),
+                    color: accentColor.withAlpha(isDark ? 30 : 20),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Veiled',
                     style: TextStyle(
-                      color: SanctuaryColors.glowingTerracotta,
+                      color: accentColor,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -527,7 +641,7 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
               voiceUrl: partner.voiceSparkUrl!,
               prompt: partner.voiceSparkPrompt,
               duration: partner.voiceSparkDuration,
-              isDark: true,
+              isDark: isDark,
             ),
           ],
         ],
@@ -535,30 +649,34 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     );
   }
 
-  Widget _buildEvaIcebreakerBanner(String prompt) {
+  Widget _buildEvaIcebreakerBanner(
+    String prompt, {
+    required bool isDark,
+    required Color goldColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: SanctuaryColors.midnightObsidian,
+        color: isDark ? DarkSanctuaryTokens.background : const Color(0xFFFAF7EE),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: SanctuaryColors.resonantGold.withAlpha(60),
+          color: goldColor.withAlpha(isDark ? 60 : 90),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.auto_awesome,
             size: 16,
-            color: SanctuaryColors.resonantGold,
+            color: goldColor,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               '"$prompt"',
-              style: const TextStyle(
-                color: SanctuaryColors.resonantGold,
+              style: TextStyle(
+                color: isDark ? goldColor : const Color(0xFF8A6D1B),
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
                 height: 1.35,
@@ -570,7 +688,14 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
     );
   }
 
-  Widget _buildChatBubble(BlindDateMessageModel msg) {
+  Widget _buildChatBubble(
+    BlindDateMessageModel msg, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color accentColor,
+  }) {
     final isMe = msg.isMe;
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -582,8 +707,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
         ),
         decoration: BoxDecoration(
           color: isMe
-              ? SanctuaryColors.glowingTerracotta
-              : SanctuaryColors.elevatedSlate,
+              ? accentColor
+              : surfaceColor,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -592,12 +717,12 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
           ),
           border: isMe
               ? null
-              : Border.all(color: SanctuaryColors.mutedCharcoalBorder),
+              : Border.all(color: surfaceMutedColor),
         ),
         child: Text(
           msg.ciphertext,
           style: TextStyle(
-            color: isMe ? Colors.white : SanctuaryColors.crispIvory,
+            color: isMe ? Colors.white : primaryTextColor,
             fontSize: 14,
             height: 1.3,
           ),
@@ -609,8 +734,15 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
   Widget _buildResonanceGateBar(
     BuildContext context,
     BlindDateState state,
-    BlindDateController controller,
-  ) {
+    BlindDateController controller, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+    required Color goldColor,
+  }) {
     final session = state.session;
     final myDecision = session?.myDecision ?? 'pending';
     final isRevealed = session?.status == 'revealed';
@@ -620,7 +752,7 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
-        color: SanctuaryColors.elevatedSlate,
+        color: surfaceColor,
         child: ElevatedButton.icon(
           onPressed: () {
             final p = session?.partner;
@@ -659,11 +791,11 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
-        color: SanctuaryColors.elevatedSlate,
-        child: const Text(
+        color: surfaceColor,
+        child: Text(
           'Mindful Bow Completed • Session Gracefully Concluded',
           style: TextStyle(
-            color: SanctuaryColors.softGreySubtext,
+            color: secondaryTextColor,
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
@@ -674,19 +806,19 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: SanctuaryColors.elevatedSlate,
+      decoration: BoxDecoration(
+        color: surfaceColor,
         border: Border(
           top: BorderSide(
-              color: SanctuaryColors.mutedCharcoalBorder, width: 1),
+              color: surfaceMutedColor, width: 1),
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (myDecision == 'resonate')
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -695,14 +827,14 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                     height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: SanctuaryColors.resonantGold,
+                      color: goldColor,
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     'You tapped Resonate. Awaiting soul counterpart...',
                     style: TextStyle(
-                      color: SanctuaryColors.resonantGold,
+                      color: goldColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -719,9 +851,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                       ? null
                       : () => controller.pass(),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: SanctuaryColors.softGreySubtext,
-                    side: const BorderSide(
-                        color: SanctuaryColors.mutedCharcoalBorder),
+                    foregroundColor: secondaryTextColor,
+                    side: BorderSide(color: surfaceMutedColor),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -746,8 +877,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: SanctuaryColors.glowingTerracotta,
-                    foregroundColor: SanctuaryColors.crispIvory,
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -766,14 +897,19 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
   void _showMutualResonanceDialog(
     BuildContext context,
     BlindDatePartner? partner,
-    String? matchId,
-  ) {
+    String? matchId, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+  }) {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return Dialog(
-          backgroundColor: SanctuaryColors.midnightObsidian,
+          backgroundColor: surfaceColor,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Padding(
@@ -784,7 +920,7 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: SanctuaryColors.onlineEmerald.withAlpha(30),
+                    color: SanctuaryColors.onlineEmerald.withAlpha(isDark ? 30 : 25),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -794,10 +930,10 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Mutual Resonance!',
                   style: TextStyle(
-                    color: SanctuaryColors.crispIvory,
+                    color: primaryTextColor,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -805,8 +941,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                 const SizedBox(height: 8),
                 Text(
                   'Both of you resonated. The veil has lifted—${partner?.name ?? "your counterpart"} is now an active match.',
-                  style: const TextStyle(
-                    color: SanctuaryColors.softGreySubtext,
+                  style: TextStyle(
+                    color: secondaryTextColor,
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -836,8 +972,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: SanctuaryColors.glowingTerracotta,
-                      foregroundColor: SanctuaryColors.crispIvory,
+                      backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -857,11 +993,18 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
   Future<void> _showExtensionDialog(
     BuildContext context,
     BlindDateController controller,
-    String userId,
-  ) async {
+    String userId, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+    required Color goldColor,
+  }) async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SanctuaryColors.elevatedSlate,
+      backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -883,7 +1026,7 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: SanctuaryColors.mutedCharcoalBorder,
+                    color: surfaceMutedColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -894,33 +1037,33 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: SanctuaryColors.resonantGold.withAlpha(40),
+                      color: goldColor.withAlpha(isDark ? 40 : 25),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.hourglass_bottom_rounded,
-                      color: SanctuaryColors.resonantGold,
+                      color: goldColor,
                       size: 26,
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Extend Soul Dialogue (+3 Mins)',
                           style: TextStyle(
-                            color: SanctuaryColors.crispIvory,
+                            color: primaryTextColor,
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           'Equal Perks • Keep connection blossoming',
                           style: TextStyle(
-                            color: SanctuaryColors.softGreySubtext,
+                            color: secondaryTextColor,
                             fontSize: 12,
                           ),
                         ),
@@ -933,14 +1076,14 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: SanctuaryColors.midnightObsidian,
+                  color: isDark ? DarkSanctuaryTokens.background : const Color(0xFFF7F5F0),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: SanctuaryColors.mutedCharcoalBorder),
+                  border: Border.all(color: surfaceMutedColor),
                 ),
-                child: const Text(
+                child: Text(
                   'Extending adds +180 seconds to this veiled sanctuary so you can continue your soulful exchange without rushing.',
                   style: TextStyle(
-                    color: SanctuaryColors.softGreySubtext,
+                    color: secondaryTextColor,
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -982,8 +1125,8 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: SanctuaryColors.glowingTerracotta,
-                  foregroundColor: SanctuaryColors.crispIvory,
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -1004,14 +1147,14 @@ class _BlindDateSessionScreenState extends ConsumerState<BlindDateSessionScreen>
                     );
                   }
                 },
-                icon: const Icon(Icons.bolt_rounded, size: 20, color: SanctuaryColors.resonantGold),
+                icon: Icon(Icons.bolt_rounded, size: 20, color: goldColor),
                 label: const Text(
                   'Unlock Instant +3 Mins (₹29)',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: SanctuaryColors.crispIvory,
-                  side: const BorderSide(color: SanctuaryColors.mutedCharcoalBorder),
+                  foregroundColor: primaryTextColor,
+                  side: BorderSide(color: surfaceMutedColor),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),

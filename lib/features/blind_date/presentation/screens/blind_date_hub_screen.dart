@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
+import '../../../../core/theme/dark_sanctuary_tokens.dart';
+import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/sanctuary_colors.dart';
+import '../../../../core/theme/theme_controller.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../controllers/blind_date_controller.dart';
 import 'blind_date_session_screen.dart';
@@ -52,6 +55,15 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
     final authState = ref.watch(authControllerProvider);
     final currentUserId = authState.authenticatedUserId ?? '';
 
+    final isDark = ref.watch(themeProvider).activeTheme == SanctuaryTheme.dark;
+    final bgColor = isDark ? DarkSanctuaryTokens.background : LightSanctuaryTokens.background;
+    final surfaceColor = isDark ? DarkSanctuaryTokens.surface : LightSanctuaryTokens.surface;
+    final surfaceMutedColor = isDark ? DarkSanctuaryTokens.surfaceMuted : LightSanctuaryTokens.surfaceMuted;
+    final primaryTextColor = isDark ? DarkSanctuaryTokens.primaryText : LightSanctuaryTokens.primaryText;
+    final secondaryTextColor = isDark ? DarkSanctuaryTokens.secondaryText : LightSanctuaryTokens.secondaryText;
+    final accentColor = isDark ? DarkSanctuaryTokens.accentTerracotta : LightSanctuaryTokens.accentTerracotta;
+    final goldColor = isDark ? DarkSanctuaryTokens.goldAccent : LightSanctuaryTokens.goldAccent;
+
     // Auto-navigate when matched
     ref.listen<BlindDateState>(blindDateControllerProvider, (prev, next) {
       if (next.queueStatus == BlindDateQueueStatus.matched &&
@@ -62,7 +74,17 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
       }
       if (next.needsPassUnlock && !_isModalShowing) {
         _isModalShowing = true;
-        _showEqualPerksDialog(context, currentUserId).whenComplete(() {
+        _showEqualPerksDialog(
+          context,
+          currentUserId,
+          isDark: isDark,
+          surfaceColor: surfaceColor,
+          surfaceMutedColor: surfaceMutedColor,
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
+          accentColor: accentColor,
+          goldColor: goldColor,
+        ).whenComplete(() {
           _isModalShowing = false;
         });
       }
@@ -71,12 +93,12 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
     final isWaiting = state.queueStatus == BlindDateQueueStatus.waiting;
 
     return Scaffold(
-      backgroundColor: SanctuaryColors.midnightObsidian,
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: SanctuaryColors.crispIvory),
+          icon: Icon(Icons.arrow_back_ios_new, color: primaryTextColor),
           onPressed: () {
             if (isWaiting) {
               controller.cancelQueue();
@@ -84,10 +106,10 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
             Navigator.of(context).maybePop();
           },
         ),
-        title: const Text(
+        title: Text(
           'Sanctuary Blind Date',
           style: TextStyle(
-            color: SanctuaryColors.crispIvory,
+            color: primaryTextColor,
             fontSize: 18,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
@@ -106,10 +128,10 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: SanctuaryColors.glowingTerracotta.withAlpha(35),
+                  color: accentColor.withAlpha(isDark ? 35 : 25),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: SanctuaryColors.glowingTerracotta.withAlpha(90),
+                    color: accentColor.withAlpha(isDark ? 90 : 70),
                   ),
                 ),
                 child: Row(
@@ -118,16 +140,16 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
-                        color: SanctuaryColors.glowingTerracotta,
+                      decoration: BoxDecoration(
+                        color: accentColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Pulse: Sunday 8 PM IST • Active 24/7',
                       style: TextStyle(
-                        color: SanctuaryColors.glowingTerracotta,
+                        color: accentColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.3,
@@ -140,7 +162,19 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
               const SizedBox(height: 16),
 
               // Equal Perks: Streak & Pass Status Card
-              _buildPerksStatusCard(context, state, controller, currentUserId),
+              _buildPerksStatusCard(
+                context,
+                state,
+                controller,
+                currentUserId,
+                isDark: isDark,
+                surfaceColor: surfaceColor,
+                surfaceMutedColor: surfaceMutedColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
+                goldColor: goldColor,
+              ),
 
               const SizedBox(height: 28),
 
@@ -159,21 +193,21 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              SanctuaryColors.glowingTerracotta.withAlpha(isWaiting ? 80 : 35),
-                              SanctuaryColors.elevatedSlate.withAlpha(120),
+                              accentColor.withAlpha(isWaiting ? (isDark ? 80 : 60) : (isDark ? 35 : 25)),
+                              surfaceColor.withAlpha(isDark ? 120 : 180),
                               Colors.transparent,
                             ],
                           ),
                           border: Border.all(
                             color: isWaiting
-                                ? SanctuaryColors.glowingTerracotta.withAlpha(180)
-                                : SanctuaryColors.mutedCharcoalBorder,
+                                ? accentColor.withAlpha(180)
+                                : surfaceMutedColor,
                             width: 2,
                           ),
                           boxShadow: isWaiting
                               ? [
                                   BoxShadow(
-                                    color: SanctuaryColors.glowingTerracotta.withAlpha(80),
+                                    color: accentColor.withAlpha(isDark ? 80 : 50),
                                     blurRadius: 30,
                                     spreadRadius: 6,
                                   ),
@@ -185,8 +219,8 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                             isWaiting ? Icons.radar : Icons.masks_outlined,
                             size: 64,
                             color: isWaiting
-                                ? SanctuaryColors.glowingTerracotta
-                                : SanctuaryColors.crispIvory.withAlpha(200),
+                                ? accentColor
+                                : primaryTextColor.withAlpha(isDark ? 200 : 160),
                           ),
                         ),
                       ),
@@ -199,8 +233,8 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
 
               Text(
                 isWaiting ? 'Seeking Resonant Soul...' : 'Awaaz & Soul Connection First',
-                style: const TextStyle(
-                  color: SanctuaryColors.crispIvory,
+                style: TextStyle(
+                  color: primaryTextColor,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.3,
@@ -215,7 +249,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                     ? 'Scanning across all identities with 100% mutual alignment. Please hold this sacred space.'
                     : 'Experience dating stripped of superficial snap judgments. 5 minutes of veiled dialogue, real voices, and soulful resonance.',
                 style: TextStyle(
-                  color: SanctuaryColors.softGreySubtext.withAlpha(220),
+                  color: secondaryTextColor.withAlpha(220),
                   fontSize: 14,
                   height: 1.45,
                 ),
@@ -227,7 +261,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: SanctuaryColors.alertRed.withAlpha(30),
+                    color: SanctuaryColors.alertRed.withAlpha(isDark ? 30 : 20),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: SanctuaryColors.alertRed.withAlpha(90)),
                   ),
@@ -246,24 +280,48 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                 icon: Icons.diversity_1_rounded,
                 title: '3-Gender Equal Harmony',
                 subtitle: 'Fair & accurate for Men, Women & Non-Binary seekers.',
+                surfaceColor: surfaceColor,
+                surfaceMutedColor: surfaceMutedColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
+                isDark: isDark,
               ),
               const SizedBox(height: 12),
               _buildFeaturePill(
                 icon: Icons.shield_rounded,
                 title: 'DPDP Act 2023 Shielded',
                 subtitle: 'Photos heavily veiled (35px). Zero screenshots or raw URL leaks.',
+                surfaceColor: surfaceColor,
+                surfaceMutedColor: surfaceMutedColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
+                isDark: isDark,
               ),
               const SizedBox(height: 12),
               _buildFeaturePill(
                 icon: Icons.graphic_eq_rounded,
                 title: 'Voice Sparks Included',
                 subtitle: 'Hear genuine 7-second voice notes before seeing faces.',
+                surfaceColor: surfaceColor,
+                surfaceMutedColor: surfaceMutedColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
+                isDark: isDark,
               ),
               const SizedBox(height: 12),
               _buildFeaturePill(
                 icon: Icons.lock_clock_rounded,
                 title: 'Mutual Consent Gate',
                 subtitle: 'Photos unblur only if both parties tap "Resonate" at the end.',
+                surfaceColor: surfaceColor,
+                surfaceMutedColor: surfaceMutedColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
+                isDark: isDark,
               ),
 
               const SizedBox(height: 36),
@@ -284,23 +342,23 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isWaiting
-                        ? SanctuaryColors.elevatedSlate
-                        : SanctuaryColors.glowingTerracotta,
-                    foregroundColor: SanctuaryColors.crispIvory,
-                    elevation: 0,
+                        ? (isDark ? DarkSanctuaryTokens.surface : const Color(0xFFE8E3D9))
+                        : accentColor,
+                    foregroundColor: isWaiting ? primaryTextColor : Colors.white,
+                    elevation: isWaiting ? 0 : 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: isWaiting
-                          ? const BorderSide(color: SanctuaryColors.mutedCharcoalBorder)
+                          ? BorderSide(color: surfaceMutedColor)
                           : BorderSide.none,
                     ),
                   ),
                   child: state.isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
-                            color: SanctuaryColors.crispIvory,
+                            color: isWaiting ? primaryTextColor : Colors.white,
                             strokeWidth: 2.5,
                           ),
                         )
@@ -310,11 +368,13 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                             Icon(
                               isWaiting ? Icons.close : Icons.favorite_border_rounded,
                               size: 20,
+                              color: isWaiting ? primaryTextColor : Colors.white,
                             ),
                             const SizedBox(width: 10),
                             Text(
                               isWaiting ? 'Leave Queue' : 'Enter The Mystery',
-                              style: const TextStyle(
+                              style: TextStyle(
+                                color: isWaiting ? primaryTextColor : Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.3,
@@ -337,26 +397,32 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
     required IconData icon,
     required String title,
     required String subtitle,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+    required bool isDark,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: SanctuaryColors.elevatedSlate,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: SanctuaryColors.mutedCharcoalBorder),
+        border: Border.all(color: surfaceMutedColor),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: SanctuaryColors.midnightObsidian,
+              color: isDark ? DarkSanctuaryTokens.background : const Color(0xFFF2EFE9),
               shape: BoxShape.circle,
               border: Border.all(
-                color: SanctuaryColors.glowingTerracotta.withAlpha(60),
+                color: accentColor.withAlpha(isDark ? 60 : 40),
               ),
             ),
-            child: Icon(icon, color: SanctuaryColors.glowingTerracotta, size: 20),
+            child: Icon(icon, color: accentColor, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -365,8 +431,8 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: SanctuaryColors.crispIvory,
+                  style: TextStyle(
+                    color: primaryTextColor,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -375,7 +441,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: SanctuaryColors.softGreySubtext.withAlpha(200),
+                    color: secondaryTextColor.withAlpha(200),
                     fontSize: 12,
                     height: 1.3,
                   ),
@@ -392,8 +458,15 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
     BuildContext context,
     BlindDateState state,
     BlindDateController controller,
-    String userId,
-  ) {
+    String userId, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+    required Color goldColor,
+  }) {
     final eligibility = state.eligibility;
     final isStreakActive = eligibility?.isStreakActive ?? false;
     final streakCount = eligibility?.streakCount ?? 0;
@@ -405,12 +478,12 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: SanctuaryColors.elevatedSlate,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isStreakActive
-              ? SanctuaryColors.resonantGold.withAlpha(80)
-              : SanctuaryColors.mutedCharcoalBorder,
+              ? goldColor.withAlpha(isDark ? 80 : 120)
+              : surfaceMutedColor,
           width: 1.2,
         ),
       ),
@@ -423,13 +496,13 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: isStreakActive
-                      ? SanctuaryColors.resonantGold.withAlpha(30)
-                      : SanctuaryColors.softGreySubtext.withAlpha(25),
+                      ? goldColor.withAlpha(isDark ? 30 : 25)
+                      : secondaryTextColor.withAlpha(25),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isStreakActive
-                        ? SanctuaryColors.resonantGold.withAlpha(120)
-                        : SanctuaryColors.mutedCharcoalBorder,
+                        ? goldColor.withAlpha(120)
+                        : surfaceMutedColor,
                   ),
                 ),
                 child: Row(
@@ -439,8 +512,8 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                       Icons.local_fire_department_rounded,
                       size: 16,
                       color: isStreakActive
-                          ? SanctuaryColors.resonantGold
-                          : SanctuaryColors.softGreySubtext,
+                          ? goldColor
+                          : secondaryTextColor,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -449,8 +522,8 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isStreakActive
-                            ? SanctuaryColors.resonantGold
-                            : SanctuaryColors.softGreySubtext,
+                            ? goldColor
+                            : secondaryTextColor,
                       ),
                     ),
                   ],
@@ -461,7 +534,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: totalPasses > 0
-                      ? SanctuaryColors.onlineEmerald.withAlpha(30)
+                      ? SanctuaryColors.onlineEmerald.withAlpha(isDark ? 30 : 25)
                       : SanctuaryColors.alertRed.withAlpha(25),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
@@ -504,14 +577,14 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                     : '⚡ Today\'s free pass used. Stored bonus passes: $bonusPasses')
                 : '🔒 Daily 1 Free Pass is locked. Maintain streak or watch 1 ad to ignite!',
             style: TextStyle(
-              color: SanctuaryColors.crispIvory.withAlpha(230),
+              color: primaryTextColor.withAlpha(isDark ? 230 : 220),
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 12),
-          const Divider(
-            color: SanctuaryColors.mutedCharcoalBorder,
+          Divider(
+            color: surfaceMutedColor,
             height: 1,
             thickness: 0.8,
           ),
@@ -519,20 +592,20 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
           // Fast-Track Radar Toggle
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.bolt_rounded,
                 size: 20,
-                color: SanctuaryColors.resonantGold,
+                color: goldColor,
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Fast-Track Radar (Equal VIP)',
                       style: TextStyle(
-                        color: SanctuaryColors.crispIvory,
+                        color: primaryTextColor,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -540,7 +613,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                     Text(
                       'Jump to top of matchmaking queue (Free for All)',
                       style: TextStyle(
-                        color: SanctuaryColors.softGreySubtext,
+                        color: secondaryTextColor,
                         fontSize: 11,
                       ),
                     ),
@@ -550,7 +623,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
               Switch(
                 value: state.isFastTrack,
                 onChanged: (val) => controller.toggleFastTrack(val),
-                activeColor: SanctuaryColors.glowingTerracotta,
+                activeColor: accentColor,
               ),
             ],
           ),
@@ -560,15 +633,25 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
               width: double.infinity,
               height: 38,
               child: OutlinedButton.icon(
-                onPressed: () => _showEqualPerksDialog(context, userId),
-                icon: const Icon(Icons.stars_rounded, size: 16, color: SanctuaryColors.resonantGold),
+                onPressed: () => _showEqualPerksDialog(
+                  context,
+                  userId,
+                  isDark: isDark,
+                  surfaceColor: surfaceColor,
+                  surfaceMutedColor: surfaceMutedColor,
+                  primaryTextColor: primaryTextColor,
+                  secondaryTextColor: secondaryTextColor,
+                  accentColor: accentColor,
+                  goldColor: goldColor,
+                ),
+                icon: Icon(Icons.stars_rounded, size: 16, color: goldColor),
                 label: const Text(
                   'Unlock Passes / Ignite Streak',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: SanctuaryColors.crispIvory,
-                  side: const BorderSide(color: SanctuaryColors.glowingTerracotta),
+                  foregroundColor: primaryTextColor,
+                  side: BorderSide(color: accentColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -581,7 +664,17 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
     );
   }
 
-  Future<void> _showEqualPerksDialog(BuildContext context, String userId) async {
+  Future<void> _showEqualPerksDialog(
+    BuildContext context,
+    String userId, {
+    required bool isDark,
+    required Color surfaceColor,
+    required Color surfaceMutedColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required Color accentColor,
+    required Color goldColor,
+  }) async {
     final controller = ref.read(blindDateControllerProvider.notifier);
     final state = ref.read(blindDateControllerProvider);
     final eligibility = state.eligibility;
@@ -589,7 +682,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
 
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SanctuaryColors.elevatedSlate,
+      backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -611,7 +704,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: SanctuaryColors.mutedCharcoalBorder,
+                    color: surfaceMutedColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -622,33 +715,33 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: SanctuaryColors.glowingTerracotta.withAlpha(40),
+                      color: accentColor.withAlpha(isDark ? 40 : 25),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.stars_rounded,
-                      color: SanctuaryColors.glowingTerracotta,
+                      color: accentColor,
                       size: 28,
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Equal Perks System',
                           style: TextStyle(
-                            color: SanctuaryColors.crispIvory,
+                            color: primaryTextColor,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           'Zero Class Discrimination • 1:1 Value Parity',
                           style: TextStyle(
-                            color: SanctuaryColors.softGreySubtext,
+                            color: secondaryTextColor,
                             fontSize: 12,
                           ),
                         ),
@@ -661,9 +754,9 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: SanctuaryColors.midnightObsidian,
+                  color: isDark ? DarkSanctuaryTokens.background : const Color(0xFFF7F5F0),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: SanctuaryColors.mutedCharcoalBorder),
+                  border: Border.all(color: surfaceMutedColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -676,16 +769,16 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                               : Icons.warning_amber_rounded,
                           size: 18,
                           color: isStreakActive
-                              ? SanctuaryColors.resonantGold
-                              : SanctuaryColors.glowingTerracotta,
+                              ? goldColor
+                              : accentColor,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           isStreakActive
                               ? 'Daily 1 Free Pass Claimed'
                               : 'Daily 1 Free Pass Locked (Streak Inactive)',
-                          style: const TextStyle(
-                            color: SanctuaryColors.crispIvory,
+                          style: TextStyle(
+                            color: primaryTextColor,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -698,7 +791,7 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                           ? 'You have used today\'s free streak pass. Unlock another pass below!'
                           : 'Daily 1 free pass is granted to seekers maintaining their streak. Watching an ad will restore your streak AND grant a pass!',
                       style: TextStyle(
-                        color: SanctuaryColors.softGreySubtext.withAlpha(200),
+                        color: secondaryTextColor.withAlpha(200),
                         fontSize: 12,
                         height: 1.35,
                       ),
@@ -738,8 +831,8 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: SanctuaryColors.glowingTerracotta,
-                  foregroundColor: SanctuaryColors.crispIvory,
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -770,23 +863,22 @@ class _BlindDateHubScreenState extends ConsumerState<BlindDateHubScreen>
                       content: Text('⚡ Instant ₹29 Pass credited to your Sanctuary account!'),
                     ),
                   );
-                  // Grant pass directly for instant IAP simulation/integration
                   controller.claimAdPass();
                 },
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: SanctuaryColors.crispIvory,
-                  side: const BorderSide(color: SanctuaryColors.mutedCharcoalBorder),
+                  foregroundColor: primaryTextColor,
+                  side: BorderSide(color: surfaceMutedColor),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.bolt_rounded, size: 20, color: SanctuaryColors.resonantGold),
-                    SizedBox(width: 8),
-                    Text(
+                    Icon(Icons.bolt_rounded, size: 20, color: goldColor),
+                    const SizedBox(width: 8),
+                    const Text(
                       'Unlock Instant Pass (₹29)',
                       style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                     ),
