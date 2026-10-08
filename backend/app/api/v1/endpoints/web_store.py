@@ -232,22 +232,23 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         res = await db.execute(select(User).where(User.email == user_query.lower()))
         user = res.scalar_one_or_none()
 
-    # Create official Razorpay order if currency is INR
-    if payload.currency == "INR":
-        user_id_for_notes = str(user.id) if user else user_query
-        notes = {
-            "order_id": order_id,
-            "product_id": payload.product_id,
-            "user_id": user_id_for_notes,
-            "user_query": user_query
-        }
-        razorpay_order = await RazorpayService.create_order(
-            amount_inr=float(amount),
-            receipt=order_id,
-            notes=notes
-        )
-        order_data["razorpay_order_id"] = razorpay_order.get("id")
-        STORE_ORDER_RAZORPAY_MAP[order_id] = razorpay_order.get("id")
+    # Create official Razorpay order for both INR and USD / global currencies
+    user_id_for_notes = str(user.id) if user else user_query
+    notes = {
+        "order_id": order_id,
+        "product_id": payload.product_id,
+        "user_id": user_id_for_notes,
+        "user_query": user_query,
+        "currency": payload.currency
+    }
+    razorpay_order = await RazorpayService.create_order(
+        amount=float(amount),
+        currency=payload.currency,
+        receipt=order_id,
+        notes=notes
+    )
+    order_data["razorpay_order_id"] = razorpay_order.get("id")
+    STORE_ORDER_RAZORPAY_MAP[order_id] = razorpay_order.get("id")
 
     WEB_STORE_ORDERS[order_id] = order_data
 
@@ -257,7 +258,7 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
     if user or not is_demo_seeker:
         try:
             target_user_id = user.id if user else (parsed_uuid or uuid.uuid4())
-            resolved_store = "web_razorpay_india" if payload.currency == "INR" else "web_stripe_global"
+            resolved_store = "web_razorpay_india" if payload.currency == "INR" else "web_razorpay_international"
             ledger = InAppPurchase(
                 user_id=target_user_id,
                 transaction_reference=order_id,
@@ -277,6 +278,7 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
             raise HTTPException(status_code=500, detail="Failed to persist order to database.")
 
     client_cfg = RazorpayService.get_client_config()
+    amount_subunits = int(round(float(amount) * 100))
     return {
         "status": "order_created",
         "order": order_data,
@@ -284,7 +286,9 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         "razorpay_key_id": client_cfg["key_id"],
         "razorpay_merchant_name": client_cfg["merchant_name"],
         "razorpay_theme_color": client_cfg["theme_color"],
-        "amount_paise": int(round(float(amount) * 100)) if payload.currency == "INR" else None
+        "currency": payload.currency,
+        "amount_subunits": amount_subunits,
+        "amount_paise": amount_subunits if payload.currency == "INR" else None
     }
 
 
@@ -1347,11 +1351,24 @@ async def serve_web_sanctuary_store(request: Request):
         <div class="step-headline">Step 1: Choose Your Sovereign Pass</div>
         <div class="step-subtext">All passes unlocked via web include 10% extra reflections and permanent priority sync.</div>
 
+        <!-- Currency Selector Toggle -->
+        <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:24px;">
+          <span style="font-size:13px; color:var(--text-muted); font-weight:500;">Select Currency:</span>
+          <div style="display:inline-flex; background:rgba(22,33,29,0.9); border:1px solid rgba(43,61,53,0.85); border-radius:30px; padding:3px;">
+            <button type="button" id="currBtnInr" onclick="setCurrency('INR')" style="padding:6px 16px; border-radius:24px; border:none; font-size:12px; font-weight:600; cursor:pointer; background:var(--gold); color:#0B1410; transition:all 0.2s;">
+              🇮🇳 INR (₹)
+            </button>
+            <button type="button" id="currBtnUsd" onclick="setCurrency('USD')" style="padding:6px 16px; border-radius:24px; border:none; font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:var(--text-muted); transition:all 0.2s;">
+              🌐 USD ($)
+            </button>
+          </div>
+        </div>
+
         <div class="products-grid">
-          <div class="product-card selected" onclick="selectProduct('urheart_pass_monthly', 149, '1-Month Sovereign Pass')">
+          <div class="product-card selected" id="card_urheart_pass_monthly" onclick="selectProduct('urheart_pass_monthly')">
             <span class="product-card-badge">Most Mindful</span>
             <div class="product-name">1-Month Sovereign Pass</div>
-            <div class="product-price">₹149 <span style="font-size:12px; color:var(--text-muted);">/ $14.99</span></div>
+            <div class="product-price" id="price_urheart_pass_monthly">₹149</div>
             <div class="product-bonus">✨ +10% Web Bonus Perks</div>
             <ul class="product-features">
               <li>550 Sovereign Swipes (+10% Web Bonus)</li>
@@ -1361,10 +1378,10 @@ async def serve_web_sanctuary_store(request: Request):
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_pass_weekly', 49, '1-Week Sovereign Sprint')">
+          <div class="product-card" id="card_urheart_pass_weekly" onclick="selectProduct('urheart_pass_weekly')">
             <span class="product-card-badge">Popular</span>
             <div class="product-name">1-Week Sovereign Sprint</div>
-            <div class="product-price">₹49 <span style="font-size:12px; color:var(--text-muted);">/ $4.99</span></div>
+            <div class="product-price" id="price_urheart_pass_weekly">₹49</div>
             <div class="product-bonus">✨ +10% Web Bonus Perks</div>
             <ul class="product-features">
               <li>110 Sovereign Swipes (+10% Web Bonus)</li>
@@ -1374,10 +1391,10 @@ async def serve_web_sanctuary_store(request: Request):
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_pass_lifetime', 1499, '1-Year Sovereign Pass')">
+          <div class="product-card" id="card_urheart_pass_lifetime" onclick="selectProduct('urheart_pass_lifetime')">
             <span class="product-card-badge">365 Days Access</span>
             <div class="product-name">1-Year Sovereign Pass</div>
-            <div class="product-price">₹1,499 <span style="font-size:12px; color:var(--text-muted);">/ $59.99</span></div>
+            <div class="product-price" id="price_urheart_pass_lifetime">₹1,499</div>
             <div class="product-bonus">✨ 365-Day Sovereign Crest</div>
             <ul class="product-features">
               <li>365 Days Sovereign Crest</li>
@@ -1389,10 +1406,10 @@ async def serve_web_sanctuary_store(request: Request):
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_key_instant_contact', 29, 'Instant Contact Key')">
+          <div class="product-card" id="card_urheart_key_instant_contact" onclick="selectProduct('urheart_key_instant_contact')">
             <span class="product-card-badge">Key</span>
             <div class="product-name">Instant Contact Key</div>
-            <div class="product-price">₹29 <span style="font-size:12px; color:var(--text-muted);">/ $1.49</span></div>
+            <div class="product-price" id="price_urheart_key_instant_contact">₹29</div>
             <div class="product-bonus">✨ Fast-Track Reveal Token</div>
             <ul class="product-features">
               <li>1 Contact Reveal Token</li>
@@ -1401,10 +1418,10 @@ async def serve_web_sanctuary_store(request: Request):
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_pack_direct_letters', 49, '3 Direct Letters Pack')">
+          <div class="product-card" id="card_urheart_pack_direct_letters" onclick="selectProduct('urheart_pack_direct_letters')">
             <span class="product-card-badge">Micro</span>
             <div class="product-name">3 Direct Letters Pack</div>
-            <div class="product-price">₹49 <span style="font-size:12px; color:var(--text-muted);">/ $1.99</span></div>
+            <div class="product-price" id="price_urheart_pack_direct_letters">₹49</div>
             <div class="product-bonus">✨ +10% Web Bonus Perks</div>
             <ul class="product-features">
               <li>4 Guaranteed Direct Notes (+10% Web Bonus)</li>
@@ -1413,10 +1430,10 @@ async def serve_web_sanctuary_store(request: Request):
             </ul>
           </div>
 
-          <div class="product-card" onclick="selectProduct('urheart_pack_global_passport', 99, '24h Global Passport')">
+          <div class="product-card" id="card_urheart_pack_global_passport" onclick="selectProduct('urheart_pack_global_passport')">
             <span class="product-card-badge">Passport</span>
             <div class="product-name">24h Global Passport</div>
-            <div class="product-price">₹99 <span style="font-size:12px; color:var(--text-muted);">/ $1.99</span></div>
+            <div class="product-price" id="price_urheart_pack_global_passport">₹79</div>
             <div class="product-bonus">✨ 24h Global Teleportation</div>
             <ul class="product-features">
               <li>Teleport to Any Global City</li>
@@ -1472,15 +1489,15 @@ async def serve_web_sanctuary_store(request: Request):
         <div class="step-subtext">Encrypted sovereign transaction via Unified Payments Interface (UPI) or Global Cards.</div>
 
         <div class="payment-options">
-          <div class="payment-option-card selected" onclick="selectPaymentMethod('upi')">
+          <div class="payment-option-card selected" id="upiOptionCard" onclick="selectPaymentMethod('upi')">
             <div class="payment-option-title">UPI / QR Code</div>
             <div class="payment-option-sub">GPay, PhonePe, Paytm</div>
           </div>
-          <div class="payment-option-card" onclick="selectPaymentMethod('cards')">
+          <div class="payment-option-card" id="cardsOptionCard" onclick="selectPaymentMethod('cards')">
             <div class="payment-option-title">Debit / Credit Cards</div>
-            <div class="payment-option-sub">RuPay, Visa, Mastercard</div>
+            <div class="payment-option-sub">RuPay, Visa, Mastercard, Amex</div>
           </div>
-          <div class="payment-option-card" onclick="selectPaymentMethod('netbanking')">
+          <div class="payment-option-card" id="netbankingOptionCard" onclick="selectPaymentMethod('netbanking')">
             <div class="payment-option-title">NetBanking</div>
             <div class="payment-option-sub">All Indian Banks</div>
           </div>
@@ -1628,26 +1645,96 @@ async def serve_web_sanctuary_store(request: Request):
       window.scrollTo({{ top: 0, behavior: "smooth" }});
     }}
 
+    let selectedProductId = "urheart_pass_monthly";
+    let selectedPrice = 149;
+    let selectedProductName = "1-Month Sovereign Pass";
+    let selectedCurrency = "INR";
+    let selectedMethod = "upi";
+    let verifiedAccount = "";
+    let currentOrderId = "ORD-UR-INITIAL";
+
+    const productCatalog = {
+      "urheart_pass_monthly": { inr: 149, usd: 14.99, name: "1-Month Sovereign Pass" },
+      "urheart_pass_weekly": { inr: 49, usd: 4.99, name: "1-Week Sovereign Sprint" },
+      "urheart_pass_lifetime": { inr: 1499, usd: 59.99, name: "1-Year Sovereign Pass" },
+      "urheart_key_instant_contact": { inr: 29, usd: 1.49, name: "Instant Contact Key" },
+      "urheart_pack_direct_letters": { inr: 49, usd: 2.99, name: "3 Direct Letters Pack" },
+      "urheart_pack_global_passport": { inr: 79, usd: 3.99, name: "24h Global Passport" }
+    };
+
+    function updatePriceDisplays() {{
+      const isUsd = selectedCurrency === "USD";
+      const symbol = isUsd ? "$" : "₹";
+      for (const [id, prod] of Object.entries(productCatalog)) {{
+        const val = isUsd ? prod.usd : prod.inr;
+        const elem = document.getElementById("price_" + id);
+        if (elem) {{
+          elem.innerText = symbol + (val >= 1000 && !isUsd ? val.toLocaleString("en-IN") : val);
+        }}
+      }}
+      const curProd = productCatalog[selectedProductId] || productCatalog["urheart_pass_monthly"];
+      selectedPrice = isUsd ? curProd.usd : curProd.inr;
+      const formattedPrice = symbol + (selectedPrice >= 1000 && !isUsd ? selectedPrice.toLocaleString("en-IN") : selectedPrice);
+      document.getElementById("sumStandardPrice").innerText = formattedPrice;
+      document.getElementById("sumTotalAmount").innerText = formattedPrice;
+    }}
+
+    function setCurrency(curr) {{
+      selectedCurrency = curr;
+      const btnInr = document.getElementById("currBtnInr");
+      const btnUsd = document.getElementById("currBtnUsd");
+      const upiCard = document.getElementById("upiOptionCard");
+      const nbCard = document.getElementById("netbankingOptionCard");
+      const upiView = document.getElementById("upiPaymentView");
+
+      if (curr === "INR") {{
+        btnInr.style.background = "var(--gold)";
+        btnInr.style.color = "#0B1410";
+        btnUsd.style.background = "transparent";
+        btnUsd.style.color = "var(--text-muted)";
+        if (upiCard) upiCard.style.display = "block";
+        if (nbCard) nbCard.style.display = "block";
+        if (upiView) upiView.style.display = "block";
+        selectPaymentMethod("upi");
+      }} else {{
+        btnUsd.style.background = "var(--gold)";
+        btnUsd.style.color = "#0B1410";
+        btnInr.style.background = "transparent";
+        btnInr.style.color = "var(--text-muted)";
+        if (upiCard) upiCard.style.display = "none";
+        if (nbCard) nbCard.style.display = "none";
+        if (upiView) upiView.style.display = "none";
+        selectPaymentMethod("cards");
+      }}
+      updatePriceDisplays();
+    }}
+
     function goToStep(step) {{
       updateStepIndicator(step);
     }}
 
-    function selectProduct(id, price, name) {{
+    function selectProduct(id) {{
       selectedProductId = id;
-      selectedPrice = price;
-      selectedProductName = name;
+      const prod = productCatalog[id] || productCatalog["urheart_pass_monthly"];
+      selectedProductName = prod.name;
+      selectedPrice = selectedCurrency === "USD" ? prod.usd : prod.inr;
 
       document.querySelectorAll(".product-card").forEach(c => c.classList.remove("selected"));
-      event.currentTarget.classList.add("selected");
+      const activeCard = document.getElementById("card_" + id);
+      if (activeCard) activeCard.classList.add("selected");
 
       // Update Summary
-      document.getElementById("sumItemName").innerText = name;
-      document.getElementById("sumStandardPrice").innerText = "₹" + price;
-      document.getElementById("sumTotalAmount").innerText = "₹" + price;
+      const symbol = selectedCurrency === "USD" ? "$" : "₹";
+      const formatted = symbol + (selectedPrice >= 1000 && selectedCurrency === "INR" ? selectedPrice.toLocaleString("en-IN") : selectedPrice);
+      document.getElementById("sumItemName").innerText = prod.name;
+      document.getElementById("sumStandardPrice").innerText = formatted;
+      document.getElementById("sumTotalAmount").innerText = formatted;
 
       // Update QR Code
-      const qrData = encodeURIComponent(`upi://pay?pa=asiverticals@icici&pn=UR-Heart%20Sanctuary&am=${{price}}&cu=INR`);
-      document.getElementById("upiQrCodeImg").src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${{qrData}}`;
+      if (selectedCurrency === "INR") {{
+        const qrData = encodeURIComponent(`upi://pay?pa=asiverticals@icici&pn=UR-Heart%20Sanctuary&am=${{selectedPrice}}&cu=INR`);
+        document.getElementById("upiQrCodeImg").src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${{qrData}}`;
+      }}
     }}
 
     async function verifyAccountLive() {{
@@ -1710,7 +1797,7 @@ async def serve_web_sanctuary_store(request: Request):
             product_id: selectedProductId,
             user_query: verifiedAccount,
             payment_method: selectedMethod,
-            currency: "INR"
+            currency: selectedCurrency
           }})
         }});
         const data = await res.json();
@@ -1728,7 +1815,8 @@ async def serve_web_sanctuary_store(request: Request):
     function selectPaymentMethod(method) {{
       selectedMethod = method;
       document.querySelectorAll(".payment-option-card").forEach(c => c.classList.remove("selected"));
-      event.currentTarget.classList.add("selected");
+      const card = document.getElementById(method === "upi" ? "upiOptionCard" : (method === "cards" ? "cardsOptionCard" : "netbankingOptionCard"));
+      if (card) card.classList.add("selected");
     }}
 
     async function processPaymentLive() {{
@@ -1740,7 +1828,8 @@ async def serve_web_sanctuary_store(request: Request):
       if (window.Razorpay && razorpayOrderData && razorpayOrderData.razorpay_order_id) {{
         const rzpKey = razorpayOrderData.razorpay_key_id;
         const rzpOrderId = razorpayOrderData.razorpay_order_id;
-        const rzpAmount = razorpayOrderData.amount_paise || (selectedPrice * 100);
+        const rzpCurrency = razorpayOrderData.currency || selectedCurrency;
+        const rzpAmount = razorpayOrderData.amount_subunits || razorpayOrderData.amount_paise || Math.round(selectedPrice * 100);
 
         // Dev/Mock simulation fallback if keys unconfigured
         if (rzpOrderId.startsWith("order_sim_") || rzpKey.startsWith("rzp_test_simulated")) {{
@@ -1781,11 +1870,11 @@ async def serve_web_sanctuary_store(request: Request):
             return;
           }}
         }} else {{
-          // Official Razorpay Checkout Modal
+          // Official Razorpay Checkout Modal (Multi-Currency: INR / USD)
           const options = {{
             key: rzpKey,
             amount: rzpAmount,
-            currency: "INR",
+            currency: rzpCurrency,
             name: razorpayOrderData.razorpay_merchant_name || "UR-Heart Sanctuary",
             description: selectedProductName,
             order_id: rzpOrderId,

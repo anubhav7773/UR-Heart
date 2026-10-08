@@ -479,3 +479,142 @@ def test_production_fail_fast_missing_secrets():
     )
     assert dormant_settings.ENVIRONMENT == "production"
 
+
+# ==============================================================================
+# 5. MULTI-CURRENCY TESTS: USD & International Corridor Validation
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_razorpay_service_usd_order_creation():
+    """Razorpay service converts USD amount to cents and sets currency code properly."""
+    # 1. Fallback mock mode
+    order_sim = await RazorpayService.create_order(
+        amount=14.99,
+        currency="USD",
+        receipt="RCPT-USD-001",
+        notes={"product_id": "urheart_pass_monthly"}
+    )
+    assert order_sim["amount"] == 1499
+    assert order_sim["currency"] == "USD"
+    assert order_sim["is_simulated"] is True
+
+    # 2. Authenticated REST mock mode
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "id": "order_USD_LIVE_123",
+        "amount": 1499,
+        "currency": "USD",
+        "status": "created"
+    }
+    with patch.object(settings, "RAZORPAY_KEY_ID", "rzp_live_usd_test"), \
+         patch.object(settings, "RAZORPAY_KEY_SECRET", "rzp_sec_usd_test"), \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp) as mock_post:
+        order_live = await RazorpayService.create_order(
+            amount=14.99,
+            currency="USD",
+            receipt="RCPT-USD-LIVE"
+        )
+        assert order_live["id"] == "order_USD_LIVE_123"
+        assert order_live["amount"] == 1499
+        assert order_live["currency"] == "USD"
+        call_kwargs = mock_post.call_args.kwargs
+        assert call_kwargs["json"]["currency"] == "USD"
+        assert call_kwargs["json"]["amount"] == 1499
+
+
+def test_store_create_order_usd_currency():
+    """Store create-order returns proper USD subunits and configures international store."""
+    seeker = create_mock_seeker()
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = MagicMock(scalar_one_or_none=lambda: seeker)
+
+    app.dependency_overrides[get_current_user] = lambda: seeker
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    mock_rzp_order = {
+        "id": "order_RZP_USD_456",
+        "entity": "order",
+        "amount": 1499,
+        "currency": "USD",
+        "status": "created",
+        "receipt": "RCPT-001",
+        "notes": {}
+    }
+
+    try:
+        with patch.object(settings, "RAZORPAY_KEY_ID", "rzp_test_mock123"), \
+             patch.object(settings, "RAZORPAY_KEY_SECRET", "rzp_sec_mock456"), \
+             patch("app.services.razorpay_service.RazorpayService.create_order", new_callable=AsyncMock, return_value=mock_rzp_order):
+            response = client.post(
+                "/api/v1/store/create-order",
+                json={
+                    "product_id": "urheart_pass_monthly",
+                    "user_query": seeker.email,
+                    "payment_method": "cards",
+                    "currency": "USD"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "order_created"
+            assert data["currency"] == "USD"
+            assert data["amount_subunits"] == 1499
+            assert data["razorpay_order_id"] == "order_RZP_USD_456"
+            assert data["order"]["currency"] == "USD"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_razorpay_webhook_usd_payment_captured_grant_entitlement():
+    """Razorpay webhook properly audits USD transactions with 3% fee and unlocks passes."""
+    seeker = create_mock_seeker()
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = MagicMock(scalar_one_or_none=lambda: None)
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    usd_webhook_payload = {
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_USD_CAPTURED_999",
+                    "amount": 1499,
+                    "currency": "USD",
+                    "status": "captured",
+                    "notes": {
+                        "order_id": "ORD-UR-USD999",
+                        "user_id": str(seeker.id),
+                        "product_id": "urheart_pass_monthly"
+                    }
+                }
+            }
+        }
+    }
+    raw_body = json.dumps(usd_webhook_payload).encode("utf-8")
+    valid_sig = hmac.new(
+        settings.RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
+        raw_body,
+        hashlib.sha256
+    ).hexdigest()
+
+    try:
+        response = client.post(
+            "/api/v1/billing/webhook/razorpay",
+            content=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Razorpay-Signature": valid_sig
+            }
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "success"}
+        assert mock_db.add.called
+        assert mock_db.commit.called
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+

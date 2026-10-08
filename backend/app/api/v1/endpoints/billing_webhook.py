@@ -180,17 +180,22 @@ async def process_razorpay_webhook(
         if existing_purchase and existing_purchase.status == "completed":
             return {"status": "already_processed", "payment_id": payment_id}
 
-        amount_inr = float(payment_entity.get("amount", 0)) / 100.0
-        fee = round(amount_inr * 0.02, 2)  # Razorpay 2% fee
-        net = round(amount_inr - fee, 2)
+        currency = (payment_entity.get("currency") or "INR").upper()
+        amount_val = float(payment_entity.get("amount", 0)) / 100.0
+        fee_rate = 0.03 if currency != "INR" else 0.02
+        fee = round(amount_val * fee_rate, 2)
+        net = round(amount_val - fee, 2)
 
         canonical_key = store_order_id or payment_id
+        store_type = "web_razorpay_india" if currency == "INR" else "web_razorpay_international"
 
-        # Record Ledger (98% Net in hand) using unified canonical key
+        # Record Ledger using unified canonical key
         if existing_purchase:
             existing_purchase.status = "completed"
             existing_purchase.transaction_reference = canonical_key
-            existing_purchase.amount_gross = amount_inr
+            existing_purchase.currency = currency
+            existing_purchase.store = store_type
+            existing_purchase.amount_gross = amount_val
             existing_purchase.platform_fee = fee
             existing_purchase.amount_net = net
         else:
@@ -198,9 +203,9 @@ async def process_razorpay_webhook(
                 user_id=user_uuid,
                 transaction_reference=canonical_key,
                 product_identifier=product_id,
-                store="web_razorpay_india",
-                currency="INR",
-                amount_gross=amount_inr,
+                store=store_type,
+                currency=currency,
+                amount_gross=amount_val,
                 platform_fee=fee,
                 amount_net=net,
                 status="completed"

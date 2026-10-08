@@ -39,16 +39,21 @@ class RazorpayService:
     @classmethod
     async def create_order(
         cls,
-        amount_inr: float,
-        receipt: str,
-        notes: Optional[Dict[str, Any]] = None
+        amount: float = 0.0,
+        currency: str = "INR",
+        receipt: str = "",
+        notes: Optional[Dict[str, Any]] = None,
+        amount_inr: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Creates an official Razorpay order in INR (amount converted to paise).
+        Creates an official Razorpay order in INR, USD, or any supported ISO currency.
+        Amounts are converted to integer subunits (paise for INR, cents for USD).
         Calls Razorpay REST API asynchronously with basic auth (key_id, key_secret).
         Falls back to resilient simulated order in development/mock environments.
         """
-        amount_paise = int(round(amount_inr * 100))
+        resolved_amount = amount_inr if amount_inr is not None else amount
+        currency_code = (currency or "INR").upper()
+        amount_subunits = int(round(resolved_amount * 100))
         sanitized_notes = {str(k): str(v) for k, v in (notes or {}).items()}
         env = (settings.ENVIRONMENT or "").lower()
 
@@ -58,10 +63,10 @@ class RazorpayService:
             return {
                 "id": sim_order_id,
                 "entity": "order",
-                "amount": amount_paise,
+                "amount": amount_subunits,
                 "amount_paid": 0,
-                "amount_due": amount_paise,
-                "currency": "INR",
+                "amount_due": amount_subunits,
+                "currency": currency_code,
                 "receipt": receipt[:40],
                 "status": "created",
                 "attempts": 0,
@@ -72,8 +77,8 @@ class RazorpayService:
 
         auth = (settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
         payload = {
-            "amount": amount_paise,
-            "currency": "INR",
+            "amount": amount_subunits,
+            "currency": currency_code,
             "receipt": receipt[:40],
             "notes": sanitized_notes
         }
