@@ -268,14 +268,17 @@ class GroqAiService:
             db_session=db_session
         )
 
-        # Hook admin escalation queue if manual review is required
-        if (eval_result.status == "pending_manual_review" or not eval_result.is_live_human) and db_session is not None:
+        # Hook admin escalation queue strictly when manual review is required (rate limits, outages, ambiguous scores)
+        if eval_result.status == "pending_manual_review" and db_session is not None:
             try:
                 await cls._escalate_to_admin_desk(
                     user_id=user_id,
                     score=eval_result.face_match_score,
                     reason=eval_result.rejection_reason or "Automated biometric review pending",
-                    db=db_session
+                    db=db_session,
+                    selfie_b64=frames_b64[0] if (frames_b64 and len(frames_b64) > 0) else None,
+                    anchor_b64=anchor_b64,
+                    profile_photos_b64=profile_photos_b64
                 )
             except Exception as e:
                 logger.warning("Failed to escalate KYC to admin desk: %s", e)
@@ -299,11 +302,63 @@ class GroqAiService:
         user_id: UUID,
         score: int,
         reason: str,
-        db: Any
+        db: Any,
+        selfie_b64: Optional[str] = None,
+        anchor_b64: Optional[str] = None,
+        profile_photos_b64: Optional[List[str]] = None,
     ) -> None:
-        """Inserts an escalation row into the admin queue table."""
+        """Inserts or updates an escalation row into the admin queue table with real selfie and profile photos."""
         from app.models.domain.admin_escalations import AdminKycEscalation
+        from app.models.domain.user import User
         from sqlalchemy import select
+        from pathlib import Path
+
+        # 1. Ephemeral Disk & Storage Persistence for the Live Selfie
+        if selfie_b64 and len(selfie_b64.strip()) > 30:
+            try:
+                clean_selfie = selfie_b64.split(",")[-1] if "," in selfie_b64 else selfie_b64
+                selfie_bytes = base64.b64decode(clean_selfie)
+                ephemeral_dir = Path("uploads/kyc_ephemeral") / str(user_id)
+                ephemeral_dir.mkdir(parents=True, exist_ok=True)
+                selfie_file = ephemeral_dir / "kyc_selfie.webp"
+                selfie_file.write_bytes(selfie_bytes)
+
+                # Sync to Supabase storage if available
+                if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+                    try:
+                        import httpx
+                        upload_url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.SUPABASE_STORAGE_BUCKET}/kyc_ephemeral/{user_id}/kyc_selfie.webp"
+                        headers = {
+                            "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+                            "Content-Type": "image/webp",
+                            "x-upsert": "true",
+                        }
+                        async with httpx.AsyncClient(timeout=8.0) as client:
+                            await client.post(upload_url, headers=headers, content=selfie_bytes)
+                    except Exception as s_err:
+                        logger.warning("Supabase storage sync for KYC selfie: %s", s_err)
+            except Exception as save_err:
+                logger.warning("Failed to save ephemeral KYC selfie to disk: %s", save_err)
+
+        # 2. Fetch User demographics & profile photos
+        user = None
+        try:
+            user_res = await db.execute(select(User).where(User.id == user_id))
+            user = user_res.scalar_one_or_none()
+        except Exception:
+            pass
+
+        declared_dob = datetime.now(timezone.utc).date()
+        declared_age = 22
+        if user and user.dob:
+            declared_dob = user.dob
+            today = datetime.now(timezone.utc).date()
+            declared_age = max(18, today.year - user.dob.year - ((today.month, today.day) < (user.dob.month, user.dob.day)))
+
+        # Verified API endpoints that stream the actual images
+        kyc_video_url = f"/api/v1/admin/kyc/media/{user_id}/selfie"
+        anchor_photo_url = f"/api/v1/admin/kyc/media/{user_id}/profile_1"
 
         stmt = select(AdminKycEscalation).where(AdminKycEscalation.user_id == user_id)
         existing = (await db.execute(stmt)).scalar_one_or_none()
@@ -311,12 +366,12 @@ class GroqAiService:
         if not existing:
             escalation = AdminKycEscalation(
                 user_id=user_id,
-                declared_dob=datetime.now(timezone.utc).date(),
-                declared_age=22,
+                declared_dob=declared_dob,
+                declared_age=declared_age,
                 groq_match_score=score,
                 groq_reasoning=reason[:250],
-                anchor_photo_url=f"users/{user_id}/moments/slot_1.webp",
-                kyc_video_url=f"kyc_ephemeral/{user_id}/kyc_selfie.webp",
+                anchor_photo_url=anchor_photo_url,
+                kyc_video_url=kyc_video_url,
                 status="pending"
             )
             db.add(escalation)
@@ -325,6 +380,10 @@ class GroqAiService:
             existing.groq_match_score = score
             existing.groq_reasoning = reason[:250]
             existing.status = "pending"
+            existing.declared_dob = declared_dob
+            existing.declared_age = declared_age
+            existing.anchor_photo_url = anchor_photo_url
+            existing.kyc_video_url = kyc_video_url
             await db.commit()
 
     @classmethod

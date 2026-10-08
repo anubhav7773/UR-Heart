@@ -344,6 +344,117 @@ def get_admin_portal_html() -> str:
       box-shadow: 0 10px 30px rgba(0,0,0,0.6);
       z-index: 10000;
     }
+
+    /* Sovereign Biometric Comparison Modal */
+    #kycCompareModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 5, 8, 0.94);
+      backdrop-filter: blur(14px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10001;
+      padding: 20px;
+    }
+    .kyc-modal-card {
+      background: #111119;
+      border: 1px solid var(--gold);
+      border-radius: 18px;
+      padding: 24px;
+      max-width: 1150px;
+      width: 100%;
+      max-height: 94vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 35px var(--gold-glow);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .kyc-photos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 860px) {
+      .kyc-photos-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .kyc-photo-box {
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .kyc-photo-box.highlight {
+      border-color: var(--gold);
+      box-shadow: 0 0 15px rgba(224, 169, 109, 0.2);
+    }
+    .kyc-photo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .kyc-photo-img {
+      width: 100%;
+      height: 330px;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #08080C;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: zoom-in;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kyc-photo-img:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 15px rgba(224, 169, 109, 0.3);
+    }
+    .btn-compare-modal {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      background: rgba(224, 169, 109, 0.15);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-compare-modal:hover {
+      background: var(--gold);
+      color: #09090D;
+      box-shadow: 0 0 12px var(--gold-glow);
+    }
+    .kyc-thumb-preview {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .kyc-thumb-img {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid rgba(224, 169, 109, 0.35);
+      cursor: pointer;
+      background: #08080C;
+      transition: transform 0.15s;
+    }
+    .kyc-thumb-img:hover {
+      transform: scale(1.15);
+      border-color: var(--gold);
+    }
   </style>
 </head>
 <body>
@@ -363,6 +474,69 @@ def get_admin_portal_html() -> str:
       
       <button class="btn-gold" id="authBtn" onclick="authenticateAdmin()">Authenticate Sovereign Sentinel</button>
       <div id="authError" style="color: var(--crimson); font-size: 12px; margin-top: 14px; display: none;"></div>
+    </div>
+  </div>
+
+  <!-- Sovereign Biometric 3-Photo Mapping Modal -->
+  <div id="kycCompareModal">
+    <div class="kyc-modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 14px;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span class="auth-badge" style="margin-bottom: 0;">🛡️ Sentinel Biometric Cross-Examination</span>
+            <span id="modalTicketId" style="font-size: 13px; color: var(--gold); font-weight: 700;">#0</span>
+          </div>
+          <h2 id="modalUserName" style="font-family: var(--font-title); font-size: 22px; color: #FFF; margin: 4px 0;">Seeker Portrait Examination</h2>
+          <div id="modalUserMeta" style="font-size: 12px; color: var(--text-muted);">email@example.com &bull; Age: 22 yrs &bull; Score: 0%</div>
+        </div>
+        <button class="btn-logout" onclick="closeKycCompareModal()">✕ Close</button>
+      </div>
+
+      <!-- 3-Photo Side-by-Side Comparison Grid -->
+      <div class="kyc-photos-grid">
+        <!-- Photo 1: KYC Live Selfie -->
+        <div class="kyc-photo-box highlight">
+          <div class="kyc-photo-header">
+            <strong style="color: var(--gold);">1. Live KYC Selfie</strong>
+            <span class="badge badge-gold">Camera Snapshot</span>
+          </div>
+          <img id="modalSelfieImg" class="kyc-photo-img" src="" alt="Live KYC Selfie" onclick="window.open(this.src, '_blank')" title="Click to view full image in tab" />
+          <div style="font-size: 11px; color: var(--text-muted); text-align: center;">Captured live during challenge &bull; ephemeral</div>
+        </div>
+
+        <!-- Photo 2: Sanctuary Profile Photo 1 (Avatar) -->
+        <div class="kyc-photo-box">
+          <div class="kyc-photo-header">
+            <strong style="color: #FFF;">2. Sanctuary Avatar</strong>
+            <span class="badge">Profile Photo 1</span>
+          </div>
+          <img id="modalProfile1Img" class="kyc-photo-img" src="" alt="Sanctuary Profile Photo 1" onclick="window.open(this.src, '_blank')" title="Click to view full image in tab" />
+          <div style="font-size: 11px; color: var(--text-muted); text-align: center;">Primary avatar uploaded on seeker's sanctuary</div>
+        </div>
+
+        <!-- Photo 3: Sanctuary Profile Photo 2 (Gallery Moment) -->
+        <div class="kyc-photo-box">
+          <div class="kyc-photo-header">
+            <strong style="color: #FFF;">3. Gallery Moment</strong>
+            <span class="badge">Profile Photo 2</span>
+          </div>
+          <img id="modalProfile2Img" class="kyc-photo-img" src="" alt="Sanctuary Profile Photo 2" onclick="window.open(this.src, '_blank')" title="Click to view full image in tab" />
+          <div style="font-size: 11px; color: var(--text-muted); text-align: center;">Secondary moment photo in profile gallery</div>
+        </div>
+      </div>
+
+      <!-- AI Evaluation Notes -->
+      <div style="background: rgba(0,0,0,0.35); border-left: 3px solid var(--gold); padding: 12px 16px; border-radius: 8px;">
+        <div style="font-size: 11px; color: var(--gold); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Biometric AI Assessment & Reasoning</div>
+        <div id="modalReasoning" style="font-size: 13px; color: var(--text); line-height: 1.5;">Reasoning details...</div>
+      </div>
+
+      <!-- Action Footer -->
+      <div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px;">
+        <button class="btn-logout" style="padding: 10px 20px;" onclick="closeKycCompareModal()">Cancel / Review Later</button>
+        <button id="modalRejectBtn" class="action-btn btn-reject" style="padding: 10px 22px; font-size: 13px;" onclick="executeModalDecision('reject')">❌ Reject Biometrics</button>
+        <button id="modalApproveBtn" class="action-btn btn-approve" style="padding: 10px 26px; font-size: 13px;" onclick="executeModalDecision('approve')">🛡️ Grant Verified Sovereign Crest</button>
+      </div>
     </div>
   </div>
 
@@ -454,11 +628,11 @@ def get_admin_portal_html() -> str:
           <thead>
             <tr>
               <th>ID</th>
-              <th>User ID</th>
+              <th>Seeker Identity</th>
               <th>Declared DOB / Age</th>
-              <th>Groq Match Score</th>
+              <th>AI Score</th>
               <th>Reasoning</th>
-              <th>Media Preview</th>
+              <th>Biometric Media (1 Live + 2 Sanctuary)</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -660,7 +834,81 @@ def get_admin_portal_html() -> str:
       } catch (e) {}
     }
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    const secureBlobUrls = new Set();
+    function clearSecureBlobs() {
+      secureBlobUrls.forEach(url => URL.revokeObjectURL(url));
+      secureBlobUrls.clear();
+    }
+
+    async function setSecureImage(imgEl, mediaUrl) {
+      if (!imgEl || !mediaUrl) return;
+      try {
+        const res = await apiFetch(mediaUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          secureBlobUrls.add(blobUrl);
+          imgEl.src = blobUrl;
+        }
+      } catch (e) {
+        console.warn('Secure image load error:', e);
+      }
+    }
+
+    let activeKycItem = null;
+    const kycQueueStore = new Map();
+
+    function openKycCompareModal(itemId) {
+      const item = kycQueueStore.get(itemId);
+      if (!item) return;
+      activeKycItem = item;
+
+      document.getElementById('modalTicketId').textContent = '#' + item.id;
+      document.getElementById('modalUserName').textContent = (item.user_name || 'Seeker') + ' (' + (item.user_email || 'No email') + ')';
+      document.getElementById('modalUserMeta').textContent = 
+        'User ID: ' + item.user_id + ' • Age: ' + item.declared_age + ' yrs (' + item.declared_dob + ') • Match Score: ' + item.groq_match_score + '%';
+      document.getElementById('modalReasoning').textContent = item.groq_reasoning || 'No AI reasoning recorded.';
+
+      const selfieEl = document.getElementById('modalSelfieImg');
+      const p1El = document.getElementById('modalProfile1Img');
+      const p2El = document.getElementById('modalProfile2Img');
+      selfieEl.src = '';
+      p1El.src = '';
+      p2El.src = '';
+
+      setSecureImage(selfieEl, item.kyc_selfie_url || `/api/v1/admin/kyc/media/${item.user_id}/selfie`);
+      setSecureImage(p1El, item.profile_photo_1_url || `/api/v1/admin/kyc/media/${item.user_id}/profile_1`);
+      setSecureImage(p2El, item.profile_photo_2_url || `/api/v1/admin/kyc/media/${item.user_id}/profile_2`);
+
+      document.getElementById('kycCompareModal').style.display = 'flex';
+    }
+
+    function closeKycCompareModal() {
+      document.getElementById('kycCompareModal').style.display = 'none';
+      activeKycItem = null;
+    }
+
+    async function executeModalDecision(action) {
+      if (!activeKycItem) return;
+      const id = activeKycItem.id;
+      const userId = activeKycItem.user_id;
+      closeKycCompareModal();
+      await resolveKyc(id, userId, action);
+    }
+
     async function loadKycQueue() {
+      clearSecureBlobs();
+      kycQueueStore.clear();
       const tbody = document.getElementById('kycQueueBody');
       tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading...</td></tr>';
       try {
@@ -670,20 +918,44 @@ def get_admin_portal_html() -> str:
           tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--emerald);">✓ Zero pending KYC items. Sanctuary is clear!</td></tr>';
           return;
         }
+
+        items.forEach(item => kycQueueStore.set(item.id, item));
+
         tbody.innerHTML = items.map(item => `
           <tr>
-            <td>#${item.id}</td>
-            <td style="font-family: monospace; font-size: 11px;">${item.user_id}</td>
-            <td>${item.declared_dob} (${item.declared_age} yrs)</td>
-            <td><span class="badge ${item.groq_match_score >= 80 ? 'badge-green' : 'badge-gold'}">${item.groq_match_score}%</span></td>
-            <td>${item.groq_reasoning}</td>
-            <td><a href="${item.anchor_photo_url}" target="_blank" style="color: var(--gold);">Photo</a> | <a href="${item.kyc_video_url}" target="_blank" style="color: var(--gold);">Selfie Photo</a></td>
+            <td>#${escapeHtml(item.id)}</td>
             <td>
-              <button class="action-btn btn-approve" onclick="resolveKyc(${item.id}, '${item.user_id}', 'approve')">Approve</button>
-              <button class="action-btn btn-reject" onclick="resolveKyc(${item.id}, '${item.user_id}', 'reject')">Reject</button>
+              <strong style="color: #FFF;">${escapeHtml(item.user_name || 'Seeker')}</strong><br/>
+              <span style="color: var(--text-muted); font-size: 11px;">${escapeHtml(item.user_email || '')}</span><br/>
+              <span style="font-family: monospace; font-size: 10px; color: var(--gold);">${escapeHtml(item.user_id)}</span>
+            </td>
+            <td>${escapeHtml(item.declared_dob)}<br/><small style="color: var(--text-muted);">${escapeHtml(item.declared_age)} yrs</small></td>
+            <td><span class="badge ${item.groq_match_score >= 80 ? 'badge-green' : 'badge-gold'}">${escapeHtml(item.groq_match_score)}%</span></td>
+            <td style="max-width: 250px; font-size: 12px; line-height: 1.4;">${escapeHtml(item.groq_reasoning)}</td>
+            <td>
+              <div class="kyc-thumb-preview">
+                <img id="thumb-selfie-${item.id}" class="kyc-thumb-img" title="Live KYC Selfie (Click to compare)" onclick="openKycCompareModal(${item.id})" />
+                <img id="thumb-p1-${item.id}" class="kyc-thumb-img" title="Sanctuary Avatar (Click to compare)" onclick="openKycCompareModal(${item.id})" />
+                <img id="thumb-p2-${item.id}" class="kyc-thumb-img" title="Gallery Moment (Click to compare)" onclick="openKycCompareModal(${item.id})" />
+              </div>
+              <button class="btn-compare-modal" onclick="openKycCompareModal(${item.id})">
+                🔍 3-Photo Mapping
+              </button>
+            </td>
+            <td style="white-space: nowrap;">
+              <button class="action-btn btn-approve" onclick="resolveKyc(${item.id}, '${escapeHtml(item.user_id)}', 'approve')">Approve</button>
+              <button class="action-btn btn-reject" onclick="resolveKyc(${item.id}, '${escapeHtml(item.user_id)}', 'reject')">Reject</button>
             </td>
           </tr>
         `).join('');
+
+        // Securely populate thumbnail previews using authorized header fetch
+        items.forEach(item => {
+          setSecureImage(document.getElementById(`thumb-selfie-${item.id}`), item.kyc_selfie_url || `/api/v1/admin/kyc/media/${item.user_id}/selfie`);
+          setSecureImage(document.getElementById(`thumb-p1-${item.id}`), item.profile_photo_1_url || `/api/v1/admin/kyc/media/${item.user_id}/profile_1`);
+          setSecureImage(document.getElementById(`thumb-p2-${item.id}`), item.profile_photo_2_url || `/api/v1/admin/kyc/media/${item.user_id}/profile_2`);
+        });
+
       } catch (e) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--crimson);">Failed to load KYC queue.</td></tr>';
       }
