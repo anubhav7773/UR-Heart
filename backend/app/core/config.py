@@ -124,12 +124,22 @@ class Settings(BaseSettings):
             admin_key = self.SUPERADMIN_SECRET_KEY or os.getenv("SUPERADMIN_SECRET_KEY") or ""
             if not admin_key or admin_key in {"asiverticals_sovereign_sanctuary_2026"}:
                 missing.append("SUPERADMIN_SECRET_KEY (must be custom high-entropy secret in production)")
-            if not self.RAZORPAY_KEY_ID or not self.RAZORPAY_KEY_ID.strip():
-                missing.append("RAZORPAY_KEY_ID (must be configured in production)")
-            if not self.RAZORPAY_KEY_SECRET or not self.RAZORPAY_KEY_SECRET.strip():
-                missing.append("RAZORPAY_KEY_SECRET (must be configured in production)")
-            if not self.RAZORPAY_WEBHOOK_SECRET or self.RAZORPAY_WEBHOOK_SECRET in {"rzp_webhook_secret_sanctuary_2026", ""}:
-                missing.append("RAZORPAY_WEBHOOK_SECRET (must be a custom production secret, not default)")
+            # Razorpay Security Gate:
+            # If keys are configured, enforce strict production security (both keys present, non-default webhook secret).
+            # If keys are not yet configured (e.g. pending bank linkage), permit boot in dormant mode so deployment succeeds.
+            if self.RAZORPAY_KEY_ID or self.RAZORPAY_KEY_SECRET:
+                if not self.RAZORPAY_KEY_ID or not self.RAZORPAY_KEY_ID.strip():
+                    missing.append("RAZORPAY_KEY_ID (must be configured when Razorpay is enabled)")
+                if not self.RAZORPAY_KEY_SECRET or not self.RAZORPAY_KEY_SECRET.strip():
+                    missing.append("RAZORPAY_KEY_SECRET (must be configured when Razorpay is enabled)")
+                if not self.RAZORPAY_WEBHOOK_SECRET or self.RAZORPAY_WEBHOOK_SECRET in {"rzp_webhook_secret_sanctuary_2026", ""}:
+                    missing.append("RAZORPAY_WEBHOOK_SECRET (must be a custom production secret, not default)")
+            else:
+                print(
+                    "[PAYMENT GATEWAY NOTICE] Razorpay keys not configured. "
+                    "Web INR gateway will remain dormant until keys are provided in Render environment variables.",
+                    flush=True
+                )
 
             if missing:
                 raise ValueError(

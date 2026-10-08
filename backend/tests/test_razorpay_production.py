@@ -465,3 +465,17 @@ def test_production_fail_fast_missing_secrets():
     assert "RAZORPAY_KEY_ID" in err
     assert "RAZORPAY_WEBHOOK_SECRET" in err
 
+    # Dormant mode verification: when keys are completely omitted, boot succeeds on Render
+    dormant_settings = Settings(
+        ENVIRONMENT="production",
+        JWT_SECRET_KEY="a" * 32,
+        FIREBASE_PROJECT_ID="proj",
+        SUPABASE_SERVICE_ROLE_KEY="role_key",
+        REVENUECAT_WEBHOOK_SECRET="rc_sec",
+        SUPERADMIN_SECRET_KEY="super_custom_key",
+        RAZORPAY_KEY_ID="",
+        RAZORPAY_KEY_SECRET="",
+        RAZORPAY_WEBHOOK_SECRET="rzp_webhook_secret_sanctuary_2026"
+    )
+    assert dormant_settings.ENVIRONMENT == "production"
+
