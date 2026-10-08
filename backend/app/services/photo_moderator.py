@@ -11,14 +11,21 @@ from app.core.exceptions import PolicyViolationException
 TESSERACT_FAST_CONFIG = r'--oem 1 --psm 6 -c tessedit_char_whitelist=0123456789@+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 PHONE_PATTERN = re.compile(r'(?:(?:\+?91|091|91|0)[\s\.\-/]*)?([6-9](?:[\s\.\-/]*\d){9})')
 SOCIAL_PREFIX_PATTERN = re.compile(r'@[a-zA-Z0-9_]{3,}', re.IGNORECASE)
+CONTACT_KEYWORD_PATTERN = re.compile(
+    r'\b(?:(?:insta(?:gram)?|snapchat|telegram|whatsapp|facebook)\s*[:=\-]?\s*[\w\.\+]{3,}|(?:ig|snap|tg|fb|dm\s*me|ping\s*me)\s*[:=\-@]\s*[\w\.\+]{3,})\b',
+    re.IGNORECASE
+)
+URL_PATTERN = re.compile(
+    r'(?:https?://\S+|www\.[a-zA-Z0-9\.\-_]+\.[a-zA-Z]{2,}(?:/[^\s]*)?|\b[a-zA-Z0-9.\-_]+\.(?:com|org|net|in|co|io|me|app|ly|link|xyz|to|cc|dev|info|biz|site|online|top|ai|gg|so|tv|ee|be)(?:/[^\s]*)?\b)',
+    re.IGNORECASE
+)
+EMAIL_PATTERN = re.compile(r'[a-zA-Z0-9\._%+-]+@[a-zA-Z0-9\.-]+\.[a-zA-Z]{2,}', re.IGNORECASE)
 
 
 def detect_cv_text_regions(img_cv: np.ndarray) -> bool:
     """
     Fast in-RAM morphological text region detector (<25ms).
-    Detects typographic character bounding boxes, stroke sequences,
-    and high-contrast text lines typical of memes, quotes, captions, watermarks, and screenshots.
-    Requires multi-character/word clustering and internal edge variance to prevent false positives.
+    Preserved for backward compatibility and extreme edge inspection.
     """
     try:
         gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
@@ -34,14 +41,10 @@ def detect_cv_text_regions(img_cv: np.ndarray) -> bool:
         for c in contours:
             bx, by, bw, bh = cv2.boundingRect(c)
             area = cv2.contourArea(c)
-            # Typographic criteria: height, width, aspect ratio, and area
             if bw >= 20 and 7 <= bh <= (h * 0.5):
                 aspect = bw / float(bh)
                 roi = grad_x[by:by+bh, bx:bx+bw]
                 std = float(np.std(roi)) if roi.size > 0 else 0
-                # Confirmed text criteria:
-                # 1. Elongated character sequence with high internal stroke frequency (std > 40, aspect >= 2.2)
-                # 2. Or multiple distinct typographic stroke clusters (text_regions >= 2)
                 if aspect >= 2.2 and area > 150 and std > 40:
                     return True
                 if aspect >= 1.4 and area > 100 and std > 25:
@@ -57,9 +60,10 @@ class PhotoModerationService:
     @staticmethod
     def inspect_photo_bytes(image_bytes: bytes) -> Tuple[bool, str, str]:
         """
-        Runs early-exit OpenCV QR detection, CV morphological text region detection,
-        and bounded Tesseract fast LSTM OCR.
-        SLA: < 400ms in RAM. Strictly rejects QR codes, and any text-bearing photos.
+        Runs early-exit OpenCV QR detection (requiring actual decoded payload)
+        and targeted Tesseract OCR for phone numbers, social handles, and contact cards.
+        SLA: < 400ms in RAM. Protects Sacred Bridge against off-platform bypass while
+        safely approving authentic portraits, creative/devotional edits, and normal clothing.
         Returns: (is_safe, message, category)
         """
         try:
@@ -71,21 +75,15 @@ class PhotoModerationService:
                 gc.collect()
                 return False, "Invalid image payload", "invalid_payload"
 
-            # 2. Early-Exit QR & Barcode Detection
+            # 2. Early-Exit QR & Barcode Detection (Requires decodable payload to prevent false positives on jewelry/zippers)
             qr_detector = cv2.QRCodeDetector()
             decoded_text, points, _ = qr_detector.detectAndDecode(img_cv)
-            if (points is not None and len(points) > 0) or (decoded_text and len(decoded_text.strip()) > 0):
+            if decoded_text and len(decoded_text.strip()) > 0:
                 del nparr, img_cv
                 gc.collect()
-                return False, "QR codes and external links are prohibited in photos", "qr_code"
+                return False, "QR codes, UPI barcodes, or invite links are strictly prohibited in photos", "qr_code"
 
-            # 3. Fast in-RAM CV Morphological Text & Stroke Region Detection
-            if detect_cv_text_regions(img_cv):
-                del nparr, img_cv
-                gc.collect()
-                return False, "Text detected in photo. Photos containing text, quotes, captions, watermarks, or screenshots are strictly prohibited. Please upload a photo without any text.", "text_detected"
-
-            # 4. Multi-Pass Tesseract OCR with Bounded Execution and Early Exit
+            # 3. Targeted Tesseract OCR for Contact Leaks & Off-Platform Bypass
             gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
             thresholds = [
                 cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1],
@@ -98,21 +96,24 @@ class PhotoModerationService:
                         text = pytesseract.image_to_string(thresh, config=config, timeout=2).strip()
                         if text:
                             cleaned = re.sub(r'[\s\.\-_/\\,;:*+~]', '', text)
+                            # Check for phone numbers or continuous digits
                             if re.search(r'\d{8,}', cleaned) or PHONE_PATTERN.search(text):
                                 del nparr, img_cv, gray, thresholds
                                 gc.collect()
                                 return False, "Contact numbers or digits detected in photo", "contact_leak"
 
-                            if SOCIAL_PREFIX_PATTERN.search(text):
+                            # Check for social media handles, emails, or links
+                            if SOCIAL_PREFIX_PATTERN.search(text) or CONTACT_KEYWORD_PATTERN.search(text) or EMAIL_PATTERN.search(text) or URL_PATTERN.search(text):
                                 del nparr, img_cv, gray, thresholds
                                 gc.collect()
-                                return False, "Social media handles detected in photo", "contact_leak"
+                                return False, "Social media handles or external contact links detected in photo", "contact_leak"
 
-                            words = re.findall(r'[a-zA-Z0-9]{2,}', text)
-                            if words:
+                            # Check for full-screen text-heavy memes / quote cards (> 30 words)
+                            words = re.findall(r'[a-zA-Z]{3,}', text)
+                            if len(words) >= 30:
                                 del nparr, img_cv, gray, thresholds
                                 gc.collect()
-                                return False, "Text detected in photo. Photos containing text, quotes, captions, watermarks, or screenshots are strictly prohibited. Please upload a photo without any text.", "text_detected"
+                                return False, "Text-heavy quote cards, memes, or screenshots are prohibited. Please upload an authentic moment photograph.", "text_detected"
                     except (pytesseract.TesseractNotFoundError, pytesseract.TesseractError, Exception):
                         pass
 
@@ -161,9 +162,15 @@ class PhotoModerationService:
 
 
 def scan_qr_and_barcodes(image_np: np.ndarray) -> bool:
+    """
+    Decodes QR and 2D barcodes.
+    A QR code is ONLY flagged if valid payload text is successfully decoded.
+    Candidate corner bounding boxes without decodable text are ignored to prevent
+    severe false positives on earrings, jewelry, zippers, and contrast patterns.
+    """
     detector = cv2.QRCodeDetector()
     data, bbox, _ = detector.detectAndDecode(image_np)
-    return bool(data or (bbox is not None and len(bbox) > 0))
+    return bool(data and len(data.strip()) > 0)
 
 
 async def scan_and_validate_photo(file: UploadFile) -> None:

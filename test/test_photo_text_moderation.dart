@@ -31,6 +31,15 @@ void main() {
       expect(result.rejectionReason, isNull);
     });
 
+    test('ModerationResult.rejected accurately stores contact_leak category for Sacred Bridge anti-bypass', () {
+      const reason = 'Contact information, phone numbers, or social handles are not permitted on profile photos.';
+      final result = ModerationResult.rejected(reason, category: 'contact_leak');
+
+      expect(result.isSafe, isFalse);
+      expect(result.category, equals('contact_leak'));
+      expect(result.rejectionReason, contains('Contact information'));
+    });
+
     test('ProfileSetupState preserves moderation error and leaves slot empty on rejection', () {
       const initialState = ProfileSetupState();
       expect(initialState.photoSlots.containsKey(1), isFalse);
