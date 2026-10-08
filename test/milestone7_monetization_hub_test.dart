@@ -137,8 +137,8 @@ void main() {
       );
 
       final state = container.read(growthHubControllerProvider);
-      expect(state.swipesRemaining, equals(45)); // 25 initial + 20
-      expect(state.directLetters, equals(3)); // 1 initial + 2
+      expect(state.swipesRemaining, equals(35)); // 25 initial + 10
+      expect(state.directLetters, equals(1)); // 1 initial
     });
   });
 
@@ -150,7 +150,7 @@ void main() {
       );
     });
 
-    testWidgets('Tab B renders Sovereign Store and Web Uplink banner', (tester) async {
+    testWidgets('Tab B renders Sovereign Store and Verified Billing banner', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -169,10 +169,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('SANCTUARY SOVEREIGN PRIVILEGE'), findsOneWidget);
-      expect(find.text('Sanctuary Web Store (10% Extra Passes)'), findsOneWidget);
+      expect(find.text('Sovereign Verified Sanctuary'), findsOneWidget);
+      expect(find.text('Sanctuary Web Store (10% Extra Passes)'), findsNothing);
       expect(find.text('SOVEREIGN PASSES'), findsOneWidget);
       expect(find.text('A LA CARTE MICRO-PACKS'), findsOneWidget);
-      expect(find.text('Restore Purchases (Google Play)'), findsOneWidget);
+      expect(find.text('Restore Purchases'), findsOneWidget);
     });
   });
 }

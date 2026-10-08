@@ -6,6 +6,8 @@ import '../controllers/growth_hub_controller.dart';
 
 /// Tab B: Sovereign Store (< 220 lines)
 class SovereignStoreTabView extends ConsumerWidget {
+  static const String storeWebUrl = 'https://urheart.asiverticals.me/store';
+
   final bool isDark;
 
   const SovereignStoreTabView({super.key, required this.isDark});
