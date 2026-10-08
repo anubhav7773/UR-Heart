@@ -134,10 +134,125 @@ async def get_store_catalogue():
     }
 
 
+async def claim_pending_web_store_entitlements(db: AsyncSession, user: User) -> list[dict]:
+    """
+    Checks PostgreSQL public.pending_web_entitlements for any passes purchased
+    under user.email before they registered or completed their profile, and automatically
+    activates them on user, recording canonical InAppPurchase ledger rows.
+    """
+    if not user or not user.email:
+        return []
+
+    clean_email = user.email.strip().lower()
+    from sqlalchemy import text
+    try:
+        stmt = text("""
+            SELECT id, order_id, product_identifier, payment_reference, amount_gross, currency
+            FROM public.pending_web_entitlements
+            WHERE lower(email) = :email AND status = 'paid_pending_claim'
+            FOR UPDATE
+        """)
+        rows = (await db.execute(stmt, {"email": clean_email})).fetchall()
+        if not rows:
+            return []
+
+        claimed = []
+        now = datetime.now(timezone.utc)
+
+        for row in rows:
+            ent_id, order_id, product_id, pay_ref, amount_gross, currency = row
+            product = STORE_PRODUCTS.get(product_id, STORE_PRODUCTS["urheart_pass_monthly"])
+            tier = product.get("tier", "monthly")
+            duration_days = product.get("duration_days", 30)
+            expires_at = now + timedelta(days=duration_days) if duration_days > 0 else None
+
+            # Apply entitlements to user
+            if tier == "weekly":
+                user.subscription_tier = "weekly"
+                user.subscription_expires_at = expires_at
+                user.is_ad_free = True
+                user.swipes_remaining = (user.swipes_remaining or 0) + 110
+                user.direct_letters_count = (user.direct_letters_count or 0) + 1
+            elif tier == "monthly":
+                user.subscription_tier = "monthly"
+                user.subscription_expires_at = expires_at
+                user.is_ad_free = True
+                user.swipes_remaining = (user.swipes_remaining or 0) + 550
+                user.direct_letters_count = (user.direct_letters_count or 0) + 6
+            elif tier == "lifetime":
+                user.subscription_tier = "lifetime"
+                user.subscription_expires_at = expires_at
+                user.is_ad_free = True
+                user.swipes_remaining = (user.swipes_remaining or 0) + 9999
+                user.direct_letters_count = (user.direct_letters_count or 0) + 11
+                user.reveal_tokens_count = (user.reveal_tokens_count or 0) + 1
+            elif product_id == "urheart_key_instant_contact":
+                user.reveal_tokens_count = (user.reveal_tokens_count or 0) + 1
+            elif product_id == "urheart_pack_direct_letters":
+                user.direct_letters_count = (user.direct_letters_count or 0) + 4
+            elif product_id == "urheart_pack_global_passport":
+                user.passport_city = "Global Discovery"
+                user.swipes_remaining = (user.swipes_remaining or 0) + 10
+                user.is_ad_free = True
+
+            # Create InAppPurchase ledger row
+            fee = round(float(amount_gross) * 0.02, 2)
+            net = round(float(amount_gross) - fee, 2)
+            ledger = InAppPurchase(
+                user_id=user.id,
+                transaction_reference=order_id,
+                product_identifier=product_id,
+                store="web_razorpay_india",
+                currency=currency or "INR",
+                amount_gross=amount_gross,
+                platform_fee=fee,
+                amount_net=net,
+                status="completed"
+            )
+            db.add(ledger)
+
+            # Mark entitlement claimed
+            update_stmt = text("""
+                UPDATE public.pending_web_entitlements
+                SET status = 'claimed',
+                    claimed_by_user_id = :uid,
+                    claimed_at = NOW()
+                WHERE id = :id
+            """)
+            await db.execute(update_stmt, {"uid": user.id, "id": ent_id})
+            claimed.append({"order_id": order_id, "product_id": product_id, "product_name": product.get("name")})
+
+        await db.commit()
+        print(f"[STORE ENTITLEMENTS] Auto-claimed {len(claimed)} web passes for {clean_email} (User {user.id})", flush=True)
+        return claimed
+    except Exception as e:
+        await db.rollback()
+        print(f"[STORE ENTITLEMENTS NOTICE] Claim pending check: {e}", flush=True)
+        return []
+
+
+@router.post("/api/v1/store/claim-pending", status_code=status.HTTP_200_OK)
+async def claim_my_pending_store_passes(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually triggers claiming of any pending Web Store purchases associated with the current user's email.
+    """
+    claimed = await claim_pending_web_store_entitlements(db, current_user)
+    return {
+        "status": "success",
+        "claimed_count": len(claimed),
+        "claimed_passes": claimed
+    }
+
+
 @router.post("/api/v1/store/verify-user")
 async def verify_store_user(payload: VerifyUserRequest, db: AsyncSession = Depends(get_db)):
     """
     Step 2: Validates the user's sanctuary credentials (email, referral code, or UUID).
+    Seamlessly accepts any valid email address for guest checkout so visitors without
+    an existing account or referral code can purchase passes without blockage.
     """
     q = payload.query.strip()
     clean_q = q.lower()
@@ -163,28 +278,47 @@ async def verify_store_user(payload: VerifyUserRequest, db: AsyncSession = Depen
         user = res.scalar_one_or_none()
 
     if not user:
-        # Check if dummy test seeker
+        # 1. Seamless Guest / New Seeker Support:
+        # Any valid email format is accepted so new users can buy passes immediately.
+        if "@" in clean_q and "." in clean_q.split("@")[-1] and len(clean_q.split("@")[0]) >= 1:
+            return {
+                "status": "verified",
+                "is_new_user": True,
+                "user_id": None,
+                "full_name": "New Sovereign Seeker",
+                "email": clean_q,
+                "subscription_tier": "free",
+                "referral_code": None,
+                "message": f"✨ Welcome! Pass will be reserved for {clean_q} and automatically activated upon app login."
+            }
+
+        # 2. Check if dummy test seeker
         if "seeker" in clean_q or "demo" in clean_q:
             return {
                 "status": "verified",
+                "is_new_user": False,
                 "user_id": "00000000-0000-0000-0000-000000000001",
                 "full_name": "Sanctuary Seeker (Demo)",
                 "email": clean_q if "@" in clean_q else "seeker@urheart.app",
                 "subscription_tier": "free",
-                "referral_code": "UR-SANCTUARY"
+                "referral_code": "UR-SANCTUARY",
+                "message": "✓ Seeker Authenticated (Demo)"
             }
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sanctuary account not found. Please verify your email or referral code."
+            detail="Referral code not recognized. If you don't have a referral code or account yet, simply enter your personal email address to continue."
         )
 
     return {
         "status": "verified",
+        "is_new_user": False,
         "user_id": str(user.id),
         "full_name": user.full_name,
         "email": user.email,
         "subscription_tier": user.subscription_tier,
-        "referral_code": user.referral_code
+        "referral_code": user.referral_code,
+        "message": f"✓ Seeker Authenticated: {user.full_name} ({user.subscription_tier.capitalize()} Tier)"
     }
 
 
@@ -366,6 +500,28 @@ async def verify_razorpay_payment(
                 "message": "Payment already verified and entitlements active.",
                 "deep_link": f"urheart://store/receipt?order_id={payload.order_id}&payment_id={payload.razorpay_payment_id}&status=completed"
             }
+
+    # Cross-check pending_web_entitlements to prevent double grant if already claimed
+    from sqlalchemy import text
+    chk_pending_stmt = text("""
+        SELECT id, status FROM public.pending_web_entitlements
+        WHERE order_id = :order_id OR payment_reference = :payment_id
+        FOR UPDATE
+    """)
+    pending_ent_row = (await db.execute(chk_pending_stmt, {
+        "order_id": payload.order_id,
+        "payment_id": payload.razorpay_payment_id
+    })).fetchone()
+    if pending_ent_row and pending_ent_row[1] == "claimed":
+        return {
+            "status": "completed",
+            "order_id": payload.order_id,
+            "payment_id": payload.razorpay_payment_id,
+            "product_id": product_id,
+            "product_name": STORE_PRODUCTS.get(product_id, {}).get("name", "Sovereign Pass"),
+            "message": "Payment already verified and entitlements active.",
+            "deep_link": f"urheart://store/receipt?order_id={payload.order_id}&payment_id={payload.razorpay_payment_id}&status=completed"
+        }
     elif order:
         product_id = order.get("product_id", "urheart_pass_monthly")
         user_query = order.get("user_query", "")
@@ -482,6 +638,39 @@ async def verify_razorpay_payment(
             status="completed"
         )
         db.add(ledger)
+    else:
+        # Guest purchase: Store in PostgreSQL pending_web_entitlements so it auto-claims on app login!
+        target_email = None
+        if "@" in user_query:
+            target_email = user_query.strip().lower()
+        elif order and "@" in str(order.get("user_query", "")):
+            target_email = str(order.get("user_query")).strip().lower()
+
+        if target_email:
+            try:
+                from sqlalchemy import text
+                stmt = text("""
+                    INSERT INTO public.pending_web_entitlements 
+                    (order_id, email, product_identifier, payment_reference, amount_gross, currency, status)
+                    VALUES (:order_id, :email, :prod_id, :pay_ref, :amt, :curr, 'paid_pending_claim')
+                    ON CONFLICT (order_id) DO NOTHING
+                """)
+                await db.execute(stmt, {
+                    "order_id": payload.order_id,
+                    "email": target_email,
+                    "prod_id": product_id,
+                    "pay_ref": payload.razorpay_payment_id,
+                    "amt": amount_inr,
+                    "curr": (order.get("currency") if order else "INR") or "INR"
+                })
+                print(f"[STORE PENDING ENTITLEMENT] Successfully queued guest pass {product_id} for {target_email}", flush=True)
+            except Exception as pend_err:
+                await db.rollback()
+                print(f"[STORE PENDING ENTITLEMENT ERROR] Failed to record pending entitlement: {pend_err}", flush=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Payment verified with gateway, but failed to persist pass entitlement. Please contact support with your payment ID."
+                )
 
     if order:
         order["status"] = "completed"
@@ -1475,12 +1664,29 @@ async def serve_web_sanctuary_store(request: Request):
 
       <!-- STEP 2 OF 4: VERIFY SANCTUARY ACCOUNT -->
       <div class="step-content" id="step2">
-        <div class="step-headline">Step 2: Enter Sanctuary Seeker Identity</div>
-        <div class="step-subtext">Passes will be cryptographically bound and instantaneously credited to this UR-Heart account.</div>
+        <div class="step-headline">Step 2: Enter Your Email Address (or Referral Code)</div>
+        <div class="step-subtext">Passes will be cryptographically bound and instantaneously credited to your UR-Heart account.</div>
+
+        <!-- NEW SEEKER & GUEST CHECKOUT GUIDANCE CARD -->
+        <div style="margin-bottom:18px; padding:14px 18px; background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.3); border-radius:14px; font-size:12.5px; color:var(--text-body); line-height:1.55;">
+          <strong style="color:var(--gold); display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:13px;">
+            <span>✨</span> New Seeker or Don't Have a Referral Code?
+          </strong>
+          <span>No account or referral code needed! Simply enter your personal email address below. Your Sovereign Pass will be reserved for this email and automatically activated as soon as you open the UR-Heart app with this email.</span>
+        </div>
+
+        <!-- APP USER GUIDANCE CARD (FOR LOST WELCOME EMAIL) -->
+        <div style="margin-bottom:18px; padding:12px 16px; background:rgba(46,111,94,0.18); border:1px solid rgba(46,111,94,0.4); border-radius:14px; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            <strong style="color:#A3E4D1; display:block; margin-bottom:2px;">📱 Already have the UR-Heart Mobile App?</strong>
+            <span style="color:var(--text-muted);">Lost your welcome email? Tap below to open your profile in the app to view your email, or simply enter the email you use on your phone.</span>
+          </div>
+          <a href="urheart://profile" class="btn btn-prev" style="padding:6px 14px; font-size:12px; text-decoration:none; white-space:nowrap; border-color:var(--pine-glow); color:#A3E4D1;">Open App ➔</a>
+        </div>
 
         <div class="form-group">
-          <label class="form-label" for="userQueryInput">Sanctuary Email or Referral Code / User ID</label>
-          <input type="text" id="userQueryInput" class="form-input" placeholder="e.g. anushkafzb@gmail.com or UR-4E9F76">
+          <label class="form-label" for="userQueryInput">Your Email Address (or Sanctuary Referral Code)</label>
+          <input type="text" id="userQueryInput" class="form-input" placeholder="e.g. yourname@gmail.com or UR-SANCTUARY">
           <div id="verifyBox" class="verify-box"></div>
         </div>
 
@@ -1759,15 +1965,24 @@ async def serve_web_sanctuary_store(request: Request):
         }});
         const data = await res.json();
         if (res.ok) {{
-          box.className = "verify-box success";
-          box.innerText = `✓ Seeker Authenticated: ${{data.full_name}} (${{data.email}}) [Tier: ${{data.subscription_tier}}]`;
+          if (data.is_new_user) {{
+            box.className = "verify-box success";
+            box.style.borderColor = "var(--gold)";
+            box.style.color = "var(--gold)";
+            box.innerText = data.message || `✨ Welcome New Seeker! Your pass will be reserved for ${{data.email}} and automatically activated upon app login.`;
+          }} else {{
+            box.className = "verify-box success";
+            box.style.borderColor = "var(--pine-glow)";
+            box.style.color = "var(--text-head)";
+            box.innerText = data.message || `✓ Seeker Authenticated: ${{data.full_name}} (${{data.email}}) [Tier: ${{data.subscription_tier}}]`;
+          }}
           box.style.display = "block";
           verifiedAccount = data.email || query;
           document.getElementById("sumSeekerEmail").innerText = verifiedAccount;
           return true;
         }} else {{
           box.className = "verify-box error";
-          box.innerText = data.detail || "Account not found.";
+          box.innerText = data.detail || "Referral code not recognized. You can simply enter your email address to continue.";
           box.style.display = "block";
           return false;
         }}
@@ -1786,7 +2001,7 @@ async def serve_web_sanctuary_store(request: Request):
     async function proceedToPaymentStep() {{
       const query = document.getElementById("userQueryInput").value.trim();
       if (!query) {{
-        alert("Please enter your sanctuary email or referral code.");
+        alert("Please enter your email address or referral code.");
         return;
       }}
       verifiedAccount = query;

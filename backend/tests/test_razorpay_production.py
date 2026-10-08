@@ -210,7 +210,7 @@ def test_verify_razorpay_payment_instant_activation():
         status="pending"
     )
 
-    def mock_execute(stmt):
+    def mock_execute(stmt, *args, **kwargs):
         stmt_str = str(stmt).lower()
         res = MagicMock()
         if "in_app_purchases" in stmt_str:
@@ -219,6 +219,7 @@ def test_verify_razorpay_payment_instant_activation():
             res.scalar_one_or_none.return_value = seeker
         else:
             res.scalar_one_or_none.return_value = None
+            res.fetchone.return_value = None
         return res
 
     mock_db.execute = AsyncMock(side_effect=mock_execute)
@@ -709,6 +710,161 @@ def test_serve_web_sanctuary_store_checkout_route():
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert "<title>Sanctuary Store | UR-Heart Sovereign Web Privileges</title>" in response.text
+
+
+def test_store_verify_user_guest_new_email_accepted():
+    """Problem 1: Verify guests without existing account or referral code can checkout using email."""
+    response = client.post(
+        "/api/v1/store/verify-user",
+        json={"query": "newseeker.wanderer@gmail.com"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "verified"
+    assert data["is_new_user"] is True
+    assert data["email"] == "newseeker.wanderer@gmail.com"
+    assert "Welcome" in data["message"] or "reserved" in data["message"]
+
+
+def test_store_verify_user_existing_account_returns_details():
+    """Problem 1: Verify existing registered user query returns authenticated seeker details."""
+    seeker = create_mock_seeker(email="priya.sanctuary@urheart.in", tier="free")
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = MagicMock(scalar_one_or_none=lambda: seeker)
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    try:
+        response = client.post(
+            "/api/v1/store/verify-user",
+            json={"query": seeker.email}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "verified"
+        assert data["is_new_user"] is False
+        assert data["email"] == seeker.email
+        assert data["full_name"] == seeker.full_name
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_store_verify_user_invalid_string_friendly_guidance():
+    """Problem 1: Verify non-email invalid code provides friendly guidance rather than dead end."""
+    response = client.post(
+        "/api/v1/store/verify-user",
+        json={"query": "INVALID_RANDOM_CODE"}
+    )
+    assert response.status_code == 404
+    detail = response.json().get("detail", "")
+    assert "Referral code not recognized" in detail or "email address" in detail
+
+
+def test_serve_web_sanctuary_store_guest_and_app_guidance_in_html():
+    """Problem 1 & 2: Verify Web Store HTML displays guidance for new seekers and mobile app users."""
+    response = client.get("/store")
+    assert response.status_code == 200
+    content = response.text
+    assert "New Seeker or Don't Have a Referral Code?" in content
+    assert "Already have the UR-Heart Mobile App?" in content
+    assert "urheart://profile" in content
+    assert "Your Email Address (or Sanctuary Referral Code)" in content
+
+
+@pytest.mark.asyncio
+async def test_claim_pending_web_store_entitlements_lifecycle():
+    """Problem 2: Verify guest purchase pending entitlement automatically activates on user."""
+    from app.api.v1.endpoints.web_store import claim_pending_web_store_entitlements
+    seeker = create_mock_seeker(email="guest_to_member@urheart.app", tier="free")
+
+    mock_db = AsyncMock()
+    # Mock row returned from pending_web_entitlements
+    # id, order_id, product_identifier, payment_reference, amount_gross, currency
+    fake_row = (101, "ORD-UR-GUEST-001", "urheart_pass_monthly", "pay_guest_123", 149.0, "INR")
+    mock_db.execute.return_value = MagicMock(fetchall=lambda: [fake_row])
+
+    claimed = await claim_pending_web_store_entitlements(mock_db, seeker)
+    assert len(claimed) == 1
+    assert claimed[0]["order_id"] == "ORD-UR-GUEST-001"
+    assert claimed[0]["product_id"] == "urheart_pass_monthly"
+    assert seeker.subscription_tier == "monthly"
+    assert seeker.is_ad_free is True
+    assert seeker.swipes_remaining >= 550
+    assert seeker.direct_letters_count >= 6
+
+
+@pytest.mark.asyncio
+async def test_claim_pending_web_store_entitlements_rolls_back_on_error():
+    """CodeRabbit Issue 2: Verify claim rolls back the session if database exception occurs."""
+    from app.api.v1.endpoints.web_store import claim_pending_web_store_entitlements
+    seeker = create_mock_seeker(email="error_case@urheart.app", tier="free")
+
+    mock_db = AsyncMock()
+    mock_db.execute.side_effect = Exception("Simulated DB connection abort")
+
+    claimed = await claim_pending_web_store_entitlements(mock_db, seeker)
+    assert claimed == []
+    mock_db.rollback.assert_awaited_once()
+
+
+def test_serve_web_sanctuary_store_no_fire_and_forget_js_call():
+    """CodeRabbit Issue 1: Verify fire-and-forget verification call is absent from store HTML."""
+    response = client.get("/store")
+    assert response.status_code == 200
+    assert "verifyAccountLive().catch" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_billing_webhook_pending_claimed_prevents_double_grant():
+    """CodeRabbit Issue 5: Verify webhook skips grant if pending entitlement was already claimed."""
+    from app.services.razorpay_service import RazorpayService
+    mock_db = AsyncMock()
+
+    # Mock pending entitlement query returning 'claimed'
+    mock_db.execute.return_value = MagicMock(
+        scalar_one_or_none=lambda: None,
+        fetchone=lambda: (101, "claimed")
+    )
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    import os
+    secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "whsec_test_mock_12345")
+    raw_payload = json.dumps({
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_double_grant_check_999",
+                    "amount": 14900,
+                    "currency": "INR",
+                    "notes": {
+                        "user_id": str(uuid.uuid4()),
+                        "product_id": "urheart_pass_monthly",
+                        "order_id": "ORD-UR-DOUBLE-001"
+                    }
+                }
+            }
+        }
+    }).encode("utf-8")
+
+    sig = hmac.new(secret.encode("utf-8"), raw_payload, hashlib.sha256).hexdigest()
+
+    try:
+        with patch.object(settings, "RAZORPAY_WEBHOOK_SECRET", secret):
+            response = client.post(
+                "/api/v1/billing/webhook/razorpay",
+                content=raw_payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Razorpay-Signature": sig
+                }
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "already_processed"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
 
 
 

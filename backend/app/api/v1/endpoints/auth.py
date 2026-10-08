@@ -217,8 +217,16 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
                 )
             except Exception as e:
                 await db.rollback()
+                new_user = None
                 print(f"[AUTH GOOGLE SYNC] Auto-provision warning: {e}", flush=True)
-            is_completed = False
+    # Claim any pending Web Store passes for this email
+    try:
+        active_user = user_row or (new_user if 'new_user' in locals() else None)
+        if active_user:
+            from app.api.v1.endpoints.web_store import claim_pending_web_store_entitlements
+            await claim_pending_web_store_entitlements(db, active_user)
+    except Exception as claim_err:
+        print(f"[AUTH NOTICE] Pending web passes auto-claim: {claim_err}", flush=True)
 
     effective_role = "superadmin" if clean_email == "asiverticals@gmail.com" else "user"
     from app.core.security import create_access_token
@@ -651,7 +659,15 @@ async def get_verification_status(
                 await db.commit()
             except Exception:
                 await db.rollback()
+                user_row = None
             user_uuid = str(new_uuid)
+
+        if user_row:
+            try:
+                from app.api.v1.endpoints.web_store import claim_pending_web_store_entitlements
+                await claim_pending_web_store_entitlements(db, user_row)
+            except Exception as claim_err:
+                pass
 
         effective_role = "superadmin" if is_super else (getattr(user_row, "role", "user") or "user")
         from app.core.security import create_access_token

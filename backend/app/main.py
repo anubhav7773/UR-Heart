@@ -295,6 +295,38 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[SCHEMA NOTICE] Welcome email schema check: {e}", flush=True)
 
+    async def _ensure_pending_web_entitlements_schema():
+        try:
+            from sqlalchemy import text
+            statements = [
+                """CREATE TABLE IF NOT EXISTS public.pending_web_entitlements (
+                    id BIGSERIAL PRIMARY KEY,
+                    order_id VARCHAR(150) UNIQUE NOT NULL,
+                    email VARCHAR(255) NOT NULL,
+                    product_identifier VARCHAR(60) NOT NULL,
+                    payment_reference VARCHAR(150),
+                    amount_gross NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+                    currency VARCHAR(10) NOT NULL DEFAULT 'INR',
+                    status VARCHAR(30) NOT NULL DEFAULT 'paid_pending_claim',
+                    claimed_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    claimed_at TIMESTAMPTZ
+                );""",
+                "CREATE INDEX IF NOT EXISTS idx_pending_web_entitlements_email ON public.pending_web_entitlements(email);",
+                "CREATE INDEX IF NOT EXISTS idx_pending_web_entitlements_status ON public.pending_web_entitlements(status);"
+            ]
+            async with async_session_factory() as session:
+                for stmt in statements:
+                    try:
+                        await session.execute(text(stmt))
+                        await session.commit()
+                    except Exception as inner_e:
+                        await session.rollback()
+                        logger.warning(f"Pending web entitlements schema statement warning: {inner_e}")
+                print("[SCHEMA] Pending web store entitlements table verified in PostgreSQL.", flush=True)
+        except Exception as e:
+            print(f"[SCHEMA NOTICE] Pending web store entitlements schema check: {e}", flush=True)
+
     try:
         await asyncio.gather(
             _ensure_voice_spark_schema(),
@@ -302,6 +334,7 @@ async def lifespan(app: FastAPI):
             _ensure_admin_schema(),
             _ensure_mindful_closure_schema(),
             _ensure_welcome_email_schema(),
+            _ensure_pending_web_entitlements_schema(),
             return_exceptions=True
         )
     except Exception as schema_err:

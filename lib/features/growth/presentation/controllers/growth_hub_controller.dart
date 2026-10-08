@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/ads/rewarded_ad_manager.dart';
 import '../../../../core/ads/ad_reward_models.dart';
 import '../../../../core/network/dio_client.dart';
@@ -509,36 +508,6 @@ class GrowthHubController extends StateNotifier<GrowthHubState> {
         SharedPreferences.getInstance().then((p) => p.setInt('ur_heart_reveal_tokens', nextTokens));
       }
     } catch (_) {}
-  }
-
-  /// Launches official Web Sanctuary Store with pre-filled user parameters
-  Future<void> openWebStore([String? productId, BuildContext? context]) async {
-    final query = <String, String>{};
-    if (productId != null && productId.isNotEmpty) {
-      query['product'] = productId;
-    }
-    if (state.userId.isNotEmpty) {
-      query['user_id'] = state.userId;
-    }
-    if (state.referralCode.isNotEmpty) {
-      query['ref'] = state.referralCode;
-    }
-
-    final uri = Uri.https('urheart.asiverticals.me', '/store', query.isNotEmpty ? query : null);
-    try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched && context != null && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open https://urheart.asiverticals.me/store in browser.')),
-        );
-      }
-    } catch (e) {
-      if (context != null && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open web store: $e')),
-        );
-      }
-    }
   }
 
   Future<void> restorePurchases([BuildContext? context]) async {

@@ -4,13 +4,11 @@ import '../../../../core/theme/dark_sanctuary_tokens.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../controllers/growth_hub_controller.dart';
 
-/// Tab B: Sovereign Store & Web Uplink (< 220 lines)
+/// Tab B: Sovereign Store (< 220 lines)
 class SovereignStoreTabView extends ConsumerWidget {
   final bool isDark;
 
   const SovereignStoreTabView({super.key, required this.isDark});
-
-  static const String storeWebUrl = 'https://urheart.asiverticals.me/store';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -109,7 +107,7 @@ class SovereignStoreTabView extends ConsumerWidget {
           _buildMicroPackRow(context, ref, '24h Global Passport', 'Teleport to any global city for 24h', '₹99 / \$1.99', 'urheart_pack_global_passport', surface, primaryText, subText, pine),
           const SizedBox(height: 18.0),
 
-          // Google Play Policy Restore Purchases & Web Store Sync Links
+          // Google Play Policy Restore Purchases & Sovereign Sync
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

@@ -84,6 +84,13 @@ async def get_my_authenticated_profile(
     await StreakEngine.evaluate_and_decay_streak(current_user, db)
     streak_info = StreakEngine.get_user_streak_payload(current_user)
 
+    # Auto-claim any pending web store passes for current user's email
+    try:
+        from app.api.v1.endpoints.web_store import claim_pending_web_store_entitlements
+        await claim_pending_web_store_entitlements(db, current_user)
+    except Exception as claim_err:
+        pass
+
     return {
         "id": str(current_user.id),
         "full_name": current_user.full_name,
@@ -434,6 +441,12 @@ async def update_my_profile(
                     full_name=payload.full_name or current_user.full_name or "Seeker",
                     delay_seconds=3.0
                 )
+    # Claim any pending Web Store passes purchased before profile completion
+    try:
+        from app.api.v1.endpoints.web_store import claim_pending_web_store_entitlements
+        await claim_pending_web_store_entitlements(db, current_user)
+    except Exception as claim_err:
+        print(f"[PROFILE NOTICE] Pending web store passes auto-claim: {claim_err}", flush=True)
 
     return {"status": "success", "message": "Profile updated and persisted successfully."}
 

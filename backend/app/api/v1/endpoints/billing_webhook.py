@@ -162,16 +162,61 @@ async def process_razorpay_webhook(
         if not user_uuid_str or not payment_id:
             return {"status": "ignored"}
 
+        user_uuid = None
+        target_email = None
         try:
             user_uuid = UUID(user_uuid_str)
         except (ValueError, TypeError, AttributeError):
+            q = notes.get("user_query") or user_uuid_str
+            if q and "@" in q:
+                target_email = q.strip().lower()
+
+        if not user_uuid and target_email:
+            res = await db.execute(select(User).where(User.email == target_email))
+            found_user = res.scalar_one_or_none()
+            if found_user:
+                user_uuid = found_user.id
+
+        if not user_uuid:
+            # Guest checkout: Record in pending_web_entitlements so it auto-claims upon login/signup
+            if target_email:
+                store_order_id = notes.get("order_id") or payment_entity.get("receipt") or f"ORD-RZP-{payment_id}"
+                from sqlalchemy import text
+                chk_pending_guest = (await db.execute(text("""
+                    SELECT id, status FROM public.pending_web_entitlements
+                    WHERE order_id = :order_id OR payment_reference = :payment_id
+                """), {"order_id": store_order_id, "payment_id": payment_id})).fetchone()
+                if chk_pending_guest and chk_pending_guest[1] == "claimed":
+                    return {"status": "already_processed", "email": target_email, "payment_id": payment_id}
+
+                stmt = text("""
+                    INSERT INTO public.pending_web_entitlements 
+                    (order_id, email, product_identifier, payment_reference, amount_gross, currency, status)
+                    VALUES (:order_id, :email, :prod_id, :pay_ref, :amt, :curr, 'paid_pending_claim')
+                    ON CONFLICT (order_id) DO NOTHING
+                """)
+                currency = (payment_entity.get("currency") or "INR").upper()
+                amount_val = float(payment_entity.get("amount", 0)) / 100.0
+                await db.execute(stmt, {
+                    "order_id": store_order_id,
+                    "email": target_email,
+                    "prod_id": product_id,
+                    "pay_ref": payment_id,
+                    "amt": amount_val,
+                    "curr": currency
+                })
+                await db.commit()
+                return {"status": "pending_claim_recorded", "email": target_email, "payment_id": payment_id}
             return {"status": "ignored", "reason": "Invalid user UUID format"}
 
         # Single canonical ledger key matching verify endpoint + row locking
         store_order_id = notes.get("order_id") or payment_entity.get("receipt")
+        rzp_order_id = payment_entity.get("order_id")
         conditions = [InAppPurchase.transaction_reference == payment_id]
         if store_order_id:
             conditions.append(InAppPurchase.transaction_reference == store_order_id)
+        if rzp_order_id:
+            conditions.append(InAppPurchase.transaction_reference == rzp_order_id)
 
         existing_check = await db.execute(
             select(InAppPurchase).where(or_(*conditions)).with_for_update()
@@ -179,6 +224,21 @@ async def process_razorpay_webhook(
         existing_purchase = existing_check.scalar_one_or_none()
         if existing_purchase and existing_purchase.status == "completed":
             return {"status": "already_processed", "payment_id": payment_id}
+
+        # Check pending entitlements to prevent double-grant with auto-claim or verify endpoint
+        from sqlalchemy import text
+        chk_pending_stmt = text("""
+            SELECT id, status FROM public.pending_web_entitlements
+            WHERE (order_id = :order_id OR payment_reference = :payment_id)
+            FOR UPDATE
+        """)
+        pending_row = (await db.execute(chk_pending_stmt, {
+            "order_id": store_order_id or payment_id,
+            "payment_id": payment_id
+        })).fetchone()
+
+        if pending_row and pending_row[1] == "claimed":
+            return {"status": "already_processed", "reason": "claimed_via_web_or_app", "payment_id": payment_id}
 
         currency = (payment_entity.get("currency") or "INR").upper()
         amount_val = float(payment_entity.get("amount", 0)) / 100.0
@@ -211,6 +271,13 @@ async def process_razorpay_webhook(
                 status="completed"
             )
             db.add(iap_audit)
+
+        # Mark pending entitlement as claimed so subsequent app login does not double-grant
+        if pending_row and pending_row[1] == "paid_pending_claim":
+            await db.execute(
+                text("UPDATE public.pending_web_entitlements SET status = 'claimed', claimed_by_user_id = :uid, claimed_at = NOW() WHERE id = :id"),
+                {"uid": user_uuid, "id": pending_row[0]}
+            )
 
         # Grant Entitlement based on product type
         now = datetime.now(timezone.utc)
