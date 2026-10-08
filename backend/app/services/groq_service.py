@@ -326,3 +326,113 @@ class GroqAiService:
             existing.groq_reasoning = reason[:250]
             existing.status = "pending"
             await db.commit()
+
+    @classmethod
+    async def moderate_image_vision(cls, b64_img: str) -> Dict[str, Any]:
+        """
+        Multimodal AI Vision Sentinel for photo moderation.
+        Strictly enforces:
+        1. Zero-tolerance text detection (no quotes, memes, captions, watermarks, timestamps, screenshots, overlay text).
+        2. Prohibits full nudity, weapons, hate symbols.
+        3. Explicitly ALLOWS AI-edited portraits, filtered photos, color-graded photos, and normal portraits without text.
+        """
+        api_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
+        if not api_key:
+            return {"is_safe": True, "reason": "", "category": "safe"}
+
+        prompt = (
+            "You are a strict photo safety reviewer for the UR-Heart dating app.\n"
+            "Your job is to check if an uploaded profile photo complies with sanctuary safety policies.\n\n"
+            "CRITICAL ZERO-TOLERANCE RULE: NO TEXT IN PHOTOS\n"
+            "- Profile photos must NEVER contain ANY text, words, letters, numbers, captions, quotes, memes, watermarks, timestamps, social handles, or screenshots of text.\n"
+            "- If even minor, small, or subtle text is detected anywhere in the photo, you MUST INSTANTLY REJECT IT.\n\n"
+            "PROHIBITED (reject immediately):\n"
+            "- ANY text, typography, letters, words, quotes, memes, captions, watermarks, or screenshots (even minor text)\n"
+            "- Full nudity or genital exposure\n"
+            "- Completely topless or pornographic poses\n"
+            "- Weapons or violence\n"
+            "- Hate symbols\n\n"
+            "ALLOWED (do NOT reject these):\n"
+            "- AI-edited photos, AI portraits, face-tuned photos (ALLOWED as long as there is NO text)\n"
+            "- Photos with filters, vintage/beauty/color filters (ALLOWED as long as there is NO text)\n"
+            "- Normal clothed portraits, candid photos, selfies, outdoor photos (WITHOUT text)\n"
+            "- Traditional clothing, beachwear at pool/beach\n\n"
+            "Respond ONLY with raw JSON (no markdown):\n"
+            "If safe and has NO text: {\"is_safe\": true, \"reason\": \"\", \"category\": \"safe\"}\n"
+            "If text is detected: {\"is_safe\": false, \"category\": \"text_detected\", \"reason\": \"Text detected in photo. Photos containing text, quotes, captions, watermarks, or screenshots are strictly prohibited. Please upload a photo without any text.\"}\n"
+            "If other prohibited content: {\"is_safe\": false, \"category\": \"explicit\", \"reason\": \"Photo does not meet sanctuary clothed attire guidelines.\"}"
+        )
+
+        payload = {
+            "model": "qwen/qwen3.8-27b",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{b64_img}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "temperature": 0.1,
+            "max_tokens": 120,
+            "response_format": {"type": "json_object"}
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
+                if res.status_code == 200:
+                    raw_content = res.json()["choices"][0]["message"]["content"]
+                    data = json.loads(raw_content)
+                    return {
+                        "is_safe": bool(data.get("is_safe", True)),
+                        "reason": str(data.get("reason", "")),
+                        "category": str(data.get("category", "safe"))
+                    }
+                else:
+                    logger.warning("Groq Vision non-200 response: %s %s", res.status_code, res.text[:120])
+        except Exception as e:
+            logger.warning("Groq Vision moderation exception/fallback: %s", str(e))
+
+        # Secondary fallback: OpenRouter Free Tier multimodal vision if configured
+        or_key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
+        if or_key:
+            try:
+                or_headers = {
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://urheart.asiverticals.me",
+                    "X-Title": "UR-Heart Mindful Sanctuary",
+                    "Authorization": f"Bearer {or_key}"
+                }
+                or_payload = {
+                    "model": "qwen/qwen-2.5-vl-72b-instruct:free",
+                    "messages": payload["messages"],
+                    "temperature": 0.1,
+                    "response_format": {"type": "json_object"}
+                }
+                async with httpx.AsyncClient(timeout=6.0) as client:
+                    or_endpoint = settings.OPENROUTER_API_URL or OPENROUTER_ENDPOINT
+                    res = await client.post(or_endpoint, headers=or_headers, json=or_payload)
+                    if res.status_code == 200:
+                        raw_content = res.json()["choices"][0]["message"]["content"]
+                        data = json.loads(raw_content)
+                        return {
+                            "is_safe": bool(data.get("is_safe", True)),
+                            "reason": str(data.get("reason", "")),
+                            "category": str(data.get("category", "safe"))
+                        }
+            except Exception as fb_err:
+                logger.warning("OpenRouter Vision fallback exception: %s", str(fb_err))
+
+        # Fail-closed sentinel: configured vision providers failed or unavailable
+        return {
+            "is_safe": False,
+            "reason": "AI Vision moderation temporarily unavailable. Please try again.",
+            "category": "service_unavailable"
+        }

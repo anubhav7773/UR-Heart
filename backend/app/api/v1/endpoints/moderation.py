@@ -31,11 +31,12 @@ async def moderate_photo(file: UploadFile = File(...)):
             detail="Empty image payload provided."
         )
 
-    is_safe, message = await PhotoModerationService.inspect_photo_bytes_with_ai(contents)
+    is_safe, message, category = await PhotoModerationService.inspect_photo_bytes_with_ai(contents)
     if not is_safe:
         return {
             "status": "rejected",
             "is_safe": False,
+            "category": category,
             "reason": message
         }
 

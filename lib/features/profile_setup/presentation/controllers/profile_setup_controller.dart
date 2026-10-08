@@ -305,7 +305,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       state = state.copyWith(
         isUploadingPhoto: false,
         lastModerationError: moderation.rejectionReason ??
-            'Photo rejected: Intimate, explicit, or abusive content is strictly prohibited.',
+            'Photo rejected: Photos containing text, quotes, watermarks, or policy violations are strictly prohibited.',
       );
       return false;
     }

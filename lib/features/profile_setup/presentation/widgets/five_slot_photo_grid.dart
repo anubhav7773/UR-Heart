@@ -33,6 +33,8 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
     if (!success && context.mounted) {
       final error = ref.read(profileSetupControllerProvider).lastModerationError;
       if (error != null) {
+        final bool isTextError = error.toLowerCase().contains('text detected') ||
+            error.toLowerCase().contains('text');
         showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -40,14 +42,18 @@ class FiveSlotPhotoGrid extends ConsumerWidget {
                 ? DarkSanctuaryTokens.surfaceCard
                 : LightSanctuaryTokens.surfaceCard,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.shield_outlined, color: Color(0xFFE63946), size: 24),
-                SizedBox(width: 10),
+                Icon(
+                  isTextError ? Icons.text_fields_outlined : Icons.shield_outlined,
+                  color: const Color(0xFFE63946),
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Sanctuary Safety Alert',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    isTextError ? 'Text Detected in Photo' : 'Sanctuary Safety Alert',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],

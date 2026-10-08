@@ -127,18 +127,13 @@ class ImageModerationService {
     return ModerationResult.approved();
   }
 
-  /// Evaluates image with Groq Llama-3.2-11b-vision-preview for truly explicit content.
+  /// Evaluates image with Groq Vision sentinel for explicit content and text detection.
   ///
-  /// The prompt is carefully calibrated to ONLY reject:
-  ///   - Full nudity / genital exposure / toplessness
-  ///   - Pornographic or sexually explicit poses
-  ///   - Weapons, violence, or hate symbols
-  ///
-  /// The prompt explicitly APPROVES:
-  ///   - Normal clothed photos (t-shirts, shirts, kurtas, casual wear)
-  ///   - Outdoor photos, selfies, group photos
-  ///   - Traditional/ethnic clothing
-  ///   - Photos with warm lighting or darker skin tones
+  /// CRITICAL ZERO-TOLERANCE RULE:
+  ///   - Any photo containing text, quotes, memes, captions, watermarks, timestamps, or screenshots
+  ///     (even minor/subtle text) is instantly rejected.
+  ///   - AI-edited photos and filtered photos are 100% ALLOWED as long as they contain NO text.
+  ///   - Full nudity, weapons, and hate symbols are strictly prohibited.
   static Future<ModerationResult> _checkWithGroqVision(Uint8List bytes) async {
     if (_groqApiKey.isEmpty) return ModerationResult.approved();
     try {
@@ -160,26 +155,26 @@ class ImageModerationService {
               {
                 'type': 'text',
                 'text':
-                    'You are a photo safety reviewer for a dating app. '
-                    'Your job is to check if a profile photo contains STRICTLY PROHIBITED content.\n\n'
-                    'PROHIBITED (reject ONLY these):\n'
+                    'You are a strict photo safety reviewer for the UR-Heart dating app.\n'
+                    'Your job is to check if an uploaded profile photo complies with sanctuary safety policies.\n\n'
+                    'CRITICAL ZERO-TOLERANCE RULE: NO TEXT IN PHOTOS\n'
+                    '- Profile photos must NEVER contain ANY text, words, letters, numbers, captions, quotes, memes, watermarks, timestamps, social handles, or screenshots of text.\n'
+                    '- If even minor, small, or subtle text is detected anywhere in the photo, you MUST INSTANTLY REJECT IT.\n\n'
+                    'PROHIBITED (reject immediately):\n'
+                    '- ANY text, typography, letters, words, quotes, memes, captions, watermarks, or screenshots (even minor text)\n'
                     '- Full nudity or genital exposure\n'
-                    '- Completely topless (no shirt/top at all, bare chest fully visible)\n'
-                    '- Pornographic or sexually explicit poses\n'
-                    '- Weapons (guns, knives) being brandished\n'
-                    '- Hate symbols or extremely offensive gestures\n\n'
+                    '- Completely topless or pornographic poses\n'
+                    '- Weapons or violence\n'
+                    '- Hate symbols or offensive gestures\n\n'
                     'ALLOWED (do NOT reject these):\n'
-                    '- Any person wearing a t-shirt, shirt, kurta, blouse, dress, or any normal clothing\n'
-                    '- Casual outdoor photos, selfies, group photos\n'
-                    '- Photos with warm lighting, different skin tones\n'
-                    '- Traditional or ethnic clothing\n'
-                    '- Swimwear at a beach/pool (acceptable for dating profiles)\n'
-                    '- Sleeveless tops, tank tops, crop tops\n'
-                    '- Photos where arms/hands/face skin is visible (this is normal)\n\n'
-                    'IMPORTANT: Most profile photos show normal clothed people. When in doubt, APPROVE the photo.\n\n'
+                    '- AI-edited photos, AI portraits, face-tuned photos (ALLOWED as long as there is NO text)\n'
+                    '- Photos with filters, vintage/beauty/color filters (ALLOWED as long as there is NO text)\n'
+                    '- Normal clothed portraits, candid photos, selfies, outdoor photos (WITHOUT text)\n'
+                    '- Traditional clothing, beachwear at pool/beach\n\n'
                     'Respond ONLY with raw JSON (no markdown):\n'
-                    'If safe: {"is_safe": true, "reason": ""}\n'
-                    'If prohibited: {"is_safe": false, "category": "explicit"|"weapons"|"hate", "reason": "Brief reason"}'
+                    'If safe and has NO text: {"is_safe": true, "reason": ""}\n'
+                    'If contains text: {"is_safe": false, "category": "text_detected", "reason": "Text detected in photo. Photos containing text, quotes, captions, watermarks, or screenshots are strictly prohibited. Please upload a photo without any text."}\n'
+                    'If other prohibited content: {"is_safe": false, "category": "explicit"|"weapons"|"hate", "reason": "Brief reason"}'
               },
               {
                 'type': 'image_url',
@@ -191,7 +186,7 @@ class ImageModerationService {
           }
         ],
         'temperature': 0.1,
-        'max_tokens': 100,
+        'max_tokens': 120,
       };
 
       final response = await http.post(
@@ -215,7 +210,7 @@ class ImageModerationService {
               final reason = parsed['reason'] as String? ?? 'Photo violates community guidelines.';
               final category = parsed['category'] as String? ?? 'explicit';
               return ModerationResult.rejected(
-                'Photo Rejected: $reason',
+                reason,
                 category: category,
               );
             }
