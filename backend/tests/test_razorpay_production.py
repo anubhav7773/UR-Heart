@@ -690,3 +690,25 @@ def test_store_products_pricing_consistency():
     assert STORE_PRODUCTS["urheart_pack_global_passport"]["price_usd"] == 1.99
 
 
+def test_serve_web_sanctuary_store_html_render_success():
+    """Verify GET /store renders complete valid HTML without 500 template evaluation error."""
+    response = client.get("/store")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    content = response.text
+    assert "<title>Sanctuary Store | UR-Heart Sovereign Web Privileges</title>" in content
+    assert "const productCatalog = {" in content
+    assert '"urheart_pass_monthly": { inr: 149, usd: 14.99, name: "1-Month Sovereign Pass" }' in content
+    assert "updatePriceDisplays()" in content
+    assert "processPaymentLive()" in content
+
+
+def test_serve_web_sanctuary_store_checkout_route():
+    """Verify GET /store/checkout alias renders complete valid HTML."""
+    response = client.get("/store/checkout")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    assert "<title>Sanctuary Store | UR-Heart Sovereign Web Privileges</title>" in response.text
+
+
+

@@ -1657,14 +1657,14 @@ async def serve_web_sanctuary_store(request: Request):
       window.scrollTo({{ top: 0, behavior: "smooth" }});
     }}
 
-    const productCatalog = {
-      "urheart_pass_monthly": { inr: 149, usd: 14.99, name: "1-Month Sovereign Pass" },
-      "urheart_pass_weekly": { inr: 49, usd: 4.99, name: "1-Week Sovereign Sprint" },
-      "urheart_pass_lifetime": { inr: 1499, usd: 59.99, name: "1-Year Sovereign Pass" },
-      "urheart_key_instant_contact": { inr: 29, usd: 1.49, name: "Instant Contact Key" },
-      "urheart_pack_direct_letters": { inr: 49, usd: 1.99, name: "3 Direct Letters Pack" },
-      "urheart_pack_global_passport": { inr: 99, usd: 1.99, name: "24h Global Passport" }
-    };
+    const productCatalog = {{
+      "urheart_pass_monthly": {{ inr: 149, usd: 14.99, name: "1-Month Sovereign Pass" }},
+      "urheart_pass_weekly": {{ inr: 49, usd: 4.99, name: "1-Week Sovereign Sprint" }},
+      "urheart_pass_lifetime": {{ inr: 1499, usd: 59.99, name: "1-Year Sovereign Pass" }},
+      "urheart_key_instant_contact": {{ inr: 29, usd: 1.49, name: "Instant Contact Key" }},
+      "urheart_pack_direct_letters": {{ inr: 49, usd: 1.99, name: "3 Direct Letters Pack" }},
+      "urheart_pack_global_passport": {{ inr: 99, usd: 1.99, name: "24h Global Passport" }}
+    }};
 
     function updatePriceDisplays() {{
       const isUsd = selectedCurrency === "USD";

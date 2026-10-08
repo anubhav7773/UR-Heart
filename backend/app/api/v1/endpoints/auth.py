@@ -512,11 +512,6 @@ async def send_magic_link(payload: MagicLinkSendRequest, db: AsyncSession = Depe
         "message": dispatch_res.get("message", "A sacred Firebase verification link has been dispatched to your email address.")
     }
 
-    # Strict Security Guard: Only expose magic_link/deep_link in non-production or debug test environments
-    if getattr(settings, "ENVIRONMENT", "production") != "production" or getattr(settings, "DEBUG", False):
-        response_payload["magic_link"] = browser_verify_link
-        response_payload["deep_link"] = deep_link
-
     return response_payload
 
 
