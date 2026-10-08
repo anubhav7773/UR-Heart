@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
@@ -115,9 +116,9 @@ class FeedScreen extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Sanctuary Blind Date Entry Banner
+            // Sanctuary Blind Date Entry Banner (Teaser & 1M Milestone Awakening)
             GestureDetector(
-              onTap: () => Navigator.of(context).pushNamed('/blind-date'),
+              onTap: () => _showBlindPulseMilestoneModal(context, isDark, ref),
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                 padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
@@ -149,16 +150,38 @@ class FeedScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'Sanctuary Blind Date',
-                            style: TextStyle(
-                              color: primaryText,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                'Sanctuary Blind Date',
+                                style: TextStyle(
+                                  color: primaryText,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD97746).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFD97746).withValues(alpha: 0.4), width: 0.8),
+                                ),
+                                child: const Text(
+                                  '1M MILESTONE 🔒',
+                                  style: TextStyle(
+                                    color: Color(0xFFD97746),
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           Text(
-                            '5-min veiled soul dialogue • Sunday 8 PM Pulse',
+                            'Cosmic veiled soul resonance • Coming at 1M Pan-India Seekers',
                             style: TextStyle(
                               color: subText,
                               fontSize: 11,
@@ -480,4 +503,216 @@ class FeedScreen extends ConsumerWidget {
       },
     );
   }
+
+  void _showBlindPulseMilestoneModal(BuildContext context, bool isDark, WidgetRef ref) {
+    final surface = isDark ? const Color(0xFF181B20) : Colors.white;
+    final primaryText = isDark ? DarkSanctuaryTokens.primaryText : LightSanctuaryTokens.primaryText;
+    final subText = isDark ? DarkSanctuaryTokens.secondaryText : LightSanctuaryTokens.secondaryText;
+    const terracotta = Color(0xFFD97746);
+    const gold = Color(0xFFD4AF37);
+
+    final growthState = ref.read(growthHubControllerProvider);
+    final refCode = growthState.referralCode.isNotEmpty ? growthState.referralCode : 'UR-SANCTUARY';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.9,
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: terracotta.withValues(alpha: 0.35), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.15),
+              blurRadius: 30,
+              offset: const Offset(0, -6),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Pill drag handle
+                Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Sovereign Milestone Lock Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: terracotta.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: terracotta.withValues(alpha: 0.4), width: 1),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_clock_rounded, size: 14, color: terracotta),
+                    SizedBox(width: 6),
+                    Text(
+                      'SOVEREIGN MILESTONE LOCK',
+                      style: TextStyle(
+                        color: terracotta,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Title
+              Text(
+                'Blind Pulse: Cosmic Veiled Encounters',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: primaryText,
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Core 1M Pan-India Requirement (English as requested)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: terracotta.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: terracotta.withValues(alpha: 0.3), width: 1),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.stars_rounded, color: gold, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'This sovereign feature is coming soon and will unlock exclusively once UR-Heart achieves 1,000,000 Daily Active Seekers Pan-India.',
+                        style: TextStyle(
+                          color: primaryText,
+                          fontSize: 12.5,
+                          height: 1.45,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Curiosity & Viral Marketing Narrative
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.black12, width: 0.8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '✨ The Sacred Experience Awaiting You:',
+                      style: TextStyle(
+                        color: gold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '• 5-Minute Veiled Soul Dialogue: Profiles, photos, and superficial attributes remain strictly veiled.\n'
+                      '• Pure Chemistry: Match solely through real-time emotional wavelength and unmasked conversation.\n'
+                      '• Mutual Consent Reveal: Faces only illuminate if both seekers mutually choose to unveil at the finale.\n'
+                      '• High-Density Cosmic Radius: The portal requires a deep sanctuary mesh across every Indian city to guarantee instantaneous, authentic pairings without idle waiting.',
+                      style: TextStyle(
+                        color: subText,
+                        fontSize: 11.5,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Viral Call to Action Button: Share Sanctuary Crest
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    final shareText =
+                        'Join me in UR-Heart — A mindful sanctuary of soul-first connection without superficial swiping.\n'
+                        'Fast-track the 1M Blind Pulse Awakening with my Passage Crest: $refCode\n'
+                        'https://urheart.asiverticals.me/join?ref=$refCode';
+                    try {
+                      await Share.share(
+                        shareText,
+                        subject: 'Accelerate the 1M Blind Pulse Awakening on UR-Heart',
+                      );
+                    } catch (_) {}
+                  },
+                  icon: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF0B1410)),
+                  label: const Text(
+                    'Invite Kindred Spirits (Fast-Track 1M) 🕊️',
+                    style: TextStyle(
+                      color: Color(0xFF0B1410),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: gold,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Dismiss
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  'I Will Await the Pulse',
+                  style: TextStyle(
+                    color: subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
 }

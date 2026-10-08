@@ -1551,8 +1551,8 @@ async def serve_web_sanctuary_store(request: Request):
         <div class="step-headline">Step 1: Choose Your Sovereign Pass</div>
         <div class="step-subtext">All passes unlocked via web include 10% extra reflections and permanent priority sync.</div>
 
-        <!-- Currency Selector Toggle -->
-        <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:24px;">
+        <!-- Currency Selector Toggle (Hidden for V1 Domestic Launch; Backend USD Ready) -->
+        <div style="display:none; justify-content:center; align-items:center; gap:12px; margin-bottom:24px;">
           <span style="font-size:13px; color:var(--text-muted); font-weight:500;">Select Currency:</span>
           <div style="display:inline-flex; background:rgba(22,33,29,0.9); border:1px solid rgba(43,61,53,0.85); border-radius:30px; padding:3px;">
             <button type="button" id="currBtnInr" onclick="setCurrency('INR')" style="padding:6px 16px; border-radius:24px; border:none; font-size:12px; font-weight:600; cursor:pointer; background:var(--gold); color:#0B1410; transition:all 0.2s;">
