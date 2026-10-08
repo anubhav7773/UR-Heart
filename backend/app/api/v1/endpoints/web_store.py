@@ -98,6 +98,9 @@ class VerifyUserRequest(BaseModel):
     query: str = Field(..., min_length=2, max_length=150, description="Email, Referral Code, or User UUID")
 
 
+SUPPORTED_STORE_CURRENCIES: set[str] = {"INR", "USD"}
+
+
 class CreateOrderRequest(BaseModel):
     product_id: str
     user_query: str
@@ -196,8 +199,16 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
     if not product:
         raise HTTPException(status_code=400, detail="Invalid product selected.")
 
+    # Validate currency before creating order (CodeRabbit Fix #1)
+    normalized_currency = (payload.currency or "INR").strip().upper()
+    if normalized_currency not in SUPPORTED_STORE_CURRENCIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported currency '{payload.currency}'. Supported currencies: {', '.join(sorted(SUPPORTED_STORE_CURRENCIES))}."
+        )
+
     order_id = f"ORD-UR-{uuid.uuid4().hex[:8].upper()}"
-    amount = product["price_inr"] if payload.currency == "INR" else product["price_usd"]
+    amount = product["price_inr"] if normalized_currency == "INR" else product["price_usd"]
 
     order_data = {
         "order_id": order_id,
@@ -205,7 +216,7 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         "product_name": product["name"],
         "user_query": payload.user_query,
         "amount": amount,
-        "currency": payload.currency,
+        "currency": normalized_currency,
         "payment_method": payload.payment_method,
         "status": "pending_verification",
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -239,11 +250,11 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         "product_id": payload.product_id,
         "user_id": user_id_for_notes,
         "user_query": user_query,
-        "currency": payload.currency
+        "currency": normalized_currency
     }
     razorpay_order = await RazorpayService.create_order(
         amount=float(amount),
-        currency=payload.currency,
+        currency=normalized_currency,
         receipt=order_id,
         notes=notes
     )
@@ -258,13 +269,13 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
     if user or not is_demo_seeker:
         try:
             target_user_id = user.id if user else (parsed_uuid or uuid.uuid4())
-            resolved_store = "web_razorpay_india" if payload.currency == "INR" else "web_razorpay_international"
+            resolved_store = "web_razorpay_india" if normalized_currency == "INR" else "web_razorpay_international"
             ledger = InAppPurchase(
                 user_id=target_user_id,
                 transaction_reference=order_id,
                 product_identifier=payload.product_id,
                 store=resolved_store,
-                currency=payload.currency,
+                currency=normalized_currency,
                 amount_gross=float(amount),
                 platform_fee=0.00,
                 amount_net=float(amount),
@@ -286,9 +297,9 @@ async def create_store_order(payload: CreateOrderRequest, db: AsyncSession = Dep
         "razorpay_key_id": client_cfg["key_id"],
         "razorpay_merchant_name": client_cfg["merchant_name"],
         "razorpay_theme_color": client_cfg["theme_color"],
-        "currency": payload.currency,
+        "currency": normalized_currency,
         "amount_subunits": amount_subunits,
-        "amount_paise": amount_subunits if payload.currency == "INR" else None
+        "amount_paise": amount_subunits if normalized_currency == "INR" else None
     }
 
 
@@ -1433,7 +1444,7 @@ async def serve_web_sanctuary_store(request: Request):
           <div class="product-card" id="card_urheart_pack_global_passport" onclick="selectProduct('urheart_pack_global_passport')">
             <span class="product-card-badge">Passport</span>
             <div class="product-name">24h Global Passport</div>
-            <div class="product-price" id="price_urheart_pack_global_passport">₹79</div>
+            <div class="product-price" id="price_urheart_pack_global_passport">₹99</div>
             <div class="product-bonus">✨ 24h Global Teleportation</div>
             <ul class="product-features">
               <li>Teleport to Any Global City</li>
@@ -1601,9 +1612,10 @@ async def serve_web_sanctuary_store(request: Request):
     let selectedProductId = "urheart_pass_monthly";
     let selectedProductName = "1-Month Sovereign Pass";
     let selectedPrice = 149;
-    let verifiedAccount = "seeker@urheart.app";
+    let selectedCurrency = "INR";
     let selectedMethod = "upi";
-    let currentOrderId = "";
+    let verifiedAccount = "seeker@urheart.app";
+    let currentOrderId = "ORD-UR-INITIAL";
 
     // Pre-fill from URL parameters if available
     window.addEventListener("DOMContentLoaded", () => {{
@@ -1645,21 +1657,13 @@ async def serve_web_sanctuary_store(request: Request):
       window.scrollTo({{ top: 0, behavior: "smooth" }});
     }}
 
-    let selectedProductId = "urheart_pass_monthly";
-    let selectedPrice = 149;
-    let selectedProductName = "1-Month Sovereign Pass";
-    let selectedCurrency = "INR";
-    let selectedMethod = "upi";
-    let verifiedAccount = "";
-    let currentOrderId = "ORD-UR-INITIAL";
-
     const productCatalog = {
       "urheart_pass_monthly": { inr: 149, usd: 14.99, name: "1-Month Sovereign Pass" },
       "urheart_pass_weekly": { inr: 49, usd: 4.99, name: "1-Week Sovereign Sprint" },
       "urheart_pass_lifetime": { inr: 1499, usd: 59.99, name: "1-Year Sovereign Pass" },
       "urheart_key_instant_contact": { inr: 29, usd: 1.49, name: "Instant Contact Key" },
-      "urheart_pack_direct_letters": { inr: 49, usd: 2.99, name: "3 Direct Letters Pack" },
-      "urheart_pack_global_passport": { inr: 79, usd: 3.99, name: "24h Global Passport" }
+      "urheart_pack_direct_letters": { inr: 49, usd: 1.99, name: "3 Direct Letters Pack" },
+      "urheart_pack_global_passport": { inr: 99, usd: 1.99, name: "24h Global Passport" }
     };
 
     function updatePriceDisplays() {{

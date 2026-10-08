@@ -618,3 +618,75 @@ def test_razorpay_webhook_usd_payment_captured_grant_entitlement():
     finally:
         app.dependency_overrides.pop(get_db, None)
 
+
+def test_store_create_order_unsupported_currency_rejected():
+    """Unsupported currency is rejected with HTTP 400 Bad Request."""
+    seeker = create_mock_seeker()
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = MagicMock(scalar_one_or_none=lambda: seeker)
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    try:
+        response = client.post(
+            "/api/v1/store/create-order",
+            json={
+                "product_id": "urheart_pass_monthly",
+                "user_query": seeker.email,
+                "payment_method": "cards",
+                "currency": "EUR"
+            }
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert "Unsupported currency 'EUR'" in data["detail"]
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_store_create_order_currency_case_insensitive_normalized():
+    """Lowercase currencies like 'inr' or 'usd' are normalized to uppercase."""
+    seeker = create_mock_seeker()
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = MagicMock(scalar_one_or_none=lambda: seeker)
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    mock_rzp_order = {
+        "id": "order_RZP_NORM_123",
+        "entity": "order",
+        "amount": 14900,
+        "currency": "INR",
+        "status": "created",
+        "receipt": "RCPT-NORM-001",
+        "notes": {}
+    }
+
+    try:
+        with patch.object(settings, "RAZORPAY_KEY_ID", "rzp_test_mock123"), \
+             patch.object(settings, "RAZORPAY_KEY_SECRET", "rzp_sec_mock456"), \
+             patch("app.services.razorpay_service.RazorpayService.create_order", new_callable=AsyncMock, return_value=mock_rzp_order):
+            response = client.post(
+                "/api/v1/store/create-order",
+                json={
+                    "product_id": "urheart_pass_monthly",
+                    "user_query": seeker.email,
+                    "payment_method": "upi",
+                    "currency": "inr"
+                }
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["currency"] == "INR"
+            assert data["order"]["currency"] == "INR"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_store_products_pricing_consistency():
+    """Verify STORE_PRODUCTS catalogue pricing matches expected specifications."""
+    from app.api.v1.endpoints.web_store import STORE_PRODUCTS
+    assert STORE_PRODUCTS["urheart_pack_direct_letters"]["price_inr"] == 49
+    assert STORE_PRODUCTS["urheart_pack_direct_letters"]["price_usd"] == 1.99
+    assert STORE_PRODUCTS["urheart_pack_global_passport"]["price_inr"] == 99
+    assert STORE_PRODUCTS["urheart_pack_global_passport"]["price_usd"] == 1.99
+
+
