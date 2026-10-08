@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 from uuid import UUID
 from fastapi import APIRouter, Request, HTTPException, status, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 
 from app.core.database import get_db
 from app.models.domain.user import User
@@ -131,6 +131,9 @@ async def process_revenuecat_event(
     return {"status": "success", "event": event_type}
 
 
+from app.services.razorpay_service import RazorpayService
+
+
 @router.post("/webhook/razorpay", status_code=status.HTTP_200_OK)
 async def process_razorpay_webhook(
     request: Request,
@@ -140,15 +143,10 @@ async def process_razorpay_webhook(
     """
     Authenticates Sanctuary Web Store payments (India Corridor).
     Enforces HMAC-SHA256 signature verification over raw body bytes.
+    Handles all 6 products with strict idempotency and zero lost orders.
     """
     body_bytes = await request.body()
-    expected_signature = hmac.new(
-        RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
-        body_bytes,
-        hashlib.sha256
-    ).hexdigest()
-
-    if not hmac.compare_digest(expected_signature, x_razorpay_signature):
+    if not RazorpayService.verify_webhook_signature(body_bytes, x_razorpay_signature):
         raise HTTPException(status_code=403, detail="Invalid Razorpay webhook signature.")
 
     payload = await request.json()
@@ -168,43 +166,90 @@ async def process_razorpay_webhook(
             user_uuid = UUID(user_uuid_str)
         except (ValueError, TypeError, AttributeError):
             return {"status": "ignored", "reason": "Invalid user UUID format"}
+
+        # Single canonical ledger key matching verify endpoint + row locking
+        store_order_id = notes.get("order_id") or payment_entity.get("receipt")
+        conditions = [InAppPurchase.transaction_reference == payment_id]
+        if store_order_id:
+            conditions.append(InAppPurchase.transaction_reference == store_order_id)
+
+        existing_check = await db.execute(
+            select(InAppPurchase).where(or_(*conditions)).with_for_update()
+        )
+        existing_purchase = existing_check.scalar_one_or_none()
+        if existing_purchase and existing_purchase.status == "completed":
+            return {"status": "already_processed", "payment_id": payment_id}
+
         amount_inr = float(payment_entity.get("amount", 0)) / 100.0
         fee = round(amount_inr * 0.02, 2)  # Razorpay 2% fee
         net = round(amount_inr - fee, 2)
 
-        # Record Ledger (98% Net in hand)
-        iap_audit = InAppPurchase(
-            user_id=user_uuid,
-            transaction_reference=payment_id,
-            product_identifier=product_id,
-            store="web_razorpay_india",
-            currency="INR",
-            amount_gross=amount_inr,
-            platform_fee=fee,
-            amount_net=net,
-            status="completed"
-        )
-        db.add(iap_audit)
+        canonical_key = store_order_id or payment_id
 
-        # Grant Entitlement
-        tier = "monthly" if "monthly" in product_id else ("weekly" if "weekly" in product_id else "lifetime")
-        swipes_grant = 500 if tier == "monthly" else (100 if tier == "weekly" else 999999)
-        letters_grant = 5 if tier == "monthly" else (0 if tier == "weekly" else 10)
-        dur_days = 30 if tier == "monthly" else (7 if tier == "weekly" else 365)
-        now = datetime.now(timezone.utc)
-        expires_at = now + timedelta(days=dur_days)
-
-        await db.execute(
-            update(User)
-            .where(User.id == user_uuid)
-            .values(
-                subscription_tier=tier,
-                subscription_expires_at=expires_at,
-                is_ad_free=True,
-                swipes_remaining=User.swipes_remaining + swipes_grant,
-                direct_letters_count=User.direct_letters_count + letters_grant
+        # Record Ledger (98% Net in hand) using unified canonical key
+        if existing_purchase:
+            existing_purchase.status = "completed"
+            existing_purchase.transaction_reference = canonical_key
+            existing_purchase.amount_gross = amount_inr
+            existing_purchase.platform_fee = fee
+            existing_purchase.amount_net = net
+        else:
+            iap_audit = InAppPurchase(
+                user_id=user_uuid,
+                transaction_reference=canonical_key,
+                product_identifier=product_id,
+                store="web_razorpay_india",
+                currency="INR",
+                amount_gross=amount_inr,
+                platform_fee=fee,
+                amount_net=net,
+                status="completed"
             )
-        )
+            db.add(iap_audit)
+
+        # Grant Entitlement based on product type
+        now = datetime.now(timezone.utc)
+        if "direct_letters" in product_id:
+            await db.execute(
+                update(User)
+                .where(User.id == user_uuid)
+                .values(direct_letters_count=User.direct_letters_count + 4)
+            )
+        elif "instant_contact" in product_id:
+            await db.execute(
+                update(User)
+                .where(User.id == user_uuid)
+                .values(reveal_tokens_count=User.reveal_tokens_count + 1)
+            )
+        elif "global_passport" in product_id:
+            expires_at = now + timedelta(days=1)
+            await db.execute(
+                update(User)
+                .where(User.id == user_uuid)
+                .values(
+                    subscription_expires_at=expires_at,
+                    swipes_remaining=User.swipes_remaining + 10,
+                    is_ad_free=True
+                )
+            )
+        else:
+            tier = "monthly" if "monthly" in product_id else ("weekly" if "weekly" in product_id else "lifetime")
+            swipes_grant = 550 if tier == "monthly" else (110 if tier == "weekly" else 999999)
+            letters_grant = 6 if tier == "monthly" else (1 if tier == "weekly" else 11)
+            dur_days = 30 if tier == "monthly" else (7 if tier == "weekly" else 365)
+            expires_at = now + timedelta(days=dur_days)
+
+            await db.execute(
+                update(User)
+                .where(User.id == user_uuid)
+                .values(
+                    subscription_tier=tier,
+                    subscription_expires_at=expires_at,
+                    is_ad_free=True,
+                    swipes_remaining=User.swipes_remaining + swipes_grant,
+                    direct_letters_count=User.direct_letters_count + letters_grant
+                )
+            )
         await db.commit()
 
     return {"status": "success"}

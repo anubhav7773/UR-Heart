@@ -1,4 +1,5 @@
 import os
+import sys
 from functools import lru_cache
 from typing import Optional
 from pydantic import model_validator
@@ -82,9 +83,13 @@ class Settings(BaseSettings):
     CHARTBOOST_SSV_SECRET: str = "chartboost_ssv_secret_sanctuary_2026"
     LIFTOFF_SSV_SECRET: str = "liftoff_ssv_secret_sanctuary_2026"
 
-    # Billing & Store Webhook Secrets
+    # Billing & Store (Razorpay India & Stripe Global)
     REVENUECAT_WEBHOOK_SECRET: str = "rc_webhook_secret_sanctuary_2026"
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
     RAZORPAY_WEBHOOK_SECRET: str = "rzp_webhook_secret_sanctuary_2026"
+    RAZORPAY_MERCHANT_NAME: str = "UR-Heart Sanctuary"
+    RAZORPAY_THEME_COLOR: str = "#2E6F5E"
     STRIPE_WEBHOOK_SECRET: str = "stripe_webhook_secret_sanctuary_2026"
 
     # Superadmin Sentinel Gate
@@ -119,6 +124,12 @@ class Settings(BaseSettings):
             admin_key = self.SUPERADMIN_SECRET_KEY or os.getenv("SUPERADMIN_SECRET_KEY") or ""
             if not admin_key or admin_key in {"asiverticals_sovereign_sanctuary_2026"}:
                 missing.append("SUPERADMIN_SECRET_KEY (must be custom high-entropy secret in production)")
+            if not self.RAZORPAY_KEY_ID or not self.RAZORPAY_KEY_ID.strip():
+                missing.append("RAZORPAY_KEY_ID (must be configured in production)")
+            if not self.RAZORPAY_KEY_SECRET or not self.RAZORPAY_KEY_SECRET.strip():
+                missing.append("RAZORPAY_KEY_SECRET (must be configured in production)")
+            if not self.RAZORPAY_WEBHOOK_SECRET or self.RAZORPAY_WEBHOOK_SECRET in {"rzp_webhook_secret_sanctuary_2026", ""}:
+                missing.append("RAZORPAY_WEBHOOK_SECRET (must be a custom production secret, not default)")
 
             if missing:
                 raise ValueError(
