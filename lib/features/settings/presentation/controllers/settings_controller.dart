@@ -153,6 +153,16 @@ class SettingsController extends StateNotifier<SettingsState> {
     );
   }
 
+  Future<void> togglePhotoVeil(bool value) async {
+    final updated = await _repo.updateSettings(isPhotoVeiled: value);
+    state = state.copyWith(
+      settings: updated,
+      successMessage: value
+          ? 'Sacred Photo Veil active: Blurred until mutual consent'
+          : 'Sacred Photo Veil disabled: Portrait visible on feed',
+    );
+  }
+
   Future<void> rotateKey() async {
     state = state.copyWith(isRotatingKey: true, errorMessage: null);
     try {

@@ -155,6 +155,34 @@ class FeedRepository {
     }
   }
 
+  /// Requests bilateral photo reveal from a veiled candidate.
+  Future<bool> requestPhotoReveal(String targetUserId) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/api/v1/feed/$targetUserId/photo-reveal/request',
+      );
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
+  /// Responds to a bilateral photo reveal request ('accept' or 'decline').
+  Future<bool> respondToPhotoReveal(String requesterUserId, String action) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/api/v1/feed/$requesterUserId/photo-reveal/respond',
+        data: {'action': action},
+      );
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      _handleDioError(e);
+      rethrow;
+    }
+  }
+
+
   void _handleDioError(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
       throw const NetworkUnavailableException();

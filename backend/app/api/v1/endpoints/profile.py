@@ -12,6 +12,7 @@ from app.core.security import get_current_user
 from app.models.domain.user import User
 from app.models.domain.match import Match
 from app.models.domain.whatsapp_token import WhatsAppRevealToken
+from app.models.domain.photo_reveal_consent import PhotoRevealConsent
 from app.services.streak_engine import StreakEngine
 from app.services.resonance_engine import ResonanceEngine
 
@@ -57,6 +58,7 @@ class ProfileUpdateRequest(BaseModel):
     voice_spark_prompt: Optional[str] = None
     voice_spark_duration: Optional[float] = None
     is_voice_verified: Optional[bool] = None
+    is_photo_veiled: Optional[bool] = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -118,6 +120,7 @@ async def get_my_authenticated_profile(
         "is_profile_completed": current_user.is_profile_completed,
         "night_slumber": current_user.night_slumber,
         "is_incognito": current_user.is_incognito,
+        "is_photo_veiled": bool(current_user.is_photo_veiled),
         "discreet_mode": current_user.discreet_mode,
         "contact_bridge_type": current_user.contact_bridge_type,
         "contact_bridge_masked": (
@@ -209,6 +212,39 @@ async def get_seeker_profile(
     is_self = bool(current_user and current_user.id == target_user.id)
     dob_value = (target_user.dob.isoformat() if target_user.dob else None) if is_self else None
 
+    # Sacred Photo Veil bilateral consent determination
+    is_photo_veiled = bool(target_user.is_photo_veiled)
+    is_photo_unlocked = True
+    photo_reveal_status = "none"
+
+    if is_photo_veiled and not is_self:
+        # Check active match (mutual like unlocks photo veil)
+        if has_match:
+            is_photo_unlocked = True
+            photo_reveal_status = "accepted"
+        else:
+            consent_res = await db.execute(
+                select(PhotoRevealConsent).where(
+                    ((PhotoRevealConsent.requester_id == current_user.id) & (PhotoRevealConsent.target_id == target_user.id)) |
+                    ((PhotoRevealConsent.requester_id == target_user.id) & (PhotoRevealConsent.target_id == current_user.id))
+                ).order_by(PhotoRevealConsent.created_at.desc())
+            )
+            consents = consent_res.scalars().all()
+            accepted_rec = next((c for c in consents if c.status == "accepted"), None)
+            if accepted_rec:
+                is_photo_unlocked = True
+                photo_reveal_status = "accepted"
+            elif consents:
+                first_rec = consents[0]
+                photo_reveal_status = first_rec.status
+                is_photo_unlocked = (first_rec.status == "accepted")
+            else:
+                is_photo_unlocked = False
+                photo_reveal_status = "none"
+
+    safe_photos = clean_photos if (is_self or not is_photo_veiled or is_photo_unlocked) else []
+    safe_avatar = primary_avatar if (is_self or not is_photo_veiled or is_photo_unlocked) else ""
+
     return {
         "id": str(target_user.id),
         "full_name": target_user.full_name,
@@ -221,10 +257,13 @@ async def get_seeker_profile(
         "education": target_user.education or "",
         "location_name": target_user.location_name or "Saket, Ayodhya",
         "distance_km": dist_km,
-        "avatar_url": primary_avatar,
-        "avatar": primary_avatar,
-        "photos": clean_photos,
-        "photo_urls": clean_photos,
+        "avatar_url": safe_avatar,
+        "avatar": safe_avatar,
+        "photos": safe_photos,
+        "photo_urls": safe_photos,
+        "is_photo_veiled": is_photo_veiled,
+        "is_photo_unlocked": is_photo_unlocked,
+        "photo_reveal_status": photo_reveal_status,
         "is_kyc_verified": bool(target_user.kyc_status),
         "kyc_status": bool(target_user.kyc_status),
         "is_verified": bool(target_user.kyc_status),

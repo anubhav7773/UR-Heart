@@ -43,6 +43,7 @@ class ProfileSetupState {
   final String? voiceSparkUrl;
   final String? voiceSparkPrompt;
   final double voiceSparkDuration;
+  final bool isPhotoVeiled;
 
   const ProfileSetupState({
     this.photoSlots = const {},
@@ -74,6 +75,7 @@ class ProfileSetupState {
     this.voiceSparkUrl,
     this.voiceSparkPrompt,
     this.voiceSparkDuration = 0.0,
+    this.isPhotoVeiled = false,
   });
 
   bool get isBioPolishing => isPolishingBio;
@@ -111,6 +113,7 @@ class ProfileSetupState {
     String? voiceSparkUrl,
     String? voiceSparkPrompt,
     double? voiceSparkDuration,
+    bool? isPhotoVeiled,
   }) {
     return ProfileSetupState(
       photoSlots: photoSlots ?? this.photoSlots,
@@ -144,6 +147,7 @@ class ProfileSetupState {
       voiceSparkUrl: voiceSparkUrl ?? this.voiceSparkUrl,
       voiceSparkPrompt: voiceSparkPrompt ?? this.voiceSparkPrompt,
       voiceSparkDuration: voiceSparkDuration ?? this.voiceSparkDuration,
+      isPhotoVeiled: isPhotoVeiled ?? this.isPhotoVeiled,
     );
   }
 }
@@ -582,6 +586,10 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     );
   }
 
+  void setPhotoVeil(bool val) {
+    state = state.copyWith(isPhotoVeiled: val);
+  }
+
   Future<bool> completeSetup() async {
     if (!state.canCompleteSetup) return false;
     state = state.copyWith(isSubmitting: true);
@@ -599,6 +607,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
     await prefs.setString('profile_location', state.location);
     await prefs.setString('profile_contact_bridge_platform', state.contactBridgePlatform);
     await prefs.setString('profile_contact_bridge_handle', state.contactBridgeHandle);
+    await prefs.setBool('profile_is_photo_veiled', state.isPhotoVeiled);
     if (state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty) {
       await prefs.setString('profile_voice_spark_url', state.voiceSparkUrl!);
       await prefs.setString('profile_voice_spark_prompt', state.voiceSparkPrompt ?? '');
@@ -620,6 +629,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
         'is_kyc': state.isKycVerified,
         'location': state.location,
         'is_gps_verified': state.isGpsVerified,
+        'is_photo_veiled': state.isPhotoVeiled,
         'has_voice_spark': state.voiceSparkUrl != null && state.voiceSparkUrl!.isNotEmpty,
       },
     );
@@ -649,6 +659,7 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'bridge_value': state.contactBridgeHandle,
       'is_kyc_verified': state.isKycVerified,
       'is_kyc': state.isKycVerified,
+      'is_photo_veiled': state.isPhotoVeiled,
       'voice_spark_url': state.voiceSparkUrl,
       'voice_spark_prompt': state.voiceSparkPrompt,
       'voice_spark_duration': state.voiceSparkDuration,

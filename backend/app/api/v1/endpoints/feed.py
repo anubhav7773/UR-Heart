@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, not_, or_
@@ -12,6 +12,7 @@ from app.models.domain.user import User
 from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
 from app.models.domain.legal import BlockedUser
+from app.models.domain.photo_reveal_consent import PhotoRevealConsent
 from app.services.streak_engine import StreakEngine
 from app.services.resonance_engine import ResonanceEngine
 
@@ -131,6 +132,21 @@ async def get_discovery_feed(
     res = await db.execute(stmt)
     users = res.scalars().all()
 
+    # Prefetch photo reveal consents for current user against candidates
+    consents_map: Dict[UUID, str] = {}
+    if current_user and users:
+        candidate_ids = [u.id for u in users]
+        c_stmt = select(PhotoRevealConsent).where(
+            or_(
+                (PhotoRevealConsent.requester_id == current_user.id) & (PhotoRevealConsent.target_id.in_(candidate_ids)),
+                (PhotoRevealConsent.target_id == current_user.id) & (PhotoRevealConsent.requester_id.in_(candidate_ids))
+            )
+        )
+        c_res = await db.execute(c_stmt)
+        for c in c_res.scalars().all():
+            other_id = c.target_id if c.requester_id == current_user.id else c.requester_id
+            consents_map[other_id] = c.status
+
     cards = []
     for u in users:
         # Defense-in-depth safety: skip caller if somehow returned
@@ -153,6 +169,13 @@ async def get_discovery_feed(
         cand_bio = u.bio.strip() if (u.bio and u.bio.strip()) else "Mindful seeker walking an intentional path."
         cand_intention = u.bio.strip() if (u.bio and u.bio.strip()) else "Seeking slow, thoughtful connection in the sanctuary."
 
+        is_veiled = bool(u.is_photo_veiled)
+        status_val = consents_map.get(u.id, "none")
+        is_unlocked = not is_veiled or (status_val == "accepted")
+
+        safe_avatar = primary_avatar if is_unlocked else ""
+        safe_photos = clean_photos if is_unlocked else []
+
         cards.append({
             "id": str(u.id),
             "full_name": u.full_name,
@@ -171,10 +194,13 @@ async def get_discovery_feed(
             "intent_quote": cand_intention,
             "interests": authentic_tags,
             "tags": authentic_tags,
-            "avatar_url": primary_avatar,
-            "avatar": primary_avatar,
-            "photos": clean_photos,
-            "photo_urls": clean_photos,
+            "avatar_url": safe_avatar,
+            "avatar": safe_avatar,
+            "photos": safe_photos,
+            "photo_urls": safe_photos,
+            "is_photo_veiled": is_veiled,
+            "is_photo_unlocked": is_unlocked,
+            "photo_reveal_status": status_val,
             "is_kyc_verified": bool(u.kyc_status),
             "is_verified": bool(u.kyc_status),
             "kyc_status": bool(u.kyc_status),
@@ -527,3 +553,151 @@ async def restore_passed_profile(
         "target_id": target_id,
         "message": "Profile restored to discovery deck."
     }
+
+
+class PhotoRevealResponseRequest(BaseModel):
+    action: str  # 'accept' or 'decline'
+
+
+@router.post("/feed/{target_id}/photo-reveal/request", status_code=status.HTTP_200_OK, summary="Request Photo Reveal")
+@router.post("/discovery/feed/{target_id}/photo-reveal/request", status_code=status.HTTP_200_OK, summary="Request Photo Reveal Alias")
+async def request_photo_reveal(
+    target_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submits bilateral photo reveal consent request for a veiled candidate.
+    Dispatches push notification and WebSocket event to candidate.
+    """
+    try:
+        target_uuid = UUID(target_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid target_id UUID format.")
+
+    if current_user.id == target_uuid:
+        raise HTTPException(status_code=400, detail="Cannot request photo reveal from yourself.")
+
+    target_res = await db.execute(select(User).where(User.id == target_uuid, User.deleted_at.is_(None)))
+    target_user = target_res.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+
+    # Upsert or retrieve PhotoRevealConsent
+    consent_stmt = select(PhotoRevealConsent).where(
+        PhotoRevealConsent.requester_id == current_user.id,
+        PhotoRevealConsent.target_id == target_uuid
+    )
+    res = await db.execute(consent_stmt)
+    consent = res.scalar_one_or_none()
+
+    if consent:
+        if consent.status == "declined":
+            raise HTTPException(
+                status_code=403,
+                detail="Photo reveal request was previously declined. Cannot resend request."
+            )
+        if consent.status == "accepted":
+            return {
+                "status": "accepted",
+                "message": "Photos are already unveiled."
+            }
+        if consent.status == "pending":
+            return {
+                "status": "pending",
+                "message": "Photo reveal request is already pending."
+            }
+    else:
+        consent = PhotoRevealConsent(
+            requester_id=current_user.id,
+            target_id=target_uuid,
+            status="pending"
+        )
+        db.add(consent)
+
+    await db.commit()
+
+    # Real-time notification to target
+    from app.api.v1.endpoints.notifications import push_notification
+    push_notification(
+        user_id=str(target_uuid),
+        notif_type="photo_reveal_request",
+        title="Sacred Photo Reveal Request 🕊️",
+        body=f"{current_user.full_name} has requested to unveil your profile photo. Mutual consent required.",
+        data={
+            "type": "photo_reveal_request",
+            "requester_id": str(current_user.id),
+            "requester_name": current_user.full_name,
+            "target_route": "/resonances"
+        }
+    )
+
+    return {
+        "status": "pending",
+        "message": f"Photo reveal request dispatched to {target_user.full_name}."
+    }
+
+
+@router.post("/feed/{requester_id}/photo-reveal/respond", status_code=status.HTTP_200_OK, summary="Respond to Photo Reveal Request")
+@router.post("/discovery/feed/{requester_id}/photo-reveal/respond", status_code=status.HTTP_200_OK, summary="Respond to Photo Reveal Request Alias")
+async def respond_to_photo_reveal(
+    requester_id: str,
+    payload: PhotoRevealResponseRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Accepts or declines a bilateral photo reveal request.
+    If accepted, both seekers can view each other's clear photos.
+    """
+    try:
+        req_uuid = UUID(requester_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid requester_id UUID format.")
+
+    action_clean = payload.action.strip().lower()
+    if action_clean not in ("accept", "decline"):
+        raise HTTPException(status_code=400, detail="Action must be 'accept' or 'decline'.")
+
+    consent_stmt = select(PhotoRevealConsent).where(
+        PhotoRevealConsent.requester_id == req_uuid,
+        PhotoRevealConsent.target_id == current_user.id
+    )
+    res = await db.execute(consent_stmt)
+    consent = res.scalar_one_or_none()
+    if not consent:
+        raise HTTPException(
+            status_code=404,
+            detail="No pending photo reveal request found from this seeker."
+        )
+
+    if consent.status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot respond to photo reveal request that is already '{consent.status}'."
+        )
+
+    consent.status = "accepted" if action_clean == "accept" else "declined"
+
+    await db.commit()
+
+    if action_clean == "accept":
+        from app.api.v1.endpoints.notifications import push_notification
+        push_notification(
+            user_id=str(req_uuid),
+            notif_type="photo_reveal_unlocked",
+            title="Sacred Photo Unveiled! ✨",
+            body=f"{current_user.full_name} accepted your photo reveal request. Their portrait is now visible.",
+            data={
+                "type": "photo_reveal_unlocked",
+                "partner_id": str(current_user.id),
+                "partner_name": current_user.full_name,
+                "target_route": "/feed"
+            }
+        )
+
+    return {
+        "status": consent.status,
+        "message": f"Photo reveal request {action_clean}ed."
+    }
+

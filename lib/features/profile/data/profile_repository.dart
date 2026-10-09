@@ -306,6 +306,9 @@ class ProfileRepository {
     return _currentProfile;
   }
 
+  /// Alias for updateProfile to guarantee interface compatibility
+  Future<UserProfile> saveProfile(UserProfile updated) => updateProfile(updated);
+
   /// Persists edits directly to public.users table via PUT /api/v1/profile/me.
   Future<UserProfile> updateProfile(UserProfile updated) async {
     _currentProfile = updated;
@@ -338,6 +341,7 @@ class ProfileRepository {
           'voice_spark_prompt': updated.voiceSparkPrompt,
           'voice_spark_duration': updated.voiceSparkDuration,
           'is_voice_verified': updated.isVoiceVerified,
+          'is_photo_veiled': updated.isPhotoVeiled,
         },
       );
 

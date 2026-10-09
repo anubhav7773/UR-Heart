@@ -55,6 +55,7 @@ class User(Base):
 
     kyc_status = Column(Boolean, nullable=False, default=False)
     is_incognito = Column(Boolean, nullable=False, default=False)
+    is_photo_veiled = Column(Boolean, nullable=False, default=False)
     discreet_mode = Column(Boolean, nullable=False, default=False)
     night_slumber = Column(Boolean, nullable=False, default=False)
     is_profile_completed = Column(Boolean, nullable=False, default=False)

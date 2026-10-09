@@ -21,6 +21,7 @@ from app.models.domain.blind_date import (
     BlindDateMessage,
     BlindDateQueueEntry,
 )
+from app.models.domain.photo_reveal_consent import PhotoRevealConsent
 
 __all__ = [
     "User",
@@ -28,6 +29,7 @@ __all__ = [
     "Swipe",
     "Message",
     "WhatsAppRevealToken",
+    "PhotoRevealConsent",
     "AdminKycEscalation",
     "ProcessedAdTransaction",
     "InAppPurchase",

@@ -49,6 +49,7 @@ class SettingsRepository {
       if (response.statusCode == 200) {
         _settings = _settings.copyWith(
           isIncognito: preferences.isIncognito ?? _settings.isIncognito,
+          isPhotoVeiled: preferences.isPhotoVeiled ?? _settings.isPhotoVeiled,
           discreetMode: preferences.discreetMode ?? _settings.discreetMode,
         );
         return true;
@@ -57,6 +58,22 @@ class SettingsRepository {
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
+    }
+  }
+
+  /// Persists photo veil toggle directly to backend and local settings
+  Future<bool> updatePhotoVeil(bool isVeiled) async {
+    _settings = _settings.copyWith(isPhotoVeiled: isVeiled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('pref_is_photo_veiled', isVeiled);
+      final response = await _dio.put<dynamic>(
+        '/api/v1/user/preferences',
+        data: {'is_photo_veiled': isVeiled},
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -98,11 +115,13 @@ class SettingsRepository {
   Future<SanctuarySettings> fetchSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final cachedIncognito = prefs.getBool('pref_is_incognito');
+    final cachedPhotoVeiled = prefs.getBool('pref_is_photo_veiled');
     final cachedFp = prefs.getString('pref_active_key_fp');
 
-    if (cachedIncognito != null || cachedFp != null) {
+    if (cachedIncognito != null || cachedFp != null || cachedPhotoVeiled != null) {
       _settings = _settings.copyWith(
         isIncognito: cachedIncognito ?? _settings.isIncognito,
+        isPhotoVeiled: cachedPhotoVeiled ?? _settings.isPhotoVeiled,
         activeKeyFingerprint: cachedFp ?? _settings.activeKeyFingerprint,
       );
     }
@@ -113,6 +132,7 @@ class SettingsRepository {
         final data = res.data as Map<String, dynamic>;
         final p = (data['preferences'] as Map<String, dynamic>?) ?? {};
         final serverIncognito = p['is_incognito'] as bool? ?? false;
+        final serverPhotoVeiled = p['is_photo_veiled'] as bool? ?? false;
         var serverFp = p['key_fingerprint'] as String? ?? '';
         final serverKey = p['public_encryption_key'] as String?;
 
@@ -127,10 +147,12 @@ class SettingsRepository {
 
         _settings = _settings.copyWith(
           isIncognito: serverIncognito,
+          isPhotoVeiled: serverPhotoVeiled,
           activeKeyFingerprint: serverFp.isNotEmpty ? serverFp : _settings.activeKeyFingerprint,
         );
 
         await prefs.setBool('pref_is_incognito', serverIncognito);
+        await prefs.setBool('pref_is_photo_veiled', serverPhotoVeiled);
         if (serverFp.isNotEmpty) {
           await prefs.setString('pref_active_key_fp', serverFp);
         }
@@ -164,17 +186,22 @@ class SettingsRepository {
     bool? discreetMode,
     bool? nightSanctuarySlumber,
     bool? isIncognito,
+    bool? isPhotoVeiled,
   }) async {
     _settings = _settings.copyWith(
       masterResonance: masterResonance,
       discreetMode: discreetMode,
       nightSanctuarySlumber: nightSanctuarySlumber,
       isIncognito: isIncognito,
+      isPhotoVeiled: isPhotoVeiled,
     );
 
     final prefs = await SharedPreferences.getInstance();
     if (isIncognito != null) {
       await prefs.setBool('pref_is_incognito', isIncognito);
+    }
+    if (isPhotoVeiled != null) {
+      await prefs.setBool('pref_is_photo_veiled', isPhotoVeiled);
     }
 
     try {
@@ -183,6 +210,7 @@ class SettingsRepository {
         data: {
           'discreet_mode': _settings.discreetMode,
           'is_incognito': _settings.isIncognito,
+          'is_photo_veiled': _settings.isPhotoVeiled,
           'push_notifications_enabled': _settings.masterResonance,
         },
       );

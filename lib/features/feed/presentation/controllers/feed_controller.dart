@@ -285,6 +285,48 @@ class FeedController extends StateNotifier<FeedState> {
     );
   }
 
+  /// Dispatches bilateral photo reveal request for a veiled candidate
+  Future<bool> requestPhotoReveal(String candidateId) async {
+    try {
+      final success = await _repository.requestPhotoReveal(candidateId);
+      if (success) {
+        final updatedCandidates = state.candidates.map((c) {
+          if (c.id == candidateId) {
+            return c.copyWith(photoRevealStatus: 'pending');
+          }
+          return c;
+        }).toList();
+        state = state.copyWith(candidates: updatedCandidates);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Responds to photo reveal request ('accept' or 'decline')
+  Future<bool> respondToPhotoReveal(String requesterId, String action) async {
+    try {
+      final success = await _repository.respondToPhotoReveal(requesterId, action);
+      if (success && action == 'accept') {
+        final updatedCandidates = state.candidates.map((c) {
+          if (c.id == requesterId) {
+            return c.copyWith(
+              isPhotoUnlocked: true,
+              photoRevealStatus: 'accepted',
+            );
+          }
+          return c;
+        }).toList();
+        state = state.copyWith(candidates: updatedCandidates);
+      }
+      return success;
+    } catch (e) {
+      return false;
+    }
+  }
+
   void setSwipesRemaining(int count) {
     state = state.copyWith(swipesRemaining: count);
   }

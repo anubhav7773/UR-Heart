@@ -104,6 +104,7 @@ class SanctuarySettingsScreen extends ConsumerWidget {
                 isDark: isDark,
                 isRotatingKey: state.isRotatingKey,
                 onIncognitoChanged: notifier.toggleIncognito,
+                onPhotoVeilChanged: notifier.togglePhotoVeil,
                 onRotateKey: notifier.rotateKey,
               ),
               // Superadmin Sentinel Tile: Strictly renders via server-side role resolution claim

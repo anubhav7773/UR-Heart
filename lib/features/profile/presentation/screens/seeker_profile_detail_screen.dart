@@ -11,6 +11,7 @@ import '../../../feed/presentation/widgets/ai_resonance_insight_box.dart';
 import '../../../feed/presentation/widgets/mindful_intent_card.dart';
 import '../../../feed/presentation/widgets/photo_carousel_with_dots.dart';
 import '../../../feed/presentation/widgets/voice_spark_pill.dart';
+import '../../../feed/data/feed_repository.dart';
 import '../../../chat/presentation/services/window_security_service.dart';
 
 /// Arguments payload for [SeekerProfileDetailScreen]
@@ -38,6 +39,9 @@ class SeekerProfileDetailArgs {
   final String? voiceSparkPrompt;
   final double voiceSparkDuration;
   final bool isVoiceVerified;
+  final bool isPhotoVeiled;
+  final bool isPhotoUnlocked;
+  final String photoRevealStatus;
 
   const SeekerProfileDetailArgs({
     required this.userId,
@@ -63,6 +67,9 @@ class SeekerProfileDetailArgs {
     this.voiceSparkPrompt,
     this.voiceSparkDuration = 7.0,
     this.isVoiceVerified = false,
+    this.isPhotoVeiled = false,
+    this.isPhotoUnlocked = false,
+    this.photoRevealStatus = 'none',
   });
 
   SeekerProfileDetailArgs copyWith({
@@ -89,6 +96,9 @@ class SeekerProfileDetailArgs {
     String? voiceSparkPrompt,
     double? voiceSparkDuration,
     bool? isVoiceVerified,
+    bool? isPhotoVeiled,
+    bool? isPhotoUnlocked,
+    String? photoRevealStatus,
   }) {
     return SeekerProfileDetailArgs(
       userId: userId ?? this.userId,
@@ -114,6 +124,9 @@ class SeekerProfileDetailArgs {
       voiceSparkPrompt: voiceSparkPrompt ?? this.voiceSparkPrompt,
       voiceSparkDuration: voiceSparkDuration ?? this.voiceSparkDuration,
       isVoiceVerified: isVoiceVerified ?? this.isVoiceVerified,
+      isPhotoVeiled: isPhotoVeiled ?? this.isPhotoVeiled,
+      isPhotoUnlocked: isPhotoUnlocked ?? this.isPhotoUnlocked,
+      photoRevealStatus: photoRevealStatus ?? this.photoRevealStatus,
     );
   }
 
@@ -211,6 +224,9 @@ class SeekerProfileDetailArgs {
       voiceSparkPrompt: peer['voice_spark_prompt'] as String?,
       voiceSparkDuration: (peer['voice_spark_duration'] as num?)?.toDouble() ?? 7.0,
       isVoiceVerified: peer['is_voice_verified'] as bool? ?? false,
+      isPhotoVeiled: peer['is_photo_veiled'] as bool? ?? false,
+      isPhotoUnlocked: peer['is_photo_unlocked'] as bool? ?? false,
+      photoRevealStatus: peer['photo_reveal_status'] as String? ?? 'none',
     );
   }
 }
@@ -266,13 +282,26 @@ class _SeekerProfileDetailScreenState extends ConsumerState<SeekerProfileDetailS
             .where((e) => e.isNotEmpty)
             .toList();
 
+        final isVeiled = (data['is_photo_veiled'] as bool?) ?? _args!.isPhotoVeiled;
+        final isUnlocked = (data['is_photo_unlocked'] as bool?) ?? _args!.isPhotoUnlocked;
+
+        final safeAvatar = (isVeiled && !isUnlocked)
+            ? ''
+            : ((data['avatar_url'] as String?)?.isNotEmpty == true
+                ? data['avatar_url'] as String
+                : _args!.avatarUrl);
+
+        final safePhotos = (isVeiled && !isUnlocked)
+            ? <String>[]
+            : ((cleanPhotos != null && cleanPhotos.isNotEmpty)
+                ? cleanPhotos
+                : _args!.photos);
+
         _args = _args!.copyWith(
           displayName: data['full_name'] as String? ?? _args!.displayName,
           age: data['age'] as int? ?? _args!.age,
-          avatarUrl: (data['avatar_url'] as String?)?.isNotEmpty == true
-              ? data['avatar_url'] as String
-              : _args!.avatarUrl,
-          photos: (cleanPhotos != null && cleanPhotos.isNotEmpty) ? cleanPhotos : _args!.photos,
+          avatarUrl: safeAvatar,
+          photos: safePhotos,
           isVerified: (data['is_kyc_verified'] as bool?) ??
               (data['kyc_status'] as bool?) ??
               _args!.isVerified,
@@ -307,6 +336,9 @@ class _SeekerProfileDetailScreenState extends ConsumerState<SeekerProfileDetailS
               : _args!.voiceSparkPrompt,
           voiceSparkDuration: (data['voice_spark_duration'] as num?)?.toDouble() ?? _args!.voiceSparkDuration,
           isVoiceVerified: data['is_voice_verified'] as bool? ?? _args!.isVoiceVerified,
+          isPhotoVeiled: (data['is_photo_veiled'] as bool?) ?? _args!.isPhotoVeiled,
+          isPhotoUnlocked: (data['is_photo_unlocked'] as bool?) ?? _args!.isPhotoUnlocked,
+          photoRevealStatus: (data['photo_reveal_status'] as String?) ?? _args!.photoRevealStatus,
         );
       });
     } catch (e) {
@@ -318,6 +350,15 @@ class _SeekerProfileDetailScreenState extends ConsumerState<SeekerProfileDetailS
 
   void _openPhotoLightbox(BuildContext context, int initialIndex, List<String> photos) {
     if (photos.isEmpty) return;
+    if (_args?.isPhotoVeiled == true && _args?.isPhotoUnlocked != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Portrait is veiled. Mutual consent required to unveil photos.'),
+          backgroundColor: Colors.black87,
+        ),
+      );
+      return;
+    }
     showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.94),
@@ -697,6 +738,26 @@ class _SeekerProfileDetailScreenState extends ConsumerState<SeekerProfileDetailS
                         locationTag: args.location.isNotEmpty
                             ? args.location
                             : 'Saket, Ayodhya · GPS Verified',
+                        isPhotoVeiled: args.isPhotoVeiled,
+                        isPhotoUnlocked: args.isPhotoUnlocked,
+                        photoRevealStatus: args.photoRevealStatus,
+                        onRequestReveal: () async {
+                          final repo = ref.read(feedRepositoryProvider);
+                          final ok = await repo.requestPhotoReveal(args.userId);
+                          if (ok && mounted) {
+                            setState(() {
+                              _args = _args!.copyWith(photoRevealStatus: 'pending');
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Photo reveal request dispatched to ${args.displayName} 🕊️',
+                                ),
+                                backgroundColor: const Color(0xFF2ECC71),
+                              ),
+                            );
+                          }
+                        },
                         onPhotoTap: (idx) => _openPhotoLightbox(context, idx, photos),
                       ),
                     ),

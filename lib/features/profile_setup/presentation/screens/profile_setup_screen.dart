@@ -10,6 +10,7 @@ import '../widgets/live_kyc_recording_modal.dart';
 import '../widgets/mindful_bio_editor.dart';
 import '../widgets/orientation_selector_pills.dart';
 import '../widgets/sacred_bridge_selector.dart';
+import 'package:ur_heart/features/profile/presentation/widgets/sacred_photo_veil_card.dart';
 import '../../../chat/presentation/services/window_security_service.dart';
 import 'package:ur_heart/features/feed/presentation/widgets/voice_spark_pill.dart';
 import 'package:ur_heart/features/profile/data/voice_spark_service.dart';
@@ -524,6 +525,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               ),
               const SizedBox(height: 16.0),
               const MindfulBioEditor(),
+              const SizedBox(height: 16.0),
+              SacredPhotoVeilCard(
+                isVeiled: state.isPhotoVeiled,
+                isDark: isDark,
+                margin: EdgeInsets.zero,
+                onChanged: (val) => notifier.setPhotoVeil(val),
+              ),
               const SizedBox(height: 16.0),
               const SacredBridgeSelector(),
               const SizedBox(height: 16.0),

@@ -13,6 +13,7 @@ router = APIRouter(prefix="/user", tags=["User Preferences & Privacy Flags"])
 
 class PreferencesUpdateRequest(BaseModel):
     is_incognito: Optional[bool] = None
+    is_photo_veiled: Optional[bool] = None
     discreet_mode: Optional[bool] = None
     push_notifications_enabled: Optional[bool] = None
     night_slumber: Optional[bool] = None
@@ -34,12 +35,13 @@ async def get_user_preferences(
 ):
     """
     Returns the authenticated user's current persistent privacy settings,
-    including Ghost Cloak incognito status and active X25519 public key fingerprint.
+    including Ghost Cloak incognito status, Sacred Photo Veil, and active X25519 public key fingerprint.
     """
     return {
         "status": "success",
         "preferences": {
             "is_incognito": bool(current_user.is_incognito),
+            "is_photo_veiled": bool(current_user.is_photo_veiled),
             "discreet_mode": bool(current_user.discreet_mode),
             "push_notifications_enabled": bool(current_user.push_notifications_enabled if current_user.push_notifications_enabled is not None else True),
             "night_slumber": bool(current_user.night_slumber),
@@ -56,7 +58,7 @@ async def update_user_preferences(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    DIS-04 Fix: Persists Ghost Cloak incognito, discreet lock-screen notifications,
+    DIS-04 Fix: Persists Ghost Cloak incognito, Sacred Photo Veil, discreet lock-screen notifications,
     and push notification flags directly into Supabase.
     """
     update_data = payload.model_dump(exclude_unset=True)
@@ -78,6 +80,7 @@ async def update_user_preferences(
         "status": "success",
         "updated_preferences": update_data,
         "is_incognito": bool(current_user.is_incognito),
+        "is_photo_veiled": bool(current_user.is_photo_veiled),
         "night_slumber": bool(current_user.night_slumber),
         "key_fingerprint": _format_key_fingerprint(current_user.public_encryption_key),
     }

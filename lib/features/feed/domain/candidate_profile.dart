@@ -20,6 +20,9 @@ class CandidateProfile {
   final String? voiceSparkPrompt;
   final double voiceSparkDuration;
   final bool isVoiceVerified;
+  final bool isPhotoVeiled;
+  final bool isPhotoUnlocked;
+  final String photoRevealStatus;
 
   const CandidateProfile({
     required this.id,
@@ -42,9 +45,13 @@ class CandidateProfile {
     this.voiceSparkPrompt,
     this.voiceSparkDuration = 7.0,
     this.isVoiceVerified = false,
+    this.isPhotoVeiled = false,
+    this.isPhotoUnlocked = false,
+    this.photoRevealStatus = 'none',
   });
 
   List<String> get photos => photoUrls;
+  String get name => fullName;
 
   factory CandidateProfile.fromJson(Map<String, dynamic> json) {
     final avatar = json['avatar_url'] as String? ?? json['avatar'] as String? ?? '';
@@ -63,6 +70,7 @@ class CandidateProfile {
     }
 
     final resolvedAvatar = avatar.trim().isNotEmpty ? avatar.trim() : (allPhotos.isNotEmpty ? allPhotos.first : '');
+    final veiled = json['is_photo_veiled'] as bool? ?? false;
 
     return CandidateProfile(
       id: json['id'] as String? ?? json['user_id'] as String? ?? 'cand_${DateTime.now().millisecondsSinceEpoch}',
@@ -85,6 +93,9 @@ class CandidateProfile {
       voiceSparkPrompt: json['voice_spark_prompt'] as String?,
       voiceSparkDuration: (json['voice_spark_duration'] as num?)?.toDouble() ?? 7.0,
       isVoiceVerified: json['is_voice_verified'] as bool? ?? false,
+      isPhotoVeiled: veiled,
+      isPhotoUnlocked: json['is_photo_unlocked'] as bool? ?? (!veiled),
+      photoRevealStatus: json['photo_reveal_status'] as String? ?? 'none',
     );
   }
 
@@ -109,6 +120,9 @@ class CandidateProfile {
     String? voiceSparkPrompt,
     double? voiceSparkDuration,
     bool? isVoiceVerified,
+    bool? isPhotoVeiled,
+    bool? isPhotoUnlocked,
+    String? photoRevealStatus,
   }) {
     return CandidateProfile(
       id: id ?? this.id,
@@ -131,6 +145,9 @@ class CandidateProfile {
       voiceSparkPrompt: voiceSparkPrompt ?? this.voiceSparkPrompt,
       voiceSparkDuration: voiceSparkDuration ?? this.voiceSparkDuration,
       isVoiceVerified: isVoiceVerified ?? this.isVoiceVerified,
+      isPhotoVeiled: isPhotoVeiled ?? this.isPhotoVeiled,
+      isPhotoUnlocked: isPhotoUnlocked ?? this.isPhotoUnlocked,
+      photoRevealStatus: photoRevealStatus ?? this.photoRevealStatus,
     );
   }
 
@@ -162,6 +179,9 @@ class CandidateProfile {
     'voice_spark_prompt': voiceSparkPrompt,
     'voice_spark_duration': voiceSparkDuration,
     'is_voice_verified': isVoiceVerified,
+    'is_photo_veiled': isPhotoVeiled,
+    'is_photo_unlocked': isPhotoUnlocked,
+    'photo_reveal_status': photoRevealStatus,
   };
 
   static bool checkOrientationShield({

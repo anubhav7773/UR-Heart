@@ -209,6 +209,21 @@ class FeedScreen extends ConsumerWidget {
                             key: ValueKey(current.id),
                             candidate: current.toMap(),
                             isDark: isDark,
+                            onRequestReveal: () async {
+                              final success = await feedNotifier.requestPhotoReveal(current.id);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      success
+                                          ? 'Photo reveal request dispatched to ${current.fullName} 🕊️'
+                                          : 'Failed to dispatch photo reveal request.',
+                                    ),
+                                    backgroundColor: success ? const Color(0xFF2ECC71) : Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            },
                             onSwipeCompleted: (swipeType) async {
                               bool ok = false;
                               if (swipeType == 'like') {

@@ -14,6 +14,7 @@ import '../widgets/persona_header_card.dart';
 import '../widgets/persona_tabs_header.dart';
 import '../widgets/photo_adjuster_dialog.dart';
 import '../widgets/preferences_slider_card.dart';
+import '../widgets/sacred_photo_veil_card.dart';
 import '../../../profile_setup/presentation/widgets/live_kyc_recording_modal.dart';
 import 'package:ur_heart/features/feed/presentation/widgets/voice_spark_pill.dart';
 import 'package:ur_heart/features/profile/data/voice_spark_service.dart';
@@ -102,6 +103,11 @@ class MyPersonaScreen extends ConsumerWidget {
                   onEditAvatar: () =>
                       _showPhotoUploadModal(context, ref, isDark, 0, isAvatar: true),
                   onVerifyKyc: () => _openLivePhotoKycModal(context, ref),
+                ),
+                SacredPhotoVeilCard(
+                  isVeiled: state.profile.isPhotoVeiled,
+                  isDark: isDark,
+                  onChanged: (val) => notifier.togglePhotoVeil(val),
                 ),
                 if (state.profile.isLoaded && !state.profile.hasVerifiedCrest)
                   _buildSanctuaryKycPromptCard(context, ref, isDark),

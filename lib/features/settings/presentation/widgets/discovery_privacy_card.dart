@@ -11,6 +11,7 @@ class DiscoveryPrivacyCard extends StatelessWidget {
   final bool isRotatingKey;
   final ValueChanged<bool>? onIncognitoChanged;
   final ValueChanged<bool>? onToggleIncognito;
+  final ValueChanged<bool>? onPhotoVeilChanged;
   final VoidCallback? onRotateKey;
   final VoidCallback? onRotateKeys;
 
@@ -22,6 +23,7 @@ class DiscoveryPrivacyCard extends StatelessWidget {
     this.isRotatingKey = false,
     this.onIncognitoChanged,
     this.onToggleIncognito,
+    this.onPhotoVeilChanged,
     this.onRotateKey,
     this.onRotateKeys,
   });
@@ -123,7 +125,63 @@ class DiscoveryPrivacyCard extends StatelessWidget {
             ],
           ),
           const Divider(height: 24),
-          // 2. Cryptographic Key Rotation
+          // 2. Sacred Photo Veil (Bilateral Consent Analog Shield)
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Sacred Photo Veil',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: headlineColor,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (settings?.isPhotoVeiled ?? false)
+                                ? accentColor.withValues(alpha: 0.15)
+                                : verifiedBadge.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            (settings?.isPhotoVeiled ?? false) ? 'VEILED 🔒' : 'CLEAR ✨',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: (settings?.isPhotoVeiled ?? false) ? accentColor : verifiedBadge,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Anti-spy analog privacy: Keep portrait blurred on discovery feed until mutual consent.',
+                      style: AppTypography.bodySmall.copyWith(color: mutedColor),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Switch.adaptive(
+                value: settings?.isPhotoVeiled ?? false,
+                activeColor: accentColor,
+                onChanged: (val) {
+                  if (onPhotoVeilChanged != null) onPhotoVeilChanged!(val);
+                },
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          // 3. Cryptographic Key Rotation
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

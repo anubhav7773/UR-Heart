@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/light_sanctuary_tokens.dart';
 import '../../../../core/theme/dark_sanctuary_tokens.dart';
@@ -10,6 +11,10 @@ class PhotoCarouselWithDots extends StatefulWidget {
   final bool isKycVerified;
   final String locationTag;
   final void Function(int index)? onPhotoTap;
+  final bool isPhotoVeiled;
+  final bool isPhotoUnlocked;
+  final String photoRevealStatus;
+  final VoidCallback? onRequestReveal;
 
   const PhotoCarouselWithDots({
     super.key,
@@ -19,6 +24,10 @@ class PhotoCarouselWithDots extends StatefulWidget {
     this.isKycVerified = false,
     this.locationTag = 'Saket, Ayodhya',
     this.onPhotoTap,
+    this.isPhotoVeiled = false,
+    this.isPhotoUnlocked = false,
+    this.photoRevealStatus = 'none',
+    this.onRequestReveal,
   });
 
   @override
@@ -46,6 +55,8 @@ class _PhotoCarouselWithDotsState extends State<PhotoCarouselWithDots> {
     final validPhotos = widget.photos.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
     final photoList = validPhotos.isNotEmpty ? validPhotos : [''];
 
+    final isVeiled = widget.isPhotoVeiled && !widget.isPhotoUnlocked;
+
     return SizedBox(
       height: 380,
       width: double.infinity,
@@ -62,33 +73,174 @@ class _PhotoCarouselWithDotsState extends State<PhotoCarouselWithDots> {
               if (photo.startsWith('/api/v1/') || photo.startsWith('/storage/')) {
                 photo = 'https://urheart.asiverticals.me$photo';
               }
+              Widget imageWidget = photo.isNotEmpty
+                  ? (photo.startsWith('http://') || photo.startsWith('https://')
+                      ? Image.network(
+                          photo,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (_, __, ___) => _buildFallback(pine),
+                        )
+                      : (File(photo).existsSync()
+                          ? Image.file(
+                              File(photo),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (_, __, ___) => _buildFallback(pine),
+                            )
+                          : _buildFallback(pine)))
+                  : _buildFallback(pine);
+
+              if (isVeiled) {
+                imageWidget = ImageFiltered(
+                  imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                  child: imageWidget,
+                );
+              }
+
               return Container(
                 color: surfaceMuted,
-                child: photo.isNotEmpty
-                    ? (photo.startsWith('http://') || photo.startsWith('https://')
-                        ? Image.network(
-                            photo,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (_, __, ___) => _buildFallback(pine),
-                          )
-                        : (File(photo).existsSync()
-                            ? Image.file(
-                                File(photo),
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
-                                errorBuilder: (_, __, ___) => _buildFallback(pine),
-                              )
-                            : _buildFallback(pine)))
-                    : _buildFallback(pine),
+                child: imageWidget,
               );
             },
           ),
+          if (isVeiled)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.38),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.76),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFD97746).withValues(alpha: 0.2),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.visibility_off_rounded,
+                              color: Color(0xFFE88A58),
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Sacred Photo Veil',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Portrait veiled for analog privacy.\nUnveils with mutual consent.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.78),
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        if (widget.photoRevealStatus == 'pending')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2ECC71).withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFF2ECC71).withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.hourglass_top_rounded, color: Color(0xFF2ECC71), size: 14),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Reveal Request Sent 🕊️',
+                                  style: TextStyle(
+                                    color: Color(0xFF2ECC71),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (widget.photoRevealStatus == 'declined')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.redAccent.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Text(
+                              'Reveal Request Declined',
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        else
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97746),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            onPressed: widget.onRequestReveal,
+                            icon: const Icon(Icons.favorite_border, size: 15),
+                            label: const Text(
+                              'Request Photo Reveal 🕊️',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // Tap zones
-          Positioned.fill(
-            child: Row(
+          if (!isVeiled)
+            Positioned.fill(
+              child: Row(
               children: [
                 Expanded(
                   child: GestureDetector(
@@ -144,7 +296,7 @@ class _PhotoCarouselWithDotsState extends State<PhotoCarouselWithDots> {
               ),
             ),
           // Zoom / Lightbox Trigger Button
-          if (widget.onPhotoTap != null)
+          if (widget.onPhotoTap != null && !isVeiled)
             Positioned(
               top: 26,
               right: 14,

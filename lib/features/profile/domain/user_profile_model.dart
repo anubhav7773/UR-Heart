@@ -33,6 +33,7 @@ class UserProfile {
   final String? voiceSparkPrompt;
   final double voiceSparkDuration;
   final bool isVoiceVerified;
+  final bool isPhotoVeiled;
 
   const UserProfile({
     required this.id,
@@ -58,6 +59,7 @@ class UserProfile {
     this.directLettersCount = 0,
     this.isAdFree = false,
     this.nightSlumber = false,
+    this.isPhotoVeiled = false,
     this.subscriptionTier = 'free',
     this.rewardBalance = 0,
     this.streakCount = 0,
@@ -107,6 +109,7 @@ class UserProfile {
     'voice_spark_prompt': voiceSparkPrompt,
     'voice_spark_duration': voiceSparkDuration,
     'is_voice_verified': isVoiceVerified,
+    'is_photo_veiled': isPhotoVeiled,
   };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -193,6 +196,7 @@ class UserProfile {
       voiceSparkPrompt: json['voice_spark_prompt'] as String?,
       voiceSparkDuration: (json['voice_spark_duration'] as num?)?.toDouble() ?? 7.0,
       isVoiceVerified: json['is_voice_verified'] as bool? ?? false,
+      isPhotoVeiled: json['is_photo_veiled'] as bool? ?? false,
     );
   }
 
@@ -220,6 +224,7 @@ class UserProfile {
     int? directLettersCount,
     bool? isAdFree,
     bool? nightSlumber,
+    bool? isPhotoVeiled,
     String? subscriptionTier,
     int? rewardBalance,
     int? streakCount,
@@ -255,6 +260,7 @@ class UserProfile {
       directLettersCount: directLettersCount ?? this.directLettersCount,
       isAdFree: isAdFree ?? this.isAdFree,
       nightSlumber: nightSlumber ?? this.nightSlumber,
+      isPhotoVeiled: isPhotoVeiled ?? this.isPhotoVeiled,
       subscriptionTier: subscriptionTier ?? this.subscriptionTier,
       rewardBalance: rewardBalance ?? this.rewardBalance,
       streakCount: streakCount ?? this.streakCount,

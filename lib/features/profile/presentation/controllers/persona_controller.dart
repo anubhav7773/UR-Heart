@@ -388,6 +388,21 @@ class PersonaController extends StateNotifier<PersonaState> {
       return false;
     }
   }
+
+  Future<void> togglePhotoVeil(bool enabled) async {
+    final updated = state.profile.copyWith(isPhotoVeiled: enabled);
+    state = state.copyWith(
+      profile: updated,
+      successMessage: enabled
+          ? 'Sacred Photo Veil active 🔒. Photos veiled on feed.'
+          : 'Photo Veil deactivated 👁️. Photos visible on feed.',
+    );
+    try {
+      await _repo.updateProfile(updated);
+    } catch (e) {
+      debugPrint('[PersonaController] togglePhotoVeil error: $e');
+    }
+  }
 }
 
 final personaControllerProvider =

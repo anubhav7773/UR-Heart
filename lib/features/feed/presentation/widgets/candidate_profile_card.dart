@@ -11,12 +11,14 @@ class CandidateProfileCard extends StatefulWidget {
   final Map<String, dynamic> candidate;
   final bool isDark;
   final void Function(String swipeType) onSwipeCompleted;
+  final VoidCallback? onRequestReveal;
 
   const CandidateProfileCard({
     super.key,
     required this.candidate,
     required this.isDark,
     required this.onSwipeCompleted,
+    this.onRequestReveal,
   });
 
   @override
@@ -113,6 +115,10 @@ class _CandidateProfileCardState extends State<CandidateProfileCard> {
                               widget.candidate['is_verified'] as bool? ??
                               false,
                           locationTag: widget.candidate['location_name'] as String? ?? 'Saket, Ayodhya',
+                          isPhotoVeiled: widget.candidate['is_photo_veiled'] as bool? ?? false,
+                          isPhotoUnlocked: widget.candidate['is_photo_unlocked'] as bool? ?? false,
+                          photoRevealStatus: widget.candidate['photo_reveal_status'] as String? ?? 'none',
+                          onRequestReveal: widget.onRequestReveal,
                         ),
                         Padding(
                           padding: const EdgeInsets.all(20),
