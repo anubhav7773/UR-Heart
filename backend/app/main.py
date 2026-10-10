@@ -104,6 +104,7 @@ async def lifespan(app: FastAPI):
     # STARTUP: Fail-fast secret validation in production
     validate_production_env(settings)
     app.state.http_client = httpx.AsyncClient(timeout=15.0)
+    app.state.photo_veil_schema_ready = False
 
     # Background periodic streak engine monitor (Runs every 60s for instant outside-app notifications)
     import asyncio
@@ -327,16 +328,61 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[SCHEMA NOTICE] Pending web store entitlements schema check: {e}", flush=True)
 
+    async def _ensure_sacred_photo_veil_schema():
+        from sqlalchemy import text
+        statements = [
+            "ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_photo_veiled BOOLEAN NOT NULL DEFAULT FALSE;",
+            """CREATE TABLE IF NOT EXISTS public.photo_reveal_consents (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                requester_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                target_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                CONSTRAINT uq_photo_reveal_pair UNIQUE (requester_id, target_id)
+            );""",
+            "CREATE INDEX IF NOT EXISTS idx_photo_reveal_target ON public.photo_reveal_consents(target_id, status);",
+            "CREATE INDEX IF NOT EXISTS idx_photo_reveal_requester ON public.photo_reveal_consents(requester_id, target_id);"
+        ]
+        failed_statements = []
+        try:
+            async with async_session_factory() as session:
+                for stmt in statements:
+                    try:
+                        await session.execute(text(stmt))
+                        await session.commit()
+                    except Exception as inner_e:
+                        await session.rollback()
+                        stmt_preview = stmt.strip().split("\n")[0]
+                        failed_statements.append((stmt_preview, str(inner_e)))
+                        print(f"[SCHEMA WARNING] Sacred photo veil statement notice: {inner_e}", flush=True)
+        except Exception as conn_err:
+            failed_statements.append(("Connection failure", str(conn_err)))
+            print(f"[SCHEMA NOTICE] Sacred photo veil connection check: {conn_err}", flush=True)
+
+        if failed_statements:
+            app.state.photo_veil_schema_ready = False
+            summary = "; ".join(f"{s} -> {err}" for s, err in failed_statements)
+            print(f"[SCHEMA ERROR] Sacred photo veil schema NOT verified: {summary}", flush=True)
+            raise RuntimeError(f"Sacred photo veil schema initialization failed: {summary}")
+
+        app.state.photo_veil_schema_ready = True
+        print("[SCHEMA] Sacred photo veil schema verified in PostgreSQL.", flush=True)
+
     try:
-        await asyncio.gather(
+        schema_results = await asyncio.gather(
             _ensure_voice_spark_schema(),
             _ensure_blind_date_schema(),
             _ensure_admin_schema(),
             _ensure_mindful_closure_schema(),
             _ensure_welcome_email_schema(),
             _ensure_pending_web_entitlements_schema(),
+            _ensure_sacred_photo_veil_schema(),
             return_exceptions=True
         )
+        for idx, res in enumerate(schema_results):
+            if isinstance(res, Exception):
+                print(f"[SCHEMA STARTUP WARNING] Schema routine #{idx} returned error: {res}", flush=True)
     except Exception as schema_err:
         print(f"[SCHEMA STARTUP WARNING] {schema_err}", flush=True)
 

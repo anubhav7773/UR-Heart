@@ -563,6 +563,7 @@ class PhotoRevealResponseRequest(BaseModel):
 @router.post("/discovery/feed/{target_id}/photo-reveal/request", status_code=status.HTTP_200_OK, summary="Request Photo Reveal Alias")
 async def request_photo_reveal(
     target_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -570,6 +571,12 @@ async def request_photo_reveal(
     Submits bilateral photo reveal consent request for a veiled candidate.
     Dispatches push notification and WebSocket event to candidate.
     """
+    if getattr(request.app.state, "photo_veil_schema_ready", True) is False:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sacred Photo Reveal feature is temporarily unavailable due to database maintenance."
+        )
+
     try:
         target_uuid = UUID(target_id)
     except ValueError:
@@ -643,6 +650,7 @@ async def request_photo_reveal(
 async def respond_to_photo_reveal(
     requester_id: str,
     payload: PhotoRevealResponseRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -650,6 +658,12 @@ async def respond_to_photo_reveal(
     Accepts or declines a bilateral photo reveal request.
     If accepted, both seekers can view each other's clear photos.
     """
+    if getattr(request.app.state, "photo_veil_schema_ready", True) is False:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sacred Photo Reveal feature is temporarily unavailable due to database maintenance."
+        )
+
     try:
         req_uuid = UUID(requester_id)
     except ValueError:

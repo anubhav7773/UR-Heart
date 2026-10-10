@@ -184,7 +184,7 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
                 EmailService.schedule_delayed_welcome_email(
                     email=clean_email,
                     full_name=payload.display_name or user_row.full_name or "Sanctuary Seeker",
-                    delay_seconds=14.0
+                    delay_seconds=2.0
                 )
         else:
             # Auto-provision user shell in Supabase
@@ -208,12 +208,12 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
             db.add(new_user)
             try:
                 await db.commit()
-                # Dispatch Welcome Email for new Google One-Tap seekers after 10-15s grace delay (14s)
+                # Dispatch Welcome Email for new Google One-Tap seekers after brief 2s grace delay
                 from app.services.email_service import EmailService
                 EmailService.schedule_delayed_welcome_email(
                     email=clean_email,
                     full_name=payload.display_name or "Sanctuary Seeker",
-                    delay_seconds=14.0
+                    delay_seconds=2.0
                 )
             except Exception as e:
                 await db.rollback()
@@ -657,6 +657,12 @@ async def get_verification_status(
             db.add(user_row)
             try:
                 await db.commit()
+                from app.services.email_service import EmailService
+                EmailService.schedule_delayed_welcome_email(
+                    email=clean_email,
+                    full_name=user_row.full_name or "Sanctuary Seeker",
+                    delay_seconds=2.0
+                )
             except Exception:
                 await db.rollback()
                 user_row = None

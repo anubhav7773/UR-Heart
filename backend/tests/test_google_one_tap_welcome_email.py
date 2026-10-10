@@ -151,7 +151,7 @@ async def test_schedule_delayed_welcome_email_suppressed_if_already_sent_in_db()
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_google_sync_schedules_delayed_welcome_for_new_user():
-    """Verify that a newly registered Google user gets the 14s delayed welcome email scheduled."""
+    """Verify that a newly registered Google user gets the 2s delayed welcome email scheduled."""
     new_email = f"newgoogle_{uuid.uuid4().hex[:6]}@example.com"
     EmailService._in_flight_welcome_emails.discard(new_email)
 
@@ -182,7 +182,7 @@ async def test_google_sync_schedules_delayed_welcome_for_new_user():
             mock_schedule.assert_called_once_with(
                 email=new_email,
                 full_name="New Google Seeker",
-                delay_seconds=14.0
+                delay_seconds=2.0
             )
     finally:
         app.dependency_overrides.pop(get_db, None)

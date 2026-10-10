@@ -623,7 +623,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           } else if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Unable to complete sanctuary profile. Please check requirements and retry.', style: AppTypography.bodySmall.copyWith(color: Colors.white)),
+                                content: Text('Unable to save sanctuary profile to server. Please check your network connection and retry.', style: AppTypography.bodySmall.copyWith(color: Colors.white)),
                                 backgroundColor: const Color(0xFFC94A29),
                                 behavior: SnackBarBehavior.floating,
                               ),

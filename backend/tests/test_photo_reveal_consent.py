@@ -257,3 +257,32 @@ def test_seeker_profile_masks_photos_when_veiled():
     finally:
         app.dependency_overrides.clear()
 
+
+def test_photo_reveal_returns_503_when_schema_not_ready():
+    """Verify that photo reveal endpoint returns 503 if schema is marked unready."""
+    caller = User(id=uuid.uuid4(), email="caller@urheart.app", full_name="Caller")
+    app.dependency_overrides[get_current_user] = lambda: caller
+
+    # Explicitly simulate degraded startup state
+    original_state = getattr(app.state, "photo_veil_schema_ready", None)
+    app.state.photo_veil_schema_ready = False
+
+    try:
+        res = client.post(f"/api/v1/feed/{uuid.uuid4()}/photo-reveal/request")
+        assert res.status_code == 503
+        assert "temporarily unavailable" in res.json()["detail"]
+    finally:
+        if original_state is not None:
+            app.state.photo_veil_schema_ready = original_state
+        else:
+            delattr(app.state, "photo_veil_schema_ready")
+        app.dependency_overrides.clear()
+
+
+def test_health_check_reports_photo_veil_ready():
+    """Verify that /api/v1/health exposes photo_veil_ready flag for observability."""
+    res = client.get("/api/v1/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert "photo_veil_ready" in data
+

@@ -613,8 +613,6 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       await prefs.setString('profile_voice_spark_prompt', state.voiceSparkPrompt ?? '');
       await prefs.setDouble('profile_voice_spark_duration', state.voiceSparkDuration);
     }
-    await prefs.setBool('ur_heart_profile_setup_completed', true);
-    main_profile.ProfileRepository.prewarmStatic(prefs);
 
     final email = prefs.getString('ur_heart_user_email') ?? '';
     final lat = prefs.getDouble('profile_gps_latitude');
@@ -674,6 +672,14 @@ class ProfileSetupController extends StateNotifier<ProfileSetupState> {
       'avatar_url': state.photoSlots[1] ?? (state.photoSlots.values.isNotEmpty ? state.photoSlots.values.first : ''),
       'email': email,
     });
+
+    if (success) {
+      await prefs.setBool('ur_heart_profile_setup_completed', true);
+      await prefs.setBool('ur_heart_has_entered_sanctuary', true);
+      main_profile.ProfileRepository.prewarmStatic(prefs);
+    } else {
+      await prefs.setBool('ur_heart_profile_setup_completed', false);
+    }
 
     state = state.copyWith(isSubmitting: false);
     return success;

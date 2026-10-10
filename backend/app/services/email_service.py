@@ -831,12 +831,11 @@ class EmailService:
         cls,
         email: str,
         full_name: Optional[str] = None,
-        delay_seconds: float = 14.0
+        delay_seconds: float = 2.0
     ) -> Optional[asyncio.Task]:
         """
-        Schedules a welcome email dispatch after a deliberate 10-15s grace delay (default 14.0s).
-        This guarantees the seeker has navigated past onboarding and Google sheets,
-        ensuring optimal attention when the notification ping arrives.
+        Schedules a welcome email dispatch after a brief 2s grace delay.
+        This guarantees the user entity commit has finalized in PostgreSQL.
         Guarded against asyncio task garbage collection and duplicate in-flight dispatch.
         """
         clean_email = (email or "").strip().lower()

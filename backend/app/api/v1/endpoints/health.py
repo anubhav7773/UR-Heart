@@ -36,4 +36,5 @@ async def health_check(request: Request, response: Response):
         "engine": "FastAPI-Async-Sleepless",
         "uptime_seconds": round(time.time() - START_TIME, 2),
         "environment": settings.ENVIRONMENT,
+        "photo_veil_ready": getattr(request.app.state, "photo_veil_schema_ready", True),
     }
