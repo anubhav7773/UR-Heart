@@ -66,3 +66,4 @@ scratch/
 .audit_output/
 backend/uploads/voice/*/
 uploads/
+.agents/

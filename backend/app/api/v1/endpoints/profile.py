@@ -145,7 +145,7 @@ async def get_my_authenticated_profile(
         "contact_bridge_handle": __import__("app.core.encryption", fromlist=["decrypt_contact_bridge"]).decrypt_contact_bridge(
             current_user.contact_bridge_encrypted, str(current_user.id)
         ),
-        "role": current_user.role or ("superadmin" if (current_user.email or "").lower() == "asiverticals@gmail.com" else "user"),
+        "role": getattr(current_user, "role", None) or "user",
         "voice_spark_url": current_user.voice_spark_url,
         "voice_spark_prompt": current_user.voice_spark_prompt,
         "voice_spark_duration": float(current_user.voice_spark_duration) if current_user.voice_spark_duration else 7.0,

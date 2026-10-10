@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/error/sanctuary_exceptions.dart';
@@ -227,6 +228,33 @@ class ChatRepository {
     }
 
     return message;
+  }
+
+  /// Transmit encrypted packet payload over REST POST fallback to maintain encryption boundary (FE-VULN-03)
+  Future<void> sendEncryptedPacket({
+    required String matchId,
+    required String ciphertext,
+    required String nonce,
+    required String mac,
+    required String recipientId,
+    required String messageId,
+    bool skipWs = true,
+  }) async {
+    try {
+      await _dio.post<dynamic>(
+        '/api/v1/chat/messages',
+        data: {
+          'match_id': matchId,
+          'text': 'enc_v1:$ciphertext:$nonce:$mac',
+          'content': 'enc_v1:$ciphertext:$nonce:$mac',
+          'recipient_id': recipientId,
+          'client_id': messageId,
+          'id': messageId,
+        },
+      );
+    } catch (e) {
+      debugPrint('[CHAT] Failed to persist encrypted message packet: $e');
+    }
   }
 
   Future<void> markMessagesAsRead(String matchId) async {

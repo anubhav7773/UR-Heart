@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_endpoints.dart';
@@ -109,8 +110,11 @@ class RealGpsLocationService {
     try {
       // Tier 1: Pre-Fetch Persisted Session Cache (< 10ms baseline)
       final prefs = await SharedPreferences.getInstance();
-      final cachedLat = prefs.getDouble('profile_gps_latitude');
-      final cachedLng = prefs.getDouble('profile_gps_longitude');
+      const secure = FlutterSecureStorage();
+      final secureLatStr = await secure.read(key: 'profile_gps_latitude');
+      final secureLngStr = await secure.read(key: 'profile_gps_longitude');
+      final cachedLat = double.tryParse(secureLatStr ?? '') ?? prefs.getDouble('profile_gps_latitude');
+      final cachedLng = double.tryParse(secureLngStr ?? '') ?? prefs.getDouble('profile_gps_longitude');
       final cachedLoc = prefs.getString('profile_location');
       final hasValidCache = cachedLat != null &&
           cachedLng != null &&
@@ -297,20 +301,30 @@ class RealGpsLocationService {
         directLocality: candidate.directLocality,
       );
 
-      // Persist Real Coordinates & Formatted Name
+      // Persist Formatted Locality Name
       await prefs.setString('profile_location', formattedAddress);
-      await prefs.setDouble('profile_gps_latitude', candidate.latitude);
-      await prefs.setDouble('profile_gps_longitude', candidate.longitude);
+      // Clean up sensitive raw coordinates from plaintext SharedPreferences (FE-VULN-02)
+      await prefs.remove('profile_gps_latitude');
+      await prefs.remove('profile_gps_longitude');
+      // Securely store coordinates only in hardware-backed secure storage
+      await const FlutterSecureStorage().write(
+        key: 'profile_gps_latitude',
+        value: candidate.latitude.toString(),
+      );
+      await const FlutterSecureStorage().write(
+        key: 'profile_gps_longitude',
+        value: candidate.longitude.toString(),
+      );
       await prefs.setDouble('profile_gps_accuracy', candidate.accuracy);
       await prefs.setBool('profile_gps_verified', true);
 
-      // Stream Activity Telemetry to Render
+      // Stream Activity Telemetry to Render (SEC-14 / TEL-02: Fuzz coordinates)
       await ActivityLogger.log(
         category: 'GPS',
         action: 'REAL_GPS_VERIFIED',
         details: {
-          'latitude': candidate.latitude,
-          'longitude': candidate.longitude,
+          'latitude': (candidate.latitude * 100).round() / 100,
+          'longitude': (candidate.longitude * 100).round() / 100,
           'accuracy_meters': candidate.accuracy,
           'location_string': formattedAddress,
           'anti_fraud_passed': true,
@@ -370,37 +384,35 @@ class RealGpsLocationService {
       debugPrint('[RealGpsLocationService] ipwho.is probe note: $e');
     }
 
-    // Attempt 2: ip-api.com
+    // Attempt 2: HTTPS Geolocation Fallback (SEC-12 / TEL-01)
     try {
       final res = await http.get(
-        Uri.parse('http://ip-api.com/json/?fields=status,message,country,regionName,city,lat,lon'),
+        Uri.parse('https://freeipapi.com/api/json'),
         headers: {'User-Agent': 'UR-Heart/1.0.0'},
       ).timeout(const Duration(seconds: 3));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        if (data['status'] == 'success') {
-          final lat = (data['lat'] as num?)?.toDouble() ?? 0.0;
-          final lon = (data['lon'] as num?)?.toDouble() ?? 0.0;
-          final city = data['city'] as String? ?? '';
-          final region = data['regionName'] as String? ?? data['country'] as String? ?? '';
-          if (lat != 0.0 || lon != 0.0) {
-            final locStr = city.isNotEmpty
-                ? '$city, $region · GPS Verified'
-                : 'Sanctuary Node · GPS Verified';
-            return _CandidateCoordinates(
-              latitude: lat,
-              longitude: lon,
-              accuracy: 2000.0,
-              isMocked: false,
-              providerSource: 'ip_api_com',
-              isIndoorFix: true,
-              directLocality: locStr,
-            );
-          }
+        final lat = (data['latitude'] as num?)?.toDouble() ?? 0.0;
+        final lon = (data['longitude'] as num?)?.toDouble() ?? 0.0;
+        final city = data['cityName'] as String? ?? '';
+        final region = data['regionName'] as String? ?? data['countryName'] as String? ?? '';
+        if (lat != 0.0 || lon != 0.0) {
+          final locStr = city.isNotEmpty
+              ? '$city, $region · GPS Verified'
+              : 'Sanctuary Node · GPS Verified';
+          return _CandidateCoordinates(
+            latitude: lat,
+            longitude: lon,
+            accuracy: 2000.0,
+            isMocked: false,
+            providerSource: 'freeipapi_https',
+            isIndoorFix: true,
+            directLocality: locStr,
+          );
         }
       }
     } catch (e) {
-      debugPrint('[RealGpsLocationService] ip-api.com probe note: $e');
+      debugPrint('[RealGpsLocationService] HTTPS Geolocation probe note: $e');
     }
 
     // Attempt 3: UR-Heart Backend Resolver Endpoint

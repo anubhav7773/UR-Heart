@@ -225,13 +225,13 @@ async def test_web_store_html_pricing_and_validity_alignment():
         assert "365 Days Access" in text
         assert "365-Day Sovereign Crest" in text
         assert "₹1,499" in text
-        assert "selectProduct('urheart_pass_lifetime', 1499" in text
+        assert "selectProduct('urheart_pass_lifetime')" in text
 
         # 2. 24h Global Passport alignment (24h, ₹99)
         assert "24h Global Passport" in text
         assert "24 Hours Unrestricted Access" in text
         assert "₹99" in text
-        assert "selectProduct('urheart_pack_global_passport', 99" in text
+        assert "selectProduct('urheart_pack_global_passport')" in text
 
         # 3. Instant Contact Key mutual consent condition
         assert "Instant Contact Key" in text

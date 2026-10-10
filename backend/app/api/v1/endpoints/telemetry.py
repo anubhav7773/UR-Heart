@@ -15,6 +15,39 @@ class ActivityLogPayload(BaseModel):
     timestamp: Optional[str] = None
 
 
+def _sanitize_telemetry_dict(data: Any) -> Any:
+    if isinstance(data, dict):
+        sanitized = {}
+        for k, v in data.items():
+            k_lower = str(k).lower()
+            if k_lower in ("email", "user_email"):
+                s_val = str(v)
+                parts = s_val.split("@")
+                sanitized[k] = f"{parts[0][:2]}***@{parts[1]}" if len(parts) == 2 else "***"
+            elif k_lower in ("phone", "phone_number", "contact", "mobile"):
+                sanitized[k] = "***REDACTED_PHONE***"
+            elif k_lower in ("token", "auth_token", "access_token", "refresh_token", "id_token", "secret", "password"):
+                sanitized[k] = "***REDACTED_SECRET***"
+            elif k_lower in ("name", "full_name", "first_name", "last_name"):
+                sanitized[k] = f"{str(v)[:1]}***" if v else "***"
+            elif k_lower in ("dob", "date_of_birth", "birth_date"):
+                sanitized[k] = "***REDACTED_DOB***"
+            elif k_lower in ("latitude", "longitude", "lat", "lon", "lng"):
+                if isinstance(v, (int, float)):
+                    sanitized[k] = round(float(v), 2)
+                else:
+                    try:
+                        sanitized[k] = round(float(v), 2)
+                    except (ValueError, TypeError):
+                        sanitized[k] = v
+            else:
+                sanitized[k] = _sanitize_telemetry_dict(v)
+        return sanitized
+    elif isinstance(data, list):
+        return [_sanitize_telemetry_dict(item) for item in data]
+    return data
+
+
 @router.post("/activity", status_code=status.HTTP_200_OK)
 async def record_activity(payload: ActivityLogPayload, request: Request):
     """
@@ -25,16 +58,22 @@ async def record_activity(payload: ActivityLogPayload, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     utc_now = payload.timestamp or datetime.now(timezone.utc).isoformat()
     
-    # Format high-visibility log for Render Dashboard
+    # SANITIZE TELEMETRY DETAILS BEFORE LOGGING (SEC-14 / TEL-02):
+    sanitized_details = _sanitize_telemetry_dict(payload.details or {})
+
+    masked_ip = (client_ip[:6] + "***") if len(client_ip) > 6 else client_ip
+    user_masked = str(payload.user_id)[:8] + "..." if payload.user_id and len(str(payload.user_id)) > 8 else payload.user_id
+
+    # Format high-visibility log for Render Dashboard with sanitized details
     print(
         f"\n==================== [UR-HEART LIVE ACTIVITY] ====================\n"
         f"TIME      : {utc_now}\n"
         f"CATEGORY  : {payload.category.upper()}\n"
         f"ACTION    : {payload.action}\n"
-        f"USER      : {payload.user_id}\n"
+        f"USER      : {user_masked}\n"
         f"SCREEN    : {payload.screen or 'N/A'}\n"
-        f"CLIENT IP : {client_ip}\n"
-        f"DETAILS   : {payload.details or {}}\n"
+        f"CLIENT IP : {masked_ip}\n"
+        f"DETAILS   : {sanitized_details}\n"
         f"==================================================================\n",
         flush=True
     )
@@ -109,23 +148,23 @@ async def resolve_client_ip_location(request: Request):
     except Exception as e:
         loc_logger.warning("Primary IP Geolocation probe note: %s", e)
 
-    # 3. Secondary Provider: ip-api.com
+    # 3. Secondary Provider: HTTPS Geolocation Fallback (SEC-12 / TEL-01)
     fallback_url = (
-        f"http://ip-api.com/json/{candidate_ip}?fields=status,message,country,regionName,city,lat,lon"
+        f"https://freeipapi.com/api/json/{candidate_ip}"
         if (candidate_ip and not is_private)
-        else "http://ip-api.com/json/?fields=status,message,country,regionName,city,lat,lon"
+        else "https://freeipapi.com/api/json"
     )
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             res = await client.get(fallback_url)
             if res.status_code == 200:
                 data = res.json()
-                if data.get("status") == "success":
-                    lat = float(data.get("lat") or 0.0)
-                    lon = float(data.get("lon") or 0.0)
-                    city = data.get("city") or "New Delhi"
-                    region = data.get("regionName") or "India"
-                    country = data.get("country") or "India"
+                lat = float(data.get("latitude") or 0.0)
+                lon = float(data.get("longitude") or 0.0)
+                city = data.get("cityName") or "New Delhi"
+                region = data.get("regionName") or data.get("countryName") or "India"
+                country = data.get("countryName") or "India"
+                if lat != 0.0 or lon != 0.0:
                     return {
                         "is_success": True,
                         "latitude": lat,
@@ -134,7 +173,7 @@ async def resolve_client_ip_location(request: Request):
                         "region": region,
                         "country": country,
                         "formatted_location": f"{city}, {region} · GPS Verified",
-                        "provider": "ip-api.com",
+                        "provider": "freeipapi.com",
                         "ip": candidate_ip,
                     }
     except Exception as e:

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -131,7 +132,7 @@ final chatDialogueControllerProvider = StateNotifierProvider.family<
   return ChatDialogueController(ws, repo, 'user-me', cleanId);
 });
 
-/// True E2EE Encrypted Chat Pipeline Controller (DIS-07 Fix)
+/// Authenticated AEAD Dialogue Pipeline Controller (FE-VULN-03)
 /// Manages X25519 Diffie-Hellman key exchange, ChaCha20-Poly1305 AEAD encryption,
 /// single-use WSS channel stream listening, and Sacred Bridge Stage progression.
 class ChatDialogueController extends StateNotifier<ChatDialogueState> {
@@ -431,16 +432,20 @@ class ChatDialogueController extends StateNotifier<ChatDialogueState> {
     );
     state = state.copyWith(messages: [...state.messages, localMsg]);
 
-    // Persist to backend database (skip duplicate WS dispatch since already sent)
+    // Persist to backend database via encrypted packet fallback (FE-VULN-03)
     try {
-      await _chatRepository.sendMessage(
+      await _chatRepository.sendEncryptedPacket(
         matchId: state.matchId,
-        text: plainText,
+        ciphertext: packet.ciphertextBase64,
+        nonce: packet.nonceBase64,
+        mac: packet.macBase64,
         recipientId: recipientId,
         messageId: messageId,
         skipWs: true,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CHAT] Failed to persist encrypted message packet: $e');
+    }
   }
 
   Future<void> _handleIncomingEncryptedMessage(Map<String, dynamic> rawEvent) async {

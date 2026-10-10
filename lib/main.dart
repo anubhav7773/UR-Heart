@@ -12,7 +12,6 @@ import 'core/app/ur_heart_app.dart';
 import 'core/services/activity_logger_service.dart';
 import 'core/services/sanctuary_notification_service.dart';
 import 'core/storage/secure_session_storage.dart';
-import 'features/chat/presentation/services/window_security_service.dart';
 import 'features/profile/data/profile_repository.dart';
 
 @pragma('vm:entry-point')
@@ -83,9 +82,8 @@ Future<void> main() async {
     final prefs = await SharedPreferences.getInstance();
     ProfileRepository.prewarmStatic(prefs);
     final secureToken = await SecureSessionStorage.instance.getAuthToken();
-    final storedAuthToken = prefs.getString('ur_heart_auth_token') ?? prefs.getString('auth_token');
-    final hasBackendToken = (secureToken != null && secureToken.isNotEmpty) ||
-                            (storedAuthToken != null && storedAuthToken.isNotEmpty);
+    // Enforce hardware-backed secure session token presence (FE-VULN-02)
+    final hasBackendToken = (secureToken != null && secureToken.isNotEmpty);
 
     final fbUser = FirebaseAuth.instance.currentUser;
 
@@ -111,11 +109,6 @@ Future<void> main() async {
       resolvedInitialRoute = '/profile-setup';
     } else {
       resolvedInitialRoute = '/main';
-    }
-
-    // Automatically bypass screenshot/recording protection app-wide if founder is authenticated
-    if (await WindowSecurityService.isBypassedUser()) {
-      await WindowSecurityService.disableSecureMode();
     }
   } catch (_) {}
 

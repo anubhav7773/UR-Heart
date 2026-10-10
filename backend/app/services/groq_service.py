@@ -233,15 +233,79 @@ class GroqAiService:
                     resolved.append(clean)
             elif item.startswith("http://") or item.startswith("https://"):
                 try:
-                    async with httpx.AsyncClient(timeout=6.0) as client:
+                    from urllib.parse import urlparse
+                    import socket
+                    import ipaddress
+
+                    parsed = urlparse(item)
+
+                    # 1. STRICT HTTPS ENFORCEMENT: Reject unencrypted HTTP
+                    if parsed.scheme.lower() != "https":
+                        logger.warning("SSRF blocked non-HTTPS image URL: %s", item[:80])
+                        continue
+
+                    # 2. STORAGE HOST WHITELIST / DOMAIN CHECK:
+                    # Permit known, official UR-Heart object storage origins and valid subdomains
+                    allowed_storage_hosts = {
+                        "fmedkihgcvvzcekwybhe.supabase.co",
+                        "ur-heart-media.firebasestorage.app",
+                    }
+                    target_host = (parsed.hostname or "").lower()
+                    is_whitelisted = target_host in allowed_storage_hosts
+                    if not is_whitelisted:
+                        logger.warning("SSRF blocked unauthorized image domain: %s", target_host)
+                        continue
+
+                    # 3. DNS REBINDING & PRIVATE IP / CLOUD METADATA FILTERING
+                    # Resolve host and inspect all IP addresses (block 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, link-local, 169.254.169.254)
+                    try:
+                        addr_info = socket.getaddrinfo(target_host, 443, proto=socket.IPPROTO_TCP)
+                    except Exception as dns_err:
+                        logger.warning("SSRF DNS resolution failed for %s: %s", target_host, dns_err)
+                        continue
+
+                    ip_blocked = False
+                    for _, _, _, _, sockaddr in addr_info:
+                        ip_str = sockaddr[0]
+                        try:
+                            ip_obj = ipaddress.ip_address(ip_str)
+                            if (
+                                ip_obj.is_private
+                                or ip_obj.is_loopback
+                                or ip_obj.is_link_local
+                                or ip_obj.is_reserved
+                                or ip_obj.is_multicast
+                                or str(ip_obj) == "169.254.169.254"
+                                or str(ip_obj) == "0.0.0.0"
+                            ):
+                                logger.warning("SSRF blocked private/metadata IP %s for host %s", ip_str, target_host)
+                                ip_blocked = True
+                                break
+                        except ValueError:
+                            ip_blocked = True
+                            break
+
+                    if ip_blocked:
+                        continue
+
+                    # 4. DISABLE REDIRECTS to prevent 302 open redirect pivots to internal IPs
+                    async with httpx.AsyncClient(timeout=6.0, follow_redirects=False) as client:
                         resp = await client.get(item)
                         if resp.status_code == 200 and len(resp.content) >= 16:
                             b64 = base64.b64encode(resp.content).decode("utf-8")
                             resolved.append(b64)
                 except Exception as e:
                     logger.warning("Failed to fetch image from URL %s: %s", item[:80], e)
+            elif "://" in item:
+                logger.warning("SSRF blocked unsupported URI scheme: %s", item[:80])
+                continue
             elif len(item) >= 16:
-                resolved.append(item)
+                try:
+                    decoded = base64.b64decode(item, validate=True)
+                    if len(decoded) >= 16:
+                        resolved.append(item)
+                except Exception:
+                    logger.warning("Dropped invalid non-base64 image payload: %s", item[:80])
         return resolved
 
     @classmethod
@@ -395,9 +459,8 @@ class GroqAiService:
         2. Prohibits full nudity, weapons, hate symbols.
         3. Explicitly ALLOWS AI-edited portraits, filtered photos, color-graded photos, and normal portraits without text.
         """
-        api_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
-        if not api_key:
-            return {"is_safe": True, "reason": "", "category": "safe"}
+        api_key = (settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")).strip()
+        has_valid_groq_key = bool(api_key and not api_key.startswith("placeholder_"))
 
         prompt = (
             "You are a photo safety and anti-bypass moderator for the UR-Heart dating app sanctuary.\n"
@@ -443,21 +506,22 @@ class GroqAiService:
             "response_format": {"type": "json_object"}
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=6.0) as client:
-                res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
-                if res.status_code == 200:
-                    raw_content = res.json()["choices"][0]["message"]["content"]
-                    data = json.loads(raw_content)
-                    return {
-                        "is_safe": bool(data.get("is_safe", True)),
-                        "reason": str(data.get("reason", "")),
-                        "category": str(data.get("category", "safe"))
-                    }
-                else:
-                    logger.warning("Groq Vision non-200 response: %s %s", res.status_code, res.text[:120])
-        except Exception as e:
-            logger.warning("Groq Vision moderation exception/fallback: %s", str(e))
+        if has_valid_groq_key:
+            try:
+                async with httpx.AsyncClient(timeout=6.0) as client:
+                    res = await client.post(GROQ_ENDPOINT, headers=cls._groq_headers(), json=payload)
+                    if res.status_code == 200:
+                        raw_content = res.json()["choices"][0]["message"]["content"]
+                        data = json.loads(raw_content)
+                        return {
+                            "is_safe": bool(data.get("is_safe", True)),
+                            "reason": str(data.get("reason", "")),
+                            "category": str(data.get("category", "safe"))
+                        }
+                    else:
+                        logger.warning("Groq Vision non-200 response: %s %s", res.status_code, res.text[:120])
+            except Exception as e:
+                logger.warning("Groq Vision moderation exception/fallback: %s", str(e))
 
         # Secondary fallback: OpenRouter Free Tier multimodal vision if configured
         or_key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")

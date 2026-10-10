@@ -83,28 +83,22 @@ class SettingsController extends StateNotifier<SettingsState> {
           prefs.getString('profile_email') ??
           prefs.getString('email') ??
           '';
-      final isSuper = savedEmail.trim().toLowerCase() == 'asiverticals@gmail.com';
-      final savedRole = isSuper
-          ? 'superadmin'
-          : (secureRole ?? prefs.getString('user_role') ?? 'user');
+      final savedRole = secureRole ?? prefs.getString('user_role') ?? 'user';
 
       state = state.copyWith(
         settings: state.settings.copyWith(
           userEmail: savedEmail.isNotEmpty ? savedEmail : state.settings.userEmail,
-          userRole: isSuper ? 'superadmin' : savedRole,
+          userRole: savedRole,
         ),
       );
     } catch (_) {}
   }
 
   void setUserEmail(String email) {
-    final clean = email.trim().toLowerCase();
-    final isSuper = clean == 'asiverticals@gmail.com';
     _repo.setUserEmail(email);
     state = state.copyWith(
       settings: state.settings.copyWith(
         userEmail: email,
-        userRole: isSuper ? 'superadmin' : state.settings.userRole,
       ),
     );
   }
@@ -184,21 +178,25 @@ class SettingsController extends StateNotifier<SettingsState> {
     state = state.copyWith(isIncinerating: true, errorMessage: null);
     try {
       final success = await _repo.incinerateAccountIrrevocably();
+      if (!success) {
+        state = state.copyWith(
+          isIncinerating: false,
+          errorMessage: 'Server account deletion failed. Please retry.',
+        );
+        return false;
+      }
       await logout();
       state = state.copyWith(
         isIncinerating: false,
         successMessage: 'Account & data irrevocably purged.',
       );
-      return success;
-    } catch (_) {
-      try {
-        await logout();
-      } catch (_) {}
+      return true;
+    } catch (e) {
       state = state.copyWith(
         isIncinerating: false,
-        errorMessage: null,
+        errorMessage: 'Network error during account deletion. Please retry.',
       );
-      return true;
+      return false;
     }
   }
 

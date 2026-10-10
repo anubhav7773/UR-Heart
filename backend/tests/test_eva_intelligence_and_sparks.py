@@ -43,21 +43,44 @@ async def test_chat_bonding_sparks_generation():
 @pytest.mark.asyncio
 async def test_chat_sparks_endpoint_authenticated():
     """Verify /api/v1/ai/eva/chat-sparks endpoint returns valid sparks for authenticated seeker."""
+    from app.core.security import get_current_user, get_current_active_user
+    from app.core.database import get_db
+    from app.models.domain.user import User
+    from unittest.mock import AsyncMock
+    import uuid
+
+    mock_user = User(
+        id=uuid.uuid4(),
+        auth_id=uuid.uuid4(),
+        email="seeker@urheart.app",
+        full_name="Seeker",
+        is_profile_completed=True,
+    )
+    mock_db = AsyncMock()
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_current_active_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
     token = create_access_token({"sub": "seeker@urheart.app"})
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        response = await ac.post(
-            "/api/v1/ai/eva/chat-sparks",
-            headers={"Authorization": f"Bearer {token}"},
-            json={
-                "partner_name": "Meera",
-                "partner_bio": "Architect & classical singer",
-                "recent_messages": [
-                    {"sender": "partner", "text": "Do you listen to any classical music?"}
-                ]
-            }
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "sparks" in data
-        assert len(data["sparks"]) >= 1
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/api/v1/ai/eva/chat-sparks",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "partner_name": "Meera",
+                    "partner_bio": "Architect & classical singer",
+                    "recent_messages": [
+                        {"sender": "partner", "text": "Do you listen to any classical music?"}
+                    ]
+                }
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert "sparks" in data
+            assert len(data["sparks"]) >= 1
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_current_active_user, None)
+        app.dependency_overrides.pop(get_db, None)

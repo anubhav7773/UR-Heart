@@ -1,5 +1,7 @@
 import os
 import time
+import secrets
+import logging
 from typing import Optional, Dict, Any
 from uuid import UUID
 import httpx
@@ -9,6 +11,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.models.domain.user import User
@@ -49,13 +53,30 @@ JWT_SECRET_KEY = _raw_jwt
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """Creates a JWT access token for authenticating sessions."""
+    """Creates a short-lived JWT access token for authenticating sessions."""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(days=30)
-    to_encode.update({"exp": expire, "iss": "ur-heart"})
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=60))
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "iss": "ur-heart",
+        "jti": secrets.token_hex(16),
+        "type": "access",
+    })
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
+
+
+def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Creates a refresh token for token rotation."""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=30))
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "iss": "ur-heart",
+        "jti": secrets.token_hex(16),
+        "type": "refresh",
+    })
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
 
 # In-memory public key caches to avoid fetching Google/Firebase certs on every single request
@@ -188,13 +209,17 @@ async def verify_firebase_jwt(token: str) -> Dict[str, Any]:
         # 3. Cryptographically verify signature, audience, and issuer
         if is_google_oauth:
             # Google OAuth2 / One Tap token verification
-            allowed_audiences = [
+            allowed_audiences = {
                 GOOGLE_SERVER_CLIENT_ID,
                 FIREBASE_PROJECT_ID,
-            ]
-            custom_client_id = getattr(_settings, "GOOGLE_CLIENT_ID", None)
+            }
+            custom_client_id = getattr(_settings, "GOOGLE_CLIENT_ID", None) or os.getenv("GOOGLE_CLIENT_ID")
             if custom_client_id:
-                allowed_audiences.append(custom_client_id)
+                allowed_audiences.add(custom_client_id)
+            web_client_id = getattr(_settings, "GOOGLE_WEB_CLIENT_ID", None) or os.getenv("GOOGLE_WEB_CLIENT_ID")
+            if web_client_id:
+                allowed_audiences.add(web_client_id)
+            allowed_audiences = {a for a in allowed_audiences if a}
 
             payload = jwt.decode(
                 token,
@@ -207,10 +232,16 @@ async def verify_firebase_jwt(token: str) -> Dict[str, Any]:
                 }
             )
             aud = payload.get("aud")
-            if aud not in allowed_audiences and not any(a in str(aud) for a in ["googleusercontent.com", FIREBASE_PROJECT_ID]):
+            if aud not in allowed_audiences:
+                logger.warning("Rejected token with unauthorized audience: %s", aud)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail=f"Google ID token audience mismatch: {aud}"
+                )
+            if payload.get("email_verified") is False:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unverified Google accounts cannot access this service."
                 )
             return payload
         else:
@@ -348,6 +379,24 @@ async def get_current_user_optional(
         return None
 
 
+async def get_current_active_user(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+) -> User:
+    """Dependency: Validates that authenticated user is active and not deleted."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if getattr(current_user, "deleted_at", None) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is deactivated or deleted."
+        )
+    return current_user
+
+
 async def require_superadmin(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -356,26 +405,22 @@ async def require_superadmin(
     admin_whitelist = {
         (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower(),
         (os.getenv("SUPERADMIN_EMAIL") or "").strip().lower(),
-        "asiverticals@gmail.com",
     }
     admin_whitelist.discard("")
-    
-    # Check verified email against superadmin whitelist
+
     user_email = (getattr(current_user, "email", "") or "").strip().lower()
-    if user_email not in admin_whitelist:
+    if admin_whitelist and user_email not in admin_whitelist:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access strictly restricted to the Sovereign Sanctuary Sentinel."
         )
-    
-    # Auto-elevate role claim if not already superadmin
+
     user_role = getattr(current_user, "role", "user") or "user"
     if user_role != "superadmin":
-        current_user.role = "superadmin"
-        try:
-            await db.commit()
-        except Exception:
-            pass
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access strictly restricted to verified superadministrators."
+        )
     return current_user
 
 

@@ -26,17 +26,17 @@ services:
       - key: FIREBASE_STORAGE_BUCKET
         value: ur-heart-44b46.firebasestorage.app
       - key: SUPERADMIN_EMAIL
-        value: asiverticals@gmail.com
+        sync: false
       - key: SUPERADMIN_SECRET_KEY
-        value: asiverticals_sovereign_sanctuary_2026
+        sync: false
       - key: META_AUDIENCE_SSV_SECRET
-        value: meta_ssv_secret_sanctuary_2026
+        sync: false
       - key: UNITY_ADS_SSV_SECRET
-        value: unity_ssv_secret_sanctuary_2026
+        sync: false
       - key: CHARTBOOST_SSV_SECRET
-        value: chartboost_ssv_secret_sanctuary_2026
+        sync: false
       - key: LIFTOFF_SSV_SECRET
-        value: liftoff_ssv_secret_sanctuary_2026
+        sync: false
       - key: ADMOB_VERIFIER_KEYS_URL
         value: https://www.gstatic.com/admob/reward/verifier-keys.json
       - key: SUPABASE_PGBOUNCER_URL

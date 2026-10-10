@@ -7,7 +7,6 @@ import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_session_storage.dart';
 import '../../../core/services/sanctuary_notification_service.dart';
 import '../../profile/data/profile_repository.dart';
-import '../../chat/presentation/services/window_security_service.dart';
 import 'google_auth_service.dart';
 
 /// Result wrapper for authentication operations
@@ -144,13 +143,11 @@ class AuthRepository {
         final tokenStr = response.data!['access_token'] ?? response.data!['token'] ?? result.idToken;
         final serverUid = response.data!['user_id']?.toString() ?? result.userId;
         final roleStr = response.data!['role']?.toString() ?? 'user';
-        final isSuperadmin = (result.email?.toLowerCase() == 'asiverticals@gmail.com') || (roleStr.toLowerCase() == 'superadmin');
+        // REMOVED HARDCODED BACKDOOR: Rely strictly on server-minted role claim in verified JWT
+        final isSuperadmin = (roleStr.toLowerCase() == 'superadmin');
 
         if (tokenStr != null && tokenStr.toString().isNotEmpty) {
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
-          await prefs.setString('auth_token', tokenStr.toString());
         }
 
         await SecureSessionStorage.instance.saveUserSession(
@@ -257,8 +254,8 @@ class AuthRepository {
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
         }
 
-        final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com') ||
-            (data['role']?.toString().toLowerCase() == 'superadmin');
+        // REMOVED HARDCODED BACKDOOR: Rely strictly on server-minted role claim in verified JWT
+        final isSuperadmin = (data['role']?.toString().toLowerCase() == 'superadmin');
         await SecureSessionStorage.instance.saveUserSession(
           userId: userId,
           email: cleanEmail,
@@ -266,15 +263,11 @@ class AuthRepository {
           isProfileCompleted: isCompleted,
         );
 
-        // Also persist to SharedPreferences for immediate app gateway resilience
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_role', isSuperadmin ? 'superadmin' : 'user');
-        if (isSuperadmin) {
-          await WindowSecurityService.disableSecureMode();
-        }
+        await prefs.remove('user_role');
         if (tokenStr != null) {
-          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
-          await prefs.setString('auth_token', tokenStr.toString());
+          await prefs.remove('ur_heart_auth_token');
+          await prefs.remove('auth_token');
           SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
         }
         if (userId != null) {
@@ -370,8 +363,8 @@ class AuthRepository {
           await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
           final matchedEmail = data['email']?.toString() ?? cleanEmail;
-          final isSuperadmin = (matchedEmail?.toLowerCase().trim() == 'asiverticals@gmail.com') ||
-              (data['role']?.toString().toLowerCase() == 'superadmin');
+          // REMOVED HARDCODED BACKDOOR: Rely strictly on server-minted role claim in verified JWT
+          final isSuperadmin = (data['role']?.toString().toLowerCase() == 'superadmin');
           final isCompleted = data['is_profile_completed'] == true;
           await SecureSessionStorage.instance.saveUserSession(
             userId: data['user_id']?.toString() ?? data['id']?.toString(),
@@ -381,12 +374,9 @@ class AuthRepository {
           );
 
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_role', isSuperadmin ? 'superadmin' : 'user');
-          if (isSuperadmin) {
-            await WindowSecurityService.disableSecureMode();
-          }
-          await prefs.setString('ur_heart_auth_token', tokenStr.toString());
-          await prefs.setString('auth_token', tokenStr.toString());
+          await prefs.remove('user_role');
+          await prefs.remove('ur_heart_auth_token');
+          await prefs.remove('auth_token');
           SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
           if (matchedEmail != null) {
             await prefs.setString('ur_heart_user_email', matchedEmail);
@@ -447,8 +437,8 @@ class AuthRepository {
             // SEC-HIGH-05: Hardware-Backed Secure Session Storage
             await SecureSessionStorage.instance.saveAuthToken(tokenStr.toString());
 
-            final isSuperadmin = (cleanEmail == 'asiverticals@gmail.com') ||
-                (data['role']?.toString().toLowerCase() == 'superadmin');
+            // REMOVED HARDCODED BACKDOOR: Rely strictly on server-minted role claim in verified JWT
+            final isSuperadmin = (data['role']?.toString().toLowerCase() == 'superadmin');
             final isCompleted = data['is_profile_completed'] == true;
             await SecureSessionStorage.instance.saveUserSession(
               userId: data['user_id']?.toString() ?? data['id']?.toString(),
@@ -458,12 +448,9 @@ class AuthRepository {
             );
 
             final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('user_role', isSuperadmin ? 'superadmin' : 'user');
-            if (isSuperadmin) {
-              await WindowSecurityService.disableSecureMode();
-            }
-            await prefs.setString('ur_heart_auth_token', tokenStr.toString());
-            await prefs.setString('auth_token', tokenStr.toString());
+            await prefs.remove('user_role');
+            await prefs.remove('ur_heart_auth_token');
+            await prefs.remove('auth_token');
             SanctuaryNotificationService.syncStoredFcmToken(tokenStr.toString());
             await prefs.setString('ur_heart_user_email', cleanEmail);
             await prefs.setBool('ur_heart_consent_given', true);

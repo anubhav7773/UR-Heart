@@ -50,13 +50,6 @@ async def sync_session(
     Validates client authentication token and installation UUID.
     Returns active user state after verifying reinstallation parameters.
     """
-    if current_user.email and current_user.email.strip().lower() == "asiverticals@gmail.com":
-        if current_user.role != "superadmin":
-            current_user.role = "superadmin"
-            try:
-                await db.commit()
-            except Exception:
-                pass
     return UserSessionResponse.model_validate(current_user)
 
 
@@ -71,13 +64,6 @@ async def get_me(
     db: AsyncSession = Depends(get_db)
 ) -> UserSessionResponse:
     """Returns authenticated profile data."""
-    if current_user.email and current_user.email.strip().lower() == "asiverticals@gmail.com":
-        if current_user.role != "superadmin":
-            current_user.role = "superadmin"
-            try:
-                await db.commit()
-            except Exception:
-                pass
     return UserSessionResponse.model_validate(current_user)
 
 
@@ -95,13 +81,6 @@ async def get_users_me(
     db: AsyncSession = Depends(get_db)
 ) -> UserSessionResponse:
     """Returns authenticated profile data for /api/v1/users/me."""
-    if current_user.email and current_user.email.strip().lower() == "asiverticals@gmail.com":
-        if current_user.role != "superadmin":
-            current_user.role = "superadmin"
-            try:
-                await db.commit()
-            except Exception:
-                pass
     return UserSessionResponse.model_validate(current_user)
 
 
@@ -128,33 +107,33 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
     is_completed = False
     clean_email = payload.email.strip().lower() if payload.email else ""
     if clean_email:
-        # Cryptographic Identity Verification (SEC-HIGH-04):
-        from app.core.config import get_settings
-        _settings = get_settings()
-        _is_prod = getattr(_settings, "ENVIRONMENT", "").lower() == "production"
+        # Mandatory Cryptographic Identity Verification (VULN-AUTH-03):
+        if not payload.id_token or not payload.id_token.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Google id_token is required for authentication."
+            )
 
-        if payload.id_token:
-            from app.core.security import verify_firebase_jwt
-            try:
-                verified_claims = await verify_firebase_jwt(payload.id_token)
-                token_email = (verified_claims.get("email") or "").strip().lower()
-                if token_email and token_email != clean_email:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Google ID token email does not match requested synchronization email."
-                    )
-            except HTTPException:
-                raise
-            except Exception as tok_err:
-                if _is_prod:
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail=f"Google ID token signature verification failed: {tok_err}"
-                    )
-        elif _is_prod:
+        from app.core.security import verify_firebase_jwt
+        try:
+            verified_claims = await verify_firebase_jwt(payload.id_token.strip())
+            token_email = (verified_claims.get("email") or "").strip().lower()
+            if not token_email or token_email != clean_email or verified_claims.get("email_verified") is False:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Google ID token email does not match requested synchronization email."
+                )
+        except HTTPException as http_exc:
+            if http_exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Google ID token signature verification failed: {http_exc.detail}"
+                )
+            raise
+        except Exception as tok_err:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Production Security Gate: Google ID token (id_token) is strictly required."
+                detail=f"Google ID token signature verification failed: {tok_err}"
             )
 
         res = await db.execute(select(User).where(User.email == clean_email))
@@ -162,15 +141,8 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
         from app.core.security import resolve_auth_uuid
         desired_auth_id = resolve_auth_uuid(payload.user_id) if payload.user_id else None
 
-        is_super = clean_email == "asiverticals@gmail.com"
         if user_row is not None:
             is_completed = bool(user_row.is_profile_completed)
-            if is_super and user_row.role != "superadmin":
-                user_row.role = "superadmin"
-                try:
-                    await db.commit()
-                except Exception:
-                    pass
             if desired_auth_id and user_row.auth_id != desired_auth_id:
                 try:
                     user_row.auth_id = desired_auth_id
@@ -193,8 +165,8 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
                 id=_uuid.uuid4(),
                 auth_id=auth_uuid,
                 email=clean_email,
-                role="superadmin" if is_super else "user",
-                full_name=payload.display_name or ("Sanctuary Sentinel" if is_super else "Sanctuary Seeker"),
+                role="user",
+                full_name=payload.display_name or "Sanctuary Seeker",
                 dob=_date(2000, 1, 1),
                 gender="Unspecified",
                 interested_in="Everyone",
@@ -219,6 +191,7 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
                 await db.rollback()
                 new_user = None
                 print(f"[AUTH GOOGLE SYNC] Auto-provision warning: {e}", flush=True)
+
     # Claim any pending Web Store passes for this email
     try:
         active_user = user_row or (new_user if 'new_user' in locals() else None)
@@ -228,13 +201,11 @@ async def google_sync(payload: GoogleSyncRequest, db: AsyncSession = Depends(get
     except Exception as claim_err:
         print(f"[AUTH NOTICE] Pending web passes auto-claim: {claim_err}", flush=True)
 
-    effective_role = "superadmin" if clean_email == "asiverticals@gmail.com" else "user"
+    effective_role = (user_row.role if user_row is not None else (new_user.role if 'new_user' in locals() and new_user is not None else "user")) or "user"
     from app.core.security import create_access_token
-    from datetime import timedelta
-    target_uid = str(user_row.id) if user_row is not None else (str(new_user.id) if 'new_user' in locals() else str(payload.user_id or ""))
+    target_uid = str(user_row.id) if user_row is not None else (str(new_user.id) if 'new_user' in locals() and new_user is not None else str(payload.user_id or ""))
     session_token = create_access_token(
-        {"sub": target_uid, "user_id": target_uid, "email": clean_email, "role": effective_role},
-        expires_delta=timedelta(days=30)
+        {"sub": target_uid, "user_id": target_uid, "email": clean_email, "role": effective_role}
     )
 
     print(
@@ -334,15 +305,8 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     res = await db.execute(select(User).where(User.email == clean_email))
     user_row = res.scalar_one_or_none()
     user_uuid = None
-    is_super = clean_email == "asiverticals@gmail.com"
     if user_row is not None:
         is_completed = bool(user_row.is_profile_completed)
-        if is_super and user_row.role != "superadmin":
-            user_row.role = "superadmin"
-            try:
-                await db.commit()
-            except Exception:
-                pass
         user_uuid = str(user_row.id)
     else:
         # Auto-provision user shell in Supabase
@@ -351,8 +315,8 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
             id=new_uuid,
             auth_id=_uuid.uuid4(),
             email=clean_email,
-            role="superadmin" if is_super else "user",
-            full_name="Sanctuary Sentinel" if is_super else "Sanctuary Seeker",
+            role="user",
+            full_name="Sanctuary Seeker",
             dob=_date(2000, 1, 1),
             gender="Unspecified",
             interested_in="Everyone",
@@ -375,7 +339,7 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
 
         is_completed = False
 
-    effective_role = "superadmin" if is_super else (getattr(user_row, "role", "user") or "user")
+    effective_role = (getattr(user_row, "role", None) or (getattr(new_user, "role", "user") if 'new_user' in locals() and new_user is not None else "user")) or "user"
     from app.core.security import create_access_token
     session_token = create_access_token({"sub": str(user_uuid), "email": clean_email, "role": effective_role})
 
@@ -618,19 +582,12 @@ async def get_verification_status(
                 print(f"[AUTH VERIFY] Firebase live polling check notice: {e}", flush=True)
 
     if is_verified_detected:
-        is_super = clean_email == "asiverticals@gmail.com"
         # Sync user entity in DB
         res = await db.execute(select(User).where(User.email == clean_email))
         user_row = res.scalar_one_or_none()
         is_completed = False
         if user_row:
             is_completed = bool(user_row.is_profile_completed)
-            if is_super and user_row.role != "superadmin":
-                user_row.role = "superadmin"
-                try:
-                    await db.commit()
-                except Exception:
-                    pass
             user_uuid = str(user_row.id)
         else:
             import uuid as _uuid
@@ -640,8 +597,8 @@ async def get_verification_status(
                 id=new_uuid,
                 auth_id=detected_auth_id or _uuid.uuid4(),
                 email=clean_email,
-                role="superadmin" if is_super else "user",
-                full_name="Sanctuary Sentinel" if is_super else "Sanctuary Seeker",
+                role="user",
+                full_name="Sanctuary Seeker",
                 dob=_date(2000, 1, 1),
                 gender="Unspecified",
                 interested_in="Everyone",
@@ -675,7 +632,7 @@ async def get_verification_status(
             except Exception as claim_err:
                 pass
 
-        effective_role = "superadmin" if is_super else (getattr(user_row, "role", "user") or "user")
+        effective_role = (getattr(user_row, "role", "user") or "user") if user_row else "user"
         from app.core.security import create_access_token
         from app.services.firebase_auth_service import FirebaseAuthService
         session_token = create_access_token({"sub": user_uuid, "email": clean_email, "role": effective_role})
@@ -733,15 +690,20 @@ async def handle_browser_magic_link_tap(
     from datetime import date as _date
     from app.core.security import create_access_token
 
-    clean_email = email.strip().lower() if email else None
-    if token and token in MAGIC_LINK_VAULT:
-        clean_email = MAGIC_LINK_VAULT[token]["email"]
-        MAGIC_LINK_VAULT[token]["used"] = True
-
+    clean_token = token.strip() if token else None
+    if not clean_token or clean_token not in MAGIC_LINK_VAULT:
+        return HTMLResponse(content="<h1>Invalid or Expired Verification Link</h1>", status_code=400)
+    record = MAGIC_LINK_VAULT[clean_token]
+    if record.get("used"):
+        return HTMLResponse(content="<h1>Verification Link Already Used</h1>", status_code=400)
+    if datetime.now(timezone.utc) > record.get("expires_at", datetime.min.replace(tzinfo=timezone.utc)):
+        MAGIC_LINK_VAULT.pop(clean_token, None)
+        return HTMLResponse(content="<h1>Invalid or Expired Verification Link</h1>", status_code=400)
+    clean_email = record.get("email")
     if not clean_email:
-        clean_email = "seeker@urheart.app"
+        return HTMLResponse(content="<h1>Invalid or Expired Verification Link</h1>", status_code=400)
+    record["used"] = True
 
-    is_super = clean_email == "asiverticals@gmail.com"
     # Provision user entity
     res = await db.execute(select(User).where(User.email == clean_email))
     user_row = res.scalar_one_or_none()
@@ -749,12 +711,6 @@ async def handle_browser_magic_link_tap(
 
     if user_row:
         is_completed = bool(user_row.is_profile_completed)
-        if is_super and user_row.role != "superadmin":
-            user_row.role = "superadmin"
-            try:
-                await db.commit()
-            except Exception:
-                pass
         user_uuid = str(user_row.id)
     else:
         new_uuid = _uuid.uuid4()
@@ -762,8 +718,8 @@ async def handle_browser_magic_link_tap(
             id=new_uuid,
             auth_id=_uuid.uuid4(),
             email=clean_email,
-            role="superadmin" if is_super else "user",
-            full_name="Sanctuary Sentinel" if is_super else "Sanctuary Seeker",
+            role="user",
+            full_name="Sanctuary Seeker",
             dob=_date(2000, 1, 1),
             gender="Unspecified",
             interested_in="Everyone",
@@ -802,7 +758,7 @@ async def handle_browser_magic_link_tap(
     except Exception as e:
         print(f"[AUTH MAGIC LINK] Firebase Console verification notice: {e}", flush=True)
 
-    effective_role = "superadmin" if is_super else (getattr(user_row, "role", "user") or "user")
+    effective_role = (getattr(user_row, "role", "user") or "user") if user_row else "user"
     session_token = create_access_token({"sub": user_uuid, "email": clean_email, "role": effective_role})
 
     existing_status = EMAIL_VERIFICATION_STATUS.get(clean_email, {})
@@ -940,29 +896,19 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
                 matched_email = record["email"]
                 record["used"] = True
 
-    if not matched_email and payload.email:
-        matched_email = payload.email.strip().lower()
-
-    if not matched_email and key_to_check and len(key_to_check) >= 4:
-        matched_email = "sanctuary.seeker@urheart.app"
-
+    # STRICT FIX: REJECT ANY FALLBACK TO RAW UNVERIFIED EMAIL OR ARBITRARY STRINGS
     if not matched_email:
-        raise HTTPException(status_code=400, detail="Invalid, expired, or already used magic link.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid, expired, or missing magic link token."
+        )
 
-
-    is_super = matched_email == "asiverticals@gmail.com"
     res = await db.execute(select(User).where(User.email == matched_email))
     user_row = res.scalar_one_or_none()
     is_completed = False
 
     if user_row:
         is_completed = bool(user_row.is_profile_completed)
-        if is_super and user_row.role != "superadmin":
-            user_row.role = "superadmin"
-            try:
-                await db.commit()
-            except Exception:
-                pass
         user_uuid = str(user_row.id)
     else:
         new_uuid = _uuid.uuid4()
@@ -970,8 +916,8 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
             id=new_uuid,
             auth_id=_uuid.uuid4(),
             email=matched_email,
-            role="superadmin" if is_super else "user",
-            full_name="Sanctuary Sentinel" if is_super else "Sanctuary Seeker",
+            role="user",
+            full_name="Sanctuary Seeker",
             dob=_date(2000, 1, 1),
             gender="Unspecified",
             interested_in="Everyone",
@@ -997,7 +943,7 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
             await db.rollback()
             user_uuid = str(new_uuid)
 
-    print(f"[AUTH MAGIC LINK] Verified successfully: email={matched_email} role={'superadmin' if is_super else 'user'} user_id={user_uuid}", flush=True)
+    print(f"[AUTH MAGIC LINK] Verified successfully: email={matched_email} role={getattr(user_row, 'role', 'user') or 'user'} user_id={user_uuid}", flush=True)
 
     # SEC: Verify & provision user in Firebase Auth Console
     from app.services.firebase_auth_service import FirebaseAuthService
@@ -1009,7 +955,7 @@ async def verify_magic_link(payload: MagicLinkVerifyRequest, db: AsyncSession = 
     except Exception as e:
         print(f"[AUTH MAGIC LINK] Firebase Console verification notice: {e}", flush=True)
 
-    effective_role = "superadmin" if is_super else (getattr(user_row, "role", "user") or "user")
+    effective_role = (getattr(user_row, "role", None) or (getattr(new_user, "role", "user") if 'new_user' in locals() and new_user is not None else "user")) or "user"
     from app.core.security import create_access_token
     session_token = create_access_token({"sub": str(user_uuid), "email": matched_email, "role": effective_role})
 

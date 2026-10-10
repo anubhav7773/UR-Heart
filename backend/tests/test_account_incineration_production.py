@@ -14,30 +14,37 @@ def test_web_deletion_request_validation():
     assert res.status_code == 422
 
 
+from app.core.database import get_db
+from app.models.domain.user import User
+import uuid
+
 def test_web_deletion_request_success():
-    """Verify valid email triggers multi-platform incineration and returns 200."""
-    with patch.object(
-        DataIncineratorService,
-        "incinerate_user",
-        new=AsyncMock(return_value={
-            "email": "test-incineration@urheart.app",
-            "firebase_purged": True,
-            "supabase_auth_purged": True,
-            "storage_purged_files": ["users/test_uid/moments/slot_1.webp"],
-            "database_purged": True,
-        }),
-    ) as mock_incinerate:
-        res = client.post(
-            "/api/v1/vault/request-web-deletion",
-            json={"email": "test-incineration@urheart.app", "reason": "Moving on"},
-        )
-        assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "success"
-        assert "audit" in data
-        assert data["audit"]["firebase_purged"] is True
-        assert data["audit"]["storage_purged_files"] == ["users/test_uid/moments/slot_1.webp"]
-        mock_incinerate.assert_awaited_once()
+    """Verify valid email triggers statutory 2-step verification and returns pending_verification (SEC-13 / COMP-01)."""
+    mock_user = User(
+        id=uuid.uuid4(),
+        auth_id=uuid.uuid4(),
+        email="test-incineration@urheart.app",
+        full_name="Incineration Target",
+    )
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_user
+    mock_db.execute.return_value = mock_result
+    mock_db.commit = AsyncMock()
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        with patch("app.services.email_service.EmailService.dispatch_account_deletion_confirmation", new=AsyncMock(return_value=True)):
+            res = client.post(
+                "/api/v1/vault/request-web-deletion",
+                json={"email": "test-incineration@urheart.app", "reason": "Moving on"},
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "pending_verification"
+            assert "verification link has been dispatched" in data["message"]
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.asyncio

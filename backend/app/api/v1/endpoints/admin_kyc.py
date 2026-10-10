@@ -1,5 +1,6 @@
 import html
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -28,19 +29,28 @@ settings = get_settings()
 
 
 def get_admin_emails() -> set[str]:
-    emails = {"asiverticals@gmail.com"}
+    emails = set()
     if getattr(settings, "SUPERADMIN_EMAIL", None):
         emails.add(settings.SUPERADMIN_EMAIL.strip().lower())
+    if getattr(settings, "SUPERADMIN_CANONICAL_EMAIL", None):
+        emails.add(settings.SUPERADMIN_CANONICAL_EMAIL.strip().lower())
+    canonical_env = (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower()
+    if canonical_env:
+        emails.add(canonical_env)
+    admin_env = (os.getenv("SUPERADMIN_EMAIL") or "").strip().lower()
+    if admin_env:
+        emails.add(admin_env)
     emails.discard("")
     return emails
 
 
 def verify_superadmin_guard(user: User = Depends(get_current_user)) -> User:
+    admin_emails = get_admin_emails()
     user_email = (getattr(user, "email", "") or "").strip().lower()
-    if user_email not in get_admin_emails():
-        raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to the Sovereign Sanctuary Sentinel.")
-    if getattr(user, "role", "user") != "superadmin":
-        user.role = "superadmin"
+    is_whitelisted = bool(admin_emails and user_email in admin_emails)
+    is_superadmin = (getattr(user, "role", "user") == "superadmin")
+    if not (is_whitelisted or is_superadmin):
+        raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to verified superadministrators.")
     return user
 
 
@@ -397,7 +407,7 @@ async def resolve_kyc_ticket(
         .values(
             status="approved" if is_approved else "rejected",
             reviewed_at=datetime.now(timezone.utc),
-            reviewed_by=getattr(admin, "email", "asiverticals@gmail.com")
+            reviewed_by=getattr(admin, "email", None) or "superadmin"
         )
     )
     await db.commit()

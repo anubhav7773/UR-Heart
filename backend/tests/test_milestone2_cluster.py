@@ -217,7 +217,17 @@ async def test_exit_criterion_5_ephemeral_purge_and_billing_audit():
             "platform_fee": 22.35,
             "amount_net": 126.65
         }
-        res = await client.post("/api/v1/billing/purchase/audit", json=payload)
+        from app.api.v1.endpoints.billing_webhook import REVENUECAT_SECRET
+        # SEC-01 / PAY-01: Unauthenticated request must return 401
+        unauth_res = await client.post("/api/v1/billing/purchase/audit", json=payload)
+        assert unauth_res.status_code == 401
+
+        # Authenticated request with constant-time HMAC bearer succeeds
+        res = await client.post(
+            "/api/v1/billing/purchase/audit",
+            json=payload,
+            headers={"Authorization": f"Bearer {REVENUECAT_SECRET}"}
+        )
         assert res.status_code == 200
         assert res.json()["status"] == "completed"
 

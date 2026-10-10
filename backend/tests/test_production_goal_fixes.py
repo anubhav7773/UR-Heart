@@ -34,49 +34,63 @@ def test_notifications_both_routes_200():
 def test_magic_link_intent_and_dispatch():
     """Problem 2: Verify register-intent and send-magic-link endpoints."""
     import uuid
-    test_email = f"seeker_{uuid.uuid4().hex[:6]}@urheart.app"
+    from app.core.database import get_db
+    from unittest.mock import AsyncMock, MagicMock
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_res.fetchone.return_value = None
+    mock_db.execute.return_value = mock_res
+    mock_db.commit = AsyncMock()
+    mock_db.add = MagicMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
 
-    # 1. Register Intent
-    res_intent = client.post("/api/v1/auth/register-intent", json={
-        "email": test_email,
-        "dob": "2000-01-01",
-        "calculated_age": 26
-    })
-    assert res_intent.status_code == 200
-    assert res_intent.json()["status"] in ["success", "intent_recorded"]
+    try:
+        test_email = f"seeker_{uuid.uuid4().hex[:6]}@urheart.app"
 
-    # 2. Send Magic Link
-    res_link = client.post("/api/v1/auth/send-magic-link", json={
-        "email": test_email
-    })
-    assert res_link.status_code == 200
-    data = res_link.json()
-    assert data["status"] == "sent"
-    assert "magic_link" not in data, "Security failure: magic_link leaked in public HTTP response"
-    assert "deep_link" not in data, "Security failure: deep_link leaked in public HTTP response"
-    assert "token" not in data, "Security failure: raw token leaked in public HTTP response"
-    assert "masked_email" in data
+        # 1. Register Intent
+        res_intent = client.post("/api/v1/auth/register-intent", json={
+            "email": test_email,
+            "dob": "2000-01-01",
+            "calculated_age": 26
+        })
+        assert res_intent.status_code == 200
+        assert res_intent.json()["status"] in ["success", "intent_recorded"]
 
-    # 3. Check Initial Live Polling Status (Should be pending)
-    poll_token = data.get("poll_token", "")
-    res_poll_init = client.get(f"/api/v1/auth/verification-status?email={test_email}&poll_token={poll_token}")
-    assert res_poll_init.status_code == 200
-    assert res_poll_init.json()["is_verified"] is False
-    assert res_poll_init.json()["status"] == "pending"
+        # 2. Send Magic Link
+        res_link = client.post("/api/v1/auth/send-magic-link", json={
+            "email": test_email
+        })
+        assert res_link.status_code == 200
+        data = res_link.json()
+        assert data["status"] == "sent"
+        assert "magic_link" not in data, "Security failure: magic_link leaked in public HTTP response"
+        assert "deep_link" not in data, "Security failure: deep_link leaked in public HTTP response"
+        assert "token" not in data, "Security failure: raw token leaked in public HTTP response"
+        assert "masked_email" in data
 
-    # 4. Simulate User Tapping Link in Dispatched Email (retrieved securely from vault)
-    from app.api.v1.endpoints.auth import EMAIL_VERIFICATION_STATUS
-    token = EMAIL_VERIFICATION_STATUS[test_email]["token"]
-    res_tap = client.get(f"/api/v1/auth/verify?token={token}&email={test_email}")
-    assert res_tap.status_code == 200
-    assert "text/html" in res_tap.headers["content-type"]
-    assert "Sanctuary Verified" in res_tap.text
+        # 3. Check Initial Live Polling Status (Should be pending)
+        poll_token = data.get("poll_token", "")
+        res_poll_init = client.get(f"/api/v1/auth/verification-status?email={test_email}&poll_token={poll_token}")
+        assert res_poll_init.status_code == 200
+        assert res_poll_init.json()["is_verified"] is False
+        assert res_poll_init.json()["status"] == "pending"
 
-    # 5. Check Live Polling Status After Tap (Instantly verified)
-    res_poll_after = client.get(f"/api/v1/auth/verification-status?email={test_email}&poll_token={poll_token}")
-    assert res_poll_after.status_code == 200
-    assert res_poll_after.json()["is_verified"] is True
-    assert res_poll_after.json()["token"] is not None
+        # 4. Simulate User Tapping Link in Dispatched Email (retrieved securely from vault)
+        from app.api.v1.endpoints.auth import EMAIL_VERIFICATION_STATUS
+        token = EMAIL_VERIFICATION_STATUS[test_email]["token"]
+        res_tap = client.get(f"/api/v1/auth/verify?token={token}&email={test_email}")
+        assert res_tap.status_code == 200
+        assert "text/html" in res_tap.headers["content-type"]
+        assert "Sanctuary Verified" in res_tap.text
+
+        # 5. Check Live Polling Status After Tap (Instantly verified)
+        res_poll_after = client.get(f"/api/v1/auth/verification-status?email={test_email}&poll_token={poll_token}")
+        assert res_poll_after.status_code == 200
+        assert res_poll_after.json()["is_verified"] is True
+        assert res_poll_after.json()["token"] is not None
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 def test_eva_creator_attribution():

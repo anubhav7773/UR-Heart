@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, not_, or_
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional, get_current_user
+from app.core.security import get_current_user_optional, get_current_user, get_current_active_user
 from app.models.domain.user import User
 from app.models.domain.swipe import Swipe
 from app.models.domain.match import Match
@@ -38,30 +38,19 @@ async def get_discovery_feed(
     request: Request,
     limit: int = Query(default=10, ge=1, le=50),
     cursor: Optional[str] = None,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Returns verified candidate profiles from PostgreSQL for the discovery deck
     with reciprocal orientation matching, excluding already swiped profiles,
     direct-letter senders, active matches, and incognito (Ghost Cloak) users.
+    Enforces mandatory authentication to prevent unauthenticated database scraping.
     """
     # 0. Deterministically resolve caller identity for strict self-exclusion
-    caller_id = current_user.id if current_user else None
-    caller_email = (current_user.email.strip().lower() if (current_user and current_user.email) else None)
-    caller_auth_id = current_user.auth_id if current_user else None
-
-    # Fallback to request headers for client-side defense-in-depth
-    hdr_uid = request.headers.get("X-User-Id", "").strip()
-    hdr_email = request.headers.get("X-User-Email", "").strip().lower()
-
-    if not caller_id and hdr_uid:
-        try:
-            caller_id = UUID(hdr_uid)
-        except Exception:
-            pass
-    if not caller_email and hdr_email:
-        caller_email = hdr_email
+    caller_id = current_user.id
+    caller_email = current_user.email.strip().lower() if current_user.email else None
+    caller_auth_id = current_user.auth_id
 
     stmt = select(User).where(
         User.deleted_at.is_(None),
@@ -144,8 +133,9 @@ async def get_discovery_feed(
         )
         c_res = await db.execute(c_stmt)
         for c in c_res.scalars().all():
-            other_id = c.target_id if c.requester_id == current_user.id else c.requester_id
-            consents_map[other_id] = c.status
+            if hasattr(c, "requester_id") and hasattr(c, "target_id"):
+                other_id = c.target_id if c.requester_id == current_user.id else c.requester_id
+                consents_map[other_id] = getattr(c, "status", "none")
 
     cards = []
     for u in users:

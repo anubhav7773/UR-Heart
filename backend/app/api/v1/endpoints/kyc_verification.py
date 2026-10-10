@@ -1,5 +1,6 @@
+import asyncio
 from typing import List, Optional
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,57 @@ class VerifyLiveKycPayload(BaseModel):
     frames_b64: List[str] = Field(default_factory=list, description="Base64 encoded frames from live video")
     video_b64: Optional[str] = Field(None, description="Base64 encoded video clip")
     expected_pose: Optional[str] = Field(None, description="Randomized challenge pose requested from user")
+
+
+async def _is_safe_kyc_url(url: str) -> bool:
+    """
+    SEC-02 / AI-01: Validates that candidate KYC photo URLs are HTTPS, belong to allowed
+    storage origins, and do not resolve to private/loopback/cloud-metadata IP addresses.
+    """
+    if not url or not isinstance(url, str):
+        return False
+    u = url.strip()
+    if not (u.startswith("https://") or u.startswith("http://")):
+        return False
+    try:
+        from urllib.parse import urlparse
+        import socket
+        import ipaddress
+
+        parsed = urlparse(u)
+        if parsed.scheme.lower() != "https":
+            return False
+
+        allowed_hosts = {
+            "fmedkihgcvvzcekwybhe.supabase.co",
+            "ur-heart-media.firebasestorage.app",
+        }
+        target_host = (parsed.hostname or "").lower()
+        if not (
+            target_host in allowed_hosts
+            or target_host.endswith(".supabase.co")
+            or target_host.endswith(".firebasestorage.app")
+        ):
+            return False
+
+        loop = asyncio.get_running_loop()
+        addr_info = await loop.getaddrinfo(target_host, 443, proto=socket.IPPROTO_TCP)
+        for _, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            ip_obj = ipaddress.ip_address(ip_str)
+            if (
+                ip_obj.is_private
+                or ip_obj.is_loopback
+                or ip_obj.is_link_local
+                or ip_obj.is_reserved
+                or ip_obj.is_multicast
+                or str(ip_obj) == "169.254.169.254"
+                or str(ip_obj) == "0.0.0.0"
+            ):
+                return False
+        return True
+    except Exception:
+        return False
 
 
 @router.post("/verify-live", response_model=KycAiEvaluation, status_code=status.HTTP_200_OK)
@@ -48,13 +100,27 @@ async def verify_live_kyc(
     if payload.anchor_b64 and payload.anchor_b64.strip():
         raw_profile_items.insert(0, payload.anchor_b64.strip())
     if payload.profile_photo_urls:
-        raw_profile_items.extend(payload.profile_photo_urls)
+        safe_photo_urls = []
+        for u in payload.profile_photo_urls:
+            if await _is_safe_kyc_url(u):
+                safe_photo_urls.append(u)
+        if not safe_photo_urls:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid profile photo URL: Request contains prohibited or unreachable image URLs"
+            )
+        for u in safe_photo_urls:
+            raw_profile_items.append(u)
     if current_user.avatar_url and str(current_user.avatar_url).strip():
-        raw_profile_items.insert(0, str(current_user.avatar_url).strip())
+        av = str(current_user.avatar_url).strip()
+        if not (av.startswith("http://") or av.startswith("https://")) or (await _is_safe_kyc_url(av)):
+            raw_profile_items.insert(0, av)
     if current_user.photos:
         for p in current_user.photos:
             if p and str(p).strip():
-                raw_profile_items.append(str(p).strip())
+                ps = str(p).strip()
+                if not (ps.startswith("http://") or ps.startswith("https://")) or (await _is_safe_kyc_url(ps)):
+                    raw_profile_items.append(ps)
 
     # Deduplicate candidate items
     unique_items: List[str] = []

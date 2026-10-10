@@ -366,45 +366,15 @@ class EvaIdentityEngine:
                 except Exception as e:
                     logger.warning("Groq Vision (%s) exception: %s", g_model, e)
 
-        # 3. Secondary: OpenRouter Validated Free Multimodal Pool (NO text-only models)
-        or_key = getattr(settings, "OPENROUTER_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "") or ""
-        if or_key:
-            or_models = [
-                "qwen/qwen3.8-27b:free",
-                "google/gemma-4-31b-it:free",
-                "google/gemma-4-26b-a4b-it:free",
-                "dots-studio/dots-3-note-preview:free",
-            ]
-            for o_model in or_models:
-                try:
-                    logger.info("[KYC VISION REQUEST] User %s: Calling OpenRouter Vision (%s)...", user_id, o_model)
-                    payload = {
-                        "model": o_model,
-                        "messages": [{"role": "user", "content": content_payload}],
-                        "temperature": 0.1,
-                        "max_tokens": 300,
-                    }
-                    async with httpx.AsyncClient(timeout=14.0) as client:
-                        res = await client.post(OPENROUTER_ENDPOINT, headers=cls._openrouter_headers(), json=payload)
-                        if res.status_code == 200:
-                            choice = res.json().get("choices", [{}])[0]
-                            content_str = choice.get("message", {}).get("content", "")
-                            eval_obj = cls._parse_kyc_json(content_str, expected_pose, local_face_found)
-                            if eval_obj:
-                                logger.info(
-                                    "[KYC VISION SUCCESS] User %s via OpenRouter (%s): status=%s, score=%s, live=%s, pose=%s",
-                                    user_id, o_model, eval_obj.status, eval_obj.face_match_score, eval_obj.is_live_human, eval_obj.pose_matched
-                                )
-                                return eval_obj
-                        else:
-                            logger.warning("OpenRouter Vision (%s) returned status %s: %s", o_model, res.status_code, res.text[:120])
-                except Exception as e:
-                    logger.warning("OpenRouter Vision (%s) error: %s", o_model, e)
-
-        # 4. Strict Fail-Closed Sentinel: Remote Vision APIs unavailable/rate-limited
-        # Zero automated pass. User is routed to manual review; kyc_status remains False.
+        # 3. STRICT ENTERPRISE ROUTING FOR BIOMETRIC DATA (SEC-07 / AI-04 & GDPR Article 9):
+        # Biometric facial frames must NEVER be sent to OpenRouter free community models or unvetted third parties.
+        # Free model pools lack enterprise Data Processing Addenda (DPAs) and violate GDPR Art. 9 & DPDP Sec. 6.
+        # If enterprise vision endpoints (Groq LPU with executed DPA) fail or are unavailable,
+        # fail-closed directly to Sentinel Desk manual review.
         logger.warning(
-            "[KYC VISION FAIL-CLOSED] All AI vision models failed or rate-limited for user %s. Strictly FAILING CLOSED to pending_manual_review. kyc_status remains False.",
+            "[KYC VISION FAIL-CLOSED] Enterprise Groq Vision unavailable or rate-limited for user %s. "
+            "Biometric video frame transmission to unvetted third-party free pools strictly blocked under GDPR Article 9. "
+            "Strictly FAILING CLOSED to pending_manual_review. kyc_status remains False.",
             user_id
         )
         return KycAiEvaluation(
@@ -415,9 +385,9 @@ class EvaIdentityEngine:
             pose_matched=False,
             estimated_age_bracket="unknown",
             is_underage=False,
-            rejection_reason="Automated biometric evaluation temporarily unavailable due to upstream AI rate-limits. Escalated to Sentinel Desk for manual verification.",
+            rejection_reason="Automated biometric evaluation temporarily unavailable. Escalated to Sentinel Desk for manual verification in compliance with GDPR Article 9.",
             status="pending_manual_review",
-            analysis_summary="All remote AI vision providers failed or rate-limited."
+            analysis_summary="Enterprise Groq vision provider unavailable; biometric transfer to free model pools strictly blocked under GDPR Article 9."
         )
 
     @classmethod

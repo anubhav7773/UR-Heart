@@ -225,12 +225,15 @@ async def test_client_cannot_spoof_kyc_status_via_profile_endpoints(mock_user, m
         assert mock_user.kyc_status is False
         
         # Verify executed DB update values did not include kyc_status or is_kyc_verified
-        update_stmt = mock_db.execute.call_args[0][0]
-        # In SQLAlchemy update statement, parameters are in compile or parameters dict
-        params = update_stmt.compile().params
-        assert "kyc_status" not in params
-        assert "is_kyc_verified" not in params
-        assert params.get("full_name") == "Tampered Name"
+        update_calls = [call[0][0] for call in mock_db.execute.call_args_list if hasattr(call[0][0], "compile")]
+        found_update = False
+        for stmt in update_calls:
+            params = stmt.compile().params
+            if params.get("full_name") == "Tampered Name":
+                found_update = True
+                assert "kyc_status" not in params
+                assert "is_kyc_verified" not in params
+        assert found_update is True, "Expected User update statement with full_name='Tampered Name'"
 
     app.dependency_overrides.clear()
 

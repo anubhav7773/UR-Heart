@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/activity_logger_service.dart';
 import '../../data/auth_repository.dart';
@@ -147,11 +148,11 @@ class AuthController extends StateNotifier<AuthState> {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ];
 
-  void setDateOfBirth({
+  Future<void> setDateOfBirth({
     required int day,
     required int month,
     required int year,
-  }) {
+  }) async {
     final now = DateTime.now();
     int age = now.year - year;
     if (now.month < month || (now.month == month && now.day < day)) {
@@ -172,28 +173,35 @@ class AuthController extends StateNotifier<AuthState> {
           : null,
     );
 
-    // Persist real selected DOB & age immediately to SharedPreferences
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString('ur_heart_selected_dob', formattedDob);
-      prefs.setString('profile_dob', formattedDob);
-      prefs.setInt('profile_age', age);
-      prefs.setInt('ur_heart_user_age', age);
-      prefs.setInt('ur_heart_dob_day', day);
-      prefs.setInt('ur_heart_dob_month', month);
-      prefs.setInt('ur_heart_dob_year', year);
-    });
+    // Persist real selected DOB securely to hardware-backed storage (FE-VULN-02)
+    try {
+      await const FlutterSecureStorage().write(key: 'ur_heart_selected_dob', value: formattedDob);
+      await const FlutterSecureStorage().write(key: 'profile_dob', value: formattedDob);
 
-    // Stream activity to Render backend
-    ActivityLogger.log(
-      category: 'AUTH',
-      action: 'DATE_OF_BIRTH_SELECTED',
-      screen: 'AgeGateAuthScreen',
-      details: {
-        'formatted_dob': formattedDob,
-        'calculated_age': age,
-        'is_adult': !isUnderage,
-      },
-    );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('ur_heart_selected_dob');
+      await prefs.remove('profile_dob');
+      await prefs.setInt('profile_age', age);
+      await prefs.setInt('ur_heart_user_age', age);
+      await prefs.setInt('ur_heart_dob_day', day);
+      await prefs.setInt('ur_heart_dob_month', month);
+      await prefs.setInt('ur_heart_dob_year', year);
+
+      // Delay telemetry streaming until explicit user consent is recorded (FE-VULN-09)
+      final consentGiven = prefs.getBool('ur_heart_consent_given') ?? false;
+      if (consentGiven) {
+        ActivityLogger.log(
+          category: 'AUTH',
+          action: 'DATE_OF_BIRTH_VERIFIED',
+          screen: 'AgeGateAuthScreen',
+          details: {
+            'is_adult': !isUnderage,
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('[AUTH] Failed to persist DOB securely: $e');
+    }
   }
 
   void setEmail(String email) {
@@ -212,7 +220,13 @@ class AuthController extends StateNotifier<AuthState> {
   Future<AuthResult> signInWithGoogle() async {
     // 1. Minor Safety Quarantine Pre-Check
     final prefs = await SharedPreferences.getInstance();
-    final millis = prefs.getInt(AgeGateController.quarantineKey);
+    int? millis = prefs.getInt(AgeGateController.quarantineKey);
+    if (millis == null) {
+      final secureVal = await const FlutterSecureStorage().read(key: AgeGateController.quarantineKey);
+      if (secureVal != null) {
+        millis = int.tryParse(secureVal);
+      }
+    }
     if (millis != null) {
       final expiry = DateTime.fromMillisecondsSinceEpoch(millis);
       if (DateTime.now().isBefore(expiry)) {
@@ -269,8 +283,10 @@ class AuthController extends StateNotifier<AuthState> {
           ? monthNames[state.selectedMonth! - 1]
           : 'Jan';
       final formattedDob = '${state.selectedDay} $mName ${state.selectedYear}';
-      await prefs.setString('ur_heart_selected_dob', formattedDob);
-      await prefs.setString('profile_dob', formattedDob);
+      await const FlutterSecureStorage().write(key: 'ur_heart_selected_dob', value: formattedDob);
+      await const FlutterSecureStorage().write(key: 'profile_dob', value: formattedDob);
+      await prefs.remove('ur_heart_selected_dob');
+      await prefs.remove('profile_dob');
 
       return result;
     } catch (e) {

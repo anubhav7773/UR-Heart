@@ -1508,7 +1508,7 @@ async def sanctuary_appinfo_overview(request: Request):
 async def sanctuary_admin_portal(request: Request):
     """
     Dedicated Zero-Trust Web Admin Portal (SEC-HIGH-01).
-    Exclusively authorized for sovereign administrator asiverticals@gmail.com.
+    Exclusively authorized for sovereign administrators.
     """
     return HTMLResponse(content=get_admin_portal_html(), status_code=200)
 

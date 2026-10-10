@@ -66,7 +66,7 @@ class SuperadminKycDeskScreen extends ConsumerWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Authorized Superadmin: asiverticals@gmail.com',
+                        'Authorized Superadmin Console',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

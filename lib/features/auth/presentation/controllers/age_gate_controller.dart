@@ -1,5 +1,10 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/services/installation_service.dart';
 
 class AgeGateState {
   final DateTime? birthDate;
@@ -43,17 +48,34 @@ class AgeGateState {
 
 class AgeGateController extends StateNotifier<AgeGateState> {
   static const String quarantineKey = 'ur_heart_quarantine_until';
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
   AgeGateController() : super(const AgeGateState()) {
     checkQuarantine();
   }
 
   Future<void> checkQuarantine() async {
+    int? millis;
+    try {
+      final secVal = await _secureStorage.read(key: quarantineKey);
+      if (secVal != null && secVal.isNotEmpty) {
+        millis = int.tryParse(secVal);
+      }
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
-    final millis = prefs.getInt(quarantineKey);
+    final prefMillis = prefs.getInt(quarantineKey);
+    millis ??= prefMillis;
+
     if (millis != null) {
       final expiry = DateTime.fromMillisecondsSinceEpoch(millis);
       if (DateTime.now().isBefore(expiry)) {
+        // Enforce bidirectional synchronization so clearing one storage cannot bypass quarantine
+        await prefs.setInt(quarantineKey, millis);
+        try {
+          await _secureStorage.write(key: quarantineKey, value: millis.toString());
+        } catch (_) {}
+
         state = state.copyWith(
           isQuarantined: true,
           quarantineUntil: expiry,
@@ -61,6 +83,9 @@ class AgeGateController extends StateNotifier<AgeGateState> {
         );
       } else {
         await prefs.remove(quarantineKey);
+        try {
+          await _secureStorage.delete(key: quarantineKey);
+        } catch (_) {}
       }
     }
   }
@@ -73,10 +98,34 @@ class AgeGateController extends StateNotifier<AgeGateState> {
     }
 
     if (age < 18) {
-      // 180-Day Hardware Quarantine
+      // 180-Day Hardware Quarantine (FE-VULN-13)
       final quarantineUntil = now.add(const Duration(days: 180));
+      final quarantineExpiryMs = quarantineUntil.millisecondsSinceEpoch;
+
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(quarantineKey, quarantineUntil.millisecondsSinceEpoch);
+      await prefs.setInt(quarantineKey, quarantineExpiryMs);
+      try {
+        await _secureStorage.write(key: quarantineKey, value: quarantineExpiryMs.toString());
+      } catch (_) {}
+
+      // Register device hardware fingerprint in backend quarantine registry
+      try {
+        final installationId = await InstallationService.getInstallationUuid();
+        final dio = Dio(BaseOptions(
+          baseUrl: ApiEndpoints.defaultBaseUrl,
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
+        ));
+        await dio.post<dynamic>(
+          '/api/v1/auth/quarantine-device',
+          data: {
+            'device_fingerprint': installationId,
+            'reason': 'underage_attempt_age_gate',
+          },
+        );
+      } catch (e) {
+        debugPrint('[QUARANTINE] Backend registration error: $e');
+      }
 
       state = state.copyWith(
         birthDate: dob,
@@ -101,6 +150,9 @@ class AgeGateController extends StateNotifier<AgeGateState> {
   Future<void> clearQuarantine() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(quarantineKey);
+    try {
+      await _secureStorage.delete(key: quarantineKey);
+    } catch (_) {}
     state = state.copyWith(isQuarantined: false, quarantineUntil: null);
   }
 }

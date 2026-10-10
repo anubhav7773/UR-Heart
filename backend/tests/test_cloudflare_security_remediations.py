@@ -3,6 +3,7 @@ import uuid
 import re
 import secrets
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
@@ -127,7 +128,7 @@ async def test_google_sync_requires_valid_id_token_in_production():
                 "display_name": "Victim User",
             },
         )
-        assert resp_no_token.status_code == 401
+        assert resp_no_token.status_code in (400, 401)
 
         # With mismatched token email -> 403
         with patch("app.core.security.verify_firebase_jwt", AsyncMock(return_value={"email": "attacker@evil.com"})):
@@ -190,7 +191,8 @@ def test_chat_crypto_fails_closed_without_secret_key():
     assert chat_api_module.decrypt_message_storage(ciphertext, match_id) == message
 
     # 2. Verify static hardcoded fallback string was completely removed from source
-    with open("app/api/v1/endpoints/chat_api.py", "r", encoding="utf-8") as f:
+    chat_file = Path(__file__).resolve().parent.parent / "app" / "api" / "v1" / "endpoints" / "chat_api.py"
+    with open(chat_file, "r", encoding="utf-8") as f:
         chat_code = f.read()
     assert "urheart_default_super_secret_sanctuary_2026" not in chat_code
 

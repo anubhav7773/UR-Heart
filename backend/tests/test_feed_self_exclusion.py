@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_active_user, get_current_user_optional
 from app.models.domain.user import User
 
 client = TestClient(app)
@@ -50,6 +50,7 @@ def test_discovery_feed_strictly_excludes_caller_profile():
     mock_result.scalars.return_value.all.return_value = [other_candidate, caller, same_email_candidate]
     mock_db.execute = AsyncMock(return_value=mock_result)
 
+    app.dependency_overrides[get_current_active_user] = lambda: caller
     app.dependency_overrides[get_current_user_optional] = lambda: caller
     app.dependency_overrides[get_db] = lambda: mock_db
 
@@ -66,15 +67,25 @@ def test_discovery_feed_strictly_excludes_caller_profile():
         # Assert caller's duplicate email row is completely excluded
         assert str(same_email_candidate.id) not in candidate_ids
     finally:
+        app.dependency_overrides.pop(get_current_active_user, None)
         app.dependency_overrides.pop(get_current_user_optional, None)
         app.dependency_overrides.pop(get_db, None)
 
 
 def test_discovery_feed_excludes_caller_via_fallback_headers():
-    """Verify that X-User-Id and X-User-Email headers exclude the caller even when unauthenticated."""
+    """Verify that unauthenticated calls with fallback headers are rejected with 401 (VULN-FEED-01), and authenticated calls exclude self."""
     caller_id = uuid.UUID("44444444-4444-4444-4444-444444444444")
     cand_id = uuid.UUID("55555555-5555-5555-5555-555555555555")
 
+    # 1. VULN-FEED-01: Unauthenticated request with only fallback headers is strictly rejected with 401 Unauthorized
+    headers = {
+        "X-User-Id": str(caller_id),
+        "X-User-Email": "self_unauthed@urheart.app"
+    }
+    res_unauth = client.get("/api/v1/discovery/feed", headers=headers)
+    assert res_unauth.status_code == 401
+
+    # 2. When authenticated, caller identity is strictly excluded from candidate list
     other_cand = User(
         id=cand_id,
         email="other_seeker@urheart.app",
@@ -84,10 +95,10 @@ def test_discovery_feed_excludes_caller_via_fallback_headers():
         is_profile_completed=True,
         is_incognito=False,
     )
-    unauthed_self = User(
+    authed_self = User(
         id=caller_id,
         email="self_unauthed@urheart.app",
-        full_name="Self Unauthed",
+        full_name="Self Authed",
         gender="Man",
         interested_in="Women",
         is_profile_completed=True,
@@ -96,18 +107,14 @@ def test_discovery_feed_excludes_caller_via_fallback_headers():
 
     mock_db = AsyncMock()
     mock_result = MagicMock()
-    mock_result.scalars.return_value.all.return_value = [other_cand, unauthed_self]
+    mock_result.scalars.return_value.all.return_value = [other_cand, authed_self]
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    app.dependency_overrides[get_current_user_optional] = lambda: None
+    app.dependency_overrides[get_current_active_user] = lambda: authed_self
     app.dependency_overrides[get_db] = lambda: mock_db
 
     try:
-        headers = {
-            "X-User-Id": str(caller_id),
-            "X-User-Email": "self_unauthed@urheart.app"
-        }
-        res = client.get("/api/v1/discovery/feed", headers=headers)
+        res = client.get("/api/v1/discovery/feed")
         assert res.status_code == 200
         data = res.json()
         candidate_ids = [c["id"] for c in data["candidates"]]
@@ -115,5 +122,5 @@ def test_discovery_feed_excludes_caller_via_fallback_headers():
         assert str(cand_id) in candidate_ids
         assert str(caller_id) not in candidate_ids
     finally:
-        app.dependency_overrides.pop(get_current_user_optional, None)
+        app.dependency_overrides.pop(get_current_active_user, None)
         app.dependency_overrides.pop(get_db, None)

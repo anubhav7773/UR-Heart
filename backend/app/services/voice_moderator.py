@@ -1,10 +1,14 @@
+import os
 import re
+import logging
 import unicodedata
 from typing import Optional, Tuple
 import httpx
 
 from app.core.config import get_settings
 from app.services.chat_sanitizer import ChatSanitizerService
+
+logger = logging.getLogger(__name__)
 
 
 class VoiceModeratorService:
@@ -41,8 +45,8 @@ class VoiceModeratorService:
         api_key = getattr(settings, "GROQ_VOICE_API_KEY", "") or ""
         url = getattr(settings, "GROQ_WHISPER_URL", "https://api.groq.com/openai/v1/audio/transcriptions")
 
-        if not api_key:
-            print("[VOICE MODERATOR] Warning: GROQ_VOICE_API_KEY missing. Bypassing STT.", flush=True)
+        if not api_key or api_key.startswith("placeholder_"):
+            logger.warning("[VOICE MODERATOR] GROQ_VOICE_API_KEY missing or placeholder. Bypassing STT.")
             return None
 
         # Build multipart payload
@@ -128,9 +132,10 @@ class VoiceModeratorService:
         """
         transcript = await cls.transcribe_audio(content, filename, content_type)
         if transcript is None:
-            # If Groq Whisper is unavailable or timeout, fail-open gracefully with warning
-            # so legitimate users are not blocked by external network blips.
-            return True, "", "Whisper service unavailable, audio approved."
+            # FAIL-CLOSED ARCHITECTURE (SEC-05 / AI-05):
+            # Under IT Act 2000 Section 79 & Intermediary Rules 2021 Rule 3(2), unmoderated audio must NEVER be approved.
+            logger.warning("Voice moderation unavailable. Rejecting audio fail-closed to preserve statutory safe harbor.")
+            return False, "", "Voice moderation temporary service unavailable. Please retry shortly."
 
         is_safe, reason = cls.evaluate_transcript(transcript)
         if not is_safe:

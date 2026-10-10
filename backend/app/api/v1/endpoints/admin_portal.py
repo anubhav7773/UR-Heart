@@ -118,8 +118,13 @@ async def admin_portal_login(
     settings = get_settings()
     clean_email = payload.email.strip().lower()
 
-    # Gate 1: Email must be strictly asiverticals@gmail.com
-    if clean_email != "asiverticals@gmail.com":
+    # Gate 1: Dynamic admin email verification
+    allowed_admin_emails = {
+        getattr(settings, "SUPERADMIN_EMAIL", "").strip().lower(),
+        (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower(),
+    }
+    allowed_admin_emails.discard("")
+    if not allowed_admin_emails or clean_email not in allowed_admin_emails:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access Denied: Email is not authorized for Sovereign Sanctuary privileges."
@@ -134,10 +139,6 @@ async def admin_portal_login(
         (os.getenv("ADMIN_ACCESS_KEY") or "").strip(),
         (os.getenv("SOVEREIGN_KEY") or "").strip(),
     }
-    # In development/test only, support dev bootstrap key
-    if getattr(settings, "ENVIRONMENT", "").lower() != "production":
-        valid_keys.add("asiverticals_sovereign_sanctuary_2026")
-
     valid_keys.discard("")
     import secrets
     provided_key = payload.secret_key.strip() if payload.secret_key else ""
@@ -322,7 +323,7 @@ async def ban_user(
     client_ip = request.client.host if request.client else "unknown"
     await _record_audit_log(
         db=db,
-        admin_email="asiverticals@gmail.com",
+        admin_email=getattr(admin, "email", None) or "superadmin",
         action="USER_BAN",
         target_type="user",
         target_id=str(user_id),
@@ -352,7 +353,7 @@ async def unban_user(
     client_ip = request.client.host if request.client else "unknown"
     await _record_audit_log(
         db=db,
-        admin_email="asiverticals@gmail.com",
+        admin_email=getattr(admin, "email", None) or "superadmin",
         action="USER_UNBAN",
         target_type="user",
         target_id=str(user_id),
@@ -383,7 +384,7 @@ async def set_user_kyc(
     client_ip = request.client.host if request.client else "unknown"
     await _record_audit_log(
         db=db,
-        admin_email="asiverticals@gmail.com",
+        admin_email=getattr(admin, "email", None) or "superadmin",
         action="USER_KYC_OVERRIDE",
         target_type="user",
         target_id=str(user_id),
@@ -420,7 +421,7 @@ async def get_system_config(
     """Retrieves current platform runtime configuration and security flags."""
     return {
         "status": "success",
-        "superadmin_email": "asiverticals@gmail.com",
+        "superadmin_email": getattr(admin, "email", None) or "superadmin",
         "config": SYSTEM_RUNTIME_CONFIG,
     }
 
@@ -442,7 +443,7 @@ async def update_system_config(
 
     await _record_audit_log(
         db=db,
-        admin_email="asiverticals@gmail.com",
+        admin_email=getattr(admin, "email", None) or "superadmin",
         action="CONFIG_UPDATE",
         target_type="system_config",
         details=f"Old: {old_state} -> New: {json.dumps(SYSTEM_RUNTIME_CONFIG)}",

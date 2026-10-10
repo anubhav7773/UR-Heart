@@ -1,13 +1,14 @@
 import re
 import uuid
 import secrets
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, Form, Request, status, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, text
 
 from app.core.config import get_settings
 from app.core.database import get_db
@@ -16,6 +17,7 @@ from app.services.data_incinerator_service import DataIncineratorService
 from app.services.email_service import EmailService
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Statutory Legal & Policy Portals"])
 
 COMMON_CSS = """
@@ -740,6 +742,27 @@ async def serve_privacy_policy(request: Request):
               <td>Non-personalized rewarded video ad impressions.</td>
               <td>HMAC-SHA256 cryptographic SSV.</td>
             </tr>
+            <tr>
+              <td><strong>Functional Software, Inc. (Sentry)</strong></td>
+              <td>Application Performance & Crash Diagnostics</td>
+              <td>USA</td>
+              <td>Strictly Pseudonymized Stack Traces & Error Logs</td>
+              <td>Zero PII retention policy, SOC 2 Type II, TLS 1.3 in transit.</td>
+            </tr>
+            <tr>
+              <td><strong>ipwho.is / ip-api.com</strong></td>
+              <td>Approximate City-Level IP Geolocation</td>
+              <td>Global / CDN</td>
+              <td>Ephemeral IP Address (No persistent storage)</td>
+              <td>Non-persistent real-time resolution, coarse city level only.</td>
+            </tr>
+            <tr>
+              <td><strong>BigDataCloud Pty Ltd</strong></td>
+              <td>Coarse Locality Reverse Geocoding</td>
+              <td>Australia</td>
+              <td>Fuzzed Coordinate Truncation Vectors</td>
+              <td>Fuzzed coordinate resolution, zero persistent user identity.</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -1178,13 +1201,38 @@ async def process_web_deletion_request(payload: WebDeletionRequest, db: AsyncSes
     if user:
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-        WEB_DELETION_TOKENS[token] = {
-            "email": clean_email,
-            "user_id": str(user.id),
-            "auth_id": str(user.auth_id) if getattr(user, "auth_id", None) else None,
-            "expires_at": expires_at,
-            "reason": payload.reason or "Web Statutory Deletion Portal"
-        }
+        auth_id_val = str(user.auth_id) if getattr(user, "auth_id", None) else None
+
+        # PERSIST TO POSTGRESQL (Survives container restarts - SEC-13 / COMP-01)
+        try:
+            await db.execute(
+                text("""
+                    INSERT INTO public.web_deletion_tokens (token, email, user_id, auth_id, expires_at, reason)
+                    VALUES (:token, :email, :user_id, :auth_id, :expires_at, :reason)
+                    ON CONFLICT (email) DO UPDATE 
+                    SET token = :token, expires_at = :expires_at, reason = :reason
+                """),
+                {
+                    "token": token,
+                    "email": clean_email,
+                    "user_id": user.id,
+                    "auth_id": auth_id_val,
+                    "expires_at": expires_at,
+                    "reason": payload.reason or "Web Statutory Deletion Portal"
+                }
+            )
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            logger.warning("DB insert for web_deletion_tokens failed, rolling back session: %s", e)
+            # In-memory resilience fallback if database table is unavailable
+            WEB_DELETION_TOKENS[token] = {
+                "email": clean_email,
+                "user_id": str(user.id),
+                "auth_id": auth_id_val,
+                "expires_at": expires_at,
+                "reason": payload.reason or "Web Statutory Deletion Portal"
+            }
 
         base_url = getattr(settings, "BASE_WEB_URL", "https://urheart.asiverticals.me")
         confirm_url = f"{base_url}/confirm-web-deletion?token={token}"
@@ -1202,7 +1250,27 @@ async def confirm_web_deletion(token: str, db: AsyncSession = Depends(get_db)):
     """
     SEC-CRIT-01 Confirm: Validates single-use cryptographic deletion token and irrevocably incinerates account.
     """
-    record = WEB_DELETION_TOKENS.pop(token, None)
+    clean_token = token.strip()
+    record: Optional[Dict[str, Any]] = None
+
+    # 1. ATOMIC READ AND CONSUMPTION FROM POSTGRESQL (SEC-13 / COMP-01)
+    try:
+        token_stmt = text("""
+            DELETE FROM public.web_deletion_tokens 
+            WHERE token = :token
+            RETURNING email, user_id, auth_id, expires_at, reason
+        """)
+        res = await db.execute(token_stmt, {"token": clean_token})
+        row = res.mappings().one_or_none()
+        await db.commit()
+        if row:
+            record = dict(row)
+    except Exception as e:
+        await db.rollback()
+        logger.warning("DB lookup for web_deletion_tokens failed, rolling back session: %s", e)
+
+    if not record:
+        record = WEB_DELETION_TOKENS.pop(clean_token, None)
     if not record:
         html = f"""<!DOCTYPE html>
 <html>

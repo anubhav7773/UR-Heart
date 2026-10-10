@@ -5,11 +5,15 @@ from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 from sqlalchemy.exc import SQLAlchemyError
 
+import logging
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 from app.core.database import get_db
 from app.core.security import require_superadmin, get_current_user
 from app.models.domain.user import User
@@ -265,17 +269,21 @@ async def verify_store_user(payload: VerifyUserRequest, db: AsyncSession = Depen
     except (ValueError, TypeError, AttributeError):
         pass
 
-    if parsed_uuid:
-        res = await db.execute(select(User).where(User.id == parsed_uuid))
-        user = res.scalar_one_or_none()
+    try:
+        if parsed_uuid:
+            res = await db.execute(select(User).where(User.id == parsed_uuid))
+            user = res.scalar_one_or_none()
 
-    if not user:
-        res = await db.execute(select(User).where(User.referral_code == q.upper()))
-        user = res.scalar_one_or_none()
+        if not user:
+            res = await db.execute(select(User).where(User.referral_code == q.upper()))
+            user = res.scalar_one_or_none()
 
-    if not user:
-        res = await db.execute(select(User).where(User.email == clean_q))
-        user = res.scalar_one_or_none()
+        if not user:
+            res = await db.execute(select(User).where(User.email == clean_q))
+            user = res.scalar_one_or_none()
+    except Exception as db_err:
+        logger.warning("Database lookup exception in verify_store_user: %s", db_err)
+        user = None
 
     if not user:
         # 1. Seamless Guest / New Seeker Support:
@@ -292,18 +300,7 @@ async def verify_store_user(payload: VerifyUserRequest, db: AsyncSession = Depen
                 "message": f"✨ Welcome! Pass will be reserved for {clean_q} and automatically activated upon app login."
             }
 
-        # 2. Check if dummy test seeker
-        if "seeker" in clean_q or "demo" in clean_q:
-            return {
-                "status": "verified",
-                "is_new_user": False,
-                "user_id": "00000000-0000-0000-0000-000000000001",
-                "full_name": "Sanctuary Seeker (Demo)",
-                "email": clean_q if "@" in clean_q else "seeker@urheart.app",
-                "subscription_tier": "free",
-                "referral_code": "UR-SANCTUARY",
-                "message": "✓ Seeker Authenticated (Demo)"
-            }
+        # 2. Strict Access Control (PAY-06): Dummy demo seeker bypass removed. Non-existent users are rejected.
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -713,7 +710,7 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
                 "product_id": db_purchase.product_identifier,
                 "product_name": product["name"],
                 "user_query": str(db_purchase.user_id),
-                "amount": float(db_purchase.amount_gross),
+                "amount": float(db_purchase.amount_gross) if db_purchase.amount_gross is not None else 0.0,
                 "currency": db_purchase.currency,
                 "payment_method": "upi",
                 "status": db_purchase.status
@@ -738,35 +735,88 @@ async def complete_store_order(payload: CompleteOrderRequest, db: AsyncSession =
     product = STORE_PRODUCTS.get(product_id, STORE_PRODUCTS["urheart_pass_monthly"])
     utr = (payload.payment_reference or "").strip()
 
-    # 2. Duplicate UTR check (prevent replay attack across orders)
-    if utr:
-        if utr in SUBMITTED_UTRS:
+    # 2. Duplicate UTR check (prevent replay attack across orders & container restarts - SEC-10 / PAY-05)
+    clean_utr = utr.strip().upper() if utr else ""
+    if clean_utr:
+        if clean_utr in SUBMITTED_UTRS:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"UTR transaction reference '{utr}' has already been submitted for another order."
+                detail=f"UTR transaction reference '{clean_utr}' has already been submitted for another order."
             )
+        # Check UTR uniqueness in PostgreSQL persistent storage rather than process RAM
         dup_stmt = select(InAppPurchase).where(
-            InAppPurchase.transaction_reference == utr,
-            InAppPurchase.status.in_(["pending_verification", "completed"])
+            or_(
+                InAppPurchase.transaction_reference == clean_utr,
+                InAppPurchase.transaction_reference == utr,
+                InAppPurchase.transaction_reference == f"UTR:{clean_utr}"
+            )
         )
         if (await db.execute(dup_stmt)).scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"UTR transaction reference '{utr}' has already been submitted or credited."
+                detail=f"This Bank Reference (UTR) '{clean_utr}' has already been submitted or processed."
             )
-        SUBMITTED_UTRS.add(utr)
+        SUBMITTED_UTRS.add(clean_utr)
 
     # 3. Transition order state machine to 'pending_verification'
     order["status"] = "pending_verification"
-    order["payment_reference"] = utr
+    order["payment_reference"] = clean_utr or utr
 
     # Update ledger status in DB
     try:
-        await db.execute(
-            update(InAppPurchase)
-            .where(InAppPurchase.transaction_reference == payload.order_id)
-            .values(status="pending")
-        )
+        stmt = select(InAppPurchase).where(InAppPurchase.transaction_reference == payload.order_id)
+        existing_order = (await db.execute(stmt)).scalar_one_or_none()
+
+        if existing_order:
+            await db.execute(
+                update(InAppPurchase)
+                .where(InAppPurchase.id == existing_order.id)
+                .values(
+                    status="pending_verification"
+                )
+            )
+        else:
+            # Persist directly in PostgreSQL database for crash-resilience across container restarts
+            user_id_val = None
+            user_query = str(order.get("user_query") or "").strip()
+            if user_query:
+                parsed_uuid = None
+                try:
+                    parsed_uuid = UUID(user_query)
+                except (ValueError, TypeError, AttributeError):
+                    pass
+                if parsed_uuid:
+                    user_row = (await db.execute(select(User).where(User.id == parsed_uuid))).scalar_one_or_none()
+                    if user_row:
+                        user_id_val = user_row.id
+                if not user_id_val and "@" in user_query:
+                    user_row = (await db.execute(select(User).where(User.email == user_query.lower()))).scalar_one_or_none()
+                    if user_row:
+                        user_id_val = user_row.id
+                if not user_id_val:
+                    user_row = (await db.execute(select(User).where(User.referral_code == user_query.upper()))).scalar_one_or_none()
+                    if user_row:
+                        user_id_val = user_row.id
+
+            if not user_id_val:
+                try:
+                    user_id_val = UUID(order.get("user_id"))
+                except Exception:
+                    pass
+
+            if user_id_val:
+                db_record = InAppPurchase(
+                    user_id=user_id_val,
+                    transaction_reference=payload.order_id,
+                    product_identifier=product_id,
+                    store="bank_transfer",
+                    currency="INR",
+                    amount_gross=float(product.get("price_inr", 0.0)),
+                    platform_fee=0.0,
+                    amount_net=float(product.get("price_inr", 0.0)),
+                    status="pending_verification"
+                )
+                db.add(db_record)
         await db.commit()
     except SQLAlchemyError as e:
         await db.rollback()

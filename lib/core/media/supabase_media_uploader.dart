@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
+import '../storage/secure_session_storage.dart';
 
 /// Direct Client-to-Supabase Cloud Storage Media Uploader
 /// Bypasses backend server completely (0 MB Render server bandwidth)
@@ -52,11 +53,14 @@ class SupabaseMediaUploader {
 
     final client = _customClient ?? http.Client();
     try {
+      final userJwt = await SecureSessionStorage.instance.getAuthToken();
+      final authHeader = (userJwt != null && userJwt.isNotEmpty) ? 'Bearer $userJwt' : 'Bearer $anonKey';
+
       final response = await client.post(
         uploadUri,
         headers: {
           'apikey': anonKey,
-          'Authorization': 'Bearer $anonKey',
+          'Authorization': authHeader,
           'Content-Type': 'image/webp',
           'x-upsert': 'true',
           'cache-control': 'public, max-age=2592000',

@@ -197,19 +197,30 @@ class TestEvaApiEndpoints:
             assert "UR-Heart Dating Sanctuary" in data["reply"]
 
     async def test_wingman_endpoint(self):
+        from unittest.mock import patch, AsyncMock
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            res = await ac.post("/api/v1/ai/eva/wingman", json={
-                "partner_name": "Ananya",
-                "last_incoming_message": "I really enjoy quiet evenings with a book.",
-                "user_draft_reply": "Same here! What are you reading?"
-            })
-            assert res.status_code == 200
-            data = res.json()
-            assert len(data["reply"]) > 10
-            # Ensure zero provider names in reply
-            assert "groq" not in data["reply"].lower()
-            assert "openrouter" not in data["reply"].lower()
+            mock_res = {
+                "reply": "That sounds delightful! Books offer a peaceful refuge from the busy world.",
+                "suggestions": [
+                    {"type": "spark", "label": "Playful Spark", "text": "What are you reading right now?"}
+                ],
+                "status": "success",
+                "is_guarded": False,
+                "engine": "gemini:gemini-2.0-flash"
+            }
+            with patch("app.services.gemini_wingman_engine.GeminiWingmanEngine.generate_wingman_guidance", new=AsyncMock(return_value=mock_res)):
+                res = await ac.post("/api/v1/ai/eva/wingman", json={
+                    "partner_name": "Ananya",
+                    "last_incoming_message": "I really enjoy quiet evenings with a book.",
+                    "user_draft_reply": "Same here! What are you reading?"
+                })
+                assert res.status_code == 200
+                data = res.json()
+                assert len(data["reply"]) > 10
+                # Ensure zero provider names in reply
+                assert "groq" not in data["reply"].lower()
+                assert "openrouter" not in data["reply"].lower()
 
     async def test_grievance_assist_endpoint(self):
         transport = ASGITransport(app=app)
@@ -225,7 +236,7 @@ class TestEvaApiEndpoints:
             assert "groq" not in data["reply"].lower()
             assert "openrouter" not in data["reply"].lower()
 
-    def test_escalation_intent_detection(self):
+    async def test_escalation_intent_detection(self):
         # 1. Safety & Harassment
         res = EvaGuardrails.detect_escalation_intent("Ek user mujhe preshan kar raha hai aur abuse kar raha hai")
         assert res is not None
@@ -256,14 +267,14 @@ class TestEvaApiEndpoints:
         assert res is not None
         assert res["category"] == "HUMAN_REQUEST"
 
-    def test_liability_sanitization(self):
+    async def test_liability_sanitization(self):
         risky_text = "It is our fault and our mistake. I will refund your money directly."
         sanitized = EvaGuardrails.sanitize_liability(risky_text)
         assert "our fault" not in sanitized.lower()
         assert "our mistake" not in sanitized.lower()
         assert "refund your money" not in sanitized.lower()
 
-    def test_90_percent_routine_queries_do_not_escalate(self):
+    async def test_90_percent_routine_queries_do_not_escalate(self):
         routine = [
             "Mere daily 10 swipes khatam ho gaye kaise badhayein?",
             "Slumber mode kab khatam hoga?",

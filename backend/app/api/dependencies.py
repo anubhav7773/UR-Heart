@@ -90,21 +90,21 @@ async def require_superadmin(
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """Strict authorization gate: Validates server-side role and immutable admin identity."""
+    from app.core.config import get_settings
+    settings = get_settings()
     admin_whitelist = {
+        getattr(settings, "SUPERADMIN_CANONICAL_EMAIL", "").strip().lower(),
+        getattr(settings, "SUPERADMIN_EMAIL", "").strip().lower(),
         (os.getenv("SUPERADMIN_CANONICAL_EMAIL") or "").strip().lower(),
         (os.getenv("SUPERADMIN_EMAIL") or "").strip().lower(),
-        "asiverticals@gmail.com",
     }
     admin_whitelist.discard("")
     user_email = (getattr(current_user, "email", "") or "").strip().lower()
 
-    if user_email not in admin_whitelist:
-        raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to the Sovereign Sanctuary Sentinel.")
+    is_whitelisted = bool(admin_whitelist and user_email in admin_whitelist)
+    is_superadmin = (getattr(current_user, "role", "user") == "superadmin")
 
-    if getattr(current_user, "role", "user") != "superadmin":
-        current_user.role = "superadmin"
-        try:
-            await db.commit()
-        except Exception:
-            pass
+    if not (is_whitelisted or is_superadmin):
+        raise ForbiddenException("Access Denied: You do not possess Sanctuary Sovereign privileges. Access strictly restricted to verified superadministrators.")
+
     return current_user

@@ -133,6 +133,7 @@ async def direct_media_upload(
 
 
 from pathlib import Path
+from uuid import UUID
 from fastapi.responses import FileResponse, Response
 import httpx
 
@@ -146,15 +147,35 @@ async def serve_voice_spark(user_id: str, filename: str):
     Serves voice spark audio snippets (.m4a / .mp4 / .wav).
     Supports local persistent disk cache with seamless Supabase Storage fallback.
     Returns audio with Accept-Ranges: bytes for smooth native Android/iOS streaming.
+    Enforces strict UUID validation and canonical Path.resolve boundary protection against path traversal.
     """
-    clean_user_id = user_id.strip()
-    clean_filename = Path(filename).name  # Prevent path traversal
-    local_file = VOICE_UPLOADS_DIR / clean_user_id / clean_filename
+    # 1. STRICT UUID VALIDATION: Reject any path traversal characters in user_id
+    try:
+        user_uuid = UUID(user_id.strip())
+        clean_user_id = str(user_uuid)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user identifier.")
 
-    # 1. Check local disk cache
-    if local_file.exists() and local_file.is_file() and local_file.stat().st_size > 0:
+    # 2. STRICT FILENAME SANITIZATION & EXTENSION CHECK:
+    clean_filename = Path(filename).name
+    allowed_extensions = {".m4a", ".mp4", ".wav"}
+    if not any(clean_filename.lower().endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid audio file extension.")
+
+    # 3. DIRECTORY TRAVERSAL BOUNDARY CHECK:
+    base_dir = VOICE_UPLOADS_DIR.resolve()
+    target_dir = (VOICE_UPLOADS_DIR / clean_user_id).resolve()
+    target_file = (target_dir / clean_filename).resolve()
+
+    try:
+        target_file.relative_to(base_dir)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    # 4. Check local disk cache
+    if target_file.exists() and target_file.is_file() and target_file.stat().st_size > 0:
         return FileResponse(
-            path=local_file,
+            path=target_file,
             media_type="audio/mp4",
             headers={
                 "Accept-Ranges": "bytes",
@@ -162,7 +183,7 @@ async def serve_voice_spark(user_id: str, filename: str):
             }
         )
 
-    # 2. Check Supabase Storage
+    # 5. Check Supabase Storage
     if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
         file_key = f"users/{clean_user_id}/voice/{clean_filename}"
         supabase_obj_url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.SUPABASE_STORAGE_BUCKET}/{file_key}"
@@ -174,8 +195,8 @@ async def serve_voice_spark(user_id: str, filename: str):
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.get(supabase_obj_url, headers=headers)
                 if res.status_code == 200 and len(res.content) > 50:
-                    local_file.parent.mkdir(parents=True, exist_ok=True)
-                    local_file.write_bytes(res.content)
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+                    target_file.write_bytes(res.content)
                     return Response(
                         content=res.content,
                         media_type="audio/mp4",

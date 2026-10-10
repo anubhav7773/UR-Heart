@@ -204,12 +204,8 @@ class _SanctuaryAppGatewayState extends State<SanctuaryAppGateway> {
                                  (prefs.getString('profile_bio')?.isNotEmpty ?? false) ||
                                  (prefs.getString('profile_photo_slot_1')?.isNotEmpty ?? false);
       final secureToken = await SecureSessionStorage.instance.getAuthToken();
-      final secureEmail = await SecureSessionStorage.instance.getUserEmail();
-      final hasAuth = (secureToken != null && secureToken.isNotEmpty) ||
-                      (secureEmail != null && secureEmail.isNotEmpty) ||
-                      (prefs.getString('ur_heart_auth_token')?.isNotEmpty ?? false) ||
-                      (prefs.getString('auth_token')?.isNotEmpty ?? false) ||
-                      (prefs.getString('ur_heart_user_email')?.isNotEmpty ?? false);
+      // Enforce cryptographic token presence: Email presence alone NEVER grants entry (FE-VULN-06)
+      final hasAuth = secureToken != null && secureToken.isNotEmpty;
       final isConsentGiven = (prefs.getBool('urheart_theme_permanently_locked') ?? false) ||
                              (prefs.getBool('ur_heart_theme_locked') ?? false) ||
                              (prefs.getBool('ur_heart_consent_given') ?? false);

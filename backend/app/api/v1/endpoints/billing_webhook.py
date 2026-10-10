@@ -1,8 +1,11 @@
 import os
 import hmac
 import hashlib
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 from uuid import UUID
 from fastapi import APIRouter, Request, HTTPException, status, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +22,7 @@ from app.schemas.billing_schemas import (
 
 router = APIRouter(prefix="/billing", tags=["Billing & Store Webhooks"])
 
-REVENUECAT_SECRET = os.getenv("REVENUECAT_WEBHOOK_SECRET", "rc_webhook_secret_sanctuary_2026")
+REVENUECAT_SECRET = os.getenv("REVENUECAT_WEBHOOK_SECRET", "")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "rzp_webhook_secret_sanctuary_2026")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "stripe_webhook_secret_sanctuary_2026")
 
@@ -336,9 +339,20 @@ async def audit_web_or_play_purchase(
     """
     Authenticated audit endpoint for Google Play, Razorpay India, and Stripe Global transactions.
     """
-    # Enforce shared server secret if authorization header provided
-    if authorization and authorization != f"Bearer {REVENUECAT_SECRET}":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid audit credentials.")
+    # MANDATORY CONSTANT-TIME AUTHENTICATION CHECK (SEC-01 / PAY-01):
+    # Requires shared server secret regardless of whether header is supplied
+    if not REVENUECAT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server audit webhook secret unconfigured."
+        )
+    expected_header = f"Bearer {REVENUECAT_SECRET}"
+    if not authorization or not hmac.compare_digest(authorization.strip(), expected_header):
+        logger.warning("Unauthorized access attempt to purchase audit endpoint.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing audit credentials."
+        )
 
     # 1. Idempotency Check
     existing = await db.execute(

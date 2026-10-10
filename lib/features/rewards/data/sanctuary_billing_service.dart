@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../../../core/network/dio_client.dart';
@@ -195,17 +195,20 @@ class SanctuaryBillingService {
   }
 
   Future<bool> purchasePackage(String productId) async {
-    _updateLocalTier(productId);
     try {
       final products = await fetchAvailableProducts();
       final match = products.firstWhere(
         (p) => p.id == productId,
         orElse: () => products.first,
       );
+      // REMOVED PRE-PAYMENT ELEVATION (SEC-08 / FE-VULN-07):
+      // Entitlements are updated exclusively via asynchronous purchaseStream listener
+      // upon successful server-side receipt validation.
       await initiateStorePurchase(match);
-      return true;
-    } catch (_) {
-      return true;
+      return true; // Indicates native store billing flow was initiated
+    } catch (e) {
+      debugPrint('[BILLING] Error initiating store purchase: $e');
+      return false; // Return false on initiation failure
     }
   }
 
@@ -218,8 +221,9 @@ class SanctuaryBillingService {
       );
       await initiateStorePurchase(match);
       return true;
-    } catch (_) {
-      return true;
+    } catch (e) {
+      debugPrint('[BILLING] Error initiating micro-pack purchase: $e');
+      return false; // Return false on initiation failure
     }
   }
 

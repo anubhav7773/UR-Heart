@@ -84,8 +84,8 @@ class SecureSessionStorage {
     bool? isProfileCompleted,
   }) async {
     final cleanEmail = email?.trim().toLowerCase();
-    final isSuper = (cleanEmail == 'asiverticals@gmail.com');
-    final effectiveRole = isSuper ? 'superadmin' : (role ?? 'user');
+    // REMOVED HARDCODED BACKDOOR: Rely strictly on server-minted role claim in verified JWT
+    final effectiveRole = (role != null && role.isNotEmpty) ? role : 'user';
 
     try {
       if (userId != null) await _secureStorage.write(key: keyUserId, value: userId);
@@ -112,7 +112,8 @@ class SecureSessionStorage {
         await prefs.setString(keyLegacyProfileEmail, cleanEmail ?? email);
         await prefs.setString('email', cleanEmail ?? email);
       }
-      await prefs.setString(keyUserRole, effectiveRole);
+      // Sensitive role must NEVER be written to plaintext SharedPreferences (FE-VULN-02)
+      await prefs.remove(keyUserRole);
       if (isProfileCompleted != null) {
         await prefs.setBool(keyProfileCompleted, isProfileCompleted);
       }
@@ -162,17 +163,15 @@ class SecureSessionStorage {
   /// Retrieves user role.
   Future<String?> getUserRole() async {
     try {
-      final email = await getUserEmail();
-      if (email != null && email.trim().toLowerCase() == 'asiverticals@gmail.com') {
-        return 'superadmin';
-      }
-
+      // REMOVED HARDCODED BACKDOOR: Rely strictly on server-minted role claim in verified JWT
       final role = await _secureStorage.read(key: keyUserRole);
       if (role != null && role.isNotEmpty) return role;
 
       final prefs = await SharedPreferences.getInstance();
       final legacyRole = prefs.getString(keyUserRole);
       if (legacyRole != null && legacyRole.isNotEmpty) {
+        await _secureStorage.write(key: keyUserRole, value: legacyRole);
+        await prefs.remove(keyUserRole);
         return legacyRole;
       }
     } catch (e) {

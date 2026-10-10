@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 from cryptography.exceptions import InvalidSignature
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.domain.user import User
@@ -27,6 +28,7 @@ from app.models.domain.match import Match
 from app.models.domain.whatsapp_token import WhatsAppRevealToken
 from app.services.streak_engine import StreakEngine
 
+settings = get_settings()
 router = APIRouter(prefix="/ads", tags=["Ad Server-Side Verification"])
 
 ADMOB_KEYS_URL = "https://gstatic.com/admob/reward/verifier-keys.json"
@@ -272,6 +274,28 @@ async def process_reward_callback(request: Request, db: AsyncSession = Depends(g
     return {"status": "success", "user_id": str(user_uuid), "granted_points": points_to_credit}
 
 
+AD_SSV_SERVER_SECRET = os.getenv("AD_SSV_SERVER_SECRET", "")
+
+
+def generate_ad_ssv_token(user_id: UUID, ad_type: str, network: str = "admob") -> str:
+    """
+    Generates a cryptographically signed Server-Side Verification (SSV) token
+    proving that an ad was verified by an authenticated ad network callback.
+    """
+    message = f"{user_id}:{ad_type}:{network}".encode("utf-8")
+    return hmac.new(AD_SSV_SERVER_SECRET.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def verify_ad_ssv_token(user_id: UUID, ad_type: str, network: str, token: str) -> bool:
+    """
+    Validates the cryptographic HMAC signature of an ad reward claim token (SEC-06 / PAY-03).
+    """
+    if not AD_SSV_SERVER_SECRET or not token or len(token) < 32:
+        return False
+    expected = generate_ad_ssv_token(user_id, ad_type, network)
+    return hmac.compare_digest(token.strip(), expected)
+
+
 _recent_user_claims: Dict[UUID, datetime] = {}
 
 
@@ -282,6 +306,7 @@ class ClaimAdRewardRequest(BaseModel):
     duration_seconds: Optional[int] = 10
     network: Optional[str] = "admob"
     rest_hours: Optional[float] = 0.0
+    ssv_token: Optional[str] = None
 
 
 @router.post("/claim-reward", status_code=status.HTTP_200_OK, summary="Claim Verified Ad Reward")
@@ -293,8 +318,24 @@ async def claim_ad_reward(
     """
     Credits ad reward points and swipes directly to authenticated public.users record in PostgreSQL.
     Supports dynamic ad duration tiers decided by provider RTB auction and anti-bot throttling.
+    Enforces server-side cryptographic SSV verification tokens (SEC-06 / PAY-03).
     """
     target_user = current_user
+
+    # Cryptographic SSV Token Verification (SEC-06 / PAY-03)
+    if payload.ssv_token:
+        if not verify_ad_ssv_token(target_user.id, payload.ad_type, payload.network or "admob", payload.ssv_token):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid cryptographic SSV verification token for ad reward claim."
+            )
+    else:
+        # In non-test production environments, client self-assertion without SSV token is strictly disabled
+        if not getattr(settings, "TESTING", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Direct client ad reward claiming without cryptographic SSV verification token is disabled. Rewards are credited via network SSV callbacks."
+            )
 
     # Anti-bot throttle: reject automated rapid-fire repeat scripts (< 2 seconds cooldown)
     now = datetime.now(timezone.utc)
